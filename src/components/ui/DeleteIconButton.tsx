@@ -1,12 +1,13 @@
 "use client";
 
 import React from "react";
+import { Tooltip } from "@/components/Tooltip";
 
 type DeleteIconButtonProps = {
   /** Invoked when the button is clicked. Click propagation is stopped first,
    *  so this is safe to use inside clickable rows. */
   onClick: () => void;
-  /** Tooltip text. */
+  /** Hover text. */
   title?: string;
   /** Accessible label. Defaults to the title. */
   ariaLabel?: string;
@@ -20,6 +21,12 @@ type DeleteIconButtonProps = {
  * Shared icon button for destructive delete actions. Renders a trash icon
  * that turns red on hover. Used across resource rows (tests, labelling items,
  * etc.) so the delete affordance stays consistent.
+ *
+ * The hover text is the app's own Tooltip, never the browser's `title`: the
+ * browser's box ignores every style here and never shows on a touch screen.
+ * While disabled it adds none of its own, because why a delete cannot be used
+ * is only known to the caller, which wraps the button in its own Tooltip to
+ * say so. Two would show at once otherwise.
  */
 export function DeleteIconButton({
   onClick,
@@ -28,16 +35,13 @@ export function DeleteIconButton({
   className = "",
   disabled = false,
 }: DeleteIconButtonProps) {
-  return (
+  const button = (
     <button
       type="button"
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
-      /* No browser tooltip while disabled: the caller wraps a disabled button
-         in the app's own Tooltip, and two would show at once. */
-      title={disabled ? undefined : title}
       aria-label={ariaLabel ?? title}
       disabled={disabled}
       className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground transition-colors ${
@@ -60,5 +64,11 @@ export function DeleteIconButton({
         />
       </svg>
     </button>
+  );
+  if (disabled) return button;
+  return (
+    <Tooltip content={title} position="top">
+      {button}
+    </Tooltip>
   );
 }

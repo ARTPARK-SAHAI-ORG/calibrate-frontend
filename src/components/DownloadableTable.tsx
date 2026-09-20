@@ -75,7 +75,6 @@ export function DownloadableTable({
         <button
           onClick={downloadCSV}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
-          title="Download as CSV"
         >
           <svg
             className="w-3.5 h-3.5"

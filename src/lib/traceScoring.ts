@@ -51,7 +51,7 @@ export function nothingCanScoreCopy(ineligible: { reason: string }[]): string {
 export function scoringRunErrorCopy(error: string | null | undefined): string {
   switch (error) {
     case "over_limit":
-      return "This workspace has scored as many traces as its limit allows";
+      return "This workspace has reached its limit for scoring traces";
     case "no_usable_evaluators":
       return "No evaluators could score this trace";
     case "scoring_disabled":

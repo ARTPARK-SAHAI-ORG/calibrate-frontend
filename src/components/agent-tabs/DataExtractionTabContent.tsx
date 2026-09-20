@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react";
 import { ParameterCard, Parameter } from "@/components/ParameterCard";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { NestedContainer } from "@/components/ui/NestedContainer";
+import { Tooltip } from "@/components/Tooltip";
 import { useHideFloatingButton } from "@/components/AppLayout";
 
 // Type alias for backward compatibility
@@ -728,34 +729,38 @@ export function DataExtractionTabContent({
               {/* Table Header */}
               <div className="grid grid-cols-[40px_80px_1fr_2fr_70px_auto] gap-4 px-4 py-2 border-b border-border bg-muted/30">
                 <div className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={toggleSelectAll}
-                    className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                      selectedFieldUuids.size === dataExtractionFields.length &&
-                      dataExtractionFields.length > 0
-                        ? "bg-foreground border-foreground"
-                        : "border-border hover:border-muted-foreground"
-                    }`}
-                    title="Select all"
-                  >
-                    {selectedFieldUuids.size === dataExtractionFields.length &&
-                      dataExtractionFields.length > 0 && (
-                        <svg
-                          className="w-3 h-3 text-background"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={3}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M4.5 12.75l6 6 9-13.5"
-                          />
-                        </svg>
-                      )}
-                  </button>
+                  <Tooltip content="Select all" position="top">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAll}
+                      className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
+                        selectedFieldUuids.size ===
+                          dataExtractionFields.length &&
+                        dataExtractionFields.length > 0
+                          ? "bg-foreground border-foreground"
+                          : "border-border hover:border-muted-foreground"
+                      }`}
+                      aria-label="Select all"
+                    >
+                      {selectedFieldUuids.size ===
+                        dataExtractionFields.length &&
+                        dataExtractionFields.length > 0 && (
+                          <svg
+                            className="w-3 h-3 text-background"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={3}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M4.5 12.75l6 6 9-13.5"
+                            />
+                          </svg>
+                        )}
+                    </button>
+                  </Tooltip>
                 </div>
                 <div className="text-sm font-medium text-muted-foreground">
                   Type
@@ -780,35 +785,37 @@ export function DataExtractionTabContent({
                 >
                   {/* Checkbox Column */}
                   <div className="flex items-center">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFieldSelection(field.uuid);
-                      }}
-                      className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                        selectedFieldUuids.has(field.uuid)
-                          ? "bg-foreground border-foreground"
-                          : "border-border hover:border-muted-foreground"
-                      }`}
-                      title="Select field"
-                    >
-                      {selectedFieldUuids.has(field.uuid) && (
-                        <svg
-                          className="w-3 h-3 text-background"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={3}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M4.5 12.75l6 6 9-13.5"
-                          />
-                        </svg>
-                      )}
-                    </button>
+                    <Tooltip content="Select field" position="top">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFieldSelection(field.uuid);
+                        }}
+                        className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
+                          selectedFieldUuids.has(field.uuid)
+                            ? "bg-foreground border-foreground"
+                            : "border-border hover:border-muted-foreground"
+                        }`}
+                        aria-label="Select field"
+                      >
+                        {selectedFieldUuids.has(field.uuid) && (
+                          <svg
+                            className="w-3 h-3 text-background"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={3}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M4.5 12.75l6 6 9-13.5"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    </Tooltip>
                   </div>
                   {/* Type Column */}
                   <div className="flex items-center">
@@ -836,28 +843,30 @@ export function DataExtractionTabContent({
                   </div>
                   {/* Delete Button */}
                   <div className="flex items-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openDeleteDialog(field);
-                      }}
-                      className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                      title="Delete field"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
+                    <Tooltip content="Delete field" position="top">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteDialog(field);
+                        }}
+                        className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                        aria-label="Delete field"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                        />
-                      </svg>
-                    </button>
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                          />
+                        </svg>
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
               ))}
@@ -919,28 +928,34 @@ export function DataExtractionTabContent({
                         )}
                       </div>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openDeleteDialog(field);
-                      }}
-                      className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                      title="Delete field"
+                    <Tooltip
+                      content="Delete field"
+                      position="top"
+                      className="flex-shrink-0"
                     >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteDialog(field);
+                        }}
+                        className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                        aria-label="Delete field"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                        />
-                      </svg>
-                    </button>
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                          />
+                        </svg>
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
               ))}

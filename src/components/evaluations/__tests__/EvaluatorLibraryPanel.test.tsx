@@ -99,6 +99,14 @@ test("lists only the evaluators of this kind", async () => {
     "href",
     "/evaluators/ev-1",
   );
+  // View and Delete already say what they do, so neither repeats itself in a
+  // hover popup.
+  expect(screen.getByRole("link", { name: "View" })).not.toHaveAttribute(
+    "title",
+  );
+  expect(screen.getByRole("button", { name: "Delete" })).not.toHaveAttribute(
+    "title",
+  );
 });
 
 test("shows the empty state with a create action when there are none", async () => {

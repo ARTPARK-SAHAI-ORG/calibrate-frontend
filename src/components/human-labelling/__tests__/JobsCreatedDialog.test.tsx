@@ -87,6 +87,15 @@ describe("JobsCreatedDialog", () => {
     const link = screen.getByLabelText("Open Alice's job in a new tab");
     expect(link).toHaveAttribute("href", expect.stringContaining("/annotate-job/tok1"));
     expect(link).toHaveAttribute("target", "_blank");
+    expect(link).not.toHaveAttribute("title");
+  });
+
+  it("says on hover that the link opens in a new tab", async () => {
+    const user = setupUser();
+    render(<JobsCreatedDialog isOpen jobs={jobs} onClose={jest.fn()} />);
+
+    await user.hover(screen.getByLabelText("Open Alice's job in a new tab"));
+    expect(await screen.findByText("Open in new tab")).toBeInTheDocument();
   });
 
   it("calls onClose from the header close button, the Done button, and the backdrop, but not the panel", async () => {

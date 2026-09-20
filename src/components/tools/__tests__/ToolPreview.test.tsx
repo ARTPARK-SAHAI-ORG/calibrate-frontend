@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import { ToolPreview } from "../ToolPreview";
 import type { ToolData } from "@/components/AddToolDialog";
 
@@ -115,5 +115,39 @@ describe("ToolPreview", () => {
     render(<ToolPreview tool={legacyTool} />);
     expect(screen.getByText("Structured Output")).toBeInTheDocument();
     expect(screen.getByText("From config")).toBeInTheDocument();
+  });
+
+  it("names the edit and delete buttons and shows their hover text in the app's own tooltip", async () => {
+    const user = setupUser();
+    render(
+      <ToolPreview
+        tool={structuredTool}
+        onEdit={jest.fn()}
+        onDelete={jest.fn()}
+      />,
+    );
+
+    const edit = screen.getByRole("button", { name: "Edit tool" });
+    const del = screen.getByRole("button", { name: "Delete tool" });
+    expect(edit).not.toHaveAttribute("title");
+    expect(del).not.toHaveAttribute("title");
+
+    await user.hover(edit);
+    expect(await screen.findAllByText("Edit tool")).not.toHaveLength(0);
+  });
+
+  it("calls back when the edit and delete buttons are clicked", async () => {
+    const user = setupUser();
+    const onEdit = jest.fn();
+    const onDelete = jest.fn();
+    render(
+      <ToolPreview tool={structuredTool} onEdit={onEdit} onDelete={onDelete} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Edit tool" }));
+    expect(onEdit).toHaveBeenCalledWith(structuredTool);
+
+    await user.click(screen.getByRole("button", { name: "Delete tool" }));
+    expect(onDelete).toHaveBeenCalledWith(structuredTool);
   });
 });

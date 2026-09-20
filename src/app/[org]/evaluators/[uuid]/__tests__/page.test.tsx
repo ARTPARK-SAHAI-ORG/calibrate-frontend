@@ -221,7 +221,7 @@ describe("evaluator page header actions", () => {
     const user = setupUser();
     render(<EvaluatorDetailPage />);
 
-    await user.click(await screen.findByTitle("Edit name and description"));
+    await user.click(await screen.findByLabelText("Edit name and description"));
 
     expect(
       screen.getByRole("heading", { name: "Edit evaluator" }),
@@ -255,7 +255,7 @@ describe("evaluator page header actions", () => {
     const user = setupUser();
     render(<EvaluatorDetailPage />);
 
-    await user.click(await screen.findByTitle("Delete evaluator"));
+    await user.click(await screen.findByLabelText("Delete evaluator"));
     expect(
       screen.getByRole("heading", { name: "Delete evaluator" }),
     ).toBeInTheDocument();
@@ -280,7 +280,7 @@ describe("evaluator page header actions", () => {
     const user = setupUser();
     render(<EvaluatorDetailPage />);
 
-    await user.click(await screen.findByTitle("Delete evaluator"));
+    await user.click(await screen.findByLabelText("Delete evaluator"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(deleteEvaluator).toHaveBeenCalled());
@@ -328,7 +328,7 @@ describe("the versions and the one on screen", () => {
     render(<EvaluatorDetailPage />);
 
     // v2 is not the current version, so its prompt is not on screen yet.
-    await user.click(await screen.findByTitle("Edit, starting from v2"));
+    await user.click(await screen.findByLabelText("Edit, starting from v2"));
 
     // The form is seeded from v2, not from the current version.
     expect(
@@ -341,7 +341,7 @@ describe("the versions and the one on screen", () => {
     render(<EvaluatorDetailPage />);
 
     // Only the version that is not current offers this.
-    const markButtons = await screen.findAllByTitle("Mark as current");
+    const markButtons = await screen.findAllByLabelText("Mark as current");
     expect(markButtons).toHaveLength(1);
 
     await user.click(markButtons[0]);
@@ -371,9 +371,9 @@ describe("deleting a version", () => {
   it("offers the bin only on versions that are not the current one", async () => {
     render(<EvaluatorDetailPage />);
 
-    const bins = await screen.findAllByTitle(/^Delete v/);
+    const bins = await screen.findAllByLabelText(/^Delete v/);
     expect(bins).toHaveLength(1);
-    expect(bins[0]).toHaveAttribute("title", "Delete v2");
+    expect(bins[0]).toHaveAttribute("aria-label", "Delete v2");
   });
 
   it("deletes the version and takes it off the list", async () => {
@@ -381,7 +381,7 @@ describe("deleting a version", () => {
     deleteEvaluatorVersion.mockResolvedValue(undefined);
     render(<EvaluatorDetailPage />);
 
-    await user.click(await screen.findByTitle("Delete v2"));
+    await user.click(await screen.findByLabelText("Delete v2"));
     await user.click(await screen.findByRole("button", { name: "Delete" }));
 
     await waitFor(() =>
@@ -392,7 +392,7 @@ describe("deleting a version", () => {
       ),
     );
     await waitFor(() =>
-      expect(screen.queryByTitle("Delete v2")).not.toBeInTheDocument(),
+      expect(screen.queryByLabelText("Delete v2")).not.toBeInTheDocument(),
     );
     // The details fall back to the current version.
     expect(screen.getByText("Grade the reply")).toBeInTheDocument();
@@ -407,7 +407,7 @@ describe("deleting a version", () => {
     );
     render(<EvaluatorDetailPage />);
 
-    await user.click(await screen.findByTitle("Delete v2"));
+    await user.click(await screen.findByLabelText("Delete v2"));
     await user.click(await screen.findByRole("button", { name: "Delete" }));
 
     await waitFor(() =>
@@ -415,7 +415,7 @@ describe("deleting a version", () => {
         "Cannot delete the live version. Set another version live first.",
       ),
     );
-    expect(screen.getByTitle("Delete v2")).toBeInTheDocument();
+    expect(screen.getByLabelText("Delete v2")).toBeInTheDocument();
   });
 });
 
@@ -440,7 +440,7 @@ describe("deleting with nowhere to go back to", () => {
     const user = setupUser();
     render(<EvaluatorDetailPage />);
 
-    await user.click(await screen.findByTitle("Delete evaluator"));
+    await user.click(await screen.findByLabelText("Delete evaluator"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/agents"));

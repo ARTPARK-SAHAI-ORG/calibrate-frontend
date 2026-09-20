@@ -23,6 +23,9 @@ import type { EvaluatorRefPayload } from "@/components/AddTestDialog";
 import type { AvailableTool } from "@/components/ToolPicker";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { parseJsonLenient } from "@/lib/jsonSanitize";
+import { Tooltip } from "@/components/Tooltip";
+import { ClippedText } from "@/components/ui";
+
 
 // Inline link styling for the in-modal helper text. Tuned to read as a link
 // inside small muted body copy without shouting — `text-foreground` plus a
@@ -30,6 +33,11 @@ import { parseJsonLenient } from "@/lib/jsonSanitize";
 // stay visually consistent.
 const HELPER_LINK_CLASS =
   "text-foreground underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/60 transition-colors";
+
+// Shown on a tool name the workspace does not have, on hover and to a screen
+// reader.
+const UNKNOWN_TOOL_HINT =
+  "This tool isn't on the platform — add it under Tools before running this test";
 
 type TestType = "response" | "tool_call" | "conversation";
 
@@ -1353,25 +1361,28 @@ export function BulkUploadTestsModal({
                     {toolName || "(missing tool name)"}
                   </code>
                 ) : (
-                  <span
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono bg-red-500/10 text-red-600 border border-red-500/30"
-                    title="This tool isn't on the platform — add it under Tools before running this test"
-                  >
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                      />
-                    </svg>
-                    {toolName || "(missing tool name)"}
-                  </span>
+                  <Tooltip content={UNKNOWN_TOOL_HINT}>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono bg-red-500/10 text-red-600 border border-red-500/30">
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                        />
+                      </svg>
+                      {toolName || "(missing tool name)"}
+                      {/* The hover text is a mouse thing; this keeps the same
+                          warning for a screen reader, which used to read it
+                          out of the browser's own hover text. */}
+                      <span className="sr-only">{UNKNOWN_TOOL_HINT}</span>
+                    </span>
+                  </Tooltip>
                 )}
                 {!isCalled && (
                   <span className="text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 bg-red-500/10 text-red-600 font-medium">
@@ -1766,13 +1777,11 @@ export function BulkUploadTestsModal({
                               Evaluators
                             </div>
                             {variableColumns.map((c) => (
-                              <div
+                              <ClippedText
                                 key={`h-${c.evaluatorUuid}-${c.varName}`}
-                                className="text-xs font-medium text-muted-foreground font-mono truncate"
-                                title={c.header}
-                              >
-                                {c.header}
-                              </div>
+                                text={c.header}
+                                className="block truncate text-xs font-medium text-muted-foreground font-mono"
+                              />
                             ))}
                           </div>
                           <div className="divide-y divide-border">
@@ -1814,12 +1823,10 @@ export function BulkUploadTestsModal({
                                   className="grid gap-3 px-4 py-2 text-xs items-start"
                                   style={gridStyle}
                                 >
-                                  <div
-                                    className="truncate text-foreground"
-                                    title={test.name}
-                                  >
-                                    {test.name}
-                                  </div>
+                                  <ClippedText
+                                    text={test.name}
+                                    className="block truncate text-foreground"
+                                  />
                                   <div className="min-w-0">
                                     {usesPlainInput ? (
                                       <span className="line-clamp-3 break-words">
@@ -1832,13 +1839,11 @@ export function BulkUploadTestsModal({
                                   <div className="min-w-0 flex flex-wrap gap-1 content-start">
                                     {attachedNames.length > 0 ? (
                                       attachedNames.map((name, i) => (
-                                        <span
+                                        <ClippedText
                                           key={`${idx}-ev-${i}`}
-                                          className="px-1.5 py-0.5 rounded bg-foreground/10 text-foreground text-[11px] truncate max-w-full"
-                                          title={name}
-                                        >
-                                          {name}
-                                        </span>
+                                          text={name}
+                                          className="block truncate px-1.5 py-0.5 rounded bg-foreground/10 text-foreground text-[11px] max-w-full"
+                                        />
                                       ))
                                     ) : (
                                       <span className="text-muted-foreground italic">
@@ -1855,10 +1860,13 @@ export function BulkUploadTestsModal({
                                         `${c.evaluatorUuid}/${c.varName}`,
                                       ) ?? "";
                                     return (
-                                      <div
+                                      <ClippedText
                                         key={`${idx}-${c.evaluatorUuid}-${c.varName}`}
-                                        title={attached ? value : undefined}
-                                        className="min-w-0 pr-1 leading-snug text-foreground break-words line-clamp-4"
+                                        // Only the value itself is worth
+                                        // showing on hover: "(excluded)" and
+                                        // "(empty)" are already whole.
+                                        text={attached ? value : ""}
+                                        className="block min-w-0 pr-1 leading-snug text-foreground break-words line-clamp-4"
                                       >
                                         {!attached ? (
                                           <span className="text-muted-foreground italic">
@@ -1871,7 +1879,7 @@ export function BulkUploadTestsModal({
                                             (empty)
                                           </span>
                                         )}
-                                      </div>
+                                      </ClippedText>
                                     );
                                   })}
                                 </div>

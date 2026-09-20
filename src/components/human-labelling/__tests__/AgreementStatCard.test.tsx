@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, setupUser } from "@/test-utils";
+import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { AgreementStatCard, agreementColor } from "../AgreementStatCard";
 import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
 
@@ -28,6 +28,21 @@ beforeAll(() => {
 });
 
 const mockFetch = fetchEvaluatorDetail as jest.Mock;
+
+// jsdom has no layout, so a name cut off by its box is described directly by
+// standing in for the two widths the card compares.
+function mockWidths(scroll: number, client: number) {
+  const scrollWidth = jest
+    .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+    .mockReturnValue(scroll);
+  const clientWidth = jest
+    .spyOn(HTMLElement.prototype, "clientWidth", "get")
+    .mockReturnValue(client);
+  return () => {
+    scrollWidth.mockRestore();
+    clientWidth.mockRestore();
+  };
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -74,12 +89,33 @@ describe("agreementColor", () => {
 
 describe("AgreementStatCard", () => {
   it("renders the static pill variant", () => {
-    render(
-      <AgreementStatCard staticPillText="Overall" value="82%" />
-    );
+    render(<AgreementStatCard staticPillText="Overall" value="82%" />);
     expect(screen.getByText("Overall")).toBeInTheDocument();
-    expect(screen.getByTitle("Overall")).toBeInTheDocument();
+    expect(screen.getByText("Overall")).not.toHaveAttribute("title");
     expect(screen.getByText("82%")).toBeInTheDocument();
+  });
+
+  it("does not repeat the pill's text when the card shows it in full", async () => {
+    const user = setupUser();
+    render(<AgreementStatCard staticPillText="Overall" value="82%" />);
+
+    await user.hover(screen.getByText("Overall"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Still only the pill itself, no popup saying the same thing again.
+    expect(screen.getAllByText("Overall")).toHaveLength(1);
+  });
+
+  it("shows the whole of the pill's text when the card has cut it off", async () => {
+    const user = setupUser();
+    const restore = mockWidths(300, 80);
+    const name = "A very long evaluator name indeed";
+    render(<AgreementStatCard staticPillText={name} value="82%" />);
+
+    await user.hover(screen.getByText(name));
+    await waitFor(() =>
+      expect(screen.getAllByText(name).length).toBeGreaterThan(1),
+    );
+    restore();
   });
 
   it("applies a custom valueClassName in the static pill variant", () => {
@@ -105,10 +141,62 @@ describe("AgreementStatCard", () => {
       />
     );
     const button = screen.getByRole("button", { name: /Correctness/ });
-    expect(button).toHaveAttribute("title", "Open Correctness");
+    expect(button).not.toHaveAttribute("title");
     expect(screen.getByText("v2")).toBeInTheDocument();
     expect(screen.getByText("alignment")).toBeInTheDocument();
     expect(screen.getByText("90%")).toBeInTheDocument();
+  });
+
+  it("says on hover that the pill opens the evaluator", async () => {
+    const user = setupUser();
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
+        value="90%"
+      />,
+    );
+
+    await user.hover(screen.getByRole("button", { name: /Correctness/ }));
+    expect(await screen.findByText("Open Correctness")).toBeInTheDocument();
+  });
+
+  it("says on hover how many items the score counts", async () => {
+    const user = setupUser();
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
+        value="90%"
+        result={{
+          label: "Correct",
+          value: "75%",
+          title: "3 of 4 items",
+          ratio: 0.75,
+        }}
+      />,
+    );
+
+    await user.hover(screen.getByText("Correct"));
+    expect(await screen.findByText("3 of 4 items")).toBeInTheDocument();
+  });
+
+  it("says on hover how many items the score counts when it is the only number", async () => {
+    const user = setupUser();
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
+        value={null}
+        result={{
+          label: "Score",
+          value: "75%",
+          title: "3 of 4 items",
+          ratio: 0.75,
+        }}
+        showResultLabel={false}
+      />,
+    );
+
+    await user.hover(screen.getByText("75%"));
+    expect(await screen.findByText("3 of 4 items")).toBeInTheDocument();
   });
 
   it("opens the evaluator preview modal when the pill is clicked", async () => {
@@ -144,9 +232,10 @@ describe("AgreementStatCard", () => {
         }}
       />
     );
-    const stat = screen.getByTitle("3 of 4 items");
+    const stat = screen.getByText("Correct").parentElement!;
     expect(stat).toHaveTextContent("Correct");
     expect(stat).toHaveTextContent("75%");
+    expect(stat).not.toHaveAttribute("title");
     // Coloured on the same thresholds as the agreement number.
     expect(screen.getByText("75%").className).toContain("text-green-600");
     expect(screen.getByText("Human agreement")).toBeInTheDocument();
@@ -169,7 +258,7 @@ describe("AgreementStatCard", () => {
       />
     );
     const number = screen.getByText("75%");
-    expect(screen.getByTitle("3 of 4 items")).toContainElement(number);
+    expect(number).not.toHaveAttribute("title");
     expect(number.className).toContain("text-green-600");
     // The score keeps its own label, exactly as it has when the agreement
     // number sits next to it. Only the agreement number is left out.
@@ -196,7 +285,7 @@ describe("AgreementStatCard", () => {
     const number = screen.getByText("75%");
     expect(number.className).toContain("text-green-600");
     expect(number.className).not.toContain("text-center");
-    expect(number).toHaveAttribute("title", "3 of 4 items");
+    expect(number).not.toHaveAttribute("title");
     expect(screen.queryByText("Score")).not.toBeInTheDocument();
     expect(screen.queryByText("alignment")).not.toBeInTheDocument();
   });

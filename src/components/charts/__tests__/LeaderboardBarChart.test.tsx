@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent } from "@/test-utils";
+import { render, screen, fireEvent, setupUser } from "@/test-utils";
 import {
   LeaderboardBarChart,
   pastelColors,
@@ -79,6 +79,15 @@ describe("LeaderboardBarChart", () => {
     expect(
       screen.getByRole("button", { name: /PNG/ })
     ).toBeInTheDocument();
+  });
+
+  it("says what the download button does in the app's own hover text", async () => {
+    const user = setupUser();
+    render(<LeaderboardBarChart title="My Chart" data={sampleData} />);
+    const button = screen.getByRole("button", { name: /PNG/ });
+    expect(button).not.toHaveAttribute("title");
+    await user.hover(button);
+    expect(await screen.findByText("Download as PNG")).toBeInTheDocument();
   });
 
   it("renders with a provided colorMap and custom yDomain/formatters", () => {

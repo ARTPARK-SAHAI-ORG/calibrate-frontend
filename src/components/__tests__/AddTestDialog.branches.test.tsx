@@ -648,7 +648,7 @@ describe("AddTestDialog — additional branch coverage", () => {
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
 
-      await user.click(screen.getByTitle("Add message"));
+      await user.click(screen.getByLabelText("Add message"));
       await user.click(screen.getByText("Agent tool call"));
       await waitFor(() =>
         expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
@@ -670,7 +670,7 @@ describe("AddTestDialog — additional branch coverage", () => {
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
 
-      await user.click(screen.getByTitle("Add message"));
+      await user.click(screen.getByLabelText("Add message"));
       await user.click(screen.getByText("Agent tool call"));
       await waitFor(() =>
         expect(screen.getByText("Pick weather_webhook")).toBeInTheDocument(),
@@ -690,7 +690,7 @@ describe("AddTestDialog — additional branch coverage", () => {
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
 
-      await user.click(screen.getByTitle("Add message"));
+      await user.click(screen.getByLabelText("Add message"));
       await user.click(screen.getByText("Agent tool call"));
       await waitFor(() =>
         expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
@@ -700,8 +700,38 @@ describe("AddTestDialog — additional branch coverage", () => {
 
       // The tool-call is the last non-tool-response, so its action-row delete
       // is the last "Remove message" button in the DOM.
-      const removeButtons = screen.getAllByTitle("Remove message");
+      const removeButtons = screen.getAllByLabelText("Remove message");
       await user.click(removeButtons[removeButtons.length - 1]);
+
+      expect(screen.queryByText("Agent Tool Call")).not.toBeInTheDocument();
+      expect(screen.queryByText("Tool Response")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("chat: removing an earlier tool-call message", () => {
+    it("removes the tool call and its response from the button beside the card", async () => {
+      const user = setupUser();
+      global.fetch = mockFetchImpl([WEATHER_TOOL]) as typeof fetch;
+      render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByLabelText("Add message"));
+      await user.click(screen.getByText("Agent tool call"));
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Pick get_weather"));
+      expect(screen.getByText("Agent Tool Call")).toBeInTheDocument();
+
+      // A message after it leaves the tool call with the button beside its
+      // card rather than the row of actions the last message gets.
+      await user.click(screen.getByLabelText("Add message"));
+      await user.click(screen.getByText("User message"));
+
+      const removeButtons = screen.getAllByLabelText("Remove message");
+      await user.click(removeButtons[removeButtons.length - 2]);
 
       expect(screen.queryByText("Agent Tool Call")).not.toBeInTheDocument();
       expect(screen.queryByText("Tool Response")).not.toBeInTheDocument();

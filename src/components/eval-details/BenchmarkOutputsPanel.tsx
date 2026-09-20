@@ -16,6 +16,7 @@ import {
   type PagerNav,
 } from "@/components/test-results/shared";
 import { SearchInput } from "@/components/ui/SearchInput";
+import { Tooltip } from "@/components/Tooltip";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
@@ -788,6 +789,7 @@ function ModelSection({
   const modelAllSelected =
     modelLabellingKeys.length > 0 &&
     modelLabellingKeys.every((key) => labellingSelection?.has(key));
+  const modelSelectAllLabel = `${modelAllSelected ? "Deselect" : "Select"} all ${formatModelName(modelResult.model)} tests`;
 
   return (
     <div className="border-b border-border">
@@ -849,18 +851,20 @@ function ModelSection({
         {showLabellingCheckboxes &&
           onLabellingBulkToggle &&
           modelLabellingKeys.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onLabellingBulkToggle(modelLabellingKeys)}
-              title={
-                modelAllSelected
-                  ? `Deselect all ${formatModelName(modelResult.model)} tests`
-                  : `Select all ${formatModelName(modelResult.model)} tests`
-              }
-              className="hidden md:block px-3 py-3 shrink-0 cursor-pointer"
+            <Tooltip
+              content={modelSelectAllLabel}
+              position="top"
+              className="hidden md:block shrink-0"
             >
-              <LabellingRowCheckbox checked={modelAllSelected} />
-            </button>
+              <button
+                type="button"
+                onClick={() => onLabellingBulkToggle(modelLabellingKeys)}
+                aria-label={modelSelectAllLabel}
+                className="px-3 py-3 cursor-pointer"
+              >
+                <LabellingRowCheckbox checked={modelAllSelected} />
+              </button>
+            </Tooltip>
           )}
       </div>
 
@@ -936,20 +940,27 @@ function ModelSection({
                         {showLabellingCheckboxes &&
                           onToggleLabellingSelection &&
                           (labellingEligible ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onToggleLabellingSelection(labellingKey)
-                              }
-                              title="Select for labelling"
-                              className="hidden md:block cursor-pointer shrink-0"
+                            <Tooltip
+                              content="Select for labelling"
+                              position="top"
+                              className="hidden md:block shrink-0"
                             >
-                              <LabellingRowCheckbox
-                                checked={
-                                  labellingSelection?.has(labellingKey) ?? false
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onToggleLabellingSelection(labellingKey)
                                 }
-                              />
-                            </button>
+                                aria-label="Select for labelling"
+                                className="cursor-pointer"
+                              >
+                                <LabellingRowCheckbox
+                                  checked={
+                                    labellingSelection?.has(labellingKey) ??
+                                    false
+                                  }
+                                />
+                              </button>
+                            </Tooltip>
                           ) : (
                             // Keeps every row's name starting at the same place
                             // when only some of the tests are tickable.

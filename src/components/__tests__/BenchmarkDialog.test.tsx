@@ -229,7 +229,9 @@ describe("BenchmarkDialog", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText("Select a model")).toHaveLength(1);
     expect(screen.queryByText("Add model")).not.toBeInTheDocument();
-    expect(screen.queryByTitle("Remove model")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Remove model" }),
+    ).not.toBeInTheDocument();
   });
 
   it("counts every linked test in the subtitle when no tests are picked", () => {
@@ -284,14 +286,32 @@ describe("BenchmarkDialog", () => {
     for (const [i, id] of ids.entries()) {
       // Always exactly one blank row, and one remove button per chosen row.
       expect(screen.getAllByText("Select a model")).toHaveLength(1);
-      expect(screen.queryAllByTitle("Remove model")).toHaveLength(i);
+      expect(
+        screen.queryAllByRole("button", { name: "Remove model" }),
+      ).toHaveLength(i);
       await user.click(screen.getByText("Select a model"));
       await user.click(screen.getByText(`select-${id}`));
     }
 
     // Five chosen: no blank row left.
     expect(screen.queryByText("Select a model")).not.toBeInTheDocument();
-    expect(screen.getAllByTitle("Remove model")).toHaveLength(5);
+    expect(
+      screen.getAllByRole("button", { name: "Remove model" }),
+    ).toHaveLength(5);
+  });
+
+  it("names the remove button in the app's own hover text, not the browser's", async () => {
+    const user = setupUser();
+    render(<BenchmarkDialog {...baseProps()} />);
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+
+    const remove = screen.getByRole("button", { name: "Remove model" });
+    expect(remove).not.toHaveAttribute("title");
+
+    await user.hover(remove);
+    expect(await screen.findByText("Remove model")).toBeInTheDocument();
   });
 
   it("removes a chosen row, keeping the others and the blank row", async () => {
@@ -304,13 +324,19 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("select-openai/gpt-4o-mini"));
 
     // row0 = GPT-4o, row1 = GPT-4o mini, row2 = blank
-    expect(screen.getAllByTitle("Remove model")).toHaveLength(2);
-    await user.click(screen.getAllByTitle("Remove model")[0]);
+    expect(
+      screen.getAllByRole("button", { name: "Remove model" }),
+    ).toHaveLength(2);
+    await user.click(
+      screen.getAllByRole("button", { name: "Remove model" })[0],
+    );
 
     expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
     expect(screen.getByText("GPT-4o mini")).toBeInTheDocument();
     expect(screen.getAllByText("Select a model")).toHaveLength(1);
-    expect(screen.getAllByTitle("Remove model")).toHaveLength(1);
+    expect(
+      screen.getAllByRole("button", { name: "Remove model" }),
+    ).toHaveLength(1);
   });
 
   it("excludes already-selected models from other rows but keeps the current row's own selection available", async () => {
@@ -1085,7 +1111,9 @@ describe("BenchmarkDialog", () => {
 
       expect(await screen.findByText("GPT-4o")).toBeInTheDocument();
       expect(screen.getByText("Claude 3 Haiku")).toBeInTheDocument();
-      expect(screen.getAllByTitle("Remove model")).toHaveLength(2);
+      expect(
+      screen.getAllByRole("button", { name: "Remove model" }),
+    ).toHaveLength(2);
       expect(screen.getAllByText("Select a model")).toHaveLength(1);
     });
 
@@ -1101,7 +1129,9 @@ describe("BenchmarkDialog", () => {
 
       expect(await screen.findByText("openai/gpt-retired")).toBeInTheDocument();
       expect(screen.getByText("GPT-4o")).toBeInTheDocument();
-      expect(screen.getAllByTitle("Remove model")).toHaveLength(2);
+      expect(
+      screen.getAllByRole("button", { name: "Remove model" }),
+    ).toHaveLength(2);
     });
 
     it("ignores a repeated model and stops at five", async () => {
@@ -1124,7 +1154,9 @@ describe("BenchmarkDialog", () => {
 
       await screen.findByText("GPT-4o");
       // Five rows, so no blank row is left to pick a sixth in.
-      expect(screen.getAllByTitle("Remove model")).toHaveLength(5);
+      expect(
+      screen.getAllByRole("button", { name: "Remove model" }),
+    ).toHaveLength(5);
       expect(screen.queryByText("Select a model")).not.toBeInTheDocument();
       expect(screen.queryByText("openai/gpt-retired")).not.toBeInTheDocument();
     });
@@ -1141,7 +1173,7 @@ describe("BenchmarkDialog", () => {
       );
       await screen.findByText("GPT-4o");
 
-      await user.click(screen.getByTitle("Remove model"));
+      await user.click(screen.getByRole("button", { name: "Remove model" }));
       expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
 
       // A new array of the same ids, the way a parent re-rendering passes it.
@@ -1154,7 +1186,9 @@ describe("BenchmarkDialog", () => {
         />,
       );
       expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
-      expect(screen.queryByTitle("Remove model")).not.toBeInTheDocument();
+      expect(
+      screen.queryByRole("button", { name: "Remove model" }),
+    ).not.toBeInTheDocument();
     });
 
     it("runs the comparison on the models it opened with", async () => {

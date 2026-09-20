@@ -40,6 +40,23 @@ describe("ExportZipButton", () => {
     expect(screen.getByRole("button", { name: "Export results" })).toBeInTheDocument();
   });
 
+  it("says which kind of file it makes, in the app's own hover text", async () => {
+    const user = setupUser();
+    render(
+      <ExportZipButton
+        filename="f"
+        getContents={() => ({ csv: { columns: [], rows: [] }, files: [] })}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "Export results" });
+    expect(button).not.toHaveAttribute("title");
+
+    await user.hover(button);
+    await waitFor(() =>
+      expect(screen.getByText("Export results as a zip")).toBeInTheDocument(),
+    );
+  });
+
   it("renders a custom label and is disabled via prop", () => {
     render(
       <ExportZipButton

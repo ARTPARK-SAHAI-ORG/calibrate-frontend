@@ -745,22 +745,15 @@ function EvaluatorRunsList({
                 : null,
           };
         });
-        const evaluatorTitle = runEvaluators
-          .map((e) => {
-            const name = e.name || e.evaluator_id.slice(0, 8);
-            return e.version_label ? `${name} (${e.version_label})` : name;
-          })
-          .join(", ");
         return (
           <div
             key={run.uuid}
             onClick={() => onOpen(run.uuid)}
             className="grid grid-cols-[minmax(0,1.5fr)_100px_140px_minmax(0,1fr)_60px] gap-4 px-4 py-3 border-b border-border last:border-b-0 items-center hover:bg-muted/20 transition-colors cursor-pointer"
           >
-            <div
-              className="flex flex-wrap gap-1.5 min-w-0"
-              title={evaluatorTitle}
-            >
+            {/* The pills wrap onto as many lines as they need, so every name
+                and version is already readable: nothing to put on hover. */}
+            <div className="flex flex-wrap gap-1.5 min-w-0">
               {runEvaluators.length === 0 ? (
                 <span className="text-sm text-muted-foreground">—</span>
               ) : (
@@ -799,30 +792,31 @@ function EvaluatorRunsList({
             </div>
             <div className="flex justify-end">
               {(run.status === "completed" || run.status === "failed") && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRequestDelete(run.uuid);
-                  }}
-                  aria-label="Delete run"
-                  title="Delete run"
-                  className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+                <Tooltip content="Delete run" position="top">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRequestDelete(run.uuid);
+                    }}
+                    aria-label="Delete run"
+                    className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                      />
+                    </svg>
+                  </button>
+                </Tooltip>
               )}
             </div>
           </div>
@@ -1112,30 +1106,31 @@ function JobsList({
               {job.completed_item_count} / {job.item_count}
             </div>
             <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRequestDelete(job.uuid);
-                }}
-                aria-label="Delete job"
-                title="Delete job"
-                className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors cursor-pointer"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
+              <Tooltip content="Delete job" position="top">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRequestDelete(job.uuid);
+                  }}
+                  aria-label="Delete job"
+                  className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors cursor-pointer"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                  />
-                </svg>
-              </button>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                    />
+                  </svg>
+                </button>
+              </Tooltip>
             </div>
           </div>
         );
@@ -2560,62 +2555,66 @@ function LabellingTaskPageInner() {
                     evDragSourceIdx !== null &&
                     evDragSourceIdx !== idx;
                   return (
-                    <button
+                    <Tooltip
                       key={ev.uuid}
-                      type="button"
-                      onClick={() =>
-                        setPreviewEvaluator({ uuid: ev.uuid, name: ev.name })
-                      }
-                      draggable={!evReordering && evaluatorsList.length > 1}
-                      onDragStart={(e) => {
-                        if (evReordering || evaluatorsList.length <= 1) {
-                          e.preventDefault();
-                          return;
-                        }
-                        setEvDragSourceIdx(idx);
-                        e.dataTransfer.effectAllowed = "move";
-                        // Firefox requires data to be set or drag is
-                        // cancelled.
-                        e.dataTransfer.setData("text/plain", ev.uuid);
-                      }}
-                      onDragOver={(e) => {
-                        if (evDragSourceIdx === null) return;
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                        if (evDragOverIdx !== idx) setEvDragOverIdx(idx);
-                      }}
-                      onDragLeave={() => {
-                        if (evDragOverIdx === idx) setEvDragOverIdx(null);
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const source = evDragSourceIdx;
-                        setEvDragSourceIdx(null);
-                        setEvDragOverIdx(null);
-                        if (source === null || source === idx) return;
-                        const next = evaluatorsList.map((x) => x.uuid);
-                        const [moved] = next.splice(source, 1);
-                        next.splice(idx, 0, moved);
-                        void reorderEvaluators(next);
-                      }}
-                      onDragEnd={() => {
-                        setEvDragSourceIdx(null);
-                        setEvDragOverIdx(null);
-                      }}
-                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer select-none ${
-                        isDropTarget
-                          ? "border-foreground/60 ring-2 ring-foreground/20"
-                          : "border-border"
-                      } ${isDragging ? "opacity-50" : ""}`}
-                      title={
+                      content={
                         evaluatorsList.length > 1
                           ? `Open ${ev.name} · drag to reorder`
                           : `Open ${ev.name}`
                       }
+                      position="top"
                     >
-                      {ev.name}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPreviewEvaluator({ uuid: ev.uuid, name: ev.name })
+                        }
+                        draggable={!evReordering && evaluatorsList.length > 1}
+                        onDragStart={(e) => {
+                          if (evReordering || evaluatorsList.length <= 1) {
+                            e.preventDefault();
+                            return;
+                          }
+                          setEvDragSourceIdx(idx);
+                          e.dataTransfer.effectAllowed = "move";
+                          // Firefox requires data to be set or drag is
+                          // cancelled.
+                          e.dataTransfer.setData("text/plain", ev.uuid);
+                        }}
+                        onDragOver={(e) => {
+                          if (evDragSourceIdx === null) return;
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          if (evDragOverIdx !== idx) setEvDragOverIdx(idx);
+                        }}
+                        onDragLeave={() => {
+                          if (evDragOverIdx === idx) setEvDragOverIdx(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const source = evDragSourceIdx;
+                          setEvDragSourceIdx(null);
+                          setEvDragOverIdx(null);
+                          if (source === null || source === idx) return;
+                          const next = evaluatorsList.map((x) => x.uuid);
+                          const [moved] = next.splice(source, 1);
+                          next.splice(idx, 0, moved);
+                          void reorderEvaluators(next);
+                        }}
+                        onDragEnd={() => {
+                          setEvDragSourceIdx(null);
+                          setEvDragOverIdx(null);
+                        }}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer select-none ${
+                          isDropTarget
+                            ? "border-foreground/60 ring-2 ring-foreground/20"
+                            : "border-border"
+                        } ${isDragging ? "opacity-50" : ""}`}
+                      >
+                        {ev.name}
+                      </button>
+                    </Tooltip>
                   );
                 })}
               </div>
@@ -2623,72 +2622,81 @@ function LabellingTaskPageInner() {
           </div>
           {task && (
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={() => setEditOpen(true)}
-                className="h-9 px-3 rounded-md text-sm font-medium bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition-colors cursor-pointer flex items-center gap-1.5"
-                title="Edit name and description"
-                aria-label="Edit task"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
+              <Tooltip content="Edit name and description" position="top">
+                <button
+                  onClick={() => setEditOpen(true)}
+                  className="h-9 px-3 rounded-md text-sm font-medium bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition-colors cursor-pointer flex items-center gap-1.5"
+                  aria-label="Edit task"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
-                  />
-                </svg>
-                Edit
-              </button>
-              <button
-                onClick={() => {
-                  if (taskType === "llm" || taskType === "conversation") {
-                    setNewItemName("");
-                    setNewItemDescription("");
-                    setCreateItemError(null);
-                    setValidationAttempted(false);
-                    setDuplicateSourcePayload(null);
-                    setAddItemOpen(true);
-                  } else if (taskType === "stt") {
-                    setDuplicateSttRows(null);
-                    setAddSttItemsOpen(true);
-                  } else if (taskType === "tts") {
-                    setDuplicateTtsRows(null);
-                    setAddTtsItemsOpen(true);
-                  } else if (taskType === "llm-general") {
-                    setDuplicateLlmGeneralRows(null);
-                    setAddLlmGeneralItemsOpen(true);
-                  }
-                }}
-                disabled={!canAddItem}
-                title={
-                  !canAddItem
-                    ? "Manual item entry isn't supported for this task type yet"
-                    : undefined
-                }
-                className="h-9 px-3 rounded-md text-sm font-medium bg-teal-500/15 text-teal-700 dark:text-teal-300 hover:bg-teal-500/25 border border-teal-500/30 transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 4.5v15m7.5-7.5h-15"
-                  />
-                </svg>
-                {taskType === "stt" || taskType === "tts"
-                  ? "Add items"
-                  : "Add item"}
-              </button>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                    />
+                  </svg>
+                  Edit
+                </button>
+              </Tooltip>
+              {(() => {
+                const addItemButton = (
+                  <button
+                    onClick={() => {
+                      if (taskType === "llm" || taskType === "conversation") {
+                        setNewItemName("");
+                        setNewItemDescription("");
+                        setCreateItemError(null);
+                        setValidationAttempted(false);
+                        setDuplicateSourcePayload(null);
+                        setAddItemOpen(true);
+                      } else if (taskType === "stt") {
+                        setDuplicateSttRows(null);
+                        setAddSttItemsOpen(true);
+                      } else if (taskType === "tts") {
+                        setDuplicateTtsRows(null);
+                        setAddTtsItemsOpen(true);
+                      } else if (taskType === "llm-general") {
+                        setDuplicateLlmGeneralRows(null);
+                        setAddLlmGeneralItemsOpen(true);
+                      }
+                    }}
+                    disabled={!canAddItem}
+                    className="h-9 px-3 rounded-md text-sm font-medium bg-teal-500/15 text-teal-700 dark:text-teal-300 hover:bg-teal-500/25 border border-teal-500/30 transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 4.5v15m7.5-7.5h-15"
+                      />
+                    </svg>
+                    {taskType === "stt" || taskType === "tts"
+                      ? "Add items"
+                      : "Add item"}
+                  </button>
+                );
+                // The hover text is there to say why the button cannot be
+                // used, so it is only worth showing while that is the case.
+                return canAddItem ? (
+                  addItemButton
+                ) : (
+                  <Tooltip content="Manual item entry isn't supported for this task type yet">
+                    {addItemButton}
+                  </Tooltip>
+                );
+              })()}
               {(() => {
                 // LLM / LLM-response bulk upload references evaluators by
                 // name in the CSV (variable columns); without any linked

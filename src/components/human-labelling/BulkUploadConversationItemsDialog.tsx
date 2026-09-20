@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { apiClient } from "@/lib/api";
 import { parseJsonLenient } from "@/lib/jsonSanitize";
+import { ClippedText } from "@/components/ui";
 import {
   AnnotationOptIn,
   BulkUploadDialogShell,
@@ -47,6 +48,7 @@ const TRANSCRIPT_HEADERS = [
 ];
 const NAME_HEADERS = ["name", "title", "conversation_name"];
 const DESCRIPTION_HEADERS = ["description", "desc", "notes"];
+
 
 const NO_SCORES_MESSAGE =
   "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.";
@@ -585,13 +587,11 @@ export function BulkUploadConversationItemsDialog({
             Turns
           </div>
           {annotationColumns.map((c) => (
-            <div
+            <ClippedText
               key={`ah-${c.evaluatorUuid}-${c.kind}`}
-              className="text-xs font-medium text-muted-foreground font-mono truncate"
-              title={c.header}
-            >
-              {c.header}
-            </div>
+              text={c.header}
+              className="block truncate text-xs font-medium text-muted-foreground font-mono"
+            />
           ))}
         </div>
         <div className="divide-y divide-border">
@@ -601,16 +601,12 @@ export function BulkUploadConversationItemsDialog({
               className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
               style={simGridStyle}
             >
-              <div className="truncate text-foreground" title={p.name}>
-                {p.name}
-              </div>
+              <ClippedText text={p.name} className="block truncate text-foreground" />
               {showDescriptionColumn && (
-                <div
-                  className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                  title={p.description || undefined}
-                >
-                  {p.description}
-                </div>
+                <ClippedText
+                  text={p.description}
+                  className="block min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                />
               )}
               <div className="min-w-0">
                 <TranscriptPreview turns={p.transcript ?? []} />

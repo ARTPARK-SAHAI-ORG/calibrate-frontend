@@ -287,16 +287,17 @@ export function SimulationResultsTable({
                         {processing && spinner("absolute inset-0 w-6 h-6 animate-spin text-yellow-500")}
                         {waiting && spinner("absolute inset-0 w-6 h-6 animate-spin text-gray-500")}
                         {hasTranscript(sim) && (
-                          <button
-                            onClick={() => onSelectSimulation(sim)}
-                            title="View transcript"
-                            aria-label="View transcript"
-                            className={`relative z-10 flex items-center justify-center w-4 h-4 cursor-pointer ${
-                              sim.aborted ? "text-red-500" : "text-foreground"
-                            }`}
-                          >
-                            {playIcon}
-                          </button>
+                          <Tooltip content="View transcript" position="top">
+                            <button
+                              onClick={() => onSelectSimulation(sim)}
+                              aria-label="View transcript"
+                              className={`relative z-10 flex items-center justify-center w-4 h-4 cursor-pointer ${
+                                sim.aborted ? "text-red-500" : "text-foreground"
+                              }`}
+                            >
+                              {playIcon}
+                            </button>
+                          </Tooltip>
                         )}
                       </div>
                     </td>

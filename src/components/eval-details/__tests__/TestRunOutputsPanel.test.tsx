@@ -1,5 +1,12 @@
 import React from "react";
-import { render, screen, setupUser, fireEvent, within } from "../../../test-utils";
+import {
+  render,
+  screen,
+  setupUser,
+  fireEvent,
+  waitFor,
+  within,
+} from "../../../test-utils";
 import {
   TestRunOutputsPanel,
   type TestRunResult,
@@ -437,6 +444,33 @@ describe("TestRunOutputsPanel", () => {
       expect(onToggleLabellingSelection).not.toHaveBeenCalled();
     });
 
+    it("says on hover why a row that has not finished cannot be picked", async () => {
+      const user = setupUser();
+      render(
+        <TestRunOutputsPanel
+          results={allResults}
+          selectedId={null}
+          onSelect={jest.fn()}
+          onToggleLabellingSelection={jest.fn()}
+        />,
+      );
+      const rowContainer = screen.getByText("Pending Test One").closest("div")!;
+      const checkboxButton = within(rowContainer).getAllByRole("button")[0];
+      expect(checkboxButton).not.toHaveAttribute("title");
+      expect(checkboxButton).toHaveAttribute(
+        "aria-label",
+        "Select for labelling",
+      );
+      // Hover the wrapper, not the button: a disabled button fires no mouse
+      // events of its own, which is why the hover sits on the wrapper.
+      await user.hover(checkboxButton.parentElement!);
+      await waitFor(() =>
+        expect(
+          screen.getByText("Available once the test completes"),
+        ).toBeInTheDocument(),
+      );
+    });
+
     it("gives a tool-call row no checkbox at all, since it could never be submitted", () => {
       mockIsLabellingEligibleRaw.mockReturnValue(false);
       render(
@@ -503,9 +537,10 @@ describe("TestRunOutputsPanel", () => {
       );
       const passedHeader = screen.getByText("Passed (1)").closest("div")!
         .parentElement!;
-      const groupSelectAllButton = within(passedHeader).getByTitle(
-        "Select all passed",
-      );
+      const groupSelectAllButton = within(passedHeader).getByRole("button", {
+        name: "Select all passed",
+      });
+      expect(groupSelectAllButton).not.toHaveAttribute("title");
       await user.click(groupSelectAllButton);
       expect(onLabellingBulkToggle).toHaveBeenCalledWith(["p1"]);
 
@@ -513,7 +548,9 @@ describe("TestRunOutputsPanel", () => {
       const queuedHeader = screen.getByText("Queued (1)").closest("div")!
         .parentElement!;
       expect(
-        within(queuedHeader).queryByTitle(/Select all|Deselect all/),
+        within(queuedHeader).queryByRole("button", {
+          name: /Select all|Deselect all/,
+        }),
       ).not.toBeInTheDocument();
     });
 

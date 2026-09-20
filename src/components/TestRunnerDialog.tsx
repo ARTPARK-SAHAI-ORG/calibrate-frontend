@@ -1,5 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import { Tooltip } from "@/components/Tooltip";
 import {
   isRunStopped,
   isUnanswered,
@@ -696,13 +697,16 @@ export function TestRunnerDialog({
               <div className="flex items-center gap-2">
                 {runHasArrived &&
                   (runStatus === "queued" || runStatus === "in_progress") && (
-                    <span
-                      className="relative flex h-2.5 w-2.5 shrink-0"
-                      title="Run in progress"
-                    >
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-500 opacity-75 dark:bg-yellow-400" />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500 dark:bg-yellow-400" />
-                    </span>
+                    <Tooltip content="Run in progress" className="shrink-0">
+                      <span
+                        className="relative flex h-2.5 w-2.5 shrink-0"
+                        role="img"
+                        aria-label="Run in progress"
+                      >
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-500 opacity-75 dark:bg-yellow-400" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-yellow-500 dark:bg-yellow-400" />
+                      </span>
+                    </Tooltip>
                   )}
                 {run &&
                   !isLoading &&

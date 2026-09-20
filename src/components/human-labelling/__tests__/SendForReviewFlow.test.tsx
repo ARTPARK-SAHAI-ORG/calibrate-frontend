@@ -105,28 +105,40 @@ describe("SendForReviewFlow", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("says how many items were removed from the task and cannot be sent", () => {
+  it("says how many items were removed from the task and cannot be sent", async () => {
+    const user = setupUser();
     renderFlow({ taskItemIds: new Set(["item-1"]) });
-    expect(sendButton()).toHaveAttribute(
-      "title",
-      "Send the items shown to annotators. 2 more are no longer in this task and cannot be sent.",
-    );
+    expect(sendButton()).not.toHaveAttribute("title");
+
+    await user.hover(sendButton());
+    expect(
+      await screen.findByText(
+        "Send the items shown to annotators. 2 more are no longer in this task and cannot be sent.",
+      ),
+    ).toBeInTheDocument();
   });
 
-  it("uses the singular when one item was removed from the task", () => {
+  it("uses the singular when one item was removed from the task", async () => {
+    const user = setupUser();
     renderFlow({ taskItemIds: new Set(["item-1", "item-2"]) });
-    expect(sendButton()).toHaveAttribute(
-      "title",
-      "Send the items shown to annotators. 1 more is no longer in this task and cannot be sent.",
-    );
+
+    await user.hover(sendButton());
+    expect(
+      await screen.findByText(
+        "Send the items shown to annotators. 1 more is no longer in this task and cannot be sent.",
+      ),
+    ).toBeInTheDocument();
   });
 
-  it("says nothing about removed items when every item can be sent", () => {
+  it("says nothing about removed items when every item can be sent", async () => {
+    const user = setupUser();
     renderFlow();
-    expect(sendButton()).toHaveAttribute(
-      "title",
-      "Send the items shown to annotators",
-    );
+    expect(sendButton()).not.toHaveAttribute("title");
+
+    await user.hover(sendButton());
+    expect(
+      await screen.findByText("Send the items shown to annotators"),
+    ).toBeInTheDocument();
   });
 
   it("creates a job from the items still on the task and reports it back", async () => {

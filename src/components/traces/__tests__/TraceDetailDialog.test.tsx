@@ -168,6 +168,55 @@ it("titles the dialog with the trace's own id and renders the shared conversatio
   expect(screen.queryByText("No text response")).not.toBeInTheDocument();
 });
 
+it("puts the whole trace id in hover text only when the heading has cut it short", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  const user = setupUser();
+  // jsdom reports every width as 0, so a heading that has been cut short is
+  // described directly by standing in for the two widths the check compares.
+  const scrollWidth = jest
+    .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+    .mockReturnValue(300);
+  const clientWidth = jest
+    .spyOn(HTMLElement.prototype, "clientWidth", "get")
+    .mockReturnValue(80);
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+
+  const heading = screen.getByRole("heading", { name: "t1" });
+  expect(heading).not.toHaveAttribute("title");
+  await user.hover(heading);
+  await waitFor(() =>
+    expect(screen.getAllByText("t1").length).toBeGreaterThan(1),
+  );
+
+  scrollWidth.mockRestore();
+  clientWidth.mockRestore();
+});
+
+it("leaves a trace id the heading shows in full without hover text", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  const user = setupUser();
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+
+  const heading = screen.getByRole("heading", { name: "t1" });
+  expect(heading).not.toHaveAttribute("title");
+  await user.hover(heading);
+  expect(screen.getAllByText("t1")).toHaveLength(1);
+});
+
 it("puts ids, created time, and metadata in the side column and omits missing ids", async () => {
   mockFetchTrace.mockResolvedValue(detail);
   render(

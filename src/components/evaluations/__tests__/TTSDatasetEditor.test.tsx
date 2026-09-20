@@ -137,7 +137,7 @@ describe("TTSDatasetEditor", () => {
 
   it("does not show a delete button for the only new row when there are no saved items", () => {
     render(<Harness />);
-    expect(screen.queryByTitle("Delete item")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Delete item")).not.toBeInTheDocument();
     // Only "Add another row" and "Download sample" — no row-delete button.
     expect(screen.getAllByRole("button")).toHaveLength(2);
   });
@@ -271,7 +271,7 @@ describe("TTSDatasetEditor", () => {
   it("offers no delete on the last saved item, which cannot be deleted", () => {
     const savedItems = [makeItem({ uuid: "a" })];
     render(<Harness savedItems={savedItems} onDeleteSavedItem={jest.fn()} />);
-    expect(screen.queryByTitle("Delete item")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Delete item")).not.toBeInTheDocument();
   });
 
   it("takes the delete off saved rows while there is unsaved work", async () => {
@@ -281,14 +281,30 @@ describe("TTSDatasetEditor", () => {
       makeItem({ uuid: "b", text: "Second" }),
     ];
     render(<Harness savedItems={savedItems} onDeleteSavedItem={jest.fn()} />);
-    expect(screen.getAllByTitle("Delete item").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Delete item").length).toBeGreaterThan(0);
 
     // Typing in the new row at the bottom is unsaved work.
     await user.type(
       screen.getAllByPlaceholderText("Enter text to synthesize")[0],
       "a new line",
     );
-    expect(screen.queryByTitle("Delete item")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Delete item")).not.toBeInTheDocument();
+  });
+
+  it("names the delete on hover, in the app's own hover text", async () => {
+    const user = setupUser();
+    const savedItems = [
+      makeItem({ uuid: "a" }),
+      makeItem({ uuid: "b", text: "Second" }),
+    ];
+    render(<Harness savedItems={savedItems} onDeleteSavedItem={jest.fn()} />);
+
+    const button = screen.getAllByLabelText("Delete item")[0];
+    expect(button).not.toHaveAttribute("title");
+    await user.hover(button);
+    await waitFor(() =>
+      expect(screen.getByText("Delete item")).toBeInTheDocument(),
+    );
   });
 
   it("deletes a saved item via confirmation dialog when onDeleteSavedItem resolves", async () => {
@@ -302,7 +318,7 @@ describe("TTSDatasetEditor", () => {
       <Harness savedItems={savedItems} onDeleteSavedItem={onDeleteSavedItem} />,
     );
 
-    const deleteButtons = screen.getAllByTitle("Delete item");
+    const deleteButtons = screen.getAllByLabelText("Delete item");
     await user.click(deleteButtons[0]);
     expect(
       screen.getByText("Remove this item from the dataset?"),
@@ -325,7 +341,7 @@ describe("TTSDatasetEditor", () => {
       <Harness savedItems={savedItems} onDeleteSavedItem={onDeleteSavedItem} />,
     );
 
-    const deleteButtons = screen.getAllByTitle("Delete item");
+    const deleteButtons = screen.getAllByLabelText("Delete item");
     await user.click(deleteButtons[0]);
     await user.click(screen.getByRole("button", { name: "Remove" }));
 
@@ -343,7 +359,7 @@ describe("TTSDatasetEditor", () => {
     render(
       <Harness savedItems={savedItems} onDeleteSavedItem={onDeleteSavedItem} />,
     );
-    const deleteButtons = screen.getAllByTitle("Delete item");
+    const deleteButtons = screen.getAllByLabelText("Delete item");
     await user.click(deleteButtons[0]);
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
@@ -356,7 +372,7 @@ describe("TTSDatasetEditor", () => {
   it("does not render a delete button for saved items when onDeleteSavedItem is absent", () => {
     const savedItems = [makeItem({ uuid: "a" })];
     render(<Harness savedItems={savedItems} />);
-    expect(screen.queryByTitle("Delete item")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Delete item")).not.toBeInTheDocument();
   });
 
   it("clearNewRows resets to a single blank row", async () => {

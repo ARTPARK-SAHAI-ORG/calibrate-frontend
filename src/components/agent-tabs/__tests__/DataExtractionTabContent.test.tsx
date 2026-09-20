@@ -199,13 +199,11 @@ describe("DataExtractionTabContent", () => {
 
   it("toggles individual field selection and bulk-deletes them", async () => {
     const user = setupUser();
-    const { container, setDataExtractionFields, saveRef } = renderComponent({
+    const { setDataExtractionFields, saveRef } = renderComponent({
       dataExtractionFields: [makeField(), makeField({ uuid: "f2", name: "second" })],
     });
 
-    const selectButtons = container.querySelectorAll(
-      'button[title="Select field"]'
-    );
+    const selectButtons = screen.getAllByLabelText("Select field");
     await user.click(selectButtons[0]);
     expect(screen.getByText("Delete selected (1)")).toBeInTheDocument();
 
@@ -227,13 +225,11 @@ describe("DataExtractionTabContent", () => {
 
   it("selects all fields via the header checkbox and can toggle it off", async () => {
     const user = setupUser();
-    const { container } = renderComponent({
+    renderComponent({
       dataExtractionFields: [makeField(), makeField({ uuid: "f2", name: "second" })],
     });
 
-    const selectAll = container.querySelector(
-      'button[title="Select all"]'
-    ) as HTMLButtonElement;
+    const selectAll = screen.getByLabelText("Select all");
     await user.click(selectAll);
     expect(screen.getByText("Delete selected (2)")).toBeInTheDocument();
 
@@ -243,13 +239,11 @@ describe("DataExtractionTabContent", () => {
 
   it("deletes a single field via the row delete button", async () => {
     const user = setupUser();
-    const { container, setDataExtractionFields, saveRef } = renderComponent({
+    const { setDataExtractionFields, saveRef } = renderComponent({
       dataExtractionFields: [makeField()],
     });
 
-    const deleteButtons = container.querySelectorAll(
-      'button[title="Delete field"]'
-    );
+    const deleteButtons = screen.getAllByLabelText("Delete field");
     await user.click(deleteButtons[0]);
 
     expect(screen.getByText("Delete field")).toBeInTheDocument();
@@ -266,12 +260,10 @@ describe("DataExtractionTabContent", () => {
 
   it("closes the delete dialog without deleting on cancel", async () => {
     const user = setupUser();
-    const { container, setDataExtractionFields } = renderComponent({
+    const { setDataExtractionFields } = renderComponent({
       dataExtractionFields: [makeField()],
     });
-    const deleteButtons = container.querySelectorAll(
-      'button[title="Delete field"]'
-    );
+    const deleteButtons = screen.getAllByLabelText("Delete field");
     await user.click(deleteButtons[0]);
     await user.click(screen.getByText("Cancel"));
     expect(screen.queryByText("Delete field")).not.toBeInTheDocument();
@@ -543,5 +535,23 @@ describe("DataExtractionTabContent", () => {
     await user.click(screen.getByText("Add field"));
     const submitButtons = screen.getAllByText("Add field");
     expect(submitButtons[submitButtons.length - 1]).toBeInTheDocument();
+  });
+  it("shows the app's own hover text on the row controls, not the browser's", async () => {
+    const user = setupUser();
+    renderComponent({ dataExtractionFields: [makeField()] });
+
+    const [selectField] = screen.getAllByLabelText("Select field");
+    const [deleteField] = screen.getAllByLabelText("Delete field");
+    const selectAll = screen.getByLabelText("Select all");
+    for (const control of [selectField, deleteField, selectAll]) {
+      expect(control).not.toHaveAttribute("title");
+    }
+
+    await user.hover(deleteField);
+    await waitFor(() =>
+      // The words are on screen only as the app's own hover text: the button
+      // itself carries them as its name for a screen reader.
+      expect(screen.getAllByText("Delete field").length).toBeGreaterThan(0),
+    );
   });
 });

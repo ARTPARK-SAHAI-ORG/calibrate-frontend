@@ -65,4 +65,40 @@ describe("Breadcrumbs", () => {
     await user.click(screen.getByRole("button", { name: "Support bot" }));
     expect(onClick).toHaveBeenCalledTimes(1);
   });
+
+  it("puts a step's own hover text in the app's box, not the browser's", async () => {
+    const user = setupUser();
+    render(
+      <Breadcrumbs
+        items={[
+          { label: "Agents", href: "/agents" },
+          {
+            label: "Support bot",
+            onClick: jest.fn(),
+            title: "Click to edit name",
+          },
+        ]}
+      />,
+    );
+
+    const step = screen.getByRole("button", { name: "Support bot" });
+    expect(step).not.toHaveAttribute("title");
+    await user.hover(step);
+    expect(await screen.findByText("Click to edit name")).toBeInTheDocument();
+  });
+
+  it("shows no hover text on a step that was given none", async () => {
+    const user = setupUser();
+    const { container } = render(
+      <Breadcrumbs
+        items={[
+          { label: "Agents", href: "/agents" },
+          { label: "Support bot", onClick: jest.fn() },
+        ]}
+      />,
+    );
+
+    await user.hover(screen.getByRole("button", { name: "Support bot" }));
+    expect(container.textContent).toBe("Agents/Support bot");
+  });
 });

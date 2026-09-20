@@ -289,7 +289,7 @@ describe("AddToolDialog", () => {
       renderComponent();
 
       expect(editToolDialogProps.isOpen).toBe(false);
-      await user.click(screen.getByTitle("Edit tool"));
+      await user.click(screen.getByLabelText("Edit tool"));
       expect(editToolDialogProps.isOpen).toBe(true);
       expect(editToolDialogProps.editingToolUuid).toBe("tool-a");
       // toolA has no config.type — defaults to structured_output.
@@ -300,7 +300,7 @@ describe("AddToolDialog", () => {
       const user = setupUser();
       renderComponent();
 
-      await user.click(screen.getByTitle("Edit tool"));
+      await user.click(screen.getByLabelText("Edit tool"));
       await user.click(screen.getByText("Finish editing"));
 
       // Name shows once in the row and again in the preview heading.
@@ -315,7 +315,7 @@ describe("AddToolDialog", () => {
       renderComponent();
 
       expect(deleteConfirmationProps.isOpen).toBe(false);
-      await user.click(screen.getByTitle("Delete tool"));
+      await user.click(screen.getByLabelText("Delete tool"));
       expect(deleteConfirmationProps.isOpen).toBe(true);
       expect(
         screen.getByText(
@@ -331,7 +331,7 @@ describe("AddToolDialog", () => {
       await user.click(screen.getByLabelText("Select Weather lookup"));
       expect(screen.getByText("Add (1)")).toBeInTheDocument();
 
-      await user.click(screen.getByTitle("Delete tool"));
+      await user.click(screen.getByLabelText("Delete tool"));
       await user.click(screen.getByText("Confirm delete"));
 
       expect(deleteToolMock).toHaveBeenCalledWith("tool-a", "test-token");
@@ -349,7 +349,7 @@ describe("AddToolDialog", () => {
       const user = setupUser();
       renderComponent();
 
-      await user.click(screen.getByTitle("Delete tool"));
+      await user.click(screen.getByLabelText("Delete tool"));
       await user.click(screen.getByText("Confirm delete"));
 
       await waitFor(() =>

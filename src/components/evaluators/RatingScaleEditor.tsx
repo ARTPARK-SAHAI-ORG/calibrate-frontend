@@ -1,4 +1,5 @@
 import React from "react";
+import { Tooltip } from "@/components/Tooltip";
 
 export type RatingScaleRow = {
   value: number | string;
@@ -136,34 +137,39 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
                     missingLabel ? "border-red-500" : "border-border"
                   }`}
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (rows.length <= 2) return;
-                    onChange(rows.filter((_, i) => i !== idx));
-                  }}
-                  disabled={rows.length <= 2}
-                  title={
+                <Tooltip
+                  content={
                     rows.length <= 2
                       ? "At least two rows are required"
                       : "Remove row"
                   }
-                  className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                  position="top"
                 >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (rows.length <= 2) return;
+                      onChange(rows.filter((_, i) => i !== idx));
+                    }}
+                    disabled={rows.length <= 2}
+                    aria-label="Remove row"
+                    className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </Tooltip>
               </div>
               <textarea
                 value={row.description}

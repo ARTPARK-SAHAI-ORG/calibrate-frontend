@@ -1301,3 +1301,121 @@ describe("BulkUploadTestsModal", () => {
     });
   });
 });
+
+describe("hover text in the preview", () => {
+  // jsdom gives every element a width of 0, so whether a cell is cut off is
+  // described directly by standing in for the two widths that are compared.
+  function mockWidths(scroll: number, client: number) {
+    jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(scroll);
+    jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(client);
+  }
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  async function openResponseDropzone(user: ReturnType<typeof setupUser>) {
+    render(<BulkUploadTestsModal {...defaultProps()} />);
+    await selectTestType(user, "Does the agent give the right reply?");
+    await waitFor(() =>
+      expect(screen.queryByText("Loading evaluators")).not.toBeInTheDocument(),
+    );
+    await user.click(screen.getByText("Select one or more evaluators"));
+    await waitFor(() =>
+      expect(screen.getByText("Helpfulness")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByText("Helpfulness"));
+    await user.click(document.body);
+    await waitFor(() =>
+      expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+    );
+  }
+
+  const csvFor = (name: string) =>
+    `name,conversation_history,Helpfulness,Helpfulness/criteria\n"${name}","[{""role"":""user"",""content"":""hi""}]","true","Be nice"`;
+
+  it("does not repeat a test name the column shows in full", async () => {
+    const user = setupUser();
+    mockWidths(80, 80);
+    await openResponseDropzone(user);
+    await uploadFile(csvFor("Greeting test"));
+    await waitFor(() =>
+      expect(screen.getByText(/ready to upload/)).toBeInTheDocument(),
+    );
+
+    // Never the browser's own hover box, which ignores every style here.
+    expect(screen.getByText("Greeting test")).not.toHaveAttribute("title");
+    await user.hover(screen.getByText("Greeting test"));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.getAllByText("Greeting test")).toHaveLength(1);
+  });
+
+  it("shows the whole test name when the column has cut it off", async () => {
+    const user = setupUser();
+    mockWidths(300, 80);
+    const long = "Greeting test for a caller who will not give their name";
+    await openResponseDropzone(user);
+    await uploadFile(csvFor(long));
+    await waitFor(() =>
+      expect(screen.getByText(/ready to upload/)).toBeInTheDocument(),
+    );
+
+    await user.hover(screen.getByText(long));
+    await waitFor(() =>
+      expect(screen.getAllByText(long).length).toBeGreaterThan(1),
+    );
+  });
+
+  it("shows an evaluator name in hover text when its pill has cut it off", async () => {
+    const user = setupUser();
+    mockWidths(300, 80);
+    await openResponseDropzone(user);
+    await uploadFile(csvFor("Greeting test"));
+    await waitFor(() =>
+      expect(screen.getByText(/ready to upload/)).toBeInTheDocument(),
+    );
+
+    const pill = screen
+      .getAllByText("Helpfulness")
+      .find((el) => el.className.includes("bg-foreground/10"))!;
+    await user.hover(pill);
+    await waitFor(() =>
+      expect(screen.getAllByText("Helpfulness").length).toBeGreaterThan(2),
+    );
+  });
+
+  it("explains an unknown tool on hover instead of in the browser's own box", async () => {
+    const user = setupUser();
+    render(<BulkUploadTestsModal {...defaultProps()} />);
+    await selectTestType(user, "Does the agent use the right tool?");
+    await waitFor(() =>
+      expect(screen.getByText(/Drag and drop a CSV/)).toBeInTheDocument(),
+    );
+    // The name is padded, so the upload accepts it (it trims before looking
+    // the tool up) while the preview still cannot match it to a tool.
+    await uploadFile(
+      `name,conversation_history,tool_calls\n"Test A","[{""role"":""user"",""content"":""hi""}]","[{""tool"":"" book_room "",""arguments"":{}}]"`,
+    );
+    await waitFor(() =>
+      expect(screen.getByText("Found 1 test")).toBeInTheDocument(),
+    );
+
+    const hint =
+      "This tool isn't on the platform — add it under Tools before running this test";
+    // Read out to a screen reader even with no pointer anywhere near it.
+    expect(screen.getByText(hint)).toBeInTheDocument();
+    const pill = screen.getByText(hint).closest("span")!.parentElement!;
+    expect(pill).not.toHaveAttribute("title");
+
+    await user.hover(pill);
+    await waitFor(() =>
+      expect(screen.getAllByText(hint).length).toBeGreaterThan(1),
+    );
+  });
+});

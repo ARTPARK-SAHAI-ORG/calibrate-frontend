@@ -49,6 +49,7 @@ import {
   matchesSearchMode,
   type SearchMode,
 } from "@/components/ui/SearchModeInput";
+import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { useSidebarState } from "@/lib/sidebar";
 import {
   testTypeLabel,
@@ -1334,34 +1335,14 @@ function LLMPageInner() {
               {/* Table Header */}
               <div className="grid grid-cols-[40px_1fr_160px_300px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
                 <div className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={toggleSelectAll}
-                    className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
+                  <SelectCheckbox
+                    checked={
                       selectedTestUuids.size === filteredTests.length &&
                       filteredTests.length > 0
-                        ? "bg-foreground border-foreground"
-                        : "border-border hover:border-muted-foreground"
-                    }`}
-                    title="Select all"
-                  >
-                    {selectedTestUuids.size === filteredTests.length &&
-                      filteredTests.length > 0 && (
-                        <svg
-                          className="w-3 h-3 text-background"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={3}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M4.5 12.75l6 6 9-13.5"
-                          />
-                        </svg>
-                      )}
-                  </button>
+                    }
+                    onToggle={toggleSelectAll}
+                    label="Select all tests"
+                  />
                 </div>
                 <div className="text-sm font-medium text-muted-foreground">
                   Name
@@ -1379,35 +1360,11 @@ function LLMPageInner() {
                   className="grid grid-cols-[40px_1fr_160px_300px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
                 >
                   <div className="flex items-center">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleTestSelection(test.uuid);
-                      }}
-                      className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                        selectedTestUuids.has(test.uuid)
-                          ? "bg-foreground border-foreground"
-                          : "border-border hover:border-muted-foreground"
-                      }`}
-                      title="Select test"
-                    >
-                      {selectedTestUuids.has(test.uuid) && (
-                        <svg
-                          className="w-3 h-3 text-background"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={3}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M4.5 12.75l6 6 9-13.5"
-                          />
-                        </svg>
-                      )}
-                    </button>
+                    <SelectCheckbox
+                      checked={selectedTestUuids.has(test.uuid)}
+                      onToggle={() => toggleTestSelection(test.uuid)}
+                      label={`Select ${test.name}`}
+                    />
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">
@@ -1492,35 +1449,12 @@ function LLMPageInner() {
                     className="p-4 cursor-pointer"
                   >
                     <div className="flex items-start gap-3">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleTestSelection(test.uuid);
-                        }}
-                        className={`w-5 h-5 mt-0.5 rounded border flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${
-                          selectedTestUuids.has(test.uuid)
-                            ? "bg-foreground border-foreground"
-                            : "border-border hover:border-muted-foreground"
-                        }`}
-                        title="Select test"
-                      >
-                        {selectedTestUuids.has(test.uuid) && (
-                          <svg
-                            className="w-3 h-3 text-background"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={3}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M4.5 12.75l6 6 9-13.5"
-                            />
-                          </svg>
-                        )}
-                      </button>
+                      <SelectCheckbox
+                        checked={selectedTestUuids.has(test.uuid)}
+                        onToggle={() => toggleTestSelection(test.uuid)}
+                        label={`Select ${test.name}`}
+                        className="mt-0.5"
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm text-foreground mb-1">
                           {test.name}

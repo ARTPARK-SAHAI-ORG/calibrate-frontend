@@ -135,7 +135,9 @@ export function useTraces({
         // would let the reader tick and delete rows from a failed load.
         setItems([]);
         setTotal(0);
-        setError("Failed to load traces. Please try again.");
+        // No "Please try again": the screen puts a Try again button beside
+        // this, which is the thing to press rather than a sentence to read.
+        setError("Failed to load traces");
         return 0;
       } finally {
         if (!silent && requestId === loadingIdRef.current) setIsLoading(false);

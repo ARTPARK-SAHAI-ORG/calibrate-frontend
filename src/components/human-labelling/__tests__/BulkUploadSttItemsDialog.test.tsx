@@ -1196,3 +1196,87 @@ describe("BulkUploadSttItemsDialog", () => {
     });
   });
 });
+
+describe("the whole cell on hover", () => {
+  // jsdom gives every element a width of 0, so whether a cell is cut off is
+  // described directly by standing in for the two widths that are compared.
+  function mockWidths(scroll: number, client: number) {
+    jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(scroll);
+    jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(client);
+  }
+
+  it("does not repeat a transcript the column shows in full", async () => {
+    const user = setupUser();
+    mockWidths(80, 80);
+    render(<BulkUploadSttItemsDialog {...defaultProps()} />);
+    await uploadFile(`name,reference_transcript,predicted_transcript
+"Greeting","Hello there","hello there"`);
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+
+    await user.hover(screen.getByText("Hello there"));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.getAllByText("Hello there")).toHaveLength(1);
+  });
+
+  it("shows the whole transcript when the column has cut it off", async () => {
+    const user = setupUser();
+    mockWidths(300, 80);
+    render(<BulkUploadSttItemsDialog {...defaultProps()} />);
+    const long = "Hello there, I would like to book a flight to Bengaluru";
+    await uploadFile(`name,reference_transcript,predicted_transcript
+"Greeting","${long}","hello there"`);
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+
+    await user.hover(screen.getByText(long));
+    await waitFor(() =>
+      expect(screen.getAllByText(long).length).toBeGreaterThan(1),
+    );
+  });
+
+  it("shows an evaluator column name in hover text when it is cut off", async () => {
+    const user = setupUser();
+    mockWidths(300, 80);
+    apiClient
+      .mockResolvedValueOnce([{ uuid: "a1", name: "Alice" }]) // annotators
+      .mockResolvedValueOnce([]) // the task's existing items
+      .mockResolvedValueOnce({
+        all_new: true,
+        existing_with_annotations: [],
+        existing_without_annotations: [],
+      }); // annotated-check
+    render(<BulkUploadSttItemsDialog {...defaultProps({ linkedEvaluators })} />);
+    await user.click(screen.getByRole("button", { name: "Yes" }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("Select annotator")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByLabelText("Select annotator"));
+    await user.click(screen.getByRole("option", { name: "Alice" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("Drop a CSV here or click to browse"),
+      ).toBeInTheDocument(),
+    );
+    await uploadFile(`name,reference_transcript,predicted_transcript,Correctness/value,Correctness/reasoning
+"Greeting","Hello there","hello there","true","Looks right"`);
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+
+    await user.hover(screen.getByText("Correctness/value"));
+    await waitFor(() =>
+      expect(screen.getAllByText("Correctness/value").length).toBeGreaterThan(
+        1,
+      ),
+    );
+  });
+});

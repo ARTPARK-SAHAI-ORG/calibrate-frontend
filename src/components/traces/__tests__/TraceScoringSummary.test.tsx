@@ -115,12 +115,12 @@ describe("TraceScoreMark", () => {
       />,
     );
     const mark = screen.getByRole("img", {
-      name: "This workspace has scored as many traces as its limit allows",
+      name: "This workspace has reached its limit for scoring traces",
     });
     await user.hover(mark);
     expect(
       await screen.findByText(
-        "This workspace has scored as many traces as its limit allows",
+        "This workspace has reached its limit for scoring traces",
       ),
     ).toBeInTheDocument();
   });
@@ -152,6 +152,18 @@ describe("TraceScoreMark", () => {
     expect(
       screen.getByRole("img", { name: "In progress" }),
     ).toBeInTheDocument();
+  });
+
+  it("spins in the same amber as the other marks, centred and never squashed", () => {
+    render(<TraceScoreMark trace={{ latest_run_status: "processing" }} />);
+    const mark = screen.getByRole("img", { name: "In progress" });
+    // Centred inside its own box and held at its width, the way RunStateMark
+    // draws the finished, stopped and error marks beside it.
+    expect(mark.className).toContain("items-center");
+    expect(mark.className).toContain("shrink-0");
+    const spinner = mark.querySelector("svg");
+    expect(spinner?.getAttribute("class")).toContain("text-amber-500");
+    expect(spinner?.getAttribute("class")).not.toContain("text-muted-foreground");
   });
 
   it("draws nothing for a trace nothing has tried to score", () => {
@@ -194,6 +206,91 @@ describe("a run that has not finished", () => {
     );
     expect(screen.getAllByText("In progress")).toHaveLength(2);
     expect(screen.queryByText("Correct")).not.toBeInTheDocument();
+  });
+});
+
+describe("a run that could not be run", () => {
+  it("says so in every column when the run failed", () => {
+    render(
+      <TraceScoreCells
+        trace={{
+          latest_run_status: "failed",
+          latest_run_error: "scoring_disabled",
+        }}
+        columns={columns}
+        layout="row"
+      />,
+    );
+    expect(screen.getAllByText("Could not run")).toHaveLength(2);
+    expect(screen.queryByText("Not scored yet")).not.toBeInTheDocument();
+  });
+
+  it("says so in every column when the run was skipped", () => {
+    render(
+      <TraceScoreCells
+        trace={{ latest_run_status: "skipped", latest_run_error: "over_limit" }}
+        columns={columns}
+        layout="row"
+      />,
+    );
+    expect(screen.getAllByText("Could not run")).toHaveLength(2);
+  });
+
+  it("labels each column on a mobile card too", () => {
+    render(
+      <TraceScoreCells
+        trace={{ latest_run_status: "failed" }}
+        columns={columns}
+        layout="card"
+      />,
+    );
+    expect(screen.getByText("Tone")).toBeInTheDocument();
+    expect(screen.getByText("Accuracy")).toBeInTheDocument();
+    expect(screen.getAllByText("Could not run")).toHaveLength(2);
+  });
+
+  it("still says a completed run is waiting on the evaluator it has no score for", () => {
+    render(
+      <TraceScoreCells
+        trace={{
+          latest_run_status: "completed",
+          results: [
+            {
+              evaluator_uuid: "ev-1",
+              name: "Tone",
+              output_type: "binary",
+              value: 1,
+              passed: true,
+            },
+          ],
+        }}
+        columns={columns}
+        layout="row"
+      />,
+    );
+    expect(screen.getByText("Not scored yet")).toBeInTheDocument();
+    expect(screen.queryByText("Could not run")).not.toBeInTheDocument();
+  });
+
+  it("still says a run in progress is in progress", () => {
+    const { rerender } = render(
+      <TraceScoreCells
+        trace={{ latest_run_status: "pending" }}
+        columns={columns}
+        layout="row"
+      />,
+    );
+    expect(screen.getAllByText("In progress")).toHaveLength(2);
+    expect(screen.queryByText("Could not run")).not.toBeInTheDocument();
+    rerender(
+      <TraceScoreCells
+        trace={{ latest_run_status: "processing" }}
+        columns={columns}
+        layout="row"
+      />,
+    );
+    expect(screen.getAllByText("In progress")).toHaveLength(2);
+    expect(screen.queryByText("Could not run")).not.toBeInTheDocument();
   });
 });
 

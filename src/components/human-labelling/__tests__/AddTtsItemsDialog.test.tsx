@@ -138,23 +138,109 @@ describe("AddTtsItemsDialog", () => {
   it("disables 'Add another item' until name, text and audio are present", async () => {
     const user = setupUser();
     const { container } = renderDialog();
-    const addAnother = screen.getByRole("button", {
-      name: "Add another item",
-    });
-    expect(addAnother).toBeDisabled();
+    const addAnother = () =>
+      screen.getByRole("button", { name: "Add another item" });
+    expect(addAnother()).toBeDisabled();
 
     await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
     await user.type(
       screen.getByPlaceholderText("The reference text that was spoken"),
       "hello",
     );
-    expect(addAnother).toBeDisabled();
+    expect(addAnother()).toBeDisabled();
 
     await pickFile(container, makeAudioFile());
     await waitFor(() =>
       expect(screen.getByLabelText("Play")).toBeInTheDocument(),
     );
-    expect(addAnother).not.toBeDisabled();
+    expect(addAnother()).not.toBeDisabled();
+  });
+
+  it("says on hover why 'Add another item' cannot be used yet", async () => {
+    const user = setupUser();
+    renderDialog();
+    const addAnother = screen.getByRole("button", {
+      name: "Add another item",
+    });
+    expect(addAnother).not.toHaveAttribute("title");
+    // The hover text is on the wrapper, so it shows even though the button
+    // cannot be clicked.
+    await user.hover(addAnother);
+    expect(
+      await screen.findByText("Fill in all items before adding another"),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing on hover over 'Add another item' once the item is complete", async () => {
+    const user = setupUser();
+    const { container } = renderDialog();
+
+    await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
+    await user.type(
+      screen.getByPlaceholderText("The reference text that was spoken"),
+      "hello",
+    );
+    await pickFile(container, makeAudioFile());
+    await waitFor(() =>
+      expect(screen.getByLabelText("Play")).toBeInTheDocument(),
+    );
+
+    await user.hover(screen.getByRole("button", { name: "Add another item" }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(
+      screen.queryByText("Fill in all items before adding another"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says on hover what the remove button on an item does", async () => {
+    const user = setupUser();
+    renderDialog();
+
+    const remove = screen.getByRole("button", { name: "Remove item 1" });
+    expect(remove).not.toHaveAttribute("title");
+    await user.hover(remove);
+    expect(await screen.findByText("Remove this item")).toBeInTheDocument();
+  });
+
+  it("does not repeat a file name the row shows in full", async () => {
+    const user = setupUser();
+    const { container } = renderDialog();
+
+    await pickFile(container, makeAudioFile());
+    await waitFor(() =>
+      expect(screen.getByText("clip.wav")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("clip.wav")).not.toHaveAttribute("title");
+
+    await user.hover(screen.getByText("clip.wav"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Still only the name beside the button, no popup repeating it.
+    expect(screen.getAllByText("clip.wav")).toHaveLength(1);
+  });
+
+  it("shows the whole file name when the row has cut it off", async () => {
+    const user = setupUser();
+    // jsdom has no layout, so the cut-off name is described directly by
+    // standing in for the two widths the row compares.
+    const scrollWidth = jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(300);
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(80);
+    const longName = "a-very-long-recording-file-name-indeed.wav";
+    const { container } = renderDialog();
+
+    await pickFile(container, makeAudioFile(longName));
+    await waitFor(() => expect(screen.getByText(longName)).toBeInTheDocument());
+
+    await user.hover(screen.getByText(longName));
+    await waitFor(() =>
+      expect(screen.getAllByText(longName).length).toBeGreaterThan(1),
+    );
+
+    scrollWidth.mockRestore();
+    clientWidth.mockRestore();
   });
 
   it("shows field validation errors when submitting with empty fields", async () => {

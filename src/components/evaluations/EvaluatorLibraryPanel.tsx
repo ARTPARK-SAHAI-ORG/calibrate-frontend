@@ -224,7 +224,6 @@ export function EvaluatorLibraryPanel({
                   <Link
                     href={`/evaluators/${evaluator.uuid}`}
                     className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
-                    title="View evaluator"
                   >
                     View
                   </Link>
@@ -236,7 +235,6 @@ export function EvaluatorLibraryPanel({
                         setDeleteTarget(evaluator);
                       }}
                       className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                      title="Delete evaluator"
                     >
                       Delete
                     </button>

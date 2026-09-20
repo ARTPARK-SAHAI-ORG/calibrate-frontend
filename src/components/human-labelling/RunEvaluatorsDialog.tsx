@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { Tooltip } from "@/components/Tooltip";
+import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { apiClient } from "@/lib/api";
 import { liveVersionOf } from "@/lib/evaluatorVersions";
@@ -66,6 +68,21 @@ type RunEvaluatorsDialogProps = {
   onClose: () => void;
   onConfirm: (selections: RunEvaluatorsSelection[]) => void | Promise<void>;
 };
+
+/**
+ * The evaluator's name, cut to fit the row. The whole of it goes on hover only
+ * when it is actually cut off: repeating a readable name covers the row below
+ * and says nothing.
+ */
+function EvaluatorName({ name }: { name: string }) {
+  const { ref, clipped } = useIsNameClipped(name);
+  const label = (
+    <span ref={ref} className="block text-sm font-medium truncate">
+      {name}
+    </span>
+  );
+  return clipped ? <Tooltip content={name}>{label}</Tooltip> : label;
+}
 
 function VersionLabel({
   version,
@@ -341,12 +358,7 @@ export function RunEvaluatorsDialog({
                       className="w-4 h-4 cursor-pointer accent-foreground"
                     />
                     <div className="flex-1 min-w-0">
-                      <div
-                        className="text-sm font-medium truncate"
-                        title={ev.name}
-                      >
-                        {ev.name}
-                      </div>
+                      <EvaluatorName name={ev.name} />
                     </div>
                     {versions.length === 0 ? (
                       <span className="text-xs text-muted-foreground">

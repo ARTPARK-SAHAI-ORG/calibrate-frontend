@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, within } from "@/test-utils";
+import { render, screen, waitFor, within } from "@/test-utils";
 import { setupUser } from "@/test-utils";
 import {
   SimulationResultsTable,
@@ -252,10 +252,31 @@ describe("SimulationResultsTable", () => {
       />,
     );
 
-    const buttons = screen.getAllByTitle("View transcript");
+    const buttons = screen.getAllByRole("button", { name: "View transcript" });
     expect(buttons).toHaveLength(1);
     await user.click(buttons[0]);
     expect(onSelectSimulation).toHaveBeenCalledWith(withTranscript);
+  });
+
+  it("shows View transcript on hover instead of the browser's own hover text", async () => {
+    const user = setupUser();
+    const sim = makeSim({ transcript: [{ role: "user", content: "hi" }] });
+    render(
+      <SimulationResultsTable
+        simulations={[sim]}
+        metricKeys={[]}
+        onSelectSimulation={jest.fn()}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "View transcript" });
+    expect(button).not.toHaveAttribute("title");
+    const before = screen.queryAllByText("View transcript").length;
+    await user.hover(button);
+    await waitFor(() =>
+      expect(screen.queryAllByText("View transcript").length).toBeGreaterThan(
+        before,
+      ),
+    );
   });
 
   it("opens the transcript from the phone card too", async () => {
@@ -305,7 +326,11 @@ describe("SimulationResultsTable", () => {
     render(
       <SimulationResultsTable simulations={[aborted]} metricKeys={[]} onSelectSimulation={jest.fn()} />,
     );
-    expect(screen.getByTitle("View transcript").getAttribute("class")).toContain("text-red-500");
+    expect(
+      screen
+        .getByRole("button", { name: "View transcript" })
+        .getAttribute("class"),
+    ).toContain("text-red-500");
   });
 
   it("does not show the transcript button when transcript is undefined", () => {
@@ -313,7 +338,9 @@ describe("SimulationResultsTable", () => {
     render(
       <SimulationResultsTable simulations={[sim]} metricKeys={[]} onSelectSimulation={jest.fn()} />,
     );
-    expect(screen.queryByTitle("View transcript")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "View transcript" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders metric key column headers", () => {

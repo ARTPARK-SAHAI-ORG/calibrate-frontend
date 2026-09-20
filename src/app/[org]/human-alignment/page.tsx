@@ -1,6 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+  useCallback,
+  type MouseEvent,
+} from "react";
 import { replaceUrl, useRouter, useSearchParams } from "@/lib/nav";
 import {
   CartesianGrid,
@@ -12,6 +18,9 @@ import {
   YAxis,
 } from "recharts";
 import { AppLayout } from "@/components/AppLayout";
+// The chart above already has a `Tooltip` of its own, so the app's hover text
+// comes in under a second name.
+import { Tooltip as HoverText } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import { EvaluatorPillList } from "@/components/EvaluatorPillList";
@@ -22,6 +31,7 @@ import { EmptyState } from "@/components/ui/LoadingState";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
 import { useAccessToken } from "@/hooks";
+import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { createAnnotator, renameAnnotator } from "@/lib/annotatorApi";
 import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
@@ -599,29 +609,30 @@ function HumanLabellingPageInner() {
                         {task.item_count ?? 0}
                       </p>
                       <EvaluatorPillList evaluators={evaluators} />
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTaskToDelete(task);
-                        }}
-                        aria-label={`Delete ${task.name}`}
-                        title="Delete task"
-                        className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={1.8}
+                      <HoverText content="Delete task" position="top">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTaskToDelete(task);
+                          }}
+                          aria-label={`Delete ${task.name}`}
+                          className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                          />
-                        </svg>
-                      </button>
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={1.8}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                            />
+                          </svg>
+                        </button>
+                      </HoverText>
                     </div>
                   );
                 })}
@@ -861,100 +872,110 @@ function HumanLabellingPageInner() {
                         >
                           {isEditing ? (
                             <>
-                              <button
-                                onClick={saveEditAnnotator}
-                                disabled={
-                                  savingAnnotatorEdit ||
-                                  !editingAnnotatorName.trim()
-                                }
-                                aria-label="Save name"
-                                title="Save"
-                                className="w-8 h-8 flex items-center justify-center rounded-md text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
+                              <HoverText content="Save" position="top">
+                                <button
+                                  onClick={saveEditAnnotator}
+                                  disabled={
+                                    savingAnnotatorEdit ||
+                                    !editingAnnotatorName.trim()
+                                  }
+                                  aria-label="Save name"
+                                  className="w-8 h-8 flex items-center justify-center rounded-md text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M4.5 12.75l6 6 9-13.5"
-                                  />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={cancelEditAnnotator}
-                                disabled={savingAnnotatorEdit}
-                                aria-label="Cancel rename"
-                                title="Cancel"
-                                className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M4.5 12.75l6 6 9-13.5"
+                                    />
+                                  </svg>
+                                </button>
+                              </HoverText>
+                              <HoverText content="Cancel" position="top">
+                                <button
+                                  onClick={cancelEditAnnotator}
+                                  disabled={savingAnnotatorEdit}
+                                  aria-label="Cancel rename"
+                                  className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M6 18L18 6M6 6l12 12"
-                                  />
-                                </svg>
-                              </button>
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                </button>
+                              </HoverText>
                             </>
                           ) : (
                             <>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  startEditAnnotator(annotator);
-                                }}
-                                aria-label={`Rename ${annotator.name}`}
-                                title="Rename annotator"
-                                className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                              <HoverText
+                                content="Rename annotator"
+                                position="top"
                               >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={1.8}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    startEditAnnotator(annotator);
+                                  }}
+                                  aria-label={`Rename ${annotator.name}`}
+                                  className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
-                                  />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setAnnotatorToDelete(annotator);
-                                }}
-                                aria-label={`Remove ${annotator.name}`}
-                                title="Remove annotator"
-                                className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={1.8}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                                    />
+                                  </svg>
+                                </button>
+                              </HoverText>
+                              <HoverText
+                                content="Remove annotator"
+                                position="top"
                               >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={1.8}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAnnotatorToDelete(annotator);
+                                  }}
+                                  aria-label={`Remove ${annotator.name}`}
+                                  className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                  />
-                                </svg>
-                              </button>
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={1.8}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                    />
+                                  </svg>
+                                </button>
+                              </HoverText>
                             </>
                           )}
                         </div>
@@ -1213,6 +1234,43 @@ const EVAL_COLORS = [
 
 type SortKey = "name" | "current";
 
+/**
+ * One evaluator's name, as a pill that opens how that evaluator judges. The
+ * name is cut to fit the row, and the whole of it is on hover only when it is
+ * actually cut off: a name already fully readable would just be covered by a
+ * popup saying the same thing.
+ */
+function EvaluatorNamePill({
+  name,
+  onOpen,
+  fitClassName,
+}: {
+  name: string;
+  onOpen: (e: MouseEvent) => void;
+  /** Sizing for the row this pill sits in, on whatever wraps the pill. */
+  fitClassName: string;
+}) {
+  const { ref, clipped } = useIsNameClipped(name);
+  const pill = (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate w-full"
+    >
+      <span ref={ref} className="truncate">
+        {name}
+      </span>
+    </button>
+  );
+  return clipped ? (
+    <HoverText content={name} className={fitClassName}>
+      {pill}
+    </HoverText>
+  ) : (
+    <div className={`relative ${fitClassName}`}>{pill}</div>
+  );
+}
+
 function AgreementOverview({
   agreement,
   agreementLoading,
@@ -1460,20 +1518,17 @@ function AgreementOverview({
                         </p>
                       ) : (
                         <>
-                          <button
-                            type="button"
-                            onClick={(e) => {
+                          <EvaluatorNamePill
+                            name={row.name}
+                            fitClassName="max-w-full min-w-0"
+                            onOpen={(e) => {
                               e.stopPropagation();
                               setPreviewEvaluator({
                                 uuid: row.key,
                                 name: row.name,
                               });
                             }}
-                            title={`Open ${row.name}`}
-                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate max-w-full min-w-0"
-                          >
-                            <span className="truncate">{row.name}</span>
-                          </button>
+                          />
                           <span className="text-sm font-medium text-foreground shrink-0">
                             alignment
                           </span>
@@ -1544,20 +1599,17 @@ function AgreementOverview({
                         </p>
                       ) : (
                         <>
-                          <button
-                            type="button"
-                            onClick={(e) => {
+                          <EvaluatorNamePill
+                            name={row.name}
+                            fitClassName="flex-1 min-w-0"
+                            onOpen={(e) => {
                               e.stopPropagation();
                               setPreviewEvaluator({
                                 uuid: row.key,
                                 name: row.name,
                               });
                             }}
-                            title={`Open ${row.name}`}
-                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate flex-1 min-w-0"
-                          >
-                            <span className="truncate">{row.name}</span>
-                          </button>
+                          />
                           <span className="text-sm font-medium text-foreground shrink-0">
                             alignment
                           </span>

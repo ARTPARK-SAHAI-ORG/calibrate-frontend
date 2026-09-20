@@ -1,5 +1,12 @@
 import React from "react";
-import { render, screen, setupUser, fireEvent, within } from "../../../test-utils";
+import {
+  render,
+  screen,
+  setupUser,
+  fireEvent,
+  waitFor,
+  within,
+} from "../../../test-utils";
 import {
   BenchmarkOutputsPanel,
   benchmarkLabellingKey,
@@ -1013,7 +1020,9 @@ describe("BenchmarkOutputsPanel", () => {
           onLabellingBulkToggle={onLabellingBulkToggle}
         />,
       );
-      const modelATitleBtn = screen.getByTitle("Select all model-a tests");
+      const modelATitleBtn = screen.getByRole("button", {
+        name: "Select all model-a tests",
+      });
       await user.click(modelATitleBtn);
       expect(onLabellingBulkToggle).toHaveBeenCalledWith([
         "model-a:0",
@@ -1022,7 +1031,32 @@ describe("BenchmarkOutputsPanel", () => {
       ]);
     });
 
-    it("title switches to 'Deselect all <model> tests' once all of that model's keys are selected", () => {
+    it("shows the model's select-all words on hover, not in the browser's own hover text", async () => {
+      const user = setupUser();
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={twoModels}
+          expandedModels={expandedAll}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          onToggleLabellingSelection={jest.fn()}
+          onLabellingBulkToggle={jest.fn()}
+        />,
+      );
+      const button = screen.getByRole("button", {
+        name: "Select all model-a tests",
+      });
+      expect(button).not.toHaveAttribute("title");
+      await user.hover(button);
+      await waitFor(() =>
+        expect(
+          screen.getAllByText("Select all model-a tests").length,
+        ).toBeGreaterThan(0),
+      );
+    });
+
+    it("the hover switches to 'Deselect all <model> tests' once all of that model's keys are selected", () => {
       render(
         <BenchmarkOutputsPanel
           modelResults={twoModels}
@@ -1035,7 +1069,9 @@ describe("BenchmarkOutputsPanel", () => {
           labellingSelection={new Set(["model-a:0", "model-a:1", "model-a:2"])}
         />,
       );
-      expect(screen.getByTitle("Deselect all model-a tests")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Deselect all model-a tests" }),
+      ).toBeInTheDocument();
     });
 
     // Select all reads each row's status the same way the rows on screen do,
@@ -1067,7 +1103,9 @@ describe("BenchmarkOutputsPanel", () => {
           runOver
         />,
       );
-      await user.click(screen.getByTitle("Select all model-h tests"));
+      await user.click(
+        screen.getByRole("button", { name: "Select all model-h tests" }),
+      );
       expect(onLabellingBulkToggle).toHaveBeenCalledWith([
         "model-h:0",
         "model-h:1",
@@ -1110,7 +1148,7 @@ describe("BenchmarkOutputsPanel", () => {
       expect(screen.queryAllByTestId("labelling-checkbox")).toHaveLength(0);
     });
 
-    it("shows 'Select for labelling' title when eligible", () => {
+    it("names the row's checkbox 'Select for labelling' when eligible", () => {
       render(
         <BenchmarkOutputsPanel
           modelResults={twoModels}
@@ -1123,7 +1161,11 @@ describe("BenchmarkOutputsPanel", () => {
       );
       const row = screen.getByText("Alpha Passed").closest("div")!.parentElement!;
       const checkboxButton = within(row).getAllByRole("button")[0];
-      expect(checkboxButton).toHaveAttribute("title", "Select for labelling");
+      expect(checkboxButton).toHaveAttribute(
+        "aria-label",
+        "Select for labelling",
+      );
+      expect(checkboxButton).not.toHaveAttribute("title");
     });
 
     it("does not render labelling checkboxes when onToggleLabellingSelection is absent", () => {

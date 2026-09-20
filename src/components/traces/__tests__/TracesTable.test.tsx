@@ -1,4 +1,4 @@
-import { render, screen, setupUser } from "@/test-utils";
+import { render, screen, setupUser, waitFor } from "@/test-utils";
 import {
   TracesTable,
   formatTraceDate,
@@ -265,7 +265,7 @@ describe("TracesTable", () => {
     expect(screen.getAllByRole("img", { name: "In progress" })).toHaveLength(2);
   });
 
-  it("says why beside a trace nothing could score, leaving its columns empty", () => {
+  it("says why beside a trace nothing could score, and in each of its columns", () => {
     renderTable({
       scoreColumns: columns,
       traces: [
@@ -281,9 +281,10 @@ describe("TracesTable", () => {
         name: "No evaluators could score this trace",
       }),
     ).toHaveLength(2);
-    // Only the trace nothing has tried yet is waiting on a score: two
-    // evaluator columns, on desktop and on mobile. The skipped trace says why
-    // once, beside its input, and leaves its columns empty.
+    // The skipped trace says why beside its input and again in each of its
+    // two evaluator columns, on desktop and on mobile. Only the trace nothing
+    // has tried yet is still waiting on a score.
+    expect(screen.getAllByText("Could not run")).toHaveLength(4);
     expect(screen.getAllByText("Not scored yet")).toHaveLength(4);
   });
 
@@ -320,6 +321,71 @@ describe("TracesTable", () => {
     expect(header).not.toHaveAttribute("title");
   });
 
+  // jsdom reports every width as 0, so a line the column has cut short is
+  // described directly by standing in for the two widths the check compares.
+  function mockClipped() {
+    const scrollWidth = jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(300);
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(80);
+    return () => {
+      scrollWidth.mockRestore();
+      clientWidth.mockRestore();
+    };
+  }
+
+  it("shows the whole reply in hover text when the column has cut it short", async () => {
+    const user = setupUser();
+    const restore = mockClipped();
+    const reply = "a very long reply the Output column cannot fit on one line";
+    renderTable({ traces: [trace({ response_preview: reply })] });
+    const before = screen.getAllByText(reply).length;
+    await user.hover(screen.getAllByText(reply)[0]);
+    await waitFor(() =>
+      expect(screen.getAllByText(reply).length).toBeGreaterThan(before),
+    );
+    restore();
+  });
+
+  it("leaves a reply that already fits without hover text", async () => {
+    const user = setupUser();
+    renderTable();
+    const line = screen.getAllByText("At 14 weeks.")[0];
+    expect(line).not.toHaveAttribute("title");
+    const before = screen.getAllByText("At 14 weeks.").length;
+    await user.hover(line);
+    expect(screen.getAllByText("At 14 weeks.").length).toBe(before);
+  });
+
+  it("shows the whole tool arguments line in hover text when it is cut short", async () => {
+    const user = setupUser();
+    const restore = mockClipped();
+    renderTable({
+      traces: [
+        trace({
+          response_preview: null,
+          tool_names: ["process_user_turn"],
+          tool_calls: [
+            {
+              tool: "process_user_turn",
+              arguments: { errors: "AWC code ke ank spasht nahi the." },
+            },
+          ],
+        }),
+      ],
+    });
+    const argsLine = "errors: AWC code ke ank spasht nahi the.";
+    const before = screen.getAllByText(argsLine).length;
+    expect(screen.getAllByText(argsLine)[0]).not.toHaveAttribute("title");
+    await user.hover(screen.getAllByText(argsLine)[0]);
+    await waitFor(() =>
+      expect(screen.getAllByText(argsLine).length).toBeGreaterThan(before),
+    );
+    restore();
+  });
+
   it("opens a trace when its row is clicked", async () => {
     const user = setupUser();
     const { onOpen } = renderTable();
@@ -331,7 +397,7 @@ describe("TracesTable", () => {
   it("deletes a trace without opening the row", async () => {
     const user = setupUser();
     const { onDelete, onOpen } = renderTable();
-    await user.click(screen.getAllByTitle("Delete trace")[0]);
+    await user.click(screen.getAllByLabelText("Delete trace")[0]);
     expect(onDelete).toHaveBeenCalled();
     expect(onOpen).not.toHaveBeenCalled();
   });

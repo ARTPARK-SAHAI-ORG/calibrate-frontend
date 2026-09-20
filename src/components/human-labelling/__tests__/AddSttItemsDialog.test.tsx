@@ -82,23 +82,67 @@ describe("AddSttItemsDialog", () => {
   it("disables 'Add another item' until the current item is complete", async () => {
     const user = setupUser();
     renderDialog();
-    const addAnother = screen.getByRole("button", {
-      name: "Add another item",
-    });
-    expect(addAnother).toBeDisabled();
+    const addAnother = () =>
+      screen.getByRole("button", { name: "Add another item" });
+    expect(addAnother()).toBeDisabled();
 
     await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
-    expect(addAnother).toBeDisabled();
+    expect(addAnother()).toBeDisabled();
     await user.type(
       screen.getByPlaceholderText("What was actually said"),
       "hello",
     );
-    expect(addAnother).toBeDisabled();
+    expect(addAnother()).toBeDisabled();
     await user.type(
       screen.getByPlaceholderText("What the system transcribed"),
       "helo",
     );
-    expect(addAnother).not.toBeDisabled();
+    expect(addAnother()).not.toBeDisabled();
+  });
+
+  it("says on hover why 'Add another item' cannot be used yet", async () => {
+    const user = setupUser();
+    renderDialog();
+    const addAnother = screen.getByRole("button", {
+      name: "Add another item",
+    });
+    expect(addAnother).not.toHaveAttribute("title");
+    // The hover text is on the wrapper, so it shows even though the button
+    // cannot be clicked.
+    await user.hover(addAnother);
+    expect(
+      await screen.findByText("Fill in all items before adding another"),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing on hover over 'Add another item' once the item is complete", async () => {
+    const user = setupUser();
+    renderDialog();
+
+    await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "Clip 1");
+    await user.type(
+      screen.getByPlaceholderText("What was actually said"),
+      "hello",
+    );
+    await user.type(
+      screen.getByPlaceholderText("What the system transcribed"),
+      "helo",
+    );
+    await user.hover(screen.getByRole("button", { name: "Add another item" }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(
+      screen.queryByText("Fill in all items before adding another"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says on hover what the remove button on an item does", async () => {
+    const user = setupUser();
+    renderDialog();
+
+    const remove = screen.getByRole("button", { name: "Remove item 1" });
+    expect(remove).not.toHaveAttribute("title");
+    await user.hover(remove);
+    expect(await screen.findByText("Remove this item")).toBeInTheDocument();
   });
 
   it("shows field validation errors when submitting with empty fields", async () => {

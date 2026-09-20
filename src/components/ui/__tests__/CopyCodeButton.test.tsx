@@ -26,6 +26,16 @@ it("copies the code and says so", async () => {
   );
 });
 
+it("says what it does in the app's own hover text, not the browser's", async () => {
+  const user = setupUser();
+  render(<CopyCodeButton value="x" label="Copy the request body" />);
+
+  const button = screen.getByRole("button", { name: "Copy the request body" });
+  expect(button).not.toHaveAttribute("title");
+  await user.hover(button);
+  expect(await screen.findByText("Copy the request body")).toBeInTheDocument();
+});
+
 it("takes its own label, so a page of them reads apart", () => {
   render(<CopyCodeButton value="x" label="Copy the request body" />);
 

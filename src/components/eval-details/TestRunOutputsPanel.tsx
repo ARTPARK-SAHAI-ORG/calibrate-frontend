@@ -16,6 +16,7 @@ import {
   type PagerNav,
 } from "@/components/test-results/shared";
 import { SearchInput } from "@/components/ui/SearchInput";
+import { Tooltip } from "@/components/Tooltip";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
@@ -287,6 +288,7 @@ export function TestRunOutputsPanel({
               onLabellingBulkToggle &&
               labellingGroupKeys.has(group.key) &&
               groupSelectableIds.length > 0;
+            const groupSelectAllLabel = `${groupAllSelected ? "Deselect" : "Select"} all ${group.label.toLowerCase()}`;
 
             return (
             <div key={group.key}>
@@ -306,14 +308,20 @@ export function TestRunOutputsPanel({
                   <span className="truncate">{group.label} ({group.items.length})</span>
                 </button>
                 {showGroupSelectAll && (
-                  <button
-                    type="button"
-                    onClick={() => onLabellingBulkToggle(groupSelectableIds)}
-                    title={groupAllSelected ? `Deselect all ${group.label.toLowerCase()}` : `Select all ${group.label.toLowerCase()}`}
-                    className="hidden md:block px-3 py-3 shrink-0 cursor-pointer"
+                  <Tooltip
+                    content={groupSelectAllLabel}
+                    position="top"
+                    className="hidden md:block shrink-0"
                   >
-                    <LabellingRowCheckbox checked={groupAllSelected} />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => onLabellingBulkToggle(groupSelectableIds)}
+                      aria-label={groupSelectAllLabel}
+                      className="px-3 py-3 cursor-pointer"
+                    >
+                      <LabellingRowCheckbox checked={groupAllSelected} />
+                    </button>
+                  </Tooltip>
                 )}
               </div>
               {!collapsedSections.has(group.key) && (
@@ -333,28 +341,34 @@ export function TestRunOutputsPanel({
                     >
                       {showLabellingCheckboxes &&
                         (isLabellingEligible(result) ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isLabellingSelectable(result)) {
-                                onToggleLabellingSelection(result.id);
-                              }
-                            }}
-                            disabled={!isLabellingSelectable(result)}
-                            title={
+                          <Tooltip
+                            content={
                               isLabellingSelectable(result)
                                 ? "Select for labelling"
                                 : "Available once the test completes"
                             }
-                            className="hidden md:block cursor-pointer disabled:cursor-not-allowed shrink-0"
+                            position="top"
+                            className="hidden md:block shrink-0"
                           >
-                            <LabellingRowCheckbox
-                              checked={
-                                labellingSelection?.has(result.id) ?? false
-                              }
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isLabellingSelectable(result)) {
+                                  onToggleLabellingSelection(result.id);
+                                }
+                              }}
                               disabled={!isLabellingSelectable(result)}
-                            />
-                          </button>
+                              aria-label="Select for labelling"
+                              className="cursor-pointer disabled:cursor-not-allowed"
+                            >
+                              <LabellingRowCheckbox
+                                checked={
+                                  labellingSelection?.has(result.id) ?? false
+                                }
+                                disabled={!isLabellingSelectable(result)}
+                              />
+                            </button>
+                          </Tooltip>
                         ) : (
                           // Keeps every row's name starting at the same place
                           // when only some of the run's tests are tickable.

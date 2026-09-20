@@ -97,7 +97,7 @@ async function deleteEvaluatorFromLibrary(
   await expect(card).toBeVisible({ timeout: 20000 });
   await page
     .locator(`[aria-label="Open ${name}"]`)
-    .locator("xpath=ancestor::*[.//button[@title='Delete evaluator']][1]")
+    .locator("xpath=ancestor::*[.//button[@aria-label='Delete evaluator']][1]")
     .getByRole("button", { name: "Delete evaluator" })
     .click();
   await expect(

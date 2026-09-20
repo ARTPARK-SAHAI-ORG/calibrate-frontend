@@ -28,6 +28,7 @@ import {
   DEFAULT_BINARY_TRUE_LABEL,
 } from "@/lib/binaryLabels";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
+import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 
 export type EvaluatorOutputType = "binary" | "rating";
 
@@ -178,6 +179,21 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
 
   const surface = evaluatorCardSurfaceClass(tone);
 
+  // The span is what shortens a long name with an ellipsis, so it is the one
+  // to measure: `ref` goes on it whether the name inside is a button or plain
+  // text.
+  const { ref: nameRef, clipped: nameClipped } = useIsNameClipped(props.name);
+  const nameBlock = (
+    <span ref={nameRef} className="min-w-0 truncate block">
+      <NameLabel
+        name={props.name}
+        uuid={props.evaluatorUuid}
+        enableLink={props.enableLink}
+        onOpenPreview={setPreviewEvaluator}
+      />
+    </span>
+  );
+
   return (
     <div className={`${surface} p-3 space-y-3`}>
       {/* Header: name + verdict pill + toggle on one row; description
@@ -189,18 +205,16 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
               used to be clipped mid-character by a sideways scroll box
               whose scrollbar was hidden, which just looked broken. */}
           <div className="flex-1 min-w-0 flex items-center gap-1.5">
-            {/* The name is clipped when long, so the whole of it is on hover.
-                The browser's own box is not allowed here. */}
-            <Tooltip content={props.name} position="top" className="min-w-0">
-              <span className="min-w-0 truncate block">
-                <NameLabel
-                  name={props.name}
-                  uuid={props.evaluatorUuid}
-                  enableLink={props.enableLink}
-                  onOpenPreview={setPreviewEvaluator}
-                />
-              </span>
-            </Tooltip>
+            {nameClipped ? (
+              // Only a name the card has had to cut short goes in hover text,
+              // and never the browser's own box. Repeating a name that is
+              // already fully readable just covers the card.
+              <Tooltip content={props.name} position="top" className="min-w-0">
+                {nameBlock}
+              </Tooltip>
+            ) : (
+              nameBlock
+            )}
             {props.versionLabel && (
               <span className="flex-shrink-0 font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-foreground/20 bg-background text-foreground whitespace-nowrap">
                 {props.versionLabel}

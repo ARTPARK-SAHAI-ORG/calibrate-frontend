@@ -1,4 +1,4 @@
-import { render, screen, setupUser, within } from "@/test-utils";
+import { render, screen, setupUser, waitFor, within } from "@/test-utils";
 import {
   ParetoFrontierChart,
   type ParetoModelPoint,
@@ -113,6 +113,56 @@ describe("ParetoFrontierChart", () => {
     // Best-only is on by default: frontier models show, dominated ones don't.
     expect(screen.getAllByText("Premium").length).toBeGreaterThan(0);
     expect(screen.queryByText("Worst")).not.toBeInTheDocument();
+  });
+
+  it("explains the two buttons above the chart in the app's own hover text", async () => {
+    const user = setupUser();
+    renderChart(points);
+
+    const best = screen.getByRole("button", {
+      name: "Show the best models only",
+    });
+    expect(best).not.toHaveAttribute("title");
+    await user.hover(best);
+    expect(
+      await screen.findByText(
+        "Show only the best models (the ones on the green line)",
+      ),
+    ).toBeInTheDocument();
+
+    const png = screen.getByRole("button", { name: "Download as PNG" });
+    expect(png).not.toHaveAttribute("title");
+    await user.hover(png);
+    expect(await screen.findByText("Download as PNG")).toBeInTheDocument();
+  });
+
+  it("shows a model name in hover text only when the column has cut it short", async () => {
+    const user = setupUser();
+    renderChart(points);
+    // The name fits: hovering it adds nothing, and there is no browser tooltip.
+    const fits = screen.getAllByText("Premium");
+    const beforeFits = fits.length;
+    expect(fits[fits.length - 1]).not.toHaveAttribute("title");
+    await user.hover(fits[fits.length - 1]);
+    expect(screen.getAllByText("Premium").length).toBe(beforeFits);
+
+    // jsdom reports every width as 0, so a name the column has cut short is
+    // described directly by standing in for the two widths the check compares.
+    const scrollWidth = jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(300);
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(80);
+    renderChart(points);
+    const clipped = screen.getAllByText("Mid");
+    const beforeClipped = clipped.length;
+    await user.hover(clipped[clipped.length - 1]);
+    await waitFor(() =>
+      expect(screen.getAllByText("Mid").length).toBeGreaterThan(beforeClipped),
+    );
+    scrollWidth.mockRestore();
+    clientWidth.mockRestore();
   });
 
   it("sorts by Quality (highest first) by default, shown on the header", () => {

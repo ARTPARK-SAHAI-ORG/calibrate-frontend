@@ -184,7 +184,7 @@ describe("TestsTabContent verify-before-run gate", () => {
     );
 
     await waitFor(() => expect(runAllButton()).toBeInTheDocument());
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     expect(runAllButton()).toHaveTextContent("Run 1 test");
     await user.click(runAllButton());
     // The same confirmation as Run all tests, worded for the ticked tests.

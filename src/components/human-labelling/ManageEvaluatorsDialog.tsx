@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { Tooltip } from "@/components/Tooltip";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import {
   EVALUATOR_TYPE_LABELS,
@@ -263,6 +264,16 @@ export function ManageEvaluatorsDialog({
     setOrderedSelected((prev) => prev.filter((id) => id !== uuid));
   };
 
+  const saveButton = (
+    <button
+      onClick={handleSave}
+      disabled={!canSave || saving}
+      className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {saving ? "Saving..." : "Save changes"}
+    </button>
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
@@ -339,29 +350,29 @@ export function ManageEvaluatorsDialog({
             {/* Left column: catalogue with checkboxes */}
             <div className="flex flex-col gap-2 min-w-0">
               <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <svg
-                      className="w-4 h-4 text-muted-foreground"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                      />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search evaluators"
-                    className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <svg
+                    className="w-4 h-4 text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                    />
+                  </svg>
                 </div>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search evaluators"
+                  className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
 
               <div className="border border-border rounded-md max-h-80 overflow-y-auto divide-y divide-border">
                 {loading ? (
@@ -511,28 +522,32 @@ export function ManageEvaluatorsDialog({
                           />
                           Optional
                         </label>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSelected(uuid)}
-                          aria-label={`Remove ${ev?.name ?? "evaluator"}`}
-                          title="Remove from selection"
-                          disabled={saving}
-                          className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        <Tooltip
+                          content="Remove from selection"
+                          className="flex-shrink-0"
                         >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSelected(uuid)}
+                            aria-label={`Remove ${ev?.name ?? "evaluator"}`}
+                            disabled={saving}
+                            className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        </Tooltip>
                       </div>
                     );
                   })
@@ -569,18 +584,15 @@ export function ManageEvaluatorsDialog({
           >
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            disabled={!canSave || saving}
-            title={
-              wouldRemoveAll
-                ? "A task must have at least one evaluator"
-                : undefined
-            }
-            className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? "Saving..." : "Save changes"}
-          </button>
+          {wouldRemoveAll ? (
+            // The hover text is on the wrapper, so it still shows while the
+            // button is disabled.
+            <Tooltip content="A task must have at least one evaluator">
+              {saveButton}
+            </Tooltip>
+          ) : (
+            saveButton
+          )}
         </div>
       </div>
 

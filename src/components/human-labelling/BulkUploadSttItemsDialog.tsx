@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { apiClient } from "@/lib/api";
+import { ClippedText } from "@/components/ui";
 import {
   AnnotationOptIn,
   BulkUploadDialogShell,
@@ -49,6 +50,7 @@ const PREDICTED_HEADERS = [
   "prediction",
   "hypothesis",
 ];
+
 
 const NO_SCORES_MESSAGE =
   "No scores were filled in. Add a value in at least one evaluator column, or answer No to uploading existing human labels.";
@@ -524,13 +526,11 @@ export function BulkUploadSttItemsDialog({
             Predicted transcript
           </div>
           {annotationColumns.map((c) => (
-            <div
+            <ClippedText
               key={`ah-${c.evaluatorUuid}-${c.kind}`}
-              className="text-xs font-medium text-muted-foreground font-mono truncate"
-              title={c.header}
-            >
-              {c.header}
-            </div>
+              text={c.header}
+              className="block truncate text-xs font-medium text-muted-foreground font-mono"
+            />
           ))}
         </div>
         <div className="divide-y divide-border">
@@ -540,21 +540,17 @@ export function BulkUploadSttItemsDialog({
               className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
               style={sttGridStyle}
             >
-              <div className="truncate text-foreground" title={p.name}>
+              <ClippedText text={p.name} className="block truncate text-foreground">
                 {p.name || <span className="text-muted-foreground">—</span>}
-              </div>
-              <div
-                className="truncate text-foreground"
-                title={p.reference_transcript}
-              >
-                {p.reference_transcript}
-              </div>
-              <div
-                className="truncate text-foreground"
-                title={p.predicted_transcript}
-              >
-                {p.predicted_transcript}
-              </div>
+              </ClippedText>
+              <ClippedText
+                text={p.reference_transcript}
+                className="block truncate text-foreground"
+              />
+              <ClippedText
+                text={p.predicted_transcript}
+                className="block truncate text-foreground"
+              />
               {annotationColumns.map((c) => {
                 const ann = p.annotations.find(
                   (a) => a.evaluator_uuid === c.evaluatorUuid,

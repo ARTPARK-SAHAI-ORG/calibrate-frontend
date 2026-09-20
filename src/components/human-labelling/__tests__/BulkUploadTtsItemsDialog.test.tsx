@@ -1,6 +1,6 @@
 import React from "react";
 import JSZip from "jszip";
-import { render, screen, waitFor, act } from "@/test-utils";
+import { render, screen, setupUser, waitFor, act } from "@/test-utils";
 import { BulkUploadTtsItemsDialog } from "../BulkUploadTtsItemsDialog";
 
 jest.mock("../../../lib/api", () => ({
@@ -379,5 +379,69 @@ describe("BulkUploadTtsItemsDialog", () => {
     );
     expect(screen.queryByText(/Request failed: 409/)).not.toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();
+  });
+});
+
+describe("the whole cell on hover", () => {
+  // jsdom gives every element a width of 0, so whether a cell is cut off is
+  // described directly by standing in for the two widths that are compared.
+  function mockWidths(scroll: number, client: number) {
+    jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(scroll);
+    jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(client);
+  }
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("does not repeat text the column shows in full", async () => {
+    const user = setupUser();
+    mockWidths(80, 80);
+    const { container } = renderDialog();
+    await uploadZip(
+      container,
+      await buildZip({
+        csv: "name,text,audio_file\nGreeting,Hello there,a.wav",
+        files: { "audios/a.wav": "RIFFfakeaudio" },
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText("Hello there")).toBeInTheDocument(),
+    );
+
+    await user.hover(screen.getByText("Hello there"));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.getAllByText("Hello there")).toHaveLength(1);
+  });
+
+  it("shows the whole text when the column has cut it off", async () => {
+    const user = setupUser();
+    mockWidths(300, 80);
+    const { container } = renderDialog();
+    await uploadZip(
+      container,
+      await buildZip({
+        csv: "name,text,audio_file\nGreeting,A very long line of speech indeed,a.wav",
+        files: { "audios/a.wav": "RIFFfakeaudio" },
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText("A very long line of speech indeed"),
+      ).toBeInTheDocument(),
+    );
+
+    await user.hover(screen.getByText("A very long line of speech indeed"));
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("A very long line of speech indeed").length,
+      ).toBeGreaterThan(1),
+    );
   });
 });

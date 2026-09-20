@@ -19,6 +19,12 @@ const NOT_SCORED = (
   <span className="text-sm text-muted-foreground/70">Not scored yet</span>
 );
 
+// A run that failed or was skipped has no score coming, and a column left
+// blank reads as something broken rather than as an answer.
+const COULD_NOT_RUN = (
+  <span className="text-sm text-muted-foreground/70">Could not run</span>
+);
+
 type Props = {
   trace: Pick<
     TraceSummary,
@@ -86,11 +92,12 @@ function ScoreValue({
     );
   }
   const score = trace.results?.find((s) => s.evaluator_uuid === evaluatorUuid);
-  // A run that failed or was skipped says so once, in the mark beside the
-  // input. "Not scored yet" here would promise a score that is not coming.
   if (!score) {
-    const done = trace.latest_run_status;
-    return done && done !== "completed" ? null : NOT_SCORED;
+    // A trace nothing has tried to score, and a finished run that simply
+    // carries no result for this evaluator, are both still waiting on one.
+    // Any other finished run is one that could not produce a score at all.
+    const status = trace.latest_run_status;
+    return !status || status === "completed" ? NOT_SCORED : COULD_NOT_RUN;
   }
   const verdict =
     score.output_type === "rating" ? (
@@ -135,8 +142,15 @@ export function TraceScoreMark({
     const words = status === "pending" ? "Waiting to be scored" : "In progress";
     return (
       <Tooltip content={words} position="top">
-        <span role="img" aria-label={words} className="inline-flex">
-          <SpinnerIcon className="w-4 h-4 animate-spin text-muted-foreground" />
+        {/* Sized, coloured and centred the way RunStateMark draws the other
+            marks in this column, so the four read as one set. The span is
+            what carries the role, since SpinnerIcon takes only a class. */}
+        <span
+          role="img"
+          aria-label={words}
+          className="inline-flex items-center shrink-0"
+        >
+          <SpinnerIcon className="w-4 h-4 animate-spin text-amber-500" />
         </span>
       </Tooltip>
     );
@@ -154,9 +168,8 @@ export function TraceScoreMark({
 
 /**
  * The evaluator cells of one trace row: one per column, holding that
- * evaluator's result. How the run itself went is the mark beside the input,
- * so a run with no results leaves these cells empty rather than explaining
- * itself once per column.
+ * evaluator's result. A column with no result says why in words, so a trace
+ * whose scoring failed or was skipped never reads as a row of blank cells.
  */
 export function TraceScoreCells({ trace, columns, layout }: Props) {
   if (columns.length === 0) return null;

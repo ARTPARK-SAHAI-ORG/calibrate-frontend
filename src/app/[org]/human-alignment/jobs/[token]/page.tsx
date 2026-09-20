@@ -183,7 +183,6 @@ export default function AdminAnnotateJobPage() {
                       ? "bg-emerald-500/15 border-emerald-500/45 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-500/25 dark:hover:bg-emerald-500/20"
                       : "bg-amber-500/16 border-amber-500/50 text-amber-950 dark:text-amber-100 hover:bg-amber-500/28 dark:hover:bg-amber-500/22"
                   }`}
-                  title="Copy job link"
                 >
                   {copied ? (
                     <>

@@ -47,8 +47,20 @@ jest.mock("../../../components/MultiSelectPicker", () => ({
   ),
 }));
 
+// The real hover popup measures and portals; here it only needs to say what
+// it would have shown, so the tests can check when it is there at all.
 jest.mock("../../Tooltip", () => ({
-  Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  Tooltip: ({
+    content,
+    children,
+  }: {
+    content: React.ReactNode;
+    children: React.ReactNode;
+  }) => (
+    <div data-testid="hover-text" data-content={String(content)}>
+      {children}
+    </div>
+  ),
 }));
 
 jest.mock("../EvaluatorRunDetailView", () => {
@@ -130,7 +142,6 @@ function baseSummary(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
-
 
 // The same rule the labelling form uses: a tool-call item is answered by the
 // tool call evaluator alone, every other item by everything else.
@@ -282,6 +293,57 @@ describe("ItemDetailDialog", () => {
         is_optional: true,
       },
     ]);
+  });
+
+  it("does not repeat the item's name when the header shows it in full", async () => {
+    apiClientMock.mockResolvedValue(baseSummary());
+    render(
+      <ItemDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        task={task}
+        item={item}
+        accessToken="tok"
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("item-detail-pane")).toBeInTheDocument(),
+    );
+
+    const heading = screen.getByRole("heading", { name: "My Item" });
+    expect(heading).not.toHaveAttribute("title");
+    expect(
+      screen.getAllByTestId("hover-text").map((el) => el.dataset.content),
+    ).not.toContain("My Item");
+  });
+
+  it("shows the whole of the item's name when the header has cut it off", async () => {
+    // jsdom has no layout, so the cut-off name is described directly by
+    // standing in for the two widths the header compares.
+    const scrollWidth = jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(300);
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(80);
+    apiClientMock.mockResolvedValue(baseSummary());
+    render(
+      <ItemDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        task={task}
+        item={item}
+        accessToken="tok"
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getAllByTestId("hover-text").map((el) => el.dataset.content),
+      ).toContain("My Item"),
+    );
+
+    scrollWidth.mockRestore();
+    clientWidth.mockRestore();
   });
 
   it("falls back to 'Item' when the payload has no name", async () => {

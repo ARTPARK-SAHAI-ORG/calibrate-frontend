@@ -597,6 +597,38 @@ describe("STTDatasetEditor", () => {
       expect(screen.getAllByText("b.wav").length).toBeGreaterThan(0);
     });
 
+    it("puts the whole path the file came from on hover", async () => {
+      const user = setupUser();
+      render(
+        <Harness
+          savedItems={[
+            makeItem({ uuid: "b", audio_path: "s3://internal/deep/b.wav" }),
+          ]}
+        />,
+      );
+
+      await user.hover(screen.getAllByText("b.wav")[0]);
+      await waitFor(() =>
+        expect(
+          screen.getByText("s3://internal/deep/b.wav"),
+        ).toBeInTheDocument(),
+      );
+    });
+
+    it("has no hover text on a row with no audio", async () => {
+      const user = setupUser();
+      render(
+        <Harness
+          savedItems={[makeItem({ uuid: "a", audio_path: undefined })]}
+        />,
+      );
+
+      // The desktop row and the mobile card each carry the badge.
+      const before = screen.getAllByText("No audio").length;
+      await user.hover(screen.getAllByText("No audio")[0]);
+      expect(screen.getAllByText("No audio")).toHaveLength(before);
+    });
+
     it("shows 'No audio' when a saved item has no audio_path", () => {
       const savedItems = [makeItem({ uuid: "a", audio_path: undefined })];
       render(<Harness savedItems={savedItems} />);

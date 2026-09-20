@@ -45,7 +45,6 @@ import {
   useTraces,
 } from "@/hooks";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
-import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { CONTACT_LINK } from "@/constants/limits";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
@@ -70,6 +69,14 @@ const OUTPUT_FILTER_OPTIONS: { value: TraceOutputFilter; label: string }[] = [
   { value: "response", label: "Response" },
   { value: "tool_call", label: "Tool call" },
 ];
+
+/**
+ * A number of traces, said the way a person says it: "1 trace", "50,000
+ * traces". Both limit lines use it so neither can end up with "1 traces".
+ */
+function traceCount(n: number): string {
+  return `${n.toLocaleString()} trace${n === 1 ? "" : "s"}`;
+}
 
 /**
  * The Monitoring tab on the agent detail page: the production conversations sent
@@ -505,14 +512,13 @@ export function TracesTabContent({
   );
 
   const overLimit = items.some((t) => t.latest_run_error === "over_limit");
-  const isScoringNow =
-    traceScoring.enabled &&
-    items.some((t) => isTraceScoringInProgress(t.latest_run_status));
-  // Only asked for once the cap has actually bitten, so the line carries the
-  // workspace's own number rather than a guess.
+  // Read on every visit, because the storage limit leaves no trace of itself
+  // here: past it the backend turns down the customer's own app, that app
+  // logs the refusal on its own server, and this tab just looks like a quiet
+  // day. The scoring limit's own number comes from the same answer.
   const [usage, setUsage] = useState<TraceUsage | null>(null);
   useEffect(() => {
-    if (!overLimit || !accessToken || usage) return;
+    if (!accessToken) return;
     let cancelled = false;
     fetchTraceUsage(accessToken)
       .then((next) => {
@@ -522,7 +528,10 @@ export function TracesTabContent({
     return () => {
       cancelled = true;
     };
-  }, [overLimit, accessToken, usage]);
+  }, [accessToken]);
+  const storageFull =
+    usage != null && usage.traces_stored >= usage.max_traces;
+  const isScoringLive = traceScoring.enabled && !overLimit && !storageFull;
 
   const handleRefresh = async () => {
     // A refresh can bring in traces of the other kind, which the counts read
@@ -607,8 +616,84 @@ export function TracesTabContent({
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
 
+  const emptyState = (
+    <TracesEmptyState
+      agentUuid={agentUuid}
+      agentNature={agentNature}
+      onCheckForTraces={async () => {
+        // The first trace is also the first chance to have labels.
+        refetchLabels();
+        return refetch();
+      }}
+    />
+  );
+
+  // A list that failed to load has nothing behind it, so the failure is all
+  // that is shown: no search box, no filters, no count, no table, and none of
+  // the scoring lines or averages, which would otherwise describe traces
+  // nobody can see. Any open dialog goes with them for the same reason.
+  // The setup steps are the one exception: the API key the reader just made
+  // lives only on that screen and is shown once, so a failed check must not
+  // take it away.
+  if (error) {
+    return (
+      <div className="flex flex-col space-y-4 md:space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">
+          <span>{error}</span>
+          {/* The same arrow RunFailureBox uses, so a retry looks the same
+              wherever something failed. It stays in its waiting state until
+              the load answers, rather than letting the reader press twice. */}
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium border border-red-300 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"
+              />
+            </svg>
+            {isRefreshing ? "Trying again" : "Try again"}
+          </button>
+        </div>
+        {showEmptyState && emptyState}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
+      {/* Shown even over the setup steps: with storage full, the very thing
+          those steps ask for cannot happen, and the reader would be left
+          sending traces that are quietly turned away. */}
+      {hasLoaded && storageFull && usage && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            New traces are no longer being stored because this workspace has
+            reached its limit of {traceCount(usage.max_traces)}. Delete traces
+            to make room.{" "}
+            <a
+              href={CONTACT_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold"
+            >
+              Click here
+            </a>{" "}
+            to contact us to extend your limits.
+          </p>
+        </div>
+      )}
+
       {/* Quiet while scoring works: the chip in the toolbar carries the state
           and its detail. Only a real problem takes a row of its own. */}
       {hasLoaded && !showEmptyState && (nothingCanScore || overLimit) && (
@@ -627,13 +712,13 @@ export function TracesTabContent({
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
               <p className="text-sm text-amber-700 dark:text-amber-300">
                 {usage
-                  ? `Some traces were not scored because this workspace has scored the ${usage.max_scored_traces} traces its limit allows.`
-                  : "Some traces were not scored because this workspace has scored as many traces as its limit allows."}{" "}
+                  ? `Some traces were not scored because this workspace has reached its limit of scoring ${traceCount(usage.max_scored_traces)}.`
+                  : "Some traces were not scored because this workspace has reached its limit for scoring traces."}{" "}
                 <a
                   href={CONTACT_LINK}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-bold underline"
+                  className="font-bold"
                 >
                   Click here
                 </a>{" "}
@@ -651,9 +736,11 @@ export function TracesTabContent({
           cards={scoreCards}
           singleRow
           headingAside={
-            // Only while a trace really is being scored: a pulse over numbers
-            // that cannot move reads as live when it is not.
-            isScoringNow ? (
+            // On whenever scoring is on, because that is what makes these
+            // numbers live: they move on their own as traces arrive. Off once
+            // the scoring limit is reached, since a pulse over numbers that
+            // cannot move reads as live when it is not.
+            isScoringLive ? (
               <span
                 aria-hidden
                 className="inline-flex w-2 h-2 rounded-full bg-green-500 animate-pulse"
@@ -661,12 +748,6 @@ export function TracesTabContent({
             ) : null
           }
         />
-      )}
-
-      {error && (
-        <div className="border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">
-          {error}
-        </div>
       )}
 
       {/* Above the list rather than inside it, so a search that matches nothing
@@ -718,15 +799,7 @@ export function TracesTabContent({
       {!hasLoaded ? (
         <LoadingState />
       ) : showEmptyState ? (
-        <TracesEmptyState
-          agentUuid={agentUuid}
-          agentNature={agentNature}
-          onCheckForTraces={async () => {
-            // The first trace is also the first chance to have labels.
-            refetchLabels();
-            return refetch();
-          }}
-        />
+        emptyState
       ) : (
         <div className="space-y-3">
           {/* Above the no-match message too: rows ticked before the search was

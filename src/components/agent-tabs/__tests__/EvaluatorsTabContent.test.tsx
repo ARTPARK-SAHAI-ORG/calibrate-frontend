@@ -477,4 +477,21 @@ describe("EvaluatorsTabContent", () => {
     await user.click(screen.getByRole("button", { name: "Create evaluator" }));
     expect(screen.getByTestId("use-case-types")).toHaveTextContent("llm");
   });
+  it("shows the app's own hover text on Remove, and none on View", async () => {
+    const user = setupUser();
+    mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
+    mockFetchAllEvaluators.mockResolvedValue([evaluator()]);
+
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    const remove = await screen.findByRole("button", { name: "Remove" });
+    expect(remove).not.toHaveAttribute("title");
+    // View says the same thing as its own label, so it has no hover text.
+    expect(screen.getByRole("button", { name: "View" })).not.toHaveAttribute(
+      "title",
+    );
+
+    await user.hover(remove);
+    expect(await screen.findByText("Remove from agent")).toBeInTheDocument();
+  });
 });

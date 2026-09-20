@@ -300,7 +300,7 @@ describe("ToolsTabContent", () => {
   it("opens the DeleteToolDialog from the desktop delete button with the selected tool", async () => {
     const user = setupUser();
     renderComponent();
-    const deleteButtons = screen.getAllByTitle("Remove tool from agent");
+    const deleteButtons = screen.getAllByLabelText("Remove tool from agent");
     await user.click(deleteButtons[0]);
     expect(deleteToolProps.isOpen).toBe(true);
     expect(deleteToolProps.tool).toEqual(toolA);
@@ -309,7 +309,7 @@ describe("ToolsTabContent", () => {
   it("opens the DeleteToolDialog from the mobile delete button with the selected tool", async () => {
     const user = setupUser();
     renderComponent();
-    const deleteButtons = screen.getAllByTitle("Remove tool from agent");
+    const deleteButtons = screen.getAllByLabelText("Remove tool from agent");
     // The desktop table and mobile cards render as two separate lists (one
     // button per tool each), so with 2 tools: [0,1] = desktop, [2,3] = mobile.
     await user.click(deleteButtons[2]);
@@ -321,7 +321,7 @@ describe("ToolsTabContent", () => {
     const setAgentTools = jest.fn();
     const user = setupUser();
     renderComponent({ setAgentTools });
-    const deleteButtons = screen.getAllByTitle("Remove tool from agent");
+    const deleteButtons = screen.getAllByLabelText("Remove tool from agent");
     await user.click(deleteButtons[0]);
 
     act(() => {
@@ -359,7 +359,7 @@ describe("ToolsTabContent", () => {
   it("does not open the edit dialog when the delete button on a row is clicked", async () => {
     const user = setupUser();
     renderComponent();
-    const deleteButtons = screen.getAllByTitle("Remove tool from agent");
+    const deleteButtons = screen.getAllByLabelText("Remove tool from agent");
     await user.click(deleteButtons[0]);
 
     expect(editToolProps.isOpen).toBe(false);
@@ -385,7 +385,7 @@ describe("ToolsTabContent", () => {
   it("clears the selected tool and closes the dialog via DeleteToolDialog onClose", async () => {
     const user = setupUser();
     renderComponent();
-    const deleteButtons = screen.getAllByTitle("Remove tool from agent");
+    const deleteButtons = screen.getAllByLabelText("Remove tool from agent");
     await user.click(deleteButtons[0]);
     expect(deleteToolProps.isOpen).toBe(true);
 
@@ -487,5 +487,19 @@ describe("ToolsTabContent creating a tool", () => {
       ),
     );
     expect(setAgentTools).not.toHaveBeenCalled();
+  });
+  it("shows the app's own hover text on the remove button, not the browser's", async () => {
+    const user = setupUser();
+    renderComponent();
+
+    const [removeButton] = screen.getAllByLabelText("Remove tool from agent");
+    expect(removeButton).not.toHaveAttribute("title");
+
+    await user.hover(removeButton);
+    await waitFor(() =>
+      // The words are on screen only as the app's own hover text: the button
+      // itself carries them as its name for a screen reader.
+      expect(screen.getByText("Remove tool from agent")).toBeInTheDocument(),
+    );
   });
 });

@@ -160,7 +160,7 @@ describe("EvaluatorPromptPreview", () => {
     render(<EvaluatorPromptPreview evaluatorUuid="e1" onDelete={onDelete} />);
     await screen.findByText("Judge whether the reply is concise.");
 
-    await user.click(screen.getByTitle("Delete evaluator"));
+    await user.click(screen.getByLabelText("Delete evaluator"));
     expect(onDelete).toHaveBeenCalledWith("e1");
   });
 
@@ -168,13 +168,13 @@ describe("EvaluatorPromptPreview", () => {
     mockFetch.mockResolvedValue({ ...DETAIL, is_protected: true });
     render(<EvaluatorPromptPreview evaluatorUuid="e1" onDelete={jest.fn()} />);
     await screen.findByText("Judge whether the reply is concise.");
-    expect(screen.queryByTitle("Delete evaluator")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Delete evaluator")).not.toBeInTheDocument();
   });
 
   it("hides Delete when onDelete is not passed", async () => {
     render(<EvaluatorPromptPreview evaluatorUuid="e1" />);
     await screen.findByText("Judge whether the reply is concise.");
-    expect(screen.queryByTitle("Delete evaluator")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Delete evaluator")).not.toBeInTheDocument();
   });
 
   it("asks for each evaluator once, even when the reader comes back to it", async () => {

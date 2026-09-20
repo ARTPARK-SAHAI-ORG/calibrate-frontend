@@ -2,11 +2,29 @@ import { render, screen, setupUser } from "@/test-utils";
 import { DeleteIconButton } from "../DeleteIconButton";
 
 describe("DeleteIconButton", () => {
-  it("renders with the default title and aria-label", () => {
+  it("renders with the default label", () => {
     render(<DeleteIconButton onClick={jest.fn()} />);
     const button = screen.getByRole("button", { name: "Delete" });
     expect(button).toBeInTheDocument();
-    expect(button).toHaveAttribute("title", "Delete");
+    expect(button).not.toHaveAttribute("title");
+  });
+
+  it("shows the hover text in the app's own tooltip, not the browser's", async () => {
+    const user = setupUser();
+    render(<DeleteIconButton onClick={jest.fn()} title="Delete trace" />);
+    const button = screen.getByRole("button", { name: "Delete trace" });
+    expect(button).not.toHaveAttribute("title");
+
+    await user.hover(button);
+    expect(await screen.findByText("Delete trace")).toBeInTheDocument();
+  });
+
+  it("leaves the hover text to the caller while disabled, so only one shows", () => {
+    render(<DeleteIconButton onClick={jest.fn()} disabled />);
+    const button = screen.getByRole("button", { name: "Delete" });
+    expect(button).toBeDisabled();
+    expect(button).not.toHaveAttribute("title");
+    expect(screen.queryByText("Delete")).not.toBeInTheDocument();
   });
 
   it("uses a custom title", () => {
@@ -24,7 +42,7 @@ describe("DeleteIconButton", () => {
     );
     expect(
       screen.getByRole("button", { name: "Remove this item permanently" })
-    ).toHaveAttribute("title", "Remove item");
+    ).not.toHaveAttribute("title");
   });
 
   it("calls onClick and stops propagation when clicked", async () => {

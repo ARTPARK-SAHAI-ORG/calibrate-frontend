@@ -2,6 +2,8 @@
 
 import React from "react";
 import { ToolIcon } from "@/components/icons";
+import { Tooltip } from "@/components/Tooltip";
+import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { DeleteIconButton } from "@/components/ui";
 import type { TraceSummary, TraceToolCall } from "@/lib/tracesApi";
@@ -81,6 +83,21 @@ export function traceOutputPreview(trace: {
   return names.length > 0 ? names.join(", ") : null;
 }
 
+/**
+ * One line of text the column shortens with an ellipsis. The whole line is put
+ * in hover text only when it has actually been cut short: repeating a line the
+ * reader can already read in full just covers the row next to it.
+ */
+function ClippedLine({ text, className }: { text: string; className: string }) {
+  const { ref, clipped } = useIsNameClipped(text);
+  const line = (
+    <div ref={ref} className={`${className} truncate`}>
+      {text}
+    </div>
+  );
+  return clipped ? <Tooltip content={text}>{line}</Tooltip> : line;
+}
+
 function ToolCallPreview({ call }: { call: TraceToolCall }) {
   const argsLine = formatToolArgs(call.arguments);
   return (
@@ -92,12 +109,10 @@ function ToolCallPreview({ call }: { call: TraceToolCall }) {
         </span>
       </div>
       {argsLine && (
-        <p
-          className="text-xs text-muted-foreground truncate mt-0.5 pl-5"
-          title={argsLine}
-        >
-          {argsLine}
-        </p>
+        <ClippedLine
+          text={argsLine}
+          className="text-xs text-muted-foreground mt-0.5 pl-5"
+        />
       )}
     </div>
   );
@@ -106,11 +121,7 @@ function ToolCallPreview({ call }: { call: TraceToolCall }) {
 function TraceOutputCell({ trace }: { trace: TraceSummary }) {
   const reply = trace.response_preview?.trim();
   if (reply) {
-    return (
-      <div className="text-sm text-foreground truncate" title={reply}>
-        {reply}
-      </div>
-    );
+    return <ClippedLine text={reply} className="text-sm text-foreground" />;
   }
   const calls = (trace.tool_calls ?? []).filter((call) => call.tool?.trim());
   if (calls.length > 0) {
@@ -124,11 +135,7 @@ function TraceOutputCell({ trace }: { trace: TraceSummary }) {
   }
   const names = traceOutputPreview(trace);
   if (!names) return null;
-  return (
-    <div className="text-sm text-foreground truncate" title={names}>
-      {names}
-    </div>
-  );
+  return <ClippedLine text={names} className="text-sm text-foreground" />;
 }
 
 /**
