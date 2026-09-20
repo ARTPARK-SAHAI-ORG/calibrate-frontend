@@ -20,18 +20,17 @@ import {
   type TraceOutputFacts,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
-import { MultiSelectPicker } from "@/components/MultiSelectPicker";
 import {
   SubmitForLabellingButton,
   SUBMIT_FOR_LABELLING_CLASS,
 } from "@/components/human-labelling/labellingSubmit";
-import { SearchIcon } from "@/components/icons";
+import { TracesFilter } from "@/components/traces/TracesFilter";
+import { CodeIcon, SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
   Button,
   LoadingState,
   SearchInput,
-  SegmentedFilter,
   ServerPaginatedListBar,
 } from "@/components/ui";
 import { useAgentDefaultsPrompt } from "@/hooks/useAgentDefaultsPrompt";
@@ -60,16 +59,6 @@ import {
   type TraceSummary,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
-
-/** What a trace's output can be filtered down to. A trace that both replied
- *  and called tools counts as a reply, which is also how "Add to tests"
- *  decides: one selected trace with a reply makes the whole batch judge
- *  replies. */
-const OUTPUT_FILTER_OPTIONS: { value: TraceOutputFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "response", label: "Response" },
-  { value: "tool_call", label: "Tool call" },
-];
 
 /**
  * The Monitoring tab on the agent detail page: the production conversations sent
@@ -607,11 +596,24 @@ export function TracesTabContent({
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
 
+  const hasWarning = nothingCanScore || overLimit;
+
+  const integrationGuideButton = (
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={() => setIntegrationGuideOpen(true)}
+    >
+      <CodeIcon className="w-4 h-4" />
+      Integration guide
+    </Button>
+  );
+
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
       {/* Quiet while scoring works: the chip in the toolbar carries the state
           and its detail. Only a real problem takes a row of its own. */}
-      {hasLoaded && !showEmptyState && (nothingCanScore || overLimit) && (
+      {hasLoaded && !showEmptyState && hasWarning && (
         <div className="space-y-3">
           {nothingCanScore && (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
@@ -644,25 +646,6 @@ export function TracesTabContent({
         </div>
       )}
 
-      {hasLoaded && !showEmptyState && scoreCards.length > 0 && (
-        <EvaluatorScoreCards
-          heading="Production quality"
-          description="Live average of the scores for each evaluator across all the production traces"
-          cards={scoreCards}
-          singleRow
-          headingAside={
-            // Only while a trace really is being scored: a pulse over numbers
-            // that cannot move reads as live when it is not.
-            isScoringNow ? (
-              <span
-                aria-hidden
-                className="inline-flex w-2 h-2 rounded-full bg-green-500 animate-pulse"
-              />
-            ) : null
-          }
-        />
-      )}
-
       {error && (
         <div className="border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">
           {error}
@@ -679,40 +662,45 @@ export function TracesTabContent({
             placeholder="Search traces"
             className="w-full sm:w-2/5"
           />
-          <SegmentedFilter
-            value={outputFilter}
-            onChange={setOutputFilter}
-            options={OUTPUT_FILTER_OPTIONS}
-            className="sm:mr-auto"
-            ariaLabel="Filter traces by output"
+          {/* One control for both the output kind and the labels, so the row
+              stays the search box and the thing that narrows it. */}
+          <TracesFilter
+            value={{ outputType: outputFilter, labels: labelFilter }}
+            labels={allLabels}
+            onApply={(next) => {
+              setOutputFilter(next.outputType);
+              setLabelFilter(next.labels);
+            }}
           />
-          {/* Only worth showing once traces carry labels; an agent that sends
-              none would otherwise get an empty picker it can do nothing with. */}
-          {allLabels.length > 0 && (
-            <MultiSelectPicker
-              items={allLabels.map((label) => ({ uuid: label, name: label }))}
-              selectedItems={labelFilter.map((label) => ({
-                uuid: label,
-                name: label,
-              }))}
-              onSelectionChange={(picked) =>
-                setLabelFilter(picked.map((item) => item.uuid))
-              }
-              placeholder="All labels"
-              searchPlaceholder="Search labels"
-              size="sm"
-              className="w-full sm:w-48"
-            />
-          )}
-          {/* Stands the same height as the search box and the labels
-              picker beside it. */}
-          <Button
-            variant="secondary"
-            onClick={() => setIntegrationGuideOpen(true)}
-          >
-            Integration guide
-          </Button>
+          {/* Not a filter, so it sits apart from the two that are, at the
+              far end of the row. */}
+          <div className="sm:ml-auto">{integrationGuideButton}</div>
         </div>
+      )}
+
+      {hasLoaded && !showEmptyState && scoreCards.length > 0 && (
+        <EvaluatorScoreCards
+          heading="Production quality"
+          description={
+            // The numbers are read from whatever the list is showing, so a
+            // search or a filter makes "all the production traces" untrue.
+            isNarrowed
+              ? "Live average of the scores for each evaluator across the traces below"
+              : "Live average of the scores for each evaluator across all the production traces"
+          }
+          cards={scoreCards}
+          singleRow
+          headingAside={
+            // Only while a trace really is being scored: a pulse over numbers
+            // that cannot move reads as live when it is not.
+            isScoringNow ? (
+              <span
+                aria-hidden
+                className="inline-flex w-2 h-2 rounded-full bg-green-500 animate-pulse"
+              />
+            ) : null
+          }
+        />
       )}
 
       {!hasLoaded ? (
