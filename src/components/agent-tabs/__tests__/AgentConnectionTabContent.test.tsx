@@ -480,9 +480,7 @@ describe("AgentConnectionTabContent", () => {
 
   it("names both switches in the tab, so each can be found on its own", () => {
     renderComponent();
-    expect(
-      screen.getAllByRole("switch").map((el) => el.getAttribute("aria-label")),
-    ).toHaveLength(2);
+    expect(screen.getAllByRole("switch")).toHaveLength(2);
     expect(
       screen.getByRole("switch", {
         name: "Does your agent return tool calls?",
