@@ -1,5 +1,8 @@
 ## September 2026
 
+- On the Monitoring tab, filtering by output kind and labels now happens through one control beside the search box, and the integration guide window is titled correctly once traces already exist ([#623](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/623))
+- The Connection tab now links to the documentation for connecting an agent, and links to the documentation elsewhere in the app that used to go nowhere now work ([#621](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/621))
+- On a connection agent, the switch to support benchmarking different models now sits in its own box with a note explaining what it does, and the model provider list just says "OpenRouter" instead of "OpenRouter (all providers)" ([#626](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/626))
 - Agents can now turn on continuous monitoring so every new trace is scored automatically by the agent's evaluators, with the scores, an average per evaluator, and the reasoning shown on the Monitoring tab ([#592](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/592))
 - A stopped model comparison now shows one clear note instead of two, and still shows the results table for the tests that finished ([#618](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/618))
 - A test run or model comparison now shows the same pass rate and status everywhere it appears, including its shared link, instead of disagreeing between screens ([#616](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/616))

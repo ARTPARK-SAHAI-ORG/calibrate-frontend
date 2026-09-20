@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DOCS_URL } from "@/constants/links";
 
 /** The coding agents the skills can be installed into. `flag` is what goes
  * after `--agent` in the install command, `label` is what the reader calls it. */
@@ -305,7 +306,7 @@ export function CodingAgentsSection() {
           </button>
         </div>
         <a
-          href={`${process.env.NEXT_PUBLIC_DOCS_URL}/agents/overview`}
+          href={`${DOCS_URL}/agents/overview`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 px-5 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"

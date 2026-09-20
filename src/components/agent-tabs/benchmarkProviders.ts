@@ -4,7 +4,7 @@
  * tab so the two lists cannot drift apart.
  */
 export const BENCHMARK_PROVIDERS: Array<{ value: string; label: string }> = [
-  { value: "openrouter", label: "OpenRouter (all providers)" },
+  { value: "openrouter", label: "OpenRouter" },
   { value: "openai", label: "OpenAI" },
   { value: "anthropic", label: "Anthropic" },
   { value: "google", label: "Google" },

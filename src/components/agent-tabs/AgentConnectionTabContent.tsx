@@ -2,7 +2,12 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useVerifyConnection } from "@/hooks";
-import { SpinnerIcon, CheckCircleIcon, AlertIcon } from "@/components/icons";
+import {
+  SpinnerIcon,
+  CheckCircleIcon,
+  AlertIcon,
+  ExternalLinkIcon,
+} from "@/components/icons";
 import {
   VerifyRequestPreviewDialog,
   type MessageRow,
@@ -20,6 +25,22 @@ import {
   BENCHMARK_PROVIDERS,
   DEFAULT_BENCHMARK_PROVIDER,
 } from "@/components/agent-tabs/benchmarkProviders";
+import {
+  AGENT_CONNECTIONS_DOCS_URL,
+  AGENT_CONNECTION_EXAMPLE_DOCS_URL,
+} from "@/constants/links";
+
+/** A documentation link sitting inside a line of grey helper text. Blue and
+ * medium weight so it does not disappear into the copy around it, with the
+ * arrow instead of an underline to say it opens outside the app. */
+const DOCS_LINK_CLASS =
+  "inline-flex items-center gap-1 font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors whitespace-nowrap";
+
+/** A documentation link that stands on its own rather than inside a sentence,
+ * so it is drawn as a button. Same classes as the blue button on the bulk
+ * upload dialog, so the two cannot drift apart. */
+const DOCS_BUTTON_CLASS =
+  "h-8 px-3 rounded-md text-xs font-semibold border border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300 hover:bg-blue-500/25 hover:border-blue-500/60 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap";
 
 type VerificationStatus = "unverified" | "verifying" | "verified" | "failed";
 
@@ -378,27 +399,6 @@ export function AgentConnectionTabContent({
       <div className="space-y-6 md:space-y-8">
         {/* Endpoint Section */}
         <div className="space-y-4 md:space-y-6">
-          {/* Benchmark toggle */}
-          <div className="flex items-center justify-between">
-            <label className="text-sm md:text-base font-medium text-foreground">
-              Support benchmarking different models
-            </label>
-            <button
-              type="button"
-              onClick={handleBenchmarkToggle}
-              disabled={isSaving}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                supportsBenchmark ? "bg-foreground" : "bg-border"
-              }`}
-            >
-              <span
-                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
-                  supportsBenchmark ? "translate-x-4" : "translate-x-1"
-                }`}
-              />
-            </button>
-          </div>
-
           {/* Agent URL */}
           <div className="space-y-1.5">
             <label className="block text-sm md:text-base font-medium text-foreground">
@@ -413,7 +413,16 @@ export function AgentConnectionTabContent({
             />
             <p className="text-xs text-muted-foreground">
               Calibrate will create a POST request to this URL with the{" "}
-              {isGeneral ? "input" : "conversation messages"}
+              {isGeneral ? "input" : "conversation messages"}.{" "}
+              <a
+                href={AGENT_CONNECTIONS_DOCS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={DOCS_LINK_CLASS}
+              >
+                Read how to connect your agent
+                <ExternalLinkIcon className="w-3 h-3" />
+              </a>
             </p>
           </div>
 
@@ -547,44 +556,81 @@ export function AgentConnectionTabContent({
             disabled={isSaving}
           />
 
-          {/* Benchmark Provider Picker */}
-          {supportsBenchmark && (
-            <div className="space-y-2 border border-border rounded-xl bg-muted/20 p-3 md:p-4">
-              <label className="text-sm md:text-base font-medium text-foreground">
-                Model provider
-              </label>
-              <p className="text-xs text-muted-foreground">
-                Choose the provider your agent uses to route model requests
-                during benchmarks.
-              </p>
-              <div className="relative">
-                <select
-                  value={benchmarkProvider}
-                  onChange={(e) => handleProviderChange(e.target.value)}
-                  className="w-full h-9 md:h-10 px-3 md:px-4 pr-10 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none"
-                >
-                  {BENCHMARK_PROVIDERS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-                <svg
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                  />
-                </svg>
+          {/* Benchmark toggle */}
+          <div
+            className={`rounded-xl border p-3 md:p-4 transition-colors ${
+              supportsBenchmark
+                ? "border-foreground/40 bg-accent"
+                : "border-border bg-muted/20"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <label className="block text-sm md:text-base font-medium text-foreground">
+                  Support benchmarking different models
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Calibrate sends a model name with every request, so the same
+                  tests can be run on several models
+                </p>
               </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={supportsBenchmark}
+                aria-label="Support benchmarking different models"
+                onClick={handleBenchmarkToggle}
+                disabled={isSaving}
+                className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                  supportsBenchmark ? "bg-foreground" : "bg-border"
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform ${
+                    supportsBenchmark ? "translate-x-4" : "translate-x-1"
+                  }`}
+                />
+              </button>
             </div>
-          )}
+
+            {supportsBenchmark && (
+              <div className="mt-3 space-y-2 border-t border-foreground/15 pt-3">
+                <label className="block text-sm md:text-base font-medium text-foreground">
+                  Model provider
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Choose the provider your agent uses to route model requests
+                  during benchmarks
+                </p>
+                <div className="relative">
+                  <select
+                    value={benchmarkProvider}
+                    onChange={(e) => handleProviderChange(e.target.value)}
+                    className="w-full h-9 md:h-10 px-3 md:px-4 pr-10 rounded-md text-sm md:text-base border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer appearance-none"
+                  >
+                    {BENCHMARK_PROVIDERS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                  <svg
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                    />
+                  </svg>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -686,21 +732,32 @@ export function AgentConnectionTabContent({
 
         {/* Expected Format */}
         <div className="border border-border rounded-xl overflow-hidden">
-          <div className="flex items-center gap-2 px-3 md:px-4 py-3 text-sm md:text-base font-medium text-foreground">
-            <svg
-              className="w-4 h-4 text-muted-foreground"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+          <div className="flex items-center justify-between gap-3 px-3 md:px-4 py-3 text-sm md:text-base font-medium text-foreground">
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-4 h-4 text-muted-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                />
+              </svg>
+              Expected request &amp; response format
+            </div>
+            <a
+              href={AGENT_CONNECTION_EXAMPLE_DOCS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={DOCS_BUTTON_CLASS}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-              />
-            </svg>
-            Expected request &amp; response format
+              See an example
+              <ExternalLinkIcon className="w-3.5 h-3.5" />
+            </a>
           </div>
           <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-4 border-t border-border bg-muted/10">
             <div className="pt-4 space-y-3">

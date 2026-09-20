@@ -158,15 +158,15 @@ test.describe("Agent detail (authenticated, real backend)", () => {
 
     // Toggle the "Does your agent return tool calls?" switch — local UI state
     // that re-renders the expected-format docs (no config change, so no
-    // unsaved-changes guard). It's the only role="switch" in this tab.
-    await page.getByRole("switch").click();
+    // unsaved-changes guard).
+    await page
+      .getByRole("switch", { name: "Does your agent return tool calls?" })
+      .click();
 
-    // Toggle "Support benchmarking different models" (a plain unlabeled toggle
-    // button that sits as the next sibling of its label). This reveals the
+    // Toggle "Support benchmarking different models". This reveals the
     // provider picker and exercises handleBenchmarkToggle.
     await page
-      .getByText("Support benchmarking different models")
-      .locator("xpath=./following-sibling::button")
+      .getByRole("switch", { name: "Support benchmarking different models" })
       .click();
     // The model-provider select appears once benchmarking is on.
     await expect(page.getByRole("combobox").first()).toBeVisible({

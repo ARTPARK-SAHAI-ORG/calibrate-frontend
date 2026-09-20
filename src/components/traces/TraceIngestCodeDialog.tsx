@@ -30,7 +30,7 @@ export function TraceIngestCodeDialog({
       <div className="bg-background rounded-xl w-full max-w-7xl h-[85vh] flex flex-col shadow-2xl">
         <div className="p-5 md:p-6 border-b border-border">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
-            Send your first trace
+            Integration guide
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             Add the following code snippet to your app to capture the agent's

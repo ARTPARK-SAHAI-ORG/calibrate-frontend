@@ -4,6 +4,10 @@ import {
   AgentConnectionTabContent,
   type ConnectionConfig,
 } from "../AgentConnectionTabContent";
+import {
+  AGENT_CONNECTIONS_DOCS_URL,
+  AGENT_CONNECTION_EXAMPLE_DOCS_URL,
+} from "@/constants/links";
 
 const verifyAdHoc = jest.fn();
 const dismiss = jest.fn();
@@ -113,6 +117,51 @@ describe("AgentConnectionTabContent", () => {
     expect(screen.getByText("Not verified")).toBeInTheDocument();
     const verifyButton = screen.getByText("Verify").closest("button");
     expect(verifyButton).toBeDisabled();
+  });
+
+  it("links the agent URL help text to the agent connections docs", () => {
+    renderComponent();
+    const link = screen.getByRole("link", {
+      name: "Read how to connect your agent",
+    });
+    expect(link).toHaveAttribute("href", AGENT_CONNECTIONS_DOCS_URL);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("puts the worked example beside the expected format heading", () => {
+    renderComponent();
+    const link = screen.getByRole("link", { name: "See an example" });
+    expect(link).toHaveAttribute("href", AGENT_CONNECTION_EXAMPLE_DOCS_URL);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+
+    // Same row as the heading, pushed to its right.
+    const row = link.parentElement!;
+    expect(row).toHaveTextContent("Expected request & response format");
+    expect(row.className).toContain("justify-between");
+  });
+
+  it("draws both documentation links in blue, with no underline", () => {
+    renderComponent();
+    for (const name of ["Read how to connect your agent", "See an example"]) {
+      const link = screen.getByRole("link", { name });
+      expect(link.className).not.toMatch(/underline/);
+      // Split on whitespace so a `hover:text-blue-…` class cannot satisfy this.
+      const restingColours = link.className
+        .split(/\s+/)
+        .filter((cls) => /^text-blue-\d00$/.test(cls));
+      expect(restingColours.length).toBeGreaterThan(0);
+      expect(link.querySelector("svg")).toBeInTheDocument();
+    }
+  });
+
+  it("draws See an example as a button, not as a line of text", () => {
+    renderComponent();
+    const link = screen.getByRole("link", { name: "See an example" });
+    expect(link.className).toContain("bg-blue-500/15");
+    expect(link.className).toContain("border-blue-500/40");
+    expect(link.className).toMatch(/\brounded-md\b/);
   });
 
   it("enables the verify button once a URL is entered", () => {
@@ -449,9 +498,9 @@ describe("AgentConnectionTabContent", () => {
     expect(screen.queryByText("Model provider")).not.toBeInTheDocument();
 
     await user.click(
-      screen
-        .getByText("Support benchmarking different models")
-        .parentElement!.querySelector("button") as HTMLButtonElement,
+      screen.getByRole("switch", {
+        name: "Support benchmarking different models",
+      }),
     );
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -472,6 +521,39 @@ describe("AgentConnectionTabContent", () => {
     expect(screen.getByText(/"model": "gpt-4.1"/)).toBeInTheDocument();
   });
 
+  function benchmarkBox() {
+    return screen.getByRole("switch", {
+      name: "Support benchmarking different models",
+    }).parentElement!.parentElement!;
+  }
+
+  it("names both switches in the tab, so each can be found on its own", () => {
+    renderComponent();
+    expect(screen.getAllByRole("switch")).toHaveLength(2);
+    expect(
+      screen.getByRole("switch", {
+        name: "Does your agent return tool calls?",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", {
+        name: "Support benchmarking different models",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the model provider picker inside the benchmarking box", () => {
+    const { unmount } = renderComponent();
+    expect(benchmarkBox().className).not.toContain("border-foreground/40");
+    unmount();
+
+    renderComponent({
+      connectionConfig: makeConfig({ supports_benchmark: true }),
+    });
+    expect(benchmarkBox().className).toContain("border-foreground/40");
+    expect(benchmarkBox()).toContainElement(screen.getByText("Model provider"));
+  });
+
   it("falls back to a generic model name for an unknown provider", () => {
     renderComponent({
       connectionConfig: makeConfig({
@@ -486,7 +568,7 @@ describe("AgentConnectionTabContent", () => {
     const { onConnectionConfigChange } = renderComponent({
       connectionConfig: makeConfig({ supports_benchmark: true }),
     });
-    const select = screen.getByDisplayValue("OpenRouter (all providers)");
+    const select = screen.getByDisplayValue("OpenRouter");
     fireEvent.change(select, { target: { value: "anthropic" } });
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
       expect.objectContaining({ benchmark_provider: "anthropic" }),
@@ -503,9 +585,9 @@ describe("AgentConnectionTabContent", () => {
     });
 
     await user.click(
-      screen
-        .getByText("Support benchmarking different models")
-        .parentElement!.querySelector("button") as HTMLButtonElement,
+      screen.getByRole("switch", {
+        name: "Support benchmarking different models",
+      }),
     );
     expect(onConnectionConfigChange).toHaveBeenCalledWith(
       expect.objectContaining({

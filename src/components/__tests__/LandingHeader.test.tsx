@@ -2,16 +2,6 @@ import { render, screen, setupUser } from "@/test-utils";
 import { LandingHeader } from "../LandingHeader";
 
 describe("LandingHeader", () => {
-  const originalDocsUrl = process.env.NEXT_PUBLIC_DOCS_URL;
-
-  beforeEach(() => {
-    process.env.NEXT_PUBLIC_DOCS_URL = "https://docs.example.com";
-  });
-
-  afterEach(() => {
-    process.env.NEXT_PUBLIC_DOCS_URL = originalDocsUrl;
-  });
-
   // The logo's name comes from its image alt plus the wordmark, so anchoring on
   // "Calibrate Logo" keeps these from also matching the "Why Calibrate?" link.
   const logoName = /^Calibrate Logo/;
