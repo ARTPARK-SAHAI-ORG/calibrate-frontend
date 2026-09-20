@@ -478,6 +478,23 @@ describe("AgentConnectionTabContent", () => {
     }).parentElement!.parentElement!;
   }
 
+  it("names both switches in the tab, so each can be found on its own", () => {
+    renderComponent();
+    expect(
+      screen.getAllByRole("switch").map((el) => el.getAttribute("aria-label")),
+    ).toHaveLength(2);
+    expect(
+      screen.getByRole("switch", {
+        name: "Does your agent return tool calls?",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", {
+        name: "Support benchmarking different models",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("keeps the model provider picker inside the benchmarking box", () => {
     const { unmount } = renderComponent();
     expect(benchmarkBox().className).not.toContain("border-foreground/40");
