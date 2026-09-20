@@ -592,7 +592,9 @@ describe("Agents", () => {
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
 
-    const deleteButtons = screen.getAllByTitle("Delete agent");
+    const deleteButtons = screen.getAllByRole("button", {
+      name: "Delete agent",
+    });
     await user.click(deleteButtons[0]);
 
     expect(
@@ -721,7 +723,9 @@ describe("Agents", () => {
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
 
-    const deleteButtons = screen.getAllByTitle("Delete agent");
+    const deleteButtons = screen.getAllByRole("button", {
+      name: "Delete agent",
+    });
     await user.click(deleteButtons[0]);
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
@@ -747,7 +751,9 @@ describe("Agents", () => {
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
 
-    const deleteButtons = screen.getAllByTitle("Delete agent");
+    const deleteButtons = screen.getAllByRole("button", {
+      name: "Delete agent",
+    });
     await user.click(deleteButtons[0]);
 
     let resolveDelete: (v: any) => void = () => {};
@@ -782,7 +788,9 @@ describe("Agents", () => {
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
 
-    const duplicateButtons = screen.getAllByTitle("Duplicate agent");
+    const duplicateButtons = screen.getAllByRole("button", {
+      name: "Duplicate agent",
+    });
     await user.click(duplicateButtons[0]);
 
     expect(screen.getByText("Duplicate agent")).toBeInTheDocument();
@@ -823,7 +831,9 @@ describe("Agents", () => {
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
 
-    const duplicateButtons = screen.getAllByTitle("Duplicate agent");
+    const duplicateButtons = screen.getAllByRole("button", {
+      name: "Duplicate agent",
+    });
     await user.click(duplicateButtons[0]);
     expect(screen.getByDisplayValue("Copy of Support Bot")).toBeInTheDocument();
 
@@ -865,7 +875,9 @@ describe("Agents", () => {
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
 
-    const duplicateButtons = screen.getAllByTitle("Duplicate agent");
+    const duplicateButtons = screen.getAllByRole("button", {
+      name: "Duplicate agent",
+    });
     await user.click(duplicateButtons[0]);
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -897,7 +909,9 @@ describe("Agents", () => {
     await waitFor(() =>
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
-    const duplicateButtons = screen.getAllByTitle("Duplicate agent");
+    const duplicateButtons = screen.getAllByRole("button", {
+      name: "Duplicate agent",
+    });
     await user.click(duplicateButtons[0]);
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
@@ -923,7 +937,9 @@ describe("Agents", () => {
     await waitFor(() =>
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
-    const duplicateButtons = screen.getAllByTitle("Duplicate agent");
+    const duplicateButtons = screen.getAllByRole("button", {
+      name: "Duplicate agent",
+    });
     await user.click(duplicateButtons[0]);
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -954,7 +970,9 @@ describe("Agents", () => {
     await waitFor(() =>
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
-    const duplicateButtons = screen.getAllByTitle("Duplicate agent");
+    const duplicateButtons = screen.getAllByRole("button", {
+      name: "Duplicate agent",
+    });
     await user.click(duplicateButtons[0]);
     expect(screen.getByText("Duplicate agent")).toBeInTheDocument();
 
@@ -999,5 +1017,30 @@ describe("Agents", () => {
 
     await user.click(screen.getAllByText("Single Agent Response")[0]);
     expect(onNavigateToAgent).toHaveBeenCalledWith("a1");
+  });
+
+  it("names the row icon buttons in the app's own hover text, not the browser's", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse(agentsPayload),
+    );
+    const user = setupUser();
+    render(<Agents />);
+    await waitFor(() =>
+      expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
+    );
+
+    const duplicate = screen.getAllByRole("button", {
+      name: "Duplicate agent",
+    })[0];
+    const remove = screen.getAllByRole("button", { name: "Delete agent" })[0];
+    expect(duplicate).not.toHaveAttribute("title");
+    expect(remove).not.toHaveAttribute("title");
+
+    await user.hover(duplicate);
+    expect(await screen.findByText("Duplicate agent")).toBeInTheDocument();
+
+    await user.unhover(duplicate);
+    await user.hover(remove);
+    expect(await screen.findByText("Delete agent")).toBeInTheDocument();
   });
 });

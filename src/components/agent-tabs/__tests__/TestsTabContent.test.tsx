@@ -741,7 +741,7 @@ describe("TestsTabContent — paging", () => {
     renderComponent();
     await screen.findAllByText("Paged test 1");
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     expect(screen.getByText(/tests selected/)).toBeInTheDocument();
 
     await user.click(screen.getByLabelText("Next page"));
@@ -867,7 +867,7 @@ describe("TestsTabContent — paging", () => {
     // before the selection was resolved, not just before the run POST.
     await user.click(screen.getByRole("button", { name: "Agent Response" }));
     await screen.findByText("1–10 of 12 tests");
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
     const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
 
@@ -884,7 +884,7 @@ describe("TestsTabContent — paging", () => {
     renderComponent();
     await screen.findAllByText("Paged test 1");
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     expect(screen.getByText(/tests selected/)).toHaveTextContent(
       "10 tests selected",
     );
@@ -903,7 +903,7 @@ describe("TestsTabContent — paging", () => {
     renderComponent();
     await screen.findAllByText("Paged test 1");
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
     await user.click(screen.getByRole("button", { name: /^Delete selected/ }));
 
@@ -921,7 +921,7 @@ describe("TestsTabContent — paging", () => {
     renderComponent();
     await screen.findAllByText("Paged test 1");
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
     await user.click(screen.getByRole("button", { name: /^Delete selected/ }));
     await screen.findByTestId("delete-dialog");
@@ -941,7 +941,7 @@ describe("TestsTabContent — paging", () => {
     renderComponent();
     await screen.findAllByText("Paged test 1");
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
     await user.click(
       screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
@@ -961,7 +961,7 @@ describe("TestsTabContent — paging", () => {
     // 13 tests, 12 of them reply tests: the reply filter spans two pages.
     await user.click(screen.getByRole("button", { name: "Agent Response" }));
     await screen.findByText("1–10 of 12 tests");
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
     await user.click(
       screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
@@ -978,7 +978,7 @@ describe("TestsTabContent — paging", () => {
     renderComponent();
     await screen.findAllByText("Paged test 1");
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
     await user.click(screen.getByTestId("compare-header"));
 
@@ -995,7 +995,7 @@ describe("TestsTabContent — paging", () => {
 
     await user.click(screen.getByRole("button", { name: "Agent Response" }));
     await screen.findByText("1–10 of 12 tests");
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
     await user.click(screen.getByTestId("compare-header"));
 
@@ -1008,9 +1008,9 @@ describe("TestsTabContent — paging", () => {
     renderComponent();
     await screen.findAllByText("Paged test 1");
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
-    await user.click(screen.getAllByTitle("Select test")[0]);
+    await user.click(screen.getAllByLabelText("Select test")[0]);
 
     expect(screen.getByText(/tests selected/)).toHaveTextContent(
       "9 tests selected",
@@ -1163,7 +1163,7 @@ describe("TestsTabContent — populated table", () => {
     await screen.findAllByText("Greeting test");
     expect(screen.getByText("Run all tests")).toBeInTheDocument();
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText(/tests selected/)).toBeInTheDocument();
     expect(screen.getByText("Run 2 tests")).toBeInTheDocument();
@@ -1187,8 +1187,35 @@ describe("TestsTabContent — populated table", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    const rowCheckboxes = screen.getAllByTitle("Select test");
+    const rowCheckboxes = screen.getAllByLabelText("Select test");
     await user.click(rowCheckboxes[0]);
+    expect(screen.getByText(/test selected/)).toBeInTheDocument();
+  });
+
+  it("names each selection checkbox in the app's own hover text, not the browser's", async () => {
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    const rowCheckbox = screen.getAllByLabelText("Select test")[0];
+    expect(rowCheckbox).not.toHaveAttribute("title");
+    expect(screen.getByLabelText("Select all")).not.toHaveAttribute("title");
+
+    await user.hover(rowCheckbox);
+    expect(await screen.findByText("Select test")).toBeInTheDocument();
+  });
+
+  it("ticks a test from the card list as well as the table", async () => {
+    // Both layouts render in jsdom, so the second checkbox of each pair is
+    // the card one. It has its own handler, and the phone has no other way
+    // to pick a test.
+    const user = setupUser();
+    renderComponent();
+    await screen.findAllByText("Greeting test");
+
+    const checkboxes = screen.getAllByLabelText("Select test");
+    expect(checkboxes.length).toBeGreaterThan(1);
+    await user.click(checkboxes[checkboxes.length - 1]);
     expect(screen.getByText(/test selected/)).toBeInTheDocument();
   });
 
@@ -1415,7 +1442,7 @@ describe("TestsTabContent — populated table", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(
       screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
     );
@@ -1697,7 +1724,7 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     // locked too, so the in-flight POST cannot be doubled from there.
     await user.click(runTestButtons()[0]);
     await waitFor(() => expect(runTestButtons()[0]).toBeDisabled());
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
 
     const bulkRun = screen.getByRole("button", { name: /^Run [0-9]+ tests?/ });
     expect(bulkRun).toBeDisabled();
@@ -1741,7 +1768,7 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(
       screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
     );
@@ -1776,7 +1803,7 @@ describe("TestsTabContent — run controls while a run is starting", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(
       screen.getByRole("button", { name: /^Run [0-9]+ tests?/ }),
     );
@@ -1934,7 +1961,7 @@ describe("TestsTabContent — delete flows", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(screen.getByRole("button", { name: /^Delete selected/ }));
     await screen.findByTestId("delete-dialog");
     expect(screen.getByTestId("delete-title")).toHaveTextContent(
@@ -1966,7 +1993,7 @@ describe("TestsTabContent — delete flows", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByLabelText("Select all"));
     await user.click(screen.getByRole("button", { name: /^Delete selected/ }));
     await screen.findByTestId("delete-dialog");
     await user.click(screen.getByText("ConfirmDelete"));
@@ -2205,7 +2232,7 @@ describe("TestsTabContent — benchmark & past runs", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    const rowCheckboxes = screen.getAllByTitle("Select test");
+    const rowCheckboxes = screen.getAllByLabelText("Select test");
     await user.click(rowCheckboxes[0]);
     await user.click(screen.getByTestId("compare-header"));
     await screen.findByTestId("benchmark-dialog");
@@ -2240,7 +2267,7 @@ describe("TestsTabContent — benchmark & past runs", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    const rowCheckboxes = screen.getAllByTitle("Select test");
+    const rowCheckboxes = screen.getAllByLabelText("Select test");
     await user.click(rowCheckboxes[0]);
     await user.click(rowCheckboxes[1]);
     await user.click(screen.getByTestId("compare-header"));

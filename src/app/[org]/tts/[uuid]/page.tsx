@@ -1,5 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import { Tooltip } from "@/components/Tooltip";
 import { unwrapList } from "@/lib/api";
 import { isDefaultEvaluator } from "@/lib/evaluatorApi";
 
@@ -875,15 +876,19 @@ export default function TTSEvaluationDetailPage() {
                 {evaluationResult.status === "failed" &&
                   backendAccessToken &&
                   evaluationResult.dataset_id && (
-                    <button
-                      onClick={handleRetry}
-                      disabled={retrying}
-                      title="Re-run this evaluation on the same dataset, providers, and evaluators"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    <Tooltip
+                      content="Re-run this evaluation on the same dataset, providers, and evaluators"
+                      position="top"
                     >
-                      <RetryIcon />
-                      {retrying ? "Retrying…" : "Retry"}
-                    </button>
+                      <button
+                        onClick={handleRetry}
+                        disabled={retrying}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background hover:bg-muted/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <RetryIcon />
+                        {retrying ? "Retrying…" : "Retry"}
+                      </button>
+                    </Tooltip>
                   )}
               </div>
             </div>
@@ -935,19 +940,24 @@ export default function TTSEvaluationDetailPage() {
                       evaluatorRows={visibleAboutEvaluators.map((e) => ({
                         key: e.uuid,
                         metric: (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPreviewEvaluator({
-                                uuid: e.uuid,
-                                name: e.name,
-                              })
-                            }
-                            className="text-foreground underline-offset-2 hover:underline cursor-pointer"
-                            title={`Open evaluator: ${e.name}`}
+                          <Tooltip
+                            content={`Open evaluator: ${e.name}`}
+                            position="top"
+                            className="inline-block"
                           >
-                            {e.name}
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPreviewEvaluator({
+                                  uuid: e.uuid,
+                                  name: e.name,
+                                })
+                              }
+                              className="text-foreground underline-offset-2 hover:underline cursor-pointer"
+                            >
+                              {e.name}
+                            </button>
+                          </Tooltip>
                         ),
                         description:
                           e.description ||

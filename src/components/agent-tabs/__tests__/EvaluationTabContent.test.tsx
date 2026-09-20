@@ -253,13 +253,11 @@ describe("EvaluationTabContent", () => {
 
   it("opens the delete dialog and deletes a criteria", async () => {
     const user = setupUser();
-    const { container, setEvaluationCriteria, saveRef } = renderComponent({
+    const { setEvaluationCriteria, saveRef } = renderComponent({
       evaluationCriteria: [makeCriteria()],
     });
 
-    const deleteButton = container.querySelector(
-      'button[title="Delete criteria"]'
-    ) as HTMLButtonElement;
+    const deleteButton = screen.getByLabelText("Delete criteria");
     await user.click(deleteButton);
 
     expect(screen.getByText("Delete criteria")).toBeInTheDocument();
@@ -279,17 +277,30 @@ describe("EvaluationTabContent", () => {
 
   it("closes the delete dialog without deleting on cancel", async () => {
     const user = setupUser();
-    const { container, setEvaluationCriteria } = renderComponent({
+    const { setEvaluationCriteria } = renderComponent({
       evaluationCriteria: [makeCriteria()],
     });
 
-    const deleteButton = container.querySelector(
-      'button[title="Delete criteria"]'
-    ) as HTMLButtonElement;
+    const deleteButton = screen.getByLabelText("Delete criteria");
     await user.click(deleteButton);
     await user.click(screen.getByText("Cancel"));
 
     expect(screen.queryByText("Delete criteria")).not.toBeInTheDocument();
     expect(setEvaluationCriteria).not.toHaveBeenCalled();
+  });
+
+  it("shows the app's own hover text on the delete button, not the browser's", async () => {
+    const user = setupUser();
+    renderComponent({ evaluationCriteria: [makeCriteria()] });
+
+    const deleteButton = screen.getByLabelText("Delete criteria");
+    expect(deleteButton).not.toHaveAttribute("title");
+
+    await user.hover(deleteButton);
+    // The app's own hover text is a second copy of the words: the button
+    // itself carries them only as its name for a screen reader.
+    await waitFor(() =>
+      expect(screen.getByText("Delete criteria")).toBeInTheDocument(),
+    );
   });
 });

@@ -259,6 +259,24 @@ describe("TextToSpeechEvaluation", () => {
     expect(screen.getByTestId("tts-editor")).toBeInTheDocument();
   });
 
+  it("names the provider's website link and shows where it goes on hover", async () => {
+    const user = setupUser();
+    render(<TextToSpeechEvaluation />);
+    await user.click(screen.getByText("Evaluators"));
+
+    const links = screen.getAllByRole("link", {
+      name: "Visit OpenAI website",
+    });
+    expect(links[0]).toHaveAttribute("href", "https://openai.com");
+    expect(links[0]).not.toHaveAttribute("title");
+    await user.hover(links[0]);
+    await waitFor(() =>
+      expect(screen.getAllByText("Visit OpenAI website").length).toBeGreaterThan(
+        0,
+      ),
+    );
+  });
+
   it("changes language and filters providers, deselecting unsupported ones", async () => {
     const user = setupUser();
     render(<TextToSpeechEvaluation />);

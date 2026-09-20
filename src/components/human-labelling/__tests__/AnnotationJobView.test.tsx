@@ -257,7 +257,7 @@ describe("AnnotationJobView", () => {
     expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
 
-    const sidebarButtons = screen.getAllByTitle(/^Item 2/);
+    const sidebarButtons = screen.getAllByLabelText(/^Item 2/);
     await user.click(sidebarButtons[0]);
     expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
   });
@@ -310,19 +310,22 @@ describe("AnnotationJobView", () => {
       expect(screen.getByText("My Task")).toBeInTheDocument(),
     );
 
-    const submitButton = screen.getByRole("button", { name: "Submit & Next" });
-    expect(submitButton).toBeDisabled();
+    // Re-read the button each time: while it cannot be used it sits inside the
+    // hover text saying why, so it is redrawn when answering unblocks it.
+    const submitButton = () =>
+      screen.getByRole("button", { name: "Submit & Next" });
+    expect(submitButton()).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Correct" }));
-    expect(submitButton).toBeDisabled();
+    expect(submitButton()).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "3" }));
-    expect(submitButton).toBeEnabled();
+    expect(submitButton()).toBeEnabled();
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ saved: ["ev-1", "ev-2"], count: 2, status: "pending" }),
     );
-    await user.click(submitButton);
+    await user.click(submitButton());
 
     await waitFor(() =>
       expect(screen.getByText("Item 2 of 2")).toBeInTheDocument(),
@@ -726,7 +729,7 @@ describe("AnnotationJobView", () => {
       jsonResponse({ saved: ["ev-1", "ev-2"], count: 2, status: "pending" }),
     );
     // Jump straight to item 2 via the index list, never touching Submit & Next.
-    const item2Buttons = screen.getAllByTitle(/^Item 2/);
+    const item2Buttons = screen.getAllByLabelText(/^Item 2/);
     await user.click(item2Buttons[0]);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
@@ -976,8 +979,8 @@ describe("AnnotationJobView", () => {
       ).toBeInTheDocument();
       expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
       // Only item-2 matched, and it keeps its original number.
-      expect(screen.getAllByTitle(/^Item 2/)).toHaveLength(2);
-      expect(screen.queryByTitle(/^Item 1/)).not.toBeInTheDocument();
+      expect(screen.getAllByLabelText(/^Item 2/)).toHaveLength(2);
+      expect(screen.queryByLabelText(/^Item 1/)).not.toBeInTheDocument();
       expect(screen.getByText("Item Two")).toBeInTheDocument();
     });
 
@@ -989,7 +992,7 @@ describe("AnnotationJobView", () => {
         screen.getByRole("button", { name: "Correctness is Wrong" }),
       ).toBeInTheDocument();
       expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
-      expect(screen.getAllByTitle(/^Item 2/)).toHaveLength(2);
+      expect(screen.getAllByLabelText(/^Item 2/)).toHaveLength(2);
     });
 
     it("keeps only the items matching every filter when two are on", async () => {
@@ -1021,9 +1024,9 @@ describe("AnnotationJobView", () => {
       await addFilter(user, "Quality", "5");
       expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
       expect(screen.getByText("Item Three")).toBeInTheDocument();
-      expect(screen.getAllByTitle(/^Item 3/)).toHaveLength(2);
-      expect(screen.queryByTitle(/^Item 1/)).not.toBeInTheDocument();
-      expect(screen.queryByTitle(/^Item 2/)).not.toBeInTheDocument();
+      expect(screen.getAllByLabelText(/^Item 3/)).toHaveLength(2);
+      expect(screen.queryByLabelText(/^Item 1/)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^Item 2/)).not.toBeInTheDocument();
     });
 
     it("says nothing matches when no item has the picked value", async () => {
@@ -1045,7 +1048,7 @@ describe("AnnotationJobView", () => {
         screen.getByRole("button", { name: "Remove Quality is 5" }),
       );
       expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
-      expect(screen.getAllByTitle(/^Item 1/)).toHaveLength(2);
+      expect(screen.getAllByLabelText(/^Item 1/)).toHaveLength(2);
       expect(screen.getByText("Item One")).toBeInTheDocument();
     });
 
@@ -1201,10 +1204,13 @@ describe("AnnotationJobView", () => {
         name: "Mark as complete",
       });
       expect(submitButton).toBeDisabled();
-      expect(submitButton).toHaveAttribute(
-        "title",
-        "Judgements should be given for all required evaluators before submitting",
-      );
+      expect(submitButton).not.toHaveAttribute("title");
+      await user.hover(submitButton);
+      expect(
+        await screen.findByText(
+          "Judgements should be given for all required evaluators before submitting",
+        ),
+      ).toBeInTheDocument();
 
       // Answering only the optional one does not unblock it.
       await user.click(screen.getByRole("button", { name: "3" }));
@@ -1274,7 +1280,7 @@ describe("AnnotationJobView", () => {
       // Item 1 is already saved with only its required evaluator answered,
       // so the view opens on item 2. Go back to item 1, answer the optional
       // evaluator there, and move on: that answer must be saved.
-      await user.click(screen.getAllByTitle(/^Item 1/)[0]);
+      await user.click(screen.getAllByLabelText(/^Item 1/)[0]);
       await waitFor(() =>
         expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
       );
@@ -1282,7 +1288,7 @@ describe("AnnotationJobView", () => {
       fetchMock.mockResolvedValueOnce(
         jsonResponse({ saved: ["ev-1", "ev-2"], count: 2, status: "pending" }),
       );
-      await user.click(screen.getAllByTitle(/^Item 2/)[0]);
+      await user.click(screen.getAllByLabelText(/^Item 2/)[0]);
 
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
       const body = JSON.parse(fetchMock.mock.calls[1][1].body);

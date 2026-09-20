@@ -37,15 +37,19 @@ describe("copy", () => {
     );
     expect(scoringRunErrorCopy("")).toBe("Scoring did not finish");
     expect(scoringRunErrorCopy(null)).toBe("Scoring did not finish");
+    // One self-contained sentence, because this same line is the hover text on
+    // the mark beside a trace row.
     expect(scoringRunErrorCopy("over_limit")).toBe(
-      "This workspace has scored as many traces as its limit allows",
+      "This workspace has reached its limit for scoring traces",
     );
     expect(scoringRunErrorCopy("scoring_disabled")).toMatch(
       /Monitoring was turned off/,
     );
     // The backend's trace_deleted and agent_deleted cannot reach a reader, so
     // they take the general line.
-    expect(scoringRunErrorCopy("trace_deleted")).toBe("Scoring did not finish");
+    expect(scoringRunErrorCopy("trace_deleted")).toBe(
+      "Scoring did not finish",
+    );
     expect(scoringRunErrorCopy("unknown-code")).toBe("Scoring did not finish");
   });
 });

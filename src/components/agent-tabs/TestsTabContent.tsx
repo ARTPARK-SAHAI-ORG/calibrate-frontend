@@ -30,6 +30,7 @@ import {
   type AgentRunLauncherSettings,
 } from "@/components/agent-tabs/useAgentRunLaunchers";
 import { SpinnerIcon, CopyIcon, TrashIcon } from "@/components/icons";
+import { Tooltip } from "@/components/Tooltip";
 import {
   AddTestDialog,
   TestConfig,
@@ -2046,20 +2047,22 @@ export function TestsTabContent({
                       {/* Table Header */}
                       <div className="grid grid-cols-[40px_minmax(0,1fr)_160px_300px] gap-4 px-4 py-2 border-b border-border bg-background sticky top-0 z-10">
                         <div className="flex items-center">
-                          <button
-                            type="button"
-                            onClick={toggleSelectAll}
-                            className="cursor-pointer"
-                            title="Select all"
-                          >
-                            <TestCheckbox
-                              checked={
-                                selectedTestUuids.size === agentTests.length &&
-                                agentTests.length > 0
-                              }
-                              hoverBorder
-                            />
-                          </button>
+                          <Tooltip content="Select all">
+                            <button
+                              type="button"
+                              onClick={toggleSelectAll}
+                              aria-label="Select all"
+                              className="cursor-pointer"
+                            >
+                              <TestCheckbox
+                                checked={
+                                  selectedTestUuids.size ===
+                                    agentTests.length && agentTests.length > 0
+                                }
+                                hoverBorder
+                              />
+                            </button>
+                          </Tooltip>
                         </div>
                         <div className="text-sm font-medium text-muted-foreground">
                           Name
@@ -2078,20 +2081,22 @@ export function TestsTabContent({
                         >
                           {/* Checkbox */}
                           <div className="flex items-center">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleTestSelection(test.uuid);
-                              }}
-                              className="cursor-pointer"
-                              title="Select test"
-                            >
-                              <TestCheckbox
-                                checked={selectedTestUuids.has(test.uuid)}
-                                hoverBorder
-                              />
-                            </button>
+                            <Tooltip content="Select test">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleTestSelection(test.uuid);
+                                }}
+                                aria-label="Select test"
+                                className="cursor-pointer"
+                              >
+                                <TestCheckbox
+                                  checked={selectedTestUuids.has(test.uuid)}
+                                  hoverBorder
+                                />
+                              </button>
+                            </Tooltip>
                           </div>
                           {/* Name Column */}
                           <div className="flex items-center min-w-0">
@@ -2161,20 +2166,22 @@ export function TestsTabContent({
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start gap-2 flex-1 min-w-0">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleTestSelection(test.uuid);
-                              }}
-                              className="mt-0.5 cursor-pointer"
-                              title="Select test"
-                            >
-                              <TestCheckbox
-                                checked={selectedTestUuids.has(test.uuid)}
-                                hoverBorder
-                              />
-                            </button>
+                            <Tooltip content="Select test">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleTestSelection(test.uuid);
+                                }}
+                                aria-label="Select test"
+                                className="mt-0.5 cursor-pointer"
+                              >
+                                <TestCheckbox
+                                  checked={selectedTestUuids.has(test.uuid)}
+                                  hoverBorder
+                                />
+                              </button>
+                            </Tooltip>
                             <div className="flex-1 min-w-0">
                               <h4 className="text-sm font-medium text-foreground truncate">
                                 {test.name}

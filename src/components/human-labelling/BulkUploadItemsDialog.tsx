@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { apiClient } from "@/lib/api";
+import { ClippedText } from "@/components/ui";
 import {
   AnnotationOptIn,
   BulkUploadDialogShell,
@@ -732,22 +733,18 @@ export function BulkUploadItemsDialog({
             </div>
           ))}
           {variableColumns.map((c) => (
-            <div
+            <ClippedText
               key={`h-${c.evaluatorUuid}-${c.varName}`}
-              className="text-xs font-medium text-muted-foreground font-mono truncate"
-              title={c.header}
-            >
-              {c.header}
-            </div>
+              text={c.header}
+              className="block truncate text-xs font-medium text-muted-foreground font-mono"
+            />
           ))}
           {annotationColumns.map((c) => (
-            <div
+            <ClippedText
               key={`ah-${c.evaluatorUuid}-${c.kind}`}
-              className="text-xs font-medium text-muted-foreground font-mono truncate"
-              title={c.header}
-            >
-              {c.header}
-            </div>
+              text={c.header}
+              className="block truncate text-xs font-medium text-muted-foreground font-mono"
+            />
           ))}
         </div>
         <div className="divide-y divide-border">
@@ -767,16 +764,14 @@ export function BulkUploadItemsDialog({
                 className={`grid gap-2 px-3 py-2 text-xs items-start ${bulkUploadAnnotatedRowBgClass(idx, annotatedCheck)}`}
                 style={gridStyle}
               >
-                <div className="truncate text-foreground" title={p.name}>
+                <ClippedText text={p.name} className="block truncate text-foreground">
                   {p.name || <span className="text-muted-foreground">—</span>}
-                </div>
+                </ClippedText>
                 {showDescriptionColumn && (
-                  <div
-                    className="min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
-                    title={p.description || undefined}
-                  >
-                    {p.description}
-                  </div>
+                  <ClippedText
+                    text={p.description}
+                    className="block min-w-0 max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap"
+                  />
                 )}
                 {contentColumns.map((c) => (
                   <div key={`c-${idx}-${c.payloadKey}`} className="min-w-0">

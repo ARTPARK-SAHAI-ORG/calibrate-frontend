@@ -24,6 +24,8 @@ import {
   CER_ABOUT_METRIC,
   SEMANTIC_WER_ABOUT_METRIC,
   TTFB_ABOUT_METRIC,
+  TTFS_ABOUT_METRIC,
+  SARVAM_ABOUT_METRICS,
   type EvaluatorAboutMetricRow,
   type STTProviderResultForDetails,
   type TTSProviderResultForDetails,
@@ -657,6 +659,43 @@ describe("SEMANTIC_WER_ABOUT_METRIC", () => {
     );
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("says where the link goes in the app's own hover text", async () => {
+    const user = setupUser();
+    render(<div>{SEMANTIC_WER_ABOUT_METRIC.metric}</div>);
+    const link = screen.getByRole("link", { name: "Semantic WER" });
+    expect(link).not.toHaveAttribute("title");
+    await user.hover(link);
+    expect(
+      await screen.findByText("Learn more in the Pipecat STT benchmark"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("TTFS_ABOUT_METRIC", () => {
+  it("says where the latency link goes in the app's own hover text", async () => {
+    const user = setupUser();
+    render(<div>{TTFS_ABOUT_METRIC.metric}</div>);
+    const link = screen.getByRole("link", { name: "Latency" });
+    expect(link).not.toHaveAttribute("title");
+    await user.hover(link);
+    expect(
+      await screen.findByText("Learn more in the Pipecat STT benchmark"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("SARVAM_ABOUT_METRICS", () => {
+  it("says where each metric link goes in the app's own hover text", async () => {
+    const user = setupUser();
+    render(<div>{SARVAM_ABOUT_METRICS[0].metric}</div>);
+    const link = screen.getByRole("link", { name: "LLM-WER" });
+    expect(link).not.toHaveAttribute("title");
+    await user.hover(link);
+    expect(
+      await screen.findByText("Learn more on the Sarvam ASR evaluation blog"),
+    ).toBeInTheDocument();
   });
 });
 

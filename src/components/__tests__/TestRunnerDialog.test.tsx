@@ -308,6 +308,41 @@ describe("TestRunnerDialog", () => {
     );
   });
 
+  it("names the pulsing dot beside a running run, in the app's own hover text", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/evaluators?include_defaults=true")) {
+        return Promise.resolve(jsonResponse([]));
+      }
+      if (isRunDetail(url, "task-dot")) {
+        return Promise.resolve(
+          jsonResponse({
+            task_id: "task-dot",
+            status: "in_progress",
+            results: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <TestRunnerDialog
+        isOpen
+        onClose={jest.fn()}
+        agentUuid="agent-1"
+        agentName="My Agent"
+        taskId="task-dot"
+      />,
+    );
+
+    const dot = await screen.findByLabelText("Run in progress");
+    expect(dot).not.toHaveAttribute("title");
+    await setupUser().hover(dot);
+    await waitFor(() =>
+      expect(screen.getByText("Run in progress")).toBeInTheDocument(),
+    );
+  });
+
   it("renders server values: name fallbacks and pass/fail/running from `passed`", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes("/evaluators?include_defaults=true")) {

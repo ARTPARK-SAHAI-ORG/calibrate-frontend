@@ -1367,3 +1367,71 @@ describe("BulkUploadItemsDialog", () => {
     });
   });
 });
+
+describe("the whole name on hover", () => {
+  // jsdom gives every element a width of 0, so whether a cell is cut off is
+  // described directly by standing in for the two widths that are compared.
+  function mockWidths(scroll: number, client: number) {
+    jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(scroll);
+    jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(client);
+  }
+
+  it("does not repeat a name the column shows in full", async () => {
+    const user = setupUser();
+    mockWidths(80, 80);
+    render(<BulkUploadItemsDialog {...defaultProps()} />);
+    await uploadFile(`name,body,data\n"Card lost","hello world","{}"`);
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+
+    // Never the browser's own hover box, which ignores every style here.
+    expect(screen.getByText("Card lost")).not.toHaveAttribute("title");
+    await user.hover(screen.getByText("Card lost"));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.getAllByText("Card lost")).toHaveLength(1);
+  });
+
+  it("shows the whole name when the column has cut it off", async () => {
+    const user = setupUser();
+    mockWidths(300, 80);
+    const long = "Card lost, caller cannot remember the last four digits";
+    render(<BulkUploadItemsDialog {...defaultProps()} />);
+    await uploadFile(`name,body,data\n"${long}","hello world","{}"`);
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+
+    await user.hover(screen.getByText(long));
+    await waitFor(() =>
+      expect(screen.getAllByText(long).length).toBeGreaterThan(1),
+    );
+  });
+
+  it("shows an evaluator column name in hover text when it is cut off", async () => {
+    const user = setupUser();
+    mockWidths(300, 80);
+    render(
+      <BulkUploadItemsDialog {...defaultProps({ linkedEvaluators })} />,
+    );
+    await uploadFile(
+      `name,body,data,Correctness/criteria\n"A","x","{}","be kind"`,
+    );
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+
+    await user.hover(screen.getByText("Correctness/criteria"));
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("Correctness/criteria").length,
+      ).toBeGreaterThan(1),
+    );
+  });
+});

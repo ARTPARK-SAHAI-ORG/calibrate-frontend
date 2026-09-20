@@ -159,6 +159,21 @@ describe("RunEvaluatorsPanel", () => {
     expect(onSelectedChange).toHaveBeenCalledWith([]);
   });
 
+  it("says on hover that Remove only takes the evaluator off this run", async () => {
+    const user = setupUser();
+    renderPanel();
+    const remove = screen.getByRole("button", { name: "Remove" });
+    expect(remove).not.toHaveAttribute("title");
+    await user.hover(remove);
+    await waitFor(() =>
+      expect(screen.getByText("Remove from this run")).toBeInTheDocument(),
+    );
+    // View says what it does already, so it carries no hover popup.
+    expect(screen.getByRole("button", { name: "View" })).not.toHaveAttribute(
+      "title",
+    );
+  });
+
   it("shows no actions when read only", () => {
     renderPanel({ readOnly: true });
     expect(

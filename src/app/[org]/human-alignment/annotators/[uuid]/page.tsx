@@ -12,10 +12,14 @@ import {
   YAxis,
 } from "recharts";
 import { AppLayout } from "@/components/AppLayout";
+// The chart on this page already has a `Tooltip` of its own, so the app's
+// hover text comes in under a second name.
+import { Tooltip as HoverText } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { Breadcrumbs, CopyLinkButton, type Crumb } from "@/components/ui";
 import { useAccessToken, usePageErrorState } from "@/hooks";
+import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 
@@ -304,26 +308,27 @@ function AnnotatorDetailPageInner() {
                 {annotator?.name ?? "—"}
               </h1>
               {annotator && (
-                <button
-                  onClick={startEditName}
-                  aria-label="Rename annotator"
-                  title="Rename"
-                  className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.8}
+                <HoverText content="Rename" position="top">
+                  <button
+                    onClick={startEditName}
+                    aria-label="Rename annotator"
+                    className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                      />
+                    </svg>
+                  </button>
+                </HoverText>
               )}
             </div>
           )}
@@ -567,6 +572,22 @@ function statusLabel(status: AnnotatorJob["status"]): string {
   return "Pending";
 }
 
+/**
+ * The labelling task's name in a jobs row. The column cuts a long name short,
+ * and the whole of it is on hover only when it is actually cut off: a name
+ * already fully readable would just be covered by a popup saying the same
+ * thing.
+ */
+function JobTaskName({ name }: { name: string }) {
+  const { ref, clipped } = useIsNameClipped(name);
+  const cell = (
+    <div ref={ref} className="text-sm font-medium truncate">
+      {name}
+    </div>
+  );
+  return clipped ? <HoverText content={name}>{cell}</HoverText> : cell;
+}
+
 function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
   const router = useRouter();
 
@@ -596,9 +617,7 @@ function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
               isImported ? "" : "cursor-pointer"
             }`}
           >
-            <div className="text-sm font-medium truncate" title={job.task_name}>
-              {job.task_name}
-            </div>
+            <JobTaskName name={job.task_name} />
             <div className="flex items-center gap-2 min-w-0">
               {isImported ? (
                 <span className="text-xs text-muted-foreground">Imported</span>

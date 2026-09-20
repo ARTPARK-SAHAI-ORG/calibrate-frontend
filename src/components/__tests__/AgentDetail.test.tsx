@@ -821,6 +821,25 @@ describe("AgentDetail", () => {
     );
   });
 
+  it("says on hover that the name and the back arrow can be clicked", async () => {
+    mockFetchSequenceForAgent(buildAgent);
+    const user = setupUser();
+    render(<AgentDetail agentUuid={buildAgent.uuid} />);
+    await waitFor(() =>
+      expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+    );
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).not.toHaveAttribute("title");
+    await user.hover(heading);
+    expect(await screen.findByText("Click to edit name")).toBeInTheDocument();
+
+    const back = screen.getByLabelText("Back to agents");
+    expect(back).not.toHaveAttribute("title");
+    await user.hover(back);
+    expect(await screen.findByText("Back to agents")).toBeInTheDocument();
+  });
+
   it("opens the edit-name dialog, saves a new name, and shows the success toast", async () => {
     mockFetchSequenceForAgent(buildAgent);
     const user = setupUser();
@@ -829,7 +848,7 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Build Agent")).toBeInTheDocument(),
     );
 
-    await user.click(screen.getByTitle("Click to edit name"));
+    await user.click(screen.getByRole("heading", { level: 1 }));
     const input = screen.getByDisplayValue("Build Agent");
     await user.clear(input);
     await user.type(input, "Renamed Agent");
@@ -853,12 +872,12 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Build Agent")).toBeInTheDocument(),
     );
 
-    await user.click(screen.getByTitle("Click to edit name"));
+    await user.click(screen.getByRole("heading", { level: 1 }));
     expect(screen.getByText("Edit Agent Name")).toBeInTheDocument();
     await user.click(screen.getByText("Cancel"));
     expect(screen.queryByText("Edit Agent Name")).not.toBeInTheDocument();
 
-    await user.click(screen.getByTitle("Click to edit name"));
+    await user.click(screen.getByRole("heading", { level: 1 }));
     await user.keyboard("{Escape}");
     expect(screen.queryByText("Edit Agent Name")).not.toBeInTheDocument();
   });
@@ -871,7 +890,7 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Build Agent")).toBeInTheDocument(),
     );
 
-    await user.click(screen.getByTitle("Click to edit name"));
+    await user.click(screen.getByRole("heading", { level: 1 }));
     const input = screen.getByDisplayValue("Build Agent");
     await user.clear(input);
     await user.type(input, "Enter Renamed");
@@ -895,7 +914,7 @@ describe("AgentDetail", () => {
     );
 
     const fetchCallsBefore = (global.fetch as jest.Mock).mock.calls.length;
-    await user.click(screen.getByTitle("Click to edit name"));
+    await user.click(screen.getByRole("heading", { level: 1 }));
     await clickLastSaveButton(user);
 
     expect(screen.queryByText("Edit Agent Name")).not.toBeInTheDocument();
@@ -912,7 +931,7 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Build Agent")).toBeInTheDocument(),
     );
 
-    await user.click(screen.getByTitle("Click to edit name"));
+    await user.click(screen.getByRole("heading", { level: 1 }));
     const input = screen.getByDisplayValue("Build Agent");
     await user.clear(input);
     await user.type(input, "Dup Name");
@@ -943,7 +962,7 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Build Agent")).toBeInTheDocument(),
     );
 
-    await user.click(screen.getByTitle("Click to edit name"));
+    await user.click(screen.getByRole("heading", { level: 1 }));
     const input = screen.getByDisplayValue("Build Agent");
     await user.clear(input);
     await user.type(input, "Will 401");
@@ -970,7 +989,7 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Build Agent")).toBeInTheDocument(),
     );
 
-    await user.click(screen.getByTitle("Click to edit name"));
+    await user.click(screen.getByRole("heading", { level: 1 }));
     const input = screen.getByDisplayValue("Build Agent");
     await user.clear(input);
     await user.type(input, "Will 500");
@@ -1390,7 +1409,7 @@ describe("AgentDetail", () => {
       ][0];
     expect(lastCall.activeTab).toBe("agent");
     // No inline back-link header rendered when the parent supplies one.
-    expect(screen.queryByTitle("Back to agents")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Back to agents")).not.toBeInTheDocument();
   });
 
   // The header and the dialog both have a button reading "Duplicate"; the

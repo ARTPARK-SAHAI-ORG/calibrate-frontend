@@ -801,10 +801,10 @@ describe("EvaluatorRunDetailView", () => {
     expect(screen.getByText("In progress")).toBeInTheDocument();
     expect(screen.getByText("1/2")).toBeInTheDocument();
     // The finished item is marked done in the item strip; the other is not.
-    expect(screen.getAllByTitle("Item 1 (completed)").length).toBeGreaterThan(
-      0,
-    );
-    expect(screen.getAllByTitle("Item 2").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByLabelText("Item 1 (completed)").length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Item 2").length).toBeGreaterThan(0);
   });
 
   it("hides the scored count once the run is completed", () => {
@@ -897,10 +897,28 @@ describe("EvaluatorRunDetailView", () => {
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
-    // Two "2" buttons exist (mobile grid + desktop grid); click the last one.
-    const buttons = screen.getAllByRole("button", { name: "2" });
+    // Two "Item 2" buttons exist (mobile grid + desktop grid); click the last.
+    const buttons = screen.getAllByRole("button", { name: "Item 2" });
     await user.click(buttons[buttons.length - 1]);
     expect(screen.getByText("Item Two")).toBeInTheDocument();
+  });
+
+  it("says on hover which item a number in the strip stands for", async () => {
+    const user = setupUser();
+    const job = makeJob({
+      evaluators: [evaluatorBinary],
+      runs: [makeRun({ item_id: "item-1", status: "completed" })],
+    });
+    render(
+      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
+    );
+
+    const buttons = screen.getAllByLabelText("Item 1 (completed)");
+    expect(buttons[0]).not.toHaveAttribute("title");
+    await user.hover(buttons[0]);
+    expect(
+      await screen.findByText("Item 1 (completed)", { selector: "div" }),
+    ).toBeInTheDocument();
   });
 
   it("marks an item as done (blue) only when every evaluator run for it is completed and job is completed", () => {
@@ -911,9 +929,11 @@ describe("EvaluatorRunDetailView", () => {
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
-    const doneButtons = screen.getAllByTitle("Item 1 (completed)");
+    const doneButtons = screen.getAllByLabelText("Item 1 (completed)");
     expect(doneButtons.length).toBeGreaterThan(0);
-    expect(screen.queryByTitle("Item 2 (completed)")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Item 2 (completed)"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the disagreement filter toggle only when disagreements exist, and filters items", async () => {
@@ -1140,8 +1160,8 @@ describe("EvaluatorRunDetailView", () => {
     await addFilter(user, "Binary Evaluator", "Wrong");
     // Only item-2 is left, and it keeps its original number 2.
     expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
-    expect(screen.getAllByTitle(/^Item 2/).length).toBeGreaterThan(0);
-    expect(screen.queryByTitle(/^Item 1/)).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText(/^Item 2/).length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText(/^Item 1/)).not.toBeInTheDocument();
   });
 
   it("shows a plain message when no item matches the value filter", async () => {
@@ -1457,6 +1477,26 @@ describe("EvaluatorRunDetailView", () => {
     expect(screen.getByText("v1")).toBeInTheDocument();
   });
 
+  it("says on hover that the linked pill opens the evaluator", async () => {
+    const user = setupUser();
+    const job = makeJob({ runs: [], items: [] });
+    render(
+      <EvaluatorRunDetailView
+        job={job}
+        task={makeTask()}
+        versionLabels={{ "v-bin-1": "v1" }}
+        linkEvaluators
+      />,
+    );
+
+    const pill = screen.getByRole("button", { name: /Binary Evaluator/i });
+    expect(pill).not.toHaveAttribute("title");
+    await user.hover(pill);
+    expect(
+      await screen.findByText("Open Binary Evaluator"),
+    ).toBeInTheDocument();
+  });
+
   it("opens the evaluator preview modal when the linked pill is clicked", async () => {
     const mockFetch = fetchEvaluatorDetail as jest.Mock;
     mockFetch.mockResolvedValue({
@@ -1513,6 +1553,83 @@ describe("EvaluatorRunDetailView", () => {
       screen.queryByRole("button", { name: /Binary Evaluator/i }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+  });
+
+  it("opens the evaluator's judging details from the pill above a run that is still going", async () => {
+    const mockFetch = fetchEvaluatorDetail as jest.Mock;
+    mockFetch.mockResolvedValue({
+      uuid: "ev-bin",
+      name: "Binary Evaluator",
+      description: null,
+      output_type: "binary" as const,
+      evaluator_type: "llm",
+      live_version_index: 0,
+      versions: [
+        {
+          uuid: "v-bin-1",
+          version_number: 1,
+          judge_model: "google/gemini-2.5-flash",
+          system_prompt: "Judge whether the reply is correct.",
+          output_config: null,
+          variables: null,
+        },
+      ],
+    });
+    const user = setupUser();
+    render(
+      <EvaluatorRunDetailView
+        job={makeJob({ status: "in_progress", runs: [], items: [] })}
+        task={makeTask()}
+        versionLabels={{ "v-bin-1": "v1" }}
+        linkEvaluators
+      />,
+    );
+
+    const pill = screen.getByRole("button", { name: /Binary Evaluator/i });
+    expect(pill).not.toHaveAttribute("title");
+    await user.hover(pill);
+    expect(
+      await screen.findByText("Open Binary Evaluator"),
+    ).toBeInTheDocument();
+
+    await user.click(pill);
+    expect(
+      await screen.findByText("Judge whether the reply is correct."),
+    ).toBeInTheDocument();
+  });
+
+  it("names the evaluator as plain text above a run that is still going when the pill does not link", () => {
+    render(
+      <EvaluatorRunDetailView
+        job={makeJob({ status: "in_progress", runs: [], items: [] })}
+        task={makeTask()}
+        versionLabels={{ "v-bin-1": "v1" }}
+        linkEvaluators={false}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /Binary Evaluator/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+    expect(screen.getByText("v1")).toBeInTheDocument();
+  });
+
+  it("shows no version label above a run that is still going when the evaluator is not pinned to a version", () => {
+    render(
+      <EvaluatorRunDetailView
+        job={makeJob({
+          status: "in_progress",
+          evaluators: [{ ...evaluatorBinary, evaluator_version_id: undefined }],
+          runs: [],
+          items: [],
+        })}
+        task={makeTask()}
+        versionLabels={{ "v-bin-1": "v1" }}
+        linkEvaluators={false}
+      />,
+    );
+    expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+    expect(screen.queryByText("v1")).not.toBeInTheDocument();
   });
 
   it("shows an em dash placeholder when there are no evaluators at all", () => {
@@ -1610,9 +1727,10 @@ describe("EvaluatorRunDetailView", () => {
     render(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
-    const stat = screen.getByTitle("Correct on 1 of 2 items");
+    const stat = screen.getByText("Score").parentElement!;
     expect(stat).toHaveTextContent("Score");
     expect(stat).toHaveTextContent("50%");
+    expect(stat).not.toHaveAttribute("title");
   });
 
   it("shows the summarised value even when there are no human labels yet", () => {
@@ -2441,8 +2559,50 @@ describe("EvaluatorResultsPane", () => {
         humanAgreementForItem={humanAgreementForItem}
       />,
     );
+    const mark = screen.getByLabelText("Annotators agree with evaluator");
+    expect(mark).toBeInTheDocument();
+    expect(mark).not.toHaveAttribute("title");
+  });
+
+  it("says on hover how much the annotators and the evaluator agreed", async () => {
+    const user = setupUser();
+    const getJobEvaluator = () => evaluatorBinary;
+    const humanAgreementForItem = {
+      item_id: "item-1",
+      annotator_count: 1,
+      evaluators: [
+        {
+          evaluator_id: "ev-bin",
+          agreement: 1,
+          pair_count: 1,
+          human_annotations: [
+            {
+              annotation_id: "ann-a1",
+              annotator_id: "a1",
+              annotator_name: "Alice",
+              job_id: "job-1",
+              value: { value: true },
+              updated_at: "",
+            },
+          ],
+        },
+      ],
+    };
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        getJobEvaluator={getJobEvaluator}
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
+        runs={[makeRun()]}
+        humanAgreementForItem={humanAgreementForItem}
+      />,
+    );
+
+    await user.hover(screen.getByLabelText("Annotators agree with evaluator"));
     expect(
-      screen.getByLabelText("Annotators agree with evaluator"),
+      await screen.findByText("Agreement 100.0% · 1 comparison"),
     ).toBeInTheDocument();
   });
 
@@ -2487,6 +2647,63 @@ describe("EvaluatorResultsPane", () => {
     ).not.toBeInTheDocument();
     // The evaluator version pill still shows since it has a value.
     expect(screen.getByText("Correct")).toBeInTheDocument();
+  });
+
+  it("shows no version label on a card whose evaluator is not pinned to a version", () => {
+    render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        evaluators={[{ evaluator_id: "ev-bin" }]}
+        runs={[makeRun({ evaluator_version_id: undefined })]}
+        versionLabels={{ "v-bin-1": "v1" }}
+      />,
+    );
+    expect(screen.getByText("Correct")).toBeInTheDocument();
+    expect(screen.queryByText("v1")).not.toBeInTheDocument();
+  });
+
+  it("keeps a grouped card readable after the version it was showing goes away", async () => {
+    const user = setupUser();
+    const getJobEvaluator = () => evaluatorBinary;
+    const bothVersions = [
+      { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+      { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-2" },
+    ];
+    const { rerender } = render(
+      <EvaluatorResultsPane
+        {...baseProps}
+        getJobEvaluator={getJobEvaluator}
+        evaluators={bothVersions}
+        runs={[
+          makeRun({ value: { value: true } }),
+          makeRun({
+            uuid: "run-2",
+            evaluator_version_id: "v-bin-2",
+            value: { value: false },
+          }),
+        ]}
+        versionLabels={{ "v-bin-1": "v1", "v-bin-2": "v2" }}
+        groupVersionsByEvaluator
+      />,
+    );
+    await user.click(screen.getByText("v2").closest("button")!);
+    expect(screen.getByText("Wrong")).toBeInTheDocument();
+
+    // The reader narrows to the first version, which scored nothing on this
+    // item. The card that was showing the second version's result falls back
+    // instead of going blank.
+    rerender(
+      <EvaluatorResultsPane
+        {...baseProps}
+        getJobEvaluator={getJobEvaluator}
+        evaluators={[bothVersions[0]]}
+        runs={[]}
+        versionLabels={{ "v-bin-1": "v1", "v-bin-2": "v2" }}
+        groupVersionsByEvaluator
+      />,
+    );
+    expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+    expect(screen.queryByText("Wrong")).not.toBeInTheDocument();
   });
 
   it("grouped cards fall back to an annotator when no version has a value", () => {

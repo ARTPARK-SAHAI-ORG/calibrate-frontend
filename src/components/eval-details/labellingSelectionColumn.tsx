@@ -1,4 +1,5 @@
 import React from "react";
+import { Tooltip } from "@/components/Tooltip";
 import { LabellingRowCheckbox } from "@/components/test-results/shared";
 
 // Shared "Submit for labelling" checkbox column used by the STT and TTS
@@ -81,21 +82,23 @@ export function LabellingHeaderCheckbox({
   allSelected: boolean;
   onBulkToggle?: (keys: string[]) => void;
 }) {
+  const label = allSelected ? "Deselect all" : "Select all";
   return (
     <th style={{ width: LABELLING_CHECKBOX_COL_WIDTH }} className="px-3 py-3 text-left">
-      <button
-        type="button"
-        onClick={() => onBulkToggle?.(allSelectableKeys)}
-        disabled={allSelectableKeys.length === 0}
-        title={allSelected ? "Deselect all" : "Select all"}
-        aria-label={allSelected ? "Deselect all" : "Select all"}
-        className="cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        <LabellingRowCheckbox
-          checked={allSelected}
+      <Tooltip content={label} position="top">
+        <button
+          type="button"
+          onClick={() => onBulkToggle?.(allSelectableKeys)}
           disabled={allSelectableKeys.length === 0}
-        />
-      </button>
+          aria-label={label}
+          className="cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <LabellingRowCheckbox
+            checked={allSelected}
+            disabled={allSelectableKeys.length === 0}
+          />
+        </button>
+      </Tooltip>
     </th>
   );
 }
@@ -118,16 +121,20 @@ export function LabellingSelectCell({
 }) {
   return (
     <td className="px-3 py-3">
-      <button
-        type="button"
-        onClick={() => eligible && onToggle()}
-        disabled={!eligible}
-        title={eligible ? "Select for labelling" : disabledTitle}
-        aria-label="Select for labelling"
-        className="cursor-pointer disabled:cursor-not-allowed"
+      <Tooltip
+        content={eligible ? "Select for labelling" : disabledTitle}
+        position="top"
       >
-        <LabellingRowCheckbox checked={checked && eligible} disabled={!eligible} />
-      </button>
+        <button
+          type="button"
+          onClick={() => eligible && onToggle()}
+          disabled={!eligible}
+          aria-label="Select for labelling"
+          className="cursor-pointer disabled:cursor-not-allowed"
+        >
+          <LabellingRowCheckbox checked={checked && eligible} disabled={!eligible} />
+        </button>
+      </Tooltip>
     </td>
   );
 }

@@ -8,6 +8,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { Tooltip as AppTooltip } from "@/components/Tooltip";
+import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import {
   ScatterChart,
   Scatter,
@@ -167,6 +169,30 @@ function ParetoTooltip({
  * highlights the winning value in each column, and shares one hover state with
  * the plot. Renders nothing when no model has a finite cost and pass rate.
  */
+/**
+ * A model name in the table under the chart. The column shows a long name in a
+ * sideways scroll box, so the whole name goes in hover text only when it does
+ * not fit: repeating a name the reader can already read covers the row.
+ */
+function RowLabel({ label, emphasis }: { label: string; emphasis: string }) {
+  const { ref, clipped } = useIsNameClipped(label);
+  const name = (
+    <span
+      ref={ref}
+      className={`block max-w-[13rem] overflow-x-auto whitespace-nowrap pb-0.5 [scrollbar-width:thin] ${emphasis}`}
+    >
+      {label}
+    </span>
+  );
+  return clipped ? (
+    <AppTooltip content={label} className="min-w-0">
+      {name}
+    </AppTooltip>
+  ) : (
+    name
+  );
+}
+
 export function ParetoFrontierChart({
   points,
   colorMap,
@@ -497,38 +523,41 @@ export function ParetoFrontierChart({
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
           {hasDominated && (
-            <button
-              onClick={() => setFrontierOnly((v) => !v)}
-              className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
-                frontierOnly
-                  ? "border-green-600 bg-green-600 text-white hover:bg-green-700"
-                  : "border-green-600 text-green-700 hover:bg-green-600/10 dark:text-green-400"
-              }`}
-              title="Show only the best models (the ones on the green line)"
-            >
-              Show the best models only
-            </button>
+            <AppTooltip content="Show only the best models (the ones on the green line)">
+              <button
+                onClick={() => setFrontierOnly((v) => !v)}
+                className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                  frontierOnly
+                    ? "border-green-600 bg-green-600 text-white hover:bg-green-700"
+                    : "border-green-600 text-green-700 hover:bg-green-600/10 dark:text-green-400"
+                }`}
+              >
+                Show the best models only
+              </button>
+            </AppTooltip>
           )}
-          <button
-            onClick={download}
-            className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground cursor-pointer"
-            title="Download as PNG"
-          >
-            <svg
-              className="w-3.5 h-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+          <AppTooltip content="Download as PNG">
+            <button
+              onClick={download}
+              aria-label="Download as PNG"
+              className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground cursor-pointer"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-              />
-            </svg>
-            PNG
-          </button>
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                />
+              </svg>
+              PNG
+            </button>
+          </AppTooltip>
         </div>
       </div>
       {toolbar && <div className="mb-3">{toolbar}</div>}
@@ -678,16 +707,14 @@ export function ParetoFrontierChart({
                             backgroundColor: colorMap.get(d.model) || "#A8D5E2",
                           }}
                         />
-                        <span
-                          className={`block max-w-[13rem] overflow-x-auto whitespace-nowrap pb-0.5 [scrollbar-width:thin] ${
+                        <RowLabel
+                          label={d.label}
+                          emphasis={
                             d.onFrontier
                               ? "font-medium text-foreground"
                               : "text-muted-foreground"
-                          }`}
-                          title={d.label}
-                        >
-                          {d.label}
-                        </span>
+                          }
+                        />
                       </div>
                     </td>
                     <td

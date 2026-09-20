@@ -36,6 +36,23 @@ describe("ExportResultsButton", () => {
     expect(screen.getByRole("button", { name: "Export results" })).toBeInTheDocument();
   });
 
+  it("says which kind of file it makes, in the app's own hover text", async () => {
+    const user = setupUser();
+    render(
+      <ExportResultsButton
+        filename="f"
+        getRows={() => ({ columns: [], rows: [] })}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "Export results" });
+    expect(button).not.toHaveAttribute("title");
+
+    await user.hover(button);
+    await waitFor(() =>
+      expect(screen.getByText("Export results as CSV")).toBeInTheDocument(),
+    );
+  });
+
   it("renders a custom label and applies the neutral variant class", () => {
     render(
       <ExportResultsButton

@@ -5,7 +5,11 @@ import { apiClient } from "@/lib/api";
 import { Tooltip } from "@/components/Tooltip";
 import { DialogNavHeader } from "@/components/ui";
 import { useDialogNavKeys } from "@/hooks";
-import { MultiSelectPicker, type PickerItem } from "@/components/MultiSelectPicker";
+import { useIsNameClipped } from "@/hooks/useIsNameClipped";
+import {
+  MultiSelectPicker,
+  type PickerItem,
+} from "@/components/MultiSelectPicker";
 import { type Item } from "@/components/human-labelling/AnnotationJobView";
 import {
   ItemDetailPane,
@@ -519,6 +523,19 @@ export function ItemDetailDialog({
     };
   }, [summary, task, item, annotatorFilter]);
 
+  // The name is cut to fit the header, so the whole of it goes on hover only
+  // when it is actually cut off.
+  const heading = itemTitle(item);
+  const { ref: headingRef, clipped: headingClipped } =
+    useIsNameClipped(heading);
+  const headingNode = (
+    <h2 className="text-sm font-semibold text-foreground min-w-0">
+      <span ref={headingRef} className="block truncate">
+        {heading}
+      </span>
+    </h2>
+  );
+
   if (!isOpen) return null;
 
   return (
@@ -531,13 +548,14 @@ export function ItemDetailDialog({
         className="bg-background rounded-none md:rounded-xl w-full max-w-[92rem] h-full md:h-[92vh] flex flex-col shadow-2xl overflow-hidden"
       >
         <div className="relative flex items-center justify-between gap-3 px-4 md:px-6 py-4 md:py-5 border-b border-border">
-          <div
-            className="flex-1 min-w-0 flex items-center gap-2 md:max-w-[calc(50%-6rem)]"
-            title={itemTitle(item)}
-          >
-            <h2 className="text-sm font-semibold text-foreground truncate min-w-0">
-              {itemTitle(item)}
-            </h2>
+          <div className="flex-1 min-w-0 flex items-center gap-2 md:max-w-[calc(50%-6rem)]">
+            {headingClipped ? (
+              <Tooltip content={heading} className="min-w-0">
+                {headingNode}
+              </Tooltip>
+            ) : (
+              <div className="relative min-w-0">{headingNode}</div>
+            )}
           </div>
           <DialogNavHeader
             noun="item"
@@ -603,65 +621,65 @@ export function ItemDetailDialog({
               </div>
             )}
             {hasAnyEvaluatorRun && (
-            <Tooltip
-              position="bottom"
-              content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions."
-            >
-              <button
-                type="button"
-                onClick={() => setLiveOnly((v) => !v)}
-                aria-pressed={liveOnly}
-                className={`h-11 px-4 inline-flex items-center gap-1.5 rounded-xl text-sm font-medium border transition-colors cursor-pointer ${
-                  liveOnly
-                    ? "bg-foreground text-background border-foreground"
-                    : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
-                }`}
+              <Tooltip
+                position="bottom"
+                content="Show results for only the live versions of each evaluator. Toggle to see the results for all versions."
               >
-                {liveOnly ? (
-                  <svg
-                    className="w-3.5 h-3.5 shrink-0"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4.5 12.75l6 6 9-13.5"
-                    />
-                  </svg>
-                ) : (
-                  <span
-                    className="w-3.5 h-3.5 shrink-0 inline-flex items-center justify-center"
-                    aria-hidden
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                  </span>
-                )}
-                Live versions only
-              </button>
-            </Tooltip>
+                <button
+                  type="button"
+                  onClick={() => setLiveOnly((v) => !v)}
+                  aria-pressed={liveOnly}
+                  className={`h-11 px-4 inline-flex items-center gap-1.5 rounded-xl text-sm font-medium border transition-colors cursor-pointer ${
+                    liveOnly
+                      ? "bg-foreground text-background border-foreground"
+                      : "bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {liveOnly ? (
+                    <svg
+                      className="w-3.5 h-3.5 shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4.5 12.75l6 6 9-13.5"
+                      />
+                    </svg>
+                  ) : (
+                    <span
+                      className="w-3.5 h-3.5 shrink-0 inline-flex items-center justify-center"
+                      aria-hidden
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                    </span>
+                  )}
+                  Live versions only
+                </button>
+              </Tooltip>
             )}
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
           </div>
         </div>
 

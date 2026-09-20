@@ -674,13 +674,15 @@ export function BenchmarkDialog({
 
                   {/* Remove Button */}
                   {selectedModel && (
-                    <button
-                      onClick={() => handleRemoveModel(index)}
-                      className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                      title="Remove model"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
+                    <Tooltip content="Remove model" position="top">
+                      <button
+                        onClick={() => handleRemoveModel(index)}
+                        aria-label="Remove model"
+                        className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </Tooltip>
                   )}
                 </div>
                 {/* Why the check failed. Beside the box on a wide screen, so

@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, setupUser } from "@/test-utils";
+import { render, screen, setupUser, waitFor } from "@/test-utils";
 import {
   EvaluatorVerdictCard,
   ReasoningToggleButton,
@@ -1038,5 +1038,113 @@ describe("ReasoningExpandedContent", () => {
   it("uses foreground text color when mutedBody is false", () => {
     render(<ReasoningExpandedContent text="Body text" mutedBody={false} />);
     expect(screen.getByText("Body text")).toHaveClass("text-foreground");
+  });
+});
+
+describe("the evaluator name on hover", () => {
+  // jsdom has no layout and reports every width as 0, so a cut-off name is
+  // described directly by standing in for the two widths being compared.
+  const mockWidths = (scroll: number, client: number) => {
+    const scrollWidth = jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(scroll);
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(client);
+    return () => {
+      scrollWidth.mockRestore();
+      clientWidth.mockRestore();
+    };
+  };
+
+  it("does not repeat a name the card shows in full", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Correctness"
+        outputType="binary"
+        match={true}
+      />,
+    );
+
+    await user.hover(screen.getByText("Correctness"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Still only the name on the card, no popup saying the same thing again.
+    expect(screen.getAllByText("Correctness")).toHaveLength(1);
+  });
+
+  it("shows the whole name when the card has cut it off", async () => {
+    const user = setupUser();
+    const restore = mockWidths(300, 80);
+    render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="a very long evaluator name indeed"
+        outputType="binary"
+        match={true}
+      />,
+    );
+
+    await user.hover(screen.getByText("a very long evaluator name indeed"));
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("a very long evaluator name indeed").length,
+      ).toBeGreaterThan(1),
+    );
+    restore();
+  });
+
+  it("shows the whole name of a cut-off name that opens the evaluator", async () => {
+    const user = setupUser();
+    const restore = mockWidths(300, 80);
+    render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="a very long evaluator name indeed"
+        outputType="binary"
+        match={true}
+        enableLink
+        evaluatorUuid="abc-123"
+      />,
+    );
+
+    const nameButton = screen.getByRole("button", {
+      name: "a very long evaluator name indeed",
+    });
+    await user.hover(nameButton);
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("a very long evaluator name indeed").length,
+      ).toBeGreaterThan(1),
+    );
+    restore();
+  });
+
+  it("keeps the name clickable, and the version pill whole, with no hover text", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Linked Eval"
+        versionLabel="v3"
+        outputType="binary"
+        match={true}
+        enableLink
+        evaluatorUuid="abc-123"
+      />,
+    );
+
+    const nameWrapper = screen.getByRole("button", {
+      name: "Linked Eval",
+    }).parentElement!;
+    expect(nameWrapper.className).toContain("truncate");
+    expect(nameWrapper.className).toContain("min-w-0");
+    expect(screen.getByText("v3").className).toContain("flex-shrink-0");
+
+    await user.click(screen.getByRole("button", { name: "Linked Eval" }));
+    expect(
+      await screen.findByRole("heading", { name: "Linked Eval" }),
+    ).toBeInTheDocument();
   });
 });

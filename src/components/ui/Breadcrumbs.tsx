@@ -2,6 +2,7 @@
 
 import React, { Fragment } from "react";
 import { Link } from "@/lib/nav";
+import { Tooltip } from "@/components/Tooltip";
 
 export type Crumb = {
   /** Text shown for this step. */
@@ -15,6 +16,16 @@ export type Crumb = {
   /** Tooltip, used with `onClick`. */
   title?: string;
 };
+
+/** The step's own hover text, when it has one. Never the browser's own box. */
+function withTooltip(title: string | undefined, step: React.ReactNode) {
+  if (!title) return step;
+  return (
+    <Tooltip content={title} className="min-w-0">
+      {step}
+    </Tooltip>
+  );
+}
 
 /**
  * The trail of pages leading to this one, e.g. Agents / Support bot.
@@ -56,15 +67,17 @@ export function Breadcrumbs({
                 {item.label}
               </Link>
             ) : item.onClick ? (
-              <button
-                type="button"
-                onClick={item.onClick}
-                title={item.title}
-                aria-current={isLast ? "page" : undefined}
-                className="font-semibold text-foreground truncate cursor-pointer hover:opacity-70 transition-opacity"
-              >
-                {item.label}
-              </button>
+              withTooltip(
+                item.title,
+                <button
+                  type="button"
+                  onClick={item.onClick}
+                  aria-current={isLast ? "page" : undefined}
+                  className="font-semibold text-foreground truncate cursor-pointer hover:opacity-70 transition-opacity"
+                >
+                  {item.label}
+                </button>,
+              )
             ) : (
               <span
                 aria-current={isLast ? "page" : undefined}

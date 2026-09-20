@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useAccessToken } from "@/hooks";
 import { reportError } from "@/lib/reportError";
 import { PreBuiltPill } from "@/components/EvaluatorPills";
+import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
@@ -390,17 +391,17 @@ export function EvaluatorsTabContent({
                         })
                       }
                       className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
-                      title="View evaluator"
                     >
                       View
                     </button>
-                    <button
-                      onClick={() => openRemoveDialog(evaluator)}
-                      className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                      title="Remove from agent"
-                    >
-                      Remove
-                    </button>
+                    <Tooltip content="Remove from agent" position="top">
+                      <button
+                        onClick={() => openRemoveDialog(evaluator)}
+                        className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
               </div>

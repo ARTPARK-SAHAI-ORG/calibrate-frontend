@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Button, DialogNavHeader, LoadingState } from "@/components/ui";
 import { useDialogNavKeys, useResizableWidth } from "@/hooks";
+import { Tooltip } from "@/components/Tooltip";
+import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import {
   ResizeHandle,
   TestDetailView,
@@ -382,19 +384,34 @@ export function TraceDetailDialog({
     () => (trace ? toTestCaseOutput(trace.output) : undefined),
     [trace],
   );
+  // The heading shortens a long trace id with an ellipsis, so the whole id goes
+  // in hover text only when it has been cut short.
+  const headingText = traceUuid ?? "Trace";
+  const { ref: headingRef, clipped: headingClipped } =
+    useIsNameClipped(headingText);
 
   if (!isOpen) return null;
+
+  const heading = (
+    <h2
+      ref={headingRef}
+      className="text-base md:text-lg font-semibold text-foreground truncate min-w-0"
+    >
+      {headingText}
+    </h2>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-background rounded-xl w-full max-w-[95vw] h-[92vh] flex flex-col shadow-2xl">
         <div className="relative flex items-start justify-between gap-3 p-5 md:p-6 border-b border-border">
-          <h2
-            className="text-base md:text-lg font-semibold text-foreground truncate min-w-0"
-            title={traceUuid ?? undefined}
-          >
-            {traceUuid ?? "Trace"}
-          </h2>
+          {headingClipped ? (
+            <Tooltip content={headingText} className="min-w-0">
+              {heading}
+            </Tooltip>
+          ) : (
+            heading
+          )}
           <DialogNavHeader
             noun="trace"
             onPrev={onPrev}

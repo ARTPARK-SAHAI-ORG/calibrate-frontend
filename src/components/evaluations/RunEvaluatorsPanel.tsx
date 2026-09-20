@@ -5,6 +5,7 @@ import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { PreBuiltPill } from "@/components/EvaluatorPills";
+import { Tooltip } from "@/components/Tooltip";
 import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 
@@ -190,25 +191,25 @@ export function RunEvaluatorsPanel({
                       })
                     }
                     className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
-                    title="View evaluator"
                   >
                     View
                   </button>
                   {!readOnly && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onSelectedChange(
-                          selectedUuids.filter(
-                            (uuid) => uuid !== evaluator.uuid,
-                          ),
-                        )
-                      }
-                      className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                      title="Remove from this run"
-                    >
-                      Remove
-                    </button>
+                    <Tooltip content="Remove from this run" position="top">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onSelectedChange(
+                            selectedUuids.filter(
+                              (uuid) => uuid !== evaluator.uuid,
+                            ),
+                          )
+                        }
+                        className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </Tooltip>
                   )}
                 </div>
               </div>

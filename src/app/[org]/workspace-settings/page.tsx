@@ -418,11 +418,6 @@ function MembersSection({
                         <button
                           type="button"
                           onClick={() => setMemberToRemove(member)}
-                          title={
-                            isSelf
-                              ? "Leave this workspace"
-                              : "Remove from workspace"
-                          }
                           className="h-9 px-3 rounded-md text-xs font-medium text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer"
                         >
                           {isSelf ? "Leave" : "Remove"}
@@ -610,7 +605,6 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
                 <button
                   type="button"
                   onClick={() => setKeyToRevoke(key)}
-                  title="Revoke this key"
                   className="justify-self-end h-9 px-3 rounded-md text-xs font-medium text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer"
                 >
                   Revoke

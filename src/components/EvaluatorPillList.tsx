@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
+import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
 export type EvaluatorPillItem = {
@@ -15,30 +16,6 @@ export type EvaluatorPillItem = {
 
 const EVALUATOR_PILL_CLASSES =
   "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground max-w-full";
-
-/**
- * True while the column is narrow enough to cut the name off. A pill whose
- * name is fully readable must not put the same name in a hover popup: it
- * covers the row and tells the reader nothing.
- */
-function useIsNameClipped(name: string) {
-  const [el, setEl] = useState<HTMLSpanElement | null>(null);
-  const [clipped, setClipped] = useState(false);
-  useEffect(() => {
-    if (!el) return;
-    const measure = () => setClipped(el.scrollWidth > el.clientWidth);
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [el, name]);
-  // The wrapper around the pill changes when the name turns out to be cut
-  // off, which mounts a new span. Keeping the span in state rather than a ref
-  // re-runs the effect on that new one, so widening the column later still
-  // clears the hover text.
-  return { ref: setEl, clipped };
-}
 
 /**
  * One pill. `onOpen` makes it a button that opens how the evaluator judges;

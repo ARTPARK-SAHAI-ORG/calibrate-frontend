@@ -113,13 +113,15 @@ async function createExerciseDeleteDataset(
   await exerciseEditor(page, editorType);
 
   // Back on the Datasets tab, the new dataset is listed; delete it via its
-  // titled icon button + confirmation dialog. Note the shared dialog's confirm
-  // button defaults to "Remove" here (the datasets page doesn't override it).
+  // icon button + confirmation dialog. The button names the dataset it acts
+  // on, so a screen reader hears which row it is on. Note the shared dialog's
+  // confirm button defaults to "Remove" here (the datasets page doesn't
+  // override it).
   await page.goto(`${listPath}?tab=datasets`);
   await waitForOrgReady(page);
   const row = page.locator("div.cursor-pointer").filter({ hasText: name });
   await expect(row).toBeVisible({ timeout: 15000 });
-  await row.getByRole("button", { name: "Delete dataset" }).click();
+  await row.getByRole("button", { name: `Delete ${name}` }).click();
   await expect(
     page.getByRole("heading", { name: "Delete dataset", exact: true }),
   ).toBeVisible();

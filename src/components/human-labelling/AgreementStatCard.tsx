@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
+import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
 export function agreementColor(v: number | null | undefined): string {
@@ -31,8 +32,8 @@ function Stat({
   valueClassName?: string;
   title?: string;
 }) {
-  return (
-    <div className="min-w-0" title={title}>
+  const body = (
+    <div className="min-w-0">
       <div className="text-[11px] text-muted-foreground whitespace-nowrap">
         {label}
       </div>
@@ -42,6 +43,15 @@ function Stat({
         {value}
       </div>
     </div>
+  );
+  // The hover text says what the number counts, e.g. "8 of 10 items", which
+  // is nowhere on screen, so it is always worth showing.
+  return title ? (
+    <Tooltip content={title} position="top" className="min-w-0">
+      {body}
+    </Tooltip>
+  ) : (
+    body
   );
 }
 
@@ -109,6 +119,34 @@ export function AgreementStatCard(
     uuid: string;
     name: string;
   } | null>(null);
+  // The plain pill shortens its text to fit the card, so the whole of it goes
+  // on hover only when it is actually cut off.
+  const staticPillText =
+    "staticPillText" in props ? props.staticPillText : null;
+  const { ref: staticPillRef, clipped: staticPillClipped } = useIsNameClipped(
+    staticPillText ?? "",
+  );
+  const staticPill = (
+    <span className={`${agreementStatPillBase} cursor-default`}>
+      <span ref={staticPillRef} className="truncate">
+        {staticPillText}
+      </span>
+    </span>
+  );
+  // One number, named by the section the card sits in.
+  const singleNumber = (
+    <div
+      className={`text-2xl font-semibold tabular-nums mt-2 ${
+        result
+          ? result.ratio == null
+            ? ""
+            : agreementColor(result.ratio)
+          : valueClassName
+      }`}
+    >
+      {result ? result.value : (value ?? "—")}
+    </div>
+  );
   const warningMark = warning ? (
     <Tooltip content={warning} position="top">
       <span
@@ -137,36 +175,41 @@ export function AgreementStatCard(
       <div className="border border-border rounded-lg px-4 py-3 bg-background w-max shrink-0 min-w-[160px]">
         {"staticPillText" in props ? (
           <div className="flex items-center gap-2 min-w-0">
-            <span
-              className={`${agreementStatPillBase} cursor-default`}
-              title={props.staticPillText}
-            >
-              <span className="truncate">{props.staticPillText}</span>
-            </span>
+            {staticPillClipped ? (
+              <Tooltip content={props.staticPillText} className="min-w-0">
+                {staticPill}
+              </Tooltip>
+            ) : (
+              <div className="relative min-w-0">{staticPill}</div>
+            )}
             {warningMark}
           </div>
         ) : (
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            <button
-              type="button"
-              onClick={() =>
-                setPreviewEvaluator({
-                  uuid: props.evaluatorPill.uuid,
-                  name: props.evaluatorPill.name,
-                })
-              }
-              className={`${evaluatorAgreementPillLink} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
-              title={`Open ${props.evaluatorPill.name}`}
+            <Tooltip
+              content={`Open ${props.evaluatorPill.name}`}
+              className="shrink-0"
             >
-              <span className="break-words whitespace-normal">
-                {props.evaluatorPill.name}
-              </span>
-              {props.evaluatorPill.versionLabel && (
-                <span className="font-mono text-[11px] text-muted-foreground">
-                  {props.evaluatorPill.versionLabel}
+              <button
+                type="button"
+                onClick={() =>
+                  setPreviewEvaluator({
+                    uuid: props.evaluatorPill.uuid,
+                    name: props.evaluatorPill.name,
+                  })
+                }
+                className={`${evaluatorAgreementPillLink} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
+              >
+                <span className="break-words whitespace-normal">
+                  {props.evaluatorPill.name}
                 </span>
-              )}
-            </button>
+                {props.evaluatorPill.versionLabel && (
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    {props.evaluatorPill.versionLabel}
+                  </span>
+                )}
+              </button>
+            </Tooltip>
             {!result && showAlignmentLabel && (
               <span className="text-sm font-medium text-foreground shrink-0">
                 alignment
@@ -200,20 +243,14 @@ export function AgreementStatCard(
               />
             )}
           </div>
+        ) : result?.title ? (
+          // The hover text says what the number counts, which is nowhere on
+          // screen, so it is always worth showing.
+          <Tooltip content={result.title} position="top">
+            {singleNumber}
+          </Tooltip>
         ) : (
-          // One number, named by the section the card sits in.
-          <div
-            className={`text-2xl font-semibold tabular-nums mt-2 ${
-              result
-                ? result.ratio == null
-                  ? ""
-                  : agreementColor(result.ratio)
-                : valueClassName
-            }`}
-            title={result?.title}
-          >
-            {result ? result.value : (value ?? "—")}
-          </div>
+          singleNumber
         )}
       </div>
       <EvaluatorPreviewModal

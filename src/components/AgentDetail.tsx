@@ -1,5 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import { Tooltip } from "@/components/Tooltip";
 import type { AgentRunLauncherSettings } from "@/components/agent-tabs/useAgentRunLaunchers";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -1193,32 +1194,45 @@ export function AgentDetail({
       {!onHeaderStateChange && (
         <div className="flex items-center justify-between gap-3 -mt-2 md:-mt-4">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <Link
-              href="/agents"
-              className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
-              title="Back to agents"
+            <Tooltip
+              content="Back to agents"
+              position="top"
+              className="flex-shrink-0"
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+              <Link
+                href="/agents"
+                aria-label="Back to agents"
+                className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15.75 19.5L8.25 12l7.5-7.5"
-                />
-              </svg>
-            </Link>
-            <h1
-              className="text-lg md:text-xl font-semibold cursor-pointer hover:opacity-70 transition-opacity truncate"
-              onClick={handleOpenEditNameDialog}
-              title="Click to edit name"
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15.75 19.5L8.25 12l7.5-7.5"
+                  />
+                </svg>
+              </Link>
+            </Tooltip>
+            {/* `min-w-0` on the wrapper keeps the name cutting short in a
+                narrow header, which it did as the flex child itself. */}
+            <Tooltip
+              content="Click to edit name"
+              position="top"
+              className="min-w-0"
             >
-              {agent.name}
-            </h1>
+              <h1
+                className="text-lg md:text-xl font-semibold cursor-pointer hover:opacity-70 transition-opacity truncate"
+                onClick={handleOpenEditNameDialog}
+              >
+                {agent.name}
+              </h1>
+            </Tooltip>
             <InteractionTypePill
               interactionType={agent.interaction_type}
               className="px-1.5 py-0.5 rounded flex-shrink-0"

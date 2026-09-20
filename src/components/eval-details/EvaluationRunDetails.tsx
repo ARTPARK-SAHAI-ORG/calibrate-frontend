@@ -42,6 +42,7 @@ import {
   formatErrorRate,
   type AudioQualityMetric,
 } from "@/lib/audioPareto";
+import { Tooltip } from "@/components/Tooltip";
 import { ParetoFrontierChart } from "@/components/charts/ParetoFrontierChart";
 import { getColorMap } from "@/components/charts/LeaderboardBarChart";
 
@@ -183,15 +184,19 @@ export const CER_ABOUT_METRIC: MetricDescription = {
 export const SEMANTIC_WER_ABOUT_METRIC: MetricDescription = {
   key: "semantic_wer",
   metric: (
-    <a
-      href={PIPECAT_SEMANTIC_WER_URL}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-foreground underline-offset-2 hover:underline"
-      title="Learn more in the Pipecat STT benchmark"
+    <Tooltip
+      content="Learn more in the Pipecat STT benchmark"
+      className="inline-block"
     >
-      Semantic WER
-    </a>
+      <a
+        href={PIPECAT_SEMANTIC_WER_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-foreground underline-offset-2 hover:underline"
+      >
+        Semantic WER
+      </a>
+    </Tooltip>
   ),
   description:
     "Semantic WER measures only transcription errors that would impact an LLM agent's understanding. Punctuation, contractions, filler words, and equivalent phrasings are ignored.",
@@ -231,15 +236,19 @@ export function hasSarvamMetrics(
 // server-side bundle and are described here for context.
 function sarvamMetricLink(label: string): React.ReactNode {
   return (
-    <a
-      href={SARVAM_ASR_BLOG_URL}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-foreground underline-offset-2 hover:underline"
-      title="Learn more on the Sarvam ASR evaluation blog"
+    <Tooltip
+      content="Learn more on the Sarvam ASR evaluation blog"
+      className="inline-block"
     >
-      {label}
-    </a>
+      <a
+        href={SARVAM_ASR_BLOG_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-foreground underline-offset-2 hover:underline"
+      >
+        {label}
+      </a>
+    </Tooltip>
   );
 }
 
@@ -293,15 +302,19 @@ export const TTFB_ABOUT_METRIC: MetricDescription = {
 export const TTFS_ABOUT_METRIC: MetricDescription = {
   key: "ttfs",
   metric: (
-    <a
-      href={PIPECAT_STT_TTFS_URL}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-foreground underline-offset-2 hover:underline"
-      title="Learn more in the Pipecat STT benchmark"
+    <Tooltip
+      content="Learn more in the Pipecat STT benchmark"
+      className="inline-block"
     >
-      Latency
-    </a>
+      <a
+        href={PIPECAT_STT_TTFS_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-foreground underline-offset-2 hover:underline"
+      >
+        Latency
+      </a>
+    </Tooltip>
   ),
   description:
     "For streaming STT, latency is measured as TTFS (Time To Final Segment): the time from when the user stops speaking to when the final transcription segment is received. Lower is better \u2014 faster responses for voice agents. The reported value is the median (p50) across the dataset.",

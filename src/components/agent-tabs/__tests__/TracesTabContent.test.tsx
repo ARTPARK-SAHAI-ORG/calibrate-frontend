@@ -354,6 +354,17 @@ beforeEach(() => {
   mockUseTraces.mockReturnValue(tracesResult([trace()]));
   mockUseTraceLabels.mockReturnValue({ labels: [], refetch: refetchLabels });
   fetchAgentEvaluators.mockResolvedValue([]);
+  // Read on every visit now, so every test needs an answer. Well inside both
+  // limits, which is the ordinary case; the limit tests override it.
+  fetchTraceUsage.mockResolvedValue({
+    traces_stored: 412,
+    max_traces: 50000,
+    traces_scored: 12,
+    max_scored_traces: 100,
+  });
+  // A test that opens a trace from the address replaces this, and
+  // clearAllMocks leaves the replacement in place, so it is put back here.
+  mockUseDialogUrlParam.mockImplementation(() => ({ setParam: jest.fn() }));
 });
 
 /** The last arguments `useTraces` was called with, i.e. what is on screen now. */
@@ -530,25 +541,55 @@ describe("TracesTabContent", () => {
       render(<TracesTabContent {...tabProps} />);
       // Before the number arrives the line still says what happened.
       expect(
-        screen.getByText(/this workspace has scored as many traces/i),
+        screen.getByText(/has reached its limit for scoring traces/i),
       ).toBeInTheDocument();
       expect(
-        await screen.findByText(/has scored the 100 traces its limit allows/i),
+        await screen.findByText(
+          /has reached its limit of scoring 100 traces\./i,
+        ),
       ).toBeInTheDocument();
+      const contact = screen.getByRole("link", { name: "Click here" });
+      expect(contact).toBeInTheDocument();
+      // Same as the limit toast in src/constants/limits.tsx: bold, not
+      // underlined.
+      expect(contact).toHaveClass("font-bold");
+      expect(contact).not.toHaveClass("underline");
+    });
+
+    it("says one trace, not one traces, when the limit is a single trace", async () => {
+      fetchTraceUsage.mockResolvedValue({
+        traces_stored: 3,
+        max_traces: 50000,
+        traces_scored: 1,
+        max_scored_traces: 1,
+      });
+      mockUseTraces.mockReturnValue(
+        tracesResult([
+          trace({
+            latest_run_status: "skipped",
+            latest_run_error: "over_limit",
+          }),
+        ]),
+      );
+      render(<TracesTabContent {...tabProps} />);
       expect(
-        screen.getByRole("link", { name: "Click here" }),
+        await screen.findByText(/has reached its limit of scoring 1 trace\./i),
       ).toBeInTheDocument();
     });
 
-    it("does not ask how much of the limit is used until the cap bites", () => {
+    it("asks how much of the limit is used on every visit", () => {
+      // The storage limit leaves no mark on this screen: past it the backend
+      // turns down the customer's own app and the refusal lands in that app's
+      // logs. Waiting for something here to go wrong would mean never saying
+      // it at all.
       render(<TracesTabContent {...tabProps} />);
-      expect(fetchTraceUsage).not.toHaveBeenCalled();
+      expect(fetchTraceUsage).toHaveBeenCalled();
     });
 
     it("says nothing about a limit when no trace was refused for one", () => {
       render(<TracesTabContent {...tabProps} />);
       expect(
-        screen.queryByText(/this workspace has scored as many traces/i),
+        screen.queryByText(/has reached its limit for scoring traces/i),
       ).not.toBeInTheDocument();
     });
 
@@ -577,8 +618,138 @@ describe("TracesTabContent", () => {
         screen.queryByRole("button", { name: "Evaluators tab" }),
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByText(/this workspace has scored as many traces/i),
+        screen.queryByText(/has reached its limit for scoring traces/i),
       ).not.toBeInTheDocument();
+    });
+
+    it("says when the workspace can store no more traces, with the number", async () => {
+      fetchTraceUsage.mockResolvedValue({
+        traces_stored: 50000,
+        max_traces: 50000,
+        traces_scored: 12,
+        max_scored_traces: 100,
+      });
+      render(<TracesTabContent {...tabProps} />);
+      expect(
+        await screen.findByText(
+          /New traces are no longer being stored because this workspace has reached its limit of 50,000 traces\. Delete traces to make room\./i,
+        ),
+      ).toBeInTheDocument();
+      const contact = screen.getByRole("link", { name: "Click here" });
+      expect(contact).toHaveClass("font-bold");
+      expect(contact).not.toHaveClass("underline");
+    });
+
+    it("says nothing about storage while there is room left", async () => {
+      render(<TracesTabContent {...tabProps} />);
+      await waitFor(() => expect(fetchTraceUsage).toHaveBeenCalled());
+      expect(
+        screen.queryByText(/no longer being stored/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("says storage is full even over the setup steps", async () => {
+      // The steps ask the reader to send a trace, and with storage full that
+      // is the one thing that cannot happen: the backend turns it away.
+      mockUseTraces.mockReturnValue(tracesResult([]));
+      fetchTraceUsage.mockResolvedValue({
+        traces_stored: 50000,
+        max_traces: 50000,
+        traces_scored: 12,
+        max_scored_traces: 100,
+      });
+      render(<TracesTabContent {...tabProps} />);
+      expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
+      expect(
+        await screen.findByText(/no longer being stored/i),
+      ).toBeInTheDocument();
+    });
+
+    it("pulses beside Production quality while scoring is on", async () => {
+      mockUseTraces.mockReturnValue(
+        tracesResult([trace()], {
+          scoreAverages: [
+            {
+              evaluator_uuid: "ev-1",
+              name: "Tone",
+              output_type: "binary",
+              traces_scored: 4,
+              average: 0.5,
+            },
+          ],
+        }),
+      );
+      const { container } = render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+      await waitFor(() => expect(fetchTraceUsage).toHaveBeenCalled());
+      expect(container.querySelector(".animate-pulse")).not.toBeNull();
+    });
+
+    it("stops pulsing once nothing more can be scored", async () => {
+      // A pulse over numbers that cannot move reads as live when it is not.
+      fetchTraceUsage.mockResolvedValue({
+        traces_stored: 50000,
+        max_traces: 50000,
+        traces_scored: 100,
+        max_scored_traces: 100,
+      });
+      mockUseTraces.mockReturnValue(
+        tracesResult([trace()], {
+          scoreAverages: [
+            {
+              evaluator_uuid: "ev-1",
+              name: "Tone",
+              output_type: "binary",
+              traces_scored: 4,
+              average: 0.5,
+            },
+          ],
+        }),
+      );
+      const { container } = render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+      await screen.findByText(/no longer being stored/i);
+      expect(container.querySelector(".animate-pulse")).toBeNull();
+    });
+
+    it("stops pulsing once the scoring limit is reached", async () => {
+      mockUseTraces.mockReturnValue(
+        tracesResult(
+          [
+            trace({
+              latest_run_status: "skipped",
+              latest_run_error: "over_limit",
+            }),
+          ],
+          {
+            scoreAverages: [
+              {
+                evaluator_uuid: "ev-1",
+                name: "Tone",
+                output_type: "binary",
+                traces_scored: 4,
+                average: 0.5,
+              },
+            ],
+          },
+        ),
+      );
+      const { container } = render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+      await waitFor(() => expect(fetchTraceUsage).toHaveBeenCalled());
+      expect(container.querySelector(".animate-pulse")).toBeNull();
     });
 
     it("shows a card per evaluator average, under the search and filter row", () => {
@@ -643,7 +814,10 @@ describe("TracesTabContent", () => {
       ).toBeInTheDocument();
     });
 
-    it("pulses beside the heading only while a trace is being scored", () => {
+    it("keeps pulsing between traces, not only while one is being scored", () => {
+      // The dot used to appear only for the seconds a trace was mid-scoring,
+      // so it was almost never seen. What makes these numbers live is that
+      // scoring is on at all: they move on their own as traces arrive.
       const averages = [
         {
           evaluator_uuid: "ev-1",
@@ -654,7 +828,7 @@ describe("TracesTabContent", () => {
         },
       ];
       mockUseTraces.mockReturnValue(
-        tracesResult([trace({ latest_run_status: "processing" })], {
+        tracesResult([trace({ latest_run_status: "completed" })], {
           scoreAverages: averages,
         }),
       );
@@ -669,20 +843,8 @@ describe("TracesTabContent", () => {
       expect(pulse()).toBeInTheDocument();
       unmount();
 
-      // Nothing being scored: a pulse over numbers that cannot move would
-      // read as live when it is not.
-      mockUseTraces.mockReturnValue(
-        tracesResult([trace({ latest_run_status: "completed" })], {
-          scoreAverages: averages,
-        }),
-      );
-      render(
-        <TracesTabContent
-          {...tabProps}
-          traceScoring={{ ...traceScoring, enabled: true }}
-        />,
-      );
-
+      // Scoring turned off: nothing is going to move these numbers.
+      render(<TracesTabContent {...tabProps} />);
       expect(pulse()).not.toBeInTheDocument();
     });
 
@@ -1333,17 +1495,112 @@ describe("TracesTabContent", () => {
 
   it("does not blame a failed load on the search", () => {
     mockUseTraces.mockReturnValue(
-      tracesResult([], { error: "Failed to load traces. Please try again." }),
+      tracesResult([], { error: "Failed to load traces" }),
     );
 
     render(<TracesTabContent {...tabProps} />);
 
     expect(
-      screen.getByText("Failed to load traces. Please try again."),
+      screen.getByText("Failed to load traces"),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("No traces match your search"),
     ).not.toBeInTheDocument();
+  });
+
+  it("offers a Try again button beside a failed load, and reads it again", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([], { error: "Failed to load traces" }),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    const retry = screen.getByRole("button", { name: /Try again/ });
+    await user.click(retry);
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it("shows only the failure when the traces cannot be loaded", () => {
+    fetchTraceUsage.mockResolvedValue({
+      traces_stored: 412,
+      max_traces: 50000,
+      traces_scored: 100,
+      max_scored_traces: 100,
+    });
+    mockUseTraces.mockReturnValue(
+      tracesResult(
+        [
+          trace({
+            latest_run_status: "skipped",
+            latest_run_error: "over_limit",
+          }),
+        ],
+        {
+          error: "Failed to load traces",
+          scoreAverages: [
+            {
+              evaluator_uuid: "ev-1",
+              name: "Tone",
+              output_type: "boolean",
+              average: 1,
+              traces_scored: 1,
+              scale_min: null,
+              scale_max: null,
+            },
+          ],
+        },
+      ),
+    );
+
+    render(<TracesTabContent {...tabProps} />);
+
+    expect(
+      screen.getByText("Failed to load traces"),
+    ).toBeInTheDocument();
+    // Nothing that describes traces nobody can see.
+    expect(
+      screen.queryByPlaceholderText("Search traces"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "Filter traces by output" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("1 trace")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Refresh" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Continuous monitoring/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Select trace")).not.toBeInTheDocument();
+    expect(screen.queryByText("Production quality")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/has reached its limit/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Integration guide" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("takes the open trace away when the list behind it fails to load", () => {
+    let openFromUrl: ((value: string) => void) | undefined;
+    mockUseDialogUrlParam.mockImplementation((args: unknown) => {
+      openFromUrl = (args as { onOpen: (value: string) => void }).onOpen;
+      return { setParam: jest.fn() };
+    });
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace()], {
+        error: "Failed to load traces",
+      }),
+    );
+
+    render(<TracesTabContent {...tabProps} />);
+    // A ?traceId= in the address asks for that trace.
+    act(() => openFromUrl?.("trace-1"));
+
+    expect(
+      screen.getByText("Failed to load traces"),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("trace-detail")).not.toBeInTheDocument();
   });
 
   it("shows the empty state when the agent has no traces", () => {
@@ -1396,7 +1653,7 @@ describe("TracesTabContent", () => {
     let failed = false;
     mockUseTraces.mockImplementation(() => ({
       ...tracesResult([]),
-      error: failed ? "Failed to load traces. Please try again." : null,
+      error: failed ? "Failed to load traces" : null,
     }));
     const { rerender } = render(<TracesTabContent {...tabProps} />);
 
@@ -1408,7 +1665,7 @@ describe("TracesTabContent", () => {
     // once, so a failed check must not take it away.
     expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
     expect(
-      screen.getByText("Failed to load traces. Please try again."),
+      screen.getByText("Failed to load traces"),
     ).toBeInTheDocument();
   });
 
@@ -1448,7 +1705,7 @@ describe("TracesTabContent", () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
 
-    await user.click(screen.getAllByTitle("Delete trace")[0]);
+    await user.click(screen.getAllByLabelText("Delete trace")[0]);
     expect(screen.getByText("Delete this trace?")).toBeInTheDocument();
     expect(
       screen.getByText(

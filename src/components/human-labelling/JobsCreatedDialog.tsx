@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { Tooltip } from "@/components/Tooltip";
 
 export type CreatedJob = {
   uuid: string;
@@ -119,28 +120,29 @@ export function JobsCreatedDialog({
                     >
                       {copied ? "Copied" : "Copy"}
                     </button>
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Open ${job.annotator_name}'s job in a new tab`}
-                      title="Open in new tab"
-                      className="h-8 w-8 flex items-center justify-center rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 transition-colors cursor-pointer"
-                    >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
+                    <Tooltip content="Open in new tab">
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Open ${job.annotator_name}'s job in a new tab`}
+                        className="h-8 w-8 flex items-center justify-center rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 transition-colors cursor-pointer"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                        />
-                      </svg>
-                    </a>
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                          />
+                        </svg>
+                      </a>
+                    </Tooltip>
                   </div>
                 </div>
               );

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { Tooltip } from "@/components/Tooltip";
 import { FieldError } from "@/components/ui/FieldError";
 import { humaniseDetailObject } from "./bulk-upload-shared";
 import {
@@ -257,6 +258,29 @@ export function AddSttItemsDialog({
     }
   };
 
+  const addAnotherButton = (
+    <button
+      onClick={addRow}
+      disabled={submitting || !allComplete}
+      className="w-full h-10 rounded-md text-sm font-medium border border-dashed border-border bg-background hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+    >
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 4.5v15m7.5-7.5h-15"
+        />
+      </svg>
+      Add another item
+    </button>
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div
@@ -322,27 +346,28 @@ export function AddSttItemsDialog({
                       Item {idx + 1}
                     </h3>
                     {!isEdit && (
-                      <button
-                        onClick={() => removeRow(row.id)}
-                        disabled={rows.length === 1 || submitting}
-                        className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                        aria-label={`Remove item ${idx + 1}`}
-                        title="Remove this item"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
+                      <Tooltip content="Remove this item">
+                        <button
+                          onClick={() => removeRow(row.id)}
+                          disabled={rows.length === 1 || submitting}
+                          className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label={`Remove item ${idx + 1}`}
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </Tooltip>
                     )}
                   </div>
                 )}
@@ -365,8 +390,7 @@ export function AddSttItemsDialog({
                 </div>
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-muted-foreground">
-                    Reference transcript{" "}
-                    <span className="text-red-500">*</span>
+                    Reference transcript <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={row.actual}
@@ -384,8 +408,7 @@ export function AddSttItemsDialog({
                 </div>
                 <div className="space-y-1">
                   <label className="block text-xs font-medium text-muted-foreground">
-                    Predicted transcript{" "}
-                    <span className="text-red-500">*</span>
+                    Predicted transcript <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={row.predicted}
@@ -405,33 +428,16 @@ export function AddSttItemsDialog({
             );
           })}
 
-          {!isEdit && (
-            <button
-              onClick={addRow}
-              disabled={submitting || !allComplete}
-              title={
-                !allComplete
-                  ? "Fill in all items before adding another"
-                  : undefined
-              }
-              className="w-full h-10 rounded-md text-sm font-medium border border-dashed border-border bg-background hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 4.5v15m7.5-7.5h-15"
-                />
-              </svg>
-              Add another item
-            </button>
-          )}
+          {!isEdit &&
+            (allComplete ? (
+              addAnotherButton
+            ) : (
+              // The hover text is on the wrapper, so it still shows while the
+              // button is disabled.
+              <Tooltip content="Fill in all items before adding another">
+                {addAnotherButton}
+              </Tooltip>
+            ))}
 
           {error && (
             <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">

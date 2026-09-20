@@ -256,6 +256,24 @@ describe("SpeechToTextEvaluation", () => {
     expect(screen.getByTestId("stt-editor")).toBeInTheDocument();
   });
 
+  it("names the provider's website link and shows where it goes on hover", async () => {
+    const user = setupUser();
+    render(<SpeechToTextEvaluation />);
+    await user.click(screen.getByText("Evaluators"));
+
+    const links = screen.getAllByRole("link", {
+      name: "Visit Deepgram website",
+    });
+    expect(links[0]).toHaveAttribute("href", "https://deepgram.com");
+    expect(links[0]).not.toHaveAttribute("title");
+    await user.hover(links[0]);
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("Visit Deepgram website").length,
+      ).toBeGreaterThan(0),
+    );
+  });
+
   it("toggles provider selection and reflects selected count", async () => {
     const user = setupUser();
     render(<SpeechToTextEvaluation />);

@@ -5,6 +5,7 @@ import { readToolParameters, NormalizedToolParam } from "@/lib/toolParams";
 import { EditIcon } from "@/components/icons";
 import { ToolTypePill } from "./ToolTypePill";
 import { DeleteIconButton } from "@/components/ui";
+import { Tooltip } from "@/components/Tooltip";
 
 /**
  * What a tool needs to be called, shown beside the tool picker so the reader
@@ -53,15 +54,16 @@ export function ToolPreview({
         {(onEdit || onDelete) && (
           <div className="flex items-center gap-1 flex-shrink-0">
             {onEdit && (
-              <button
-                type="button"
-                onClick={() => onEdit(tool)}
-                title="Edit tool"
-                aria-label="Edit tool"
-                className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-              >
-                <EditIcon className="w-4 h-4" />
-              </button>
+              <Tooltip content="Edit tool" position="top">
+                <button
+                  type="button"
+                  onClick={() => onEdit(tool)}
+                  aria-label="Edit tool"
+                  className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <EditIcon className="w-4 h-4" />
+                </button>
+              </Tooltip>
             )}
             {onDelete && (
               <DeleteIconButton

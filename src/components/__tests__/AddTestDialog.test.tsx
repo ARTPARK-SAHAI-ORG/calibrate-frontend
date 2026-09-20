@@ -825,17 +825,35 @@ describe("AddTestDialog", () => {
       let textareas = document.querySelectorAll("textarea[data-msg-id]");
       expect(textareas.length).toBe(3);
 
-      await user.click(screen.getByTitle("Add message"));
+      await user.click(screen.getByLabelText("Add message"));
       await user.click(screen.getByText("User message"));
 
       textareas = document.querySelectorAll("textarea[data-msg-id]");
       expect(textareas.length).toBe(4);
 
-      const removeButtons = screen.getAllByTitle("Remove message");
+      const removeButtons = screen.getAllByLabelText("Remove message");
       await user.click(removeButtons[removeButtons.length - 1]);
 
       textareas = document.querySelectorAll("textarea[data-msg-id]");
       expect(textareas.length).toBe(3);
+    });
+
+    it("removes an earlier message from the button beside its bubble", async () => {
+      const user = setupUser();
+      render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+
+      expect(document.querySelectorAll("textarea[data-msg-id]").length).toBe(3);
+
+      // The last message keeps its own row of actions; every earlier one has
+      // a button beside the bubble, which is the first in the page.
+      const removeButtons = screen.getAllByLabelText("Remove message");
+      expect(removeButtons[0]).not.toHaveAttribute("title");
+      await user.click(removeButtons[0]);
+
+      expect(document.querySelectorAll("textarea[data-msg-id]").length).toBe(2);
     });
 
     it("adds an inbuilt tool call message via the Add message dropdown", async () => {
@@ -845,7 +863,7 @@ describe("AddTestDialog", () => {
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
 
-      await user.click(screen.getByTitle("Add message"));
+      await user.click(screen.getByLabelText("Add message"));
       await user.click(screen.getByText("Agent tool call"));
       await user.click(screen.getByText("Pick inbuilt tool"));
 
@@ -861,7 +879,7 @@ describe("AddTestDialog", () => {
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
 
-      await user.click(screen.getByTitle("Add message"));
+      await user.click(screen.getByLabelText("Add message"));
       expect(createToolFlowSlots[1]?.isOpen).not.toBe(true);
       await user.click(screen.getByText("Create tool"));
       expect(createToolFlowSlots[1].isOpen).toBe(true);
@@ -876,7 +894,7 @@ describe("AddTestDialog", () => {
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
 
-      await user.click(screen.getByTitle("Add message"));
+      await user.click(screen.getByLabelText("Add message"));
       await user.click(screen.getByText("Create tool"));
       await user.click(screen.getByText("Finish creating tool"));
 
@@ -895,7 +913,7 @@ describe("AddTestDialog", () => {
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
 
-      await user.click(screen.getByTitle("Add message"));
+      await user.click(screen.getByLabelText("Add message"));
       await user.click(screen.getByText("Create tool"));
       await user.click(screen.getByText("Finish creating tool"));
 

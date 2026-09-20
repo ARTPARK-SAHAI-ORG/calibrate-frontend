@@ -94,6 +94,44 @@ describe("RunEvaluatorsDialog", () => {
     expect(screen.queryByText(/left out of this run/)).not.toBeInTheDocument();
   });
 
+  it("does not repeat an evaluator's name the row shows in full", async () => {
+    mockedApiClient.mockResolvedValue(detailResponse);
+    const user = setupUser();
+    renderDialog();
+
+    const name = await screen.findByText("Relevance");
+    expect(name).not.toHaveAttribute("title");
+    await user.hover(name);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Still only the row itself, no popup saying the same thing again.
+    expect(screen.getAllByText("Relevance")).toHaveLength(1);
+  });
+
+  it("shows the whole of an evaluator's name when the row has cut it off", async () => {
+    // jsdom has no layout, so the cut-off name is described directly by
+    // standing in for the two widths the row compares.
+    const scrollWidth = jest
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(300);
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(80);
+    mockedApiClient.mockResolvedValue(detailResponse);
+    const user = setupUser();
+    renderDialog();
+
+    await screen.findByText("Relevance");
+    // The row measures itself after it first draws, and the name it draws once
+    // it knows the name is cut off is a new one, so hover what is there now.
+    await waitFor(async () => {
+      await user.hover(screen.getByText("Relevance"));
+      expect(screen.getAllByText("Relevance").length).toBeGreaterThan(1);
+    });
+
+    scrollWidth.mockRestore();
+    clientWidth.mockRestore();
+  });
+
   it("renders nothing when closed", () => {
     render(
       <RunEvaluatorsDialog

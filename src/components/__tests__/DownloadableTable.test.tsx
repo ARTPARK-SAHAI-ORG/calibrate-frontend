@@ -39,6 +39,13 @@ describe("DownloadableTable", () => {
     expect(screen.getByText("80%")).toBeInTheDocument();
   });
 
+  it("leaves the download button with no hover text, since it names itself", () => {
+    render(<DownloadableTable columns={columns} data={data} />);
+    expect(
+      screen.getByRole("button", { name: "Download CSV" }),
+    ).not.toHaveAttribute("title");
+  });
+
   it("triggers a CSV download with the default filename when the button is clicked", async () => {
     const user = setupUser();
     if (!URL.createObjectURL) (URL as any).createObjectURL = () => "";
@@ -54,7 +61,7 @@ describe("DownloadableTable", () => {
       .mockImplementation(() => {});
 
     render(<DownloadableTable columns={columns} data={data} />);
-    await user.click(screen.getByTitle("Download as CSV"));
+    await user.click(screen.getByRole("button", { name: "Download CSV" }));
 
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     const blobArg = createObjectURL.mock.calls[0][0] as Blob;
@@ -82,7 +89,7 @@ describe("DownloadableTable", () => {
     render(
       <DownloadableTable columns={columns} data={data} filename="custom" />,
     );
-    await user.click(screen.getByTitle("Download as CSV"));
+    await user.click(screen.getByRole("button", { name: "Download CSV" }));
 
     expect(setAttributeSpy).toHaveBeenCalledWith("download", "custom.csv");
 

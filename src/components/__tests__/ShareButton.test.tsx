@@ -67,6 +67,11 @@ describe("ShareButton", () => {
 
     await user.hover(screen.getByRole("button", { name: "Public" }));
     expect(await screen.findByText("Make this private")).toBeInTheDocument();
+
+    const copyButton = screen.getByRole("button", { name: "Copy link" });
+    expect(copyButton).not.toHaveAttribute("title");
+    await user.hover(copyButton);
+    expect(await screen.findByText("Copy public link")).toBeInTheDocument();
   });
 
   it("toggles from private to public, calling the visibility endpoint and updating state", async () => {

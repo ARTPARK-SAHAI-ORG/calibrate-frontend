@@ -1,4 +1,5 @@
 import { render, screen } from "@/test-utils";
+import { CONTACT_LINK } from "@/constants/limits";
 import { TraceScorePanel } from "../TraceScorePanel";
 import type { TraceScoringRun } from "@/lib/tracesApi";
 
@@ -131,16 +132,9 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
     />,
   );
   expect(
-    screen.getByText("No evaluators could score this trace"),
+    screen.getByText("No evaluators could score this trace."),
   ).toBeInTheDocument();
   expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
-
-  rerender(<TraceScorePanel run={prior} />);
-  expect(
-    screen.getByText(
-      "This workspace has scored as many traces as its limit allows",
-    ),
-  ).toBeInTheDocument();
 
   rerender(
     <TraceScorePanel
@@ -154,6 +148,47 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
     />,
   );
   expect(screen.getByText("This run produced no scores.")).toBeInTheDocument();
+});
+
+it("shows every reason a trace was not scored as a warning, not a note", () => {
+  const { container } = render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r5",
+        status: "skipped",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "scoring_disabled",
+        results: [],
+      }}
+    />,
+  );
+
+  const box = container.querySelector(".border-amber-500\\/40");
+  expect(box).not.toBeNull();
+  expect(box).toHaveTextContent(
+    "Monitoring was turned off before this trace was scored.",
+  );
+  expect(box?.querySelector("p")?.className).toContain("text-amber-700");
+  // Only the limit has somewhere for the reader to go next.
+  expect(screen.queryByRole("link")).not.toBeInTheDocument();
+});
+
+it("says the workspace is over its scoring limit and offers the contact link", () => {
+  const { container } = render(<TraceScorePanel run={prior} />);
+
+  const box = container.querySelector(".border-amber-500\\/40");
+  expect(box).not.toBeNull();
+  expect(box).toHaveTextContent(
+    "This workspace has reached its limit for scoring traces. Click here to contact us to extend your limits.",
+  );
+
+  const link = screen.getByRole("link", { name: "Click here" });
+  expect(link).toHaveAttribute("href", CONTACT_LINK);
+  expect(link).toHaveAttribute("target", "_blank");
+  expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  // Bold, with no underline, the same as the limit message shown elsewhere.
+  expect(link.className).toContain("font-bold");
+  expect(link.className).not.toContain("underline");
 });
 
 it("gives each card what its own evaluator is for, and nothing for one with no words", () => {

@@ -2,6 +2,7 @@
 
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { SpinnerIcon } from "@/components/icons";
+import { CONTACT_LINK } from "@/constants/limits";
 import {
   isTraceScoringInProgress,
   scoringRunErrorCopy,
@@ -45,11 +46,33 @@ function RunBody({
     );
   }
 
+  // A trace that could not be scored is a warning whatever the reason, so
+  // every reason gets the same amber box the Traces tab uses. Only the limit
+  // has somewhere for the reader to go next, so only it carries the link.
   if (run.status === "failed" || run.status === "skipped") {
     return (
-      <p className="text-sm text-muted-foreground">
-        {scoringRunErrorCopy(run.error)}
-      </p>
+      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+        <p className="text-sm text-amber-700 dark:text-amber-300">
+          {/* The reason is hover text elsewhere, so it carries no full stop
+              of its own. Here it is a sentence, and the limit one is followed
+              by another, so this is where the stop belongs. */}
+          {scoringRunErrorCopy(run.error)}.
+          {run.error === "over_limit" && (
+            <>
+              {" "}
+              <a
+                href={CONTACT_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold"
+              >
+                Click here
+              </a>{" "}
+              to contact us to extend your limits.
+            </>
+          )}
+        </p>
+      </div>
     );
   }
 

@@ -109,17 +109,24 @@ describe("RatingScaleEditor", () => {
     expect(nameInputs[0].className).not.toContain("border-red-500");
   });
 
-  it("disables remove button and shows tooltip when only two rows remain", () => {
+  it("disables remove button and says why on hover when only two rows remain", async () => {
+    const user = setupUser();
     const rows: RatingScaleRow[] = [
       { value: 1, name: "", description: "" },
       { value: 2, name: "", description: "" },
     ];
     setup({ rows });
-    const removeButtons = screen.getAllByTitle(
-      "At least two rows are required",
-    );
+    const removeButtons = screen.getAllByLabelText("Remove row");
     expect(removeButtons).toHaveLength(2);
-    removeButtons.forEach((btn) => expect(btn).toBeDisabled());
+    removeButtons.forEach((btn) => {
+      expect(btn).toBeDisabled();
+      expect(btn).not.toHaveAttribute("title");
+    });
+
+    await user.hover(removeButtons[0]);
+    expect(
+      await screen.findByText("At least two rows are required"),
+    ).toBeInTheDocument();
   });
 
   it("does not remove a row when disabled remove button is clicked (no-op guard)", async () => {
@@ -129,24 +136,30 @@ describe("RatingScaleEditor", () => {
       { value: 2, name: "", description: "" },
     ];
     const { onChange } = setup({ rows });
-    const removeButtons = screen.getAllByTitle(
-      "At least two rows are required",
-    );
+    const removeButtons = screen.getAllByLabelText("Remove row");
     await user.click(removeButtons[0]);
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("enables remove button with 'Remove row' title when more than two rows", () => {
+  it("enables remove button and offers 'Remove row' on hover when more than two rows", async () => {
+    const user = setupUser();
     setup();
-    const removeButtons = screen.getAllByTitle("Remove row");
+    const removeButtons = screen.getAllByLabelText("Remove row");
     expect(removeButtons).toHaveLength(3);
-    removeButtons.forEach((btn) => expect(btn).not.toBeDisabled());
+    removeButtons.forEach((btn) => {
+      expect(btn).not.toBeDisabled();
+      expect(btn).not.toHaveAttribute("title");
+    });
+
+    await user.hover(removeButtons[0]);
+    const hovered = await screen.findAllByText("Remove row");
+    expect(hovered.length).toBeGreaterThan(0);
   });
 
   it("removes the correct row when remove button is clicked", async () => {
     const user = setupUser();
     const { onChange } = setup();
-    const removeButtons = screen.getAllByTitle("Remove row");
+    const removeButtons = screen.getAllByLabelText("Remove row");
     await user.click(removeButtons[1]);
     expect(onChange).toHaveBeenCalledWith([
       { value: 1, name: "", description: "" },

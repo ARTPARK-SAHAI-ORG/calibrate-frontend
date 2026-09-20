@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { getBackendUrl } from "@/lib/api";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
+import { Tooltip } from "@/components/Tooltip";
 import {
   getBinaryDescription,
   getBinaryLabel,
@@ -1051,15 +1052,20 @@ function AnnotateView({
                 const tooltip = !allEvaluatorsAnswered
                   ? "Judgements should be given for all required evaluators before submitting"
                   : undefined;
-                return (
+                const submitButton = (
                   <button
                     onClick={() => handleSubmitItem()}
                     disabled={disabled}
-                    title={tooltip}
                     className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {label}
                   </button>
+                );
+                if (!tooltip) return submitButton;
+                return (
+                  <Tooltip content={tooltip} position="top">
+                    {submitButton}
+                  </Tooltip>
                 );
               })()}
           </div>
@@ -1090,20 +1096,25 @@ function AnnotateView({
                 const isCurrent = i === currentIndex;
                 const position = originalIndexByUuid.get(it.uuid);
                 return (
-                  <button
+                  <Tooltip
                     key={it.uuid}
-                    onClick={() => navigateTo(i)}
-                    title={`Item ${position}${done ? " (completed)" : ""}`}
-                    className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
-                      isCurrent
-                        ? "border-foreground bg-foreground text-background"
-                        : done
-                          ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
-                          : "border-border bg-background text-foreground hover:bg-muted/50"
-                    }`}
+                    content={`Item ${position}${done ? " (completed)" : ""}`}
+                    position="top"
                   >
-                    {position}
-                  </button>
+                    <button
+                      onClick={() => navigateTo(i)}
+                      aria-label={`Item ${position}${done ? " (completed)" : ""}`}
+                      className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                        isCurrent
+                          ? "border-foreground bg-foreground text-background"
+                          : done
+                            ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
+                            : "border-border bg-background text-foreground hover:bg-muted/50"
+                      }`}
+                    >
+                      {position}
+                    </button>
+                  </Tooltip>
                 );
               })}
             </div>
@@ -1117,20 +1128,25 @@ function AnnotateView({
                   const isCurrent = i === currentIndex;
                   const position = originalIndexByUuid.get(it.uuid);
                   return (
-                    <button
+                    <Tooltip
                       key={it.uuid}
-                      onClick={() => navigateTo(i)}
-                      title={`Item ${position}${done ? " (completed)" : ""}`}
-                      className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
-                        isCurrent
-                          ? "border-foreground bg-foreground text-background"
-                          : done
-                            ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
-                            : "border-border bg-background text-foreground hover:bg-muted/50"
-                      }`}
+                      content={`Item ${position}${done ? " (completed)" : ""}`}
+                      position="right"
                     >
-                      {position}
-                    </button>
+                      <button
+                        onClick={() => navigateTo(i)}
+                        aria-label={`Item ${position}${done ? " (completed)" : ""}`}
+                        className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                          isCurrent
+                            ? "border-foreground bg-foreground text-background"
+                            : done
+                              ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
+                              : "border-border bg-background text-foreground hover:bg-muted/50"
+                        }`}
+                      >
+                        {position}
+                      </button>
+                    </Tooltip>
                   );
                 })}
               </div>

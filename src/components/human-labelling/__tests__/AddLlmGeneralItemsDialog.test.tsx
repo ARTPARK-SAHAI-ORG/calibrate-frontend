@@ -191,6 +191,27 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     ).toBeInTheDocument();
   });
 
+  it("says what the remove button does in the app's own tooltip, not the browser's", async () => {
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    const remove = screen.getByRole("button", { name: "Remove dummy" });
+    expect(remove).not.toHaveAttribute("title");
+
+    await user.hover(remove);
+    expect(await screen.findByText("Remove tool call")).toBeInTheDocument();
+  });
+
   it("lets the item be saved on a tool call alone, with no text answer", () => {
     renderDialog({
       mode: "edit",

@@ -10,6 +10,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
+import { Tooltip } from "@/components/Tooltip";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
   binaryScaleFor,
@@ -94,11 +95,13 @@ export type JobEvaluator = {
       color?: string | null;
     }[];
   } | null;
-  variables?: {
-    name: string;
-    description?: string | null;
-    default?: string | null;
-  }[] | null;
+  variables?:
+    | {
+        name: string;
+        description?: string | null;
+        default?: string | null;
+      }[]
+    | null;
 };
 
 export type EvaluatorRunItemSnapshot = {
@@ -586,32 +589,25 @@ function AgreementGlyph({
     agreement == null
       ? "No comparisons"
       : `Agreement ${formatAgreement(agreement)} · ${pairCount} comparison${pairCount === 1 ? "" : "s"}`;
-  if (perfect) {
-    return (
-      <span
-        title={tooltip}
-        className="inline-flex items-center justify-center w-5 h-5 rounded-full text-green-600 dark:text-green-400"
-        aria-label="Annotators agree with evaluator"
-      >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={3}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M5 13l4 4L19 7"
-          />
-        </svg>
-      </span>
-    );
-  }
-  return (
+  // The hover text carries the agreement number and how many comparisons it
+  // came from, neither of which is on screen beside the mark.
+  const mark = perfect ? (
     <span
-      title={tooltip}
+      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-green-600 dark:text-green-400"
+      aria-label="Annotators agree with evaluator"
+    >
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={3}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+    </span>
+  ) : (
+    <span
       className="inline-flex items-center justify-center w-5 h-5 rounded-full text-red-600 dark:text-red-400"
       aria-label="At least one annotator disagrees with evaluator"
     >
@@ -629,6 +625,11 @@ function AgreementGlyph({
         />
       </svg>
     </span>
+  );
+  return (
+    <Tooltip content={tooltip} className="inline-flex shrink-0">
+      {mark}
+    </Tooltip>
   );
 }
 
@@ -827,80 +828,80 @@ export function EvaluatorResultsPane({
     );
   }
 
-  const renderEvaluatorCard = (
-    ev: { evaluator_id: string; evaluator_version_id?: string; name?: string },
-  ) => {
-        const versionLabel = ev.evaluator_version_id
-          ? versionLabels[ev.evaluator_version_id]
-          : null;
-        const r = runs.find(
-          (x) =>
-            x.evaluator_id === ev.evaluator_id &&
-            (!ev.evaluator_version_id ||
-              x.evaluator_version_id === ev.evaluator_version_id),
-        );
-        const jobEvaluator = getJobEvaluator(ev);
-        const displayName = evaluatorDisplayName(ev, evaluatorNamesById);
-        // Prefer the evaluator's declared output type so annotations still
-        // render with the right pill when the evaluator itself produced no
-        // value yet (e.g. items labelled by humans before a run).
-        let outputType: "binary" | "rating" =
-          jobEvaluator?.output_type === "rating" ? "rating" : "binary";
-        if (r) {
-          const v = r.value?.value;
-          if (typeof v === "boolean") outputType = "binary";
-          else if (typeof v === "number") outputType = "rating";
-        }
-        // outputType above can flip to binary on a boolean-valued row, so
-        // gate the binary lookups on the evaluator's declared type instead.
-        const binaryScale = binaryScaleFor(
-          jobEvaluator?.output_type,
-          jobEvaluator?.output_config?.scale,
-        );
+  const renderEvaluatorCard = (ev: {
+    evaluator_id: string;
+    evaluator_version_id?: string;
+    name?: string;
+  }) => {
+    const versionLabel = ev.evaluator_version_id
+      ? versionLabels[ev.evaluator_version_id]
+      : null;
+    const r = runs.find(
+      (x) =>
+        x.evaluator_id === ev.evaluator_id &&
+        (!ev.evaluator_version_id ||
+          x.evaluator_version_id === ev.evaluator_version_id),
+    );
+    const jobEvaluator = getJobEvaluator(ev);
+    const displayName = evaluatorDisplayName(ev, evaluatorNamesById);
+    // Prefer the evaluator's declared output type so annotations still
+    // render with the right pill when the evaluator itself produced no
+    // value yet (e.g. items labelled by humans before a run).
+    let outputType: "binary" | "rating" =
+      jobEvaluator?.output_type === "rating" ? "rating" : "binary";
+    if (r) {
+      const v = r.value?.value;
+      if (typeof v === "boolean") outputType = "binary";
+      else if (typeof v === "number") outputType = "rating";
+    }
+    // outputType above can flip to binary on a boolean-valued row, so
+    // gate the binary lookups on the evaluator's declared type instead.
+    const binaryScale = binaryScaleFor(
+      jobEvaluator?.output_type,
+      jobEvaluator?.output_config?.scale,
+    );
 
-        const stillRunning =
-          !r && (jobStatus === "in_progress" || jobStatus === "queued");
-        if (stillRunning) {
-          return (
-            <div
-              key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
-              className="border border-border rounded-xl p-4 space-y-2"
+    const stillRunning =
+      !r && (jobStatus === "in_progress" || jobStatus === "queued");
+    if (stillRunning) {
+      return (
+        <div
+          key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+          className="border border-border rounded-xl p-4 space-y-2"
+        >
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <h3 className="text-sm font-semibold">{displayName}</h3>
+            {versionLabel && (
+              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-muted-foreground">
+                {versionLabel}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 py-1">
+            <svg
+              className="w-5 h-5 animate-spin text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
             >
-              <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <h3 className="text-sm font-semibold">{displayName}</h3>
-                {versionLabel && (
-                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-muted-foreground">
-                    {versionLabel}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-3 py-1">
-                <svg
-                  className="w-5 h-5 animate-spin text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                <p className="text-sm text-muted-foreground">
-                  Running evaluator
-                </p>
-              </div>
-            </div>
-          );
-        }
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <p className="text-sm text-muted-foreground">Running evaluator</p>
+          </div>
+        </div>
+      );
+    }
 
         const evaluatorName = displayName;
 
@@ -1016,70 +1017,68 @@ export function EvaluatorResultsPane({
           outputType,
         );
 
-        return (
-          <div
-            key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
-            className="space-y-2"
-          >
-            {(hasHumans || alwaysShowSourcePills) && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {!hideAgreementGlyph && hasHumans && (
-                  <AgreementGlyph
-                    perfect={humansForEvaluator?.agreement === 1}
-                    agreement={humansForEvaluator?.agreement ?? null}
-                    pairCount={humansForEvaluator?.pair_count ?? 0}
-                  />
-                )}
-                {hasEvaluatorLabel && (
-                  <SourcePill
-                    selected={selection === "evaluator"}
-                    onClick={() => setSelection("evaluator")}
-                    primaryLabel="Evaluator"
-                    monoSuffix={showVersionInSourcePill ? versionLabel : null}
-                  />
-                )}
-                {annotationPills.map((a) => {
-                  const aligned = isAnnotationAligned(
-                    a.value?.value,
-                    r.value?.value,
-                    outputType,
-                  );
-                  return (
-                    <SourcePill
-                      key={a.annotation_id}
-                      primaryLabel={annotatorDisplayName(a)}
-                      selected={selection === a.annotator_id}
-                      onClick={() => setSelection(a.annotator_id)}
-                      tone={aligned ? "aligned" : "misaligned"}
-                    />
-                  );
-                })}
-              </div>
+    return (
+      <div
+        key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
+        className="space-y-2"
+      >
+        {(hasHumans || alwaysShowSourcePills) && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {!hideAgreementGlyph && hasHumans && (
+              <AgreementGlyph
+                perfect={humansForEvaluator?.agreement === 1}
+                agreement={humansForEvaluator?.agreement ?? null}
+                pairCount={humansForEvaluator?.pair_count ?? 0}
+              />
             )}
-            <EvaluatorVerdictCard
-              mode="read"
-              name={evaluatorName}
-              description={jobEvaluator?.description ?? null}
-              versionLabel={showVersionInSourcePill ? null : versionLabel}
-              outputType={outputType}
-              evaluatorUuid={ev.evaluator_id}
-              enableLink={linkEvaluators}
-              variableValues={
-                evaluatorVariablesByEvaluatorId[ev.evaluator_id] ?? null
-              }
-              match={displayMatch}
-              score={displayScore}
-              scaleMin={scaleMin}
-              scaleMax={scaleMax}
-              trueLabel={getBinaryLabel(binaryScale, true)}
-              falseLabel={getBinaryLabel(binaryScale, false)}
-              ratingScale={toRatingScale(
-                jobEvaluator?.output_config?.scale,
-              )}
-              reasoning={displayReasoning}
-            />
+            {hasEvaluatorLabel && (
+              <SourcePill
+                selected={selection === "evaluator"}
+                onClick={() => setSelection("evaluator")}
+                primaryLabel="Evaluator"
+                monoSuffix={showVersionInSourcePill ? versionLabel : null}
+              />
+            )}
+            {annotationPills.map((a) => {
+              const aligned = isAnnotationAligned(
+                a.value?.value,
+                r.value?.value,
+                outputType,
+              );
+              return (
+                <SourcePill
+                  key={a.annotation_id}
+                  primaryLabel={annotatorDisplayName(a)}
+                  selected={selection === a.annotator_id}
+                  onClick={() => setSelection(a.annotator_id)}
+                  tone={aligned ? "aligned" : "misaligned"}
+                />
+              );
+            })}
           </div>
-        );
+        )}
+        <EvaluatorVerdictCard
+          mode="read"
+          name={evaluatorName}
+          description={jobEvaluator?.description ?? null}
+          versionLabel={showVersionInSourcePill ? null : versionLabel}
+          outputType={outputType}
+          evaluatorUuid={ev.evaluator_id}
+          enableLink={linkEvaluators}
+          variableValues={
+            evaluatorVariablesByEvaluatorId[ev.evaluator_id] ?? null
+          }
+          match={displayMatch}
+          score={displayScore}
+          scaleMin={scaleMin}
+          scaleMax={scaleMax}
+          trueLabel={getBinaryLabel(binaryScale, true)}
+          falseLabel={getBinaryLabel(binaryScale, false)}
+          ratingScale={toRatingScale(jobEvaluator?.output_config?.scale)}
+          reasoning={displayReasoning}
+        />
+      </div>
+    );
   };
 
   if (groupVersionsByEvaluator) {
@@ -1290,12 +1289,12 @@ function GroupedEvaluatorCard({
       : defaultSelection;
 
   const selectedVersion = selection.startsWith("v:")
-    ? versions.find(
+    ? (versions.find(
         (x) => `v:${x.ev.evaluator_version_id ?? ""}` === selection,
-      ) ?? null
+      ) ?? null)
     : null;
   const selectedAnnotation = selection.startsWith("a:")
-    ? annotations.find((a) => `a:${a.annotator_id}` === selection) ?? null
+    ? (annotations.find((a) => `a:${a.annotator_id}` === selection) ?? null)
     : null;
 
   // The card's "anchor" run (for output value / reasoning) is either the
@@ -1977,51 +1976,55 @@ export function EvaluatorRunDetailView({
               <span className="text-sm text-muted-foreground">—</span>
             ) : (
               detailsEvaluators.map((e) => {
-                    const name = evaluatorDisplayName(e, evaluatorNamesById);
-                    const label = e.evaluator_version_id
-                      ? versionLabels[e.evaluator_version_id]
-                      : null;
-                    const pillClass =
-                      "inline-flex items-center gap-1 flex-wrap px-2 py-0.5 rounded-md text-sm font-semibold border border-border bg-muted/40 text-foreground shrink-0 text-left";
-                    const inner = (
-                      <>
-                        <span className="break-words whitespace-normal">
-                          {name}
-                        </span>
-                        {label && (
-                          <span className="font-mono text-[11px] text-muted-foreground">
-                            {label}
-                          </span>
-                        )}
-                      </>
-                    );
-                    if (linkEvaluators) {
-                      return (
-                        <button
-                          key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
-                          type="button"
-                          onClick={() =>
-                            setPreviewEvaluator({
-                              uuid: e.evaluator_id,
-                              name,
-                            })
-                          }
-                          title={`Open ${name}`}
-                          className={`${pillClass} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
-                        >
-                          {inner}
-                        </button>
-                      );
-                    }
-                    return (
-                      <span
-                        key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
-                        className={pillClass}
+                const name = evaluatorDisplayName(e, evaluatorNamesById);
+                const label = e.evaluator_version_id
+                  ? versionLabels[e.evaluator_version_id]
+                  : null;
+                const pillClass =
+                  "inline-flex items-center gap-1 flex-wrap px-2 py-0.5 rounded-md text-sm font-semibold border border-border bg-muted/40 text-foreground shrink-0 text-left";
+                const inner = (
+                  <>
+                    <span className="break-words whitespace-normal">
+                      {name}
+                    </span>
+                    {label && (
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {label}
+                      </span>
+                    )}
+                  </>
+                );
+                if (linkEvaluators) {
+                  return (
+                    <Tooltip
+                      key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
+                      content={`Open ${name}`}
+                      className="shrink-0"
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPreviewEvaluator({
+                            uuid: e.evaluator_id,
+                            name,
+                          })
+                        }
+                        className={`${pillClass} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
                       >
                         {inner}
-                      </span>
-                    );
-                  })
+                      </button>
+                    </Tooltip>
+                  );
+                }
+                return (
+                  <span
+                    key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
+                    className={pillClass}
+                  >
+                    {inner}
+                  </span>
+                );
+              })
             )}
             {statusPill}
           </div>
@@ -2119,20 +2122,24 @@ export function EvaluatorRunDetailView({
                   const isCurrent = i === safeIndex;
                   const label = originalIndexByUuid.get(it.uuid) ?? i + 1;
                   return (
-                    <button
+                    <Tooltip
                       key={it.uuid}
-                      onClick={() => setCurrentIndex(i)}
-                      title={`Item ${label}${done ? " (completed)" : ""}`}
-                      className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
-                        isCurrent
-                          ? "border-foreground bg-foreground text-background"
-                          : done
-                            ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
-                            : "border-border bg-background text-foreground hover:bg-muted/50"
-                      }`}
+                      content={`Item ${label}${done ? " (completed)" : ""}`}
                     >
-                      {label}
-                    </button>
+                      <button
+                        onClick={() => setCurrentIndex(i)}
+                        aria-label={`Item ${label}${done ? " (completed)" : ""}`}
+                        className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                          isCurrent
+                            ? "border-foreground bg-foreground text-background"
+                            : done
+                              ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
+                              : "border-border bg-background text-foreground hover:bg-muted/50"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    </Tooltip>
                   );
                 })}
               </div>
@@ -2145,20 +2152,25 @@ export function EvaluatorRunDetailView({
                     const isCurrent = i === safeIndex;
                     const label = originalIndexByUuid.get(it.uuid) ?? i + 1;
                     return (
-                      <button
+                      <Tooltip
                         key={it.uuid}
-                        onClick={() => setCurrentIndex(i)}
-                        title={`Item ${label}${done ? " (completed)" : ""}`}
-                        className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
-                          isCurrent
-                            ? "border-foreground bg-foreground text-background"
-                            : done
-                              ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
-                              : "border-border bg-background text-foreground hover:bg-muted/50"
-                        }`}
+                        content={`Item ${label}${done ? " (completed)" : ""}`}
+                        position="right"
                       >
-                        {label}
-                      </button>
+                        <button
+                          onClick={() => setCurrentIndex(i)}
+                          aria-label={`Item ${label}${done ? " (completed)" : ""}`}
+                          className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                            isCurrent
+                              ? "border-foreground bg-foreground text-background"
+                              : done
+                                ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
+                                : "border-border bg-background text-foreground hover:bg-muted/50"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      </Tooltip>
                     );
                   })}
                 </div>

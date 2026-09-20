@@ -51,7 +51,7 @@ async function createEvaluator(page: Page, name: string) {
   return card;
 }
 
-// Delete `name` from the "My evaluators" list via the card's titled delete
+// Delete `name` from the "My evaluators" list via the card's delete
 // button + confirmation dialog.
 async function deleteEvaluator(page: Page, name: string) {
   const card = page.getByRole("link", { name: `Open ${name}` });
@@ -60,7 +60,7 @@ async function deleteEvaluator(page: Page, name: string) {
   await expect(card).toBeVisible({ timeout: 20000 });
   await page
     .locator(`[aria-label="Open ${name}"]`)
-    .locator("xpath=ancestor::*[.//button[@title='Delete evaluator']][1]")
+    .locator("xpath=ancestor::*[.//button[@aria-label='Delete evaluator']][1]")
     .getByRole("button", { name: "Delete evaluator" })
     .click();
   await expect(

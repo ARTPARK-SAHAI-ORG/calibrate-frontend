@@ -720,28 +720,33 @@ export function SpeechToTextEvaluation({
                       </td>
                       <td className="w-12 px-4 py-2">
                         {provider.website && (
-                          <a
-                            href={provider.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-muted-foreground hover:text-foreground transition-colors"
-                            title={`Visit ${provider.label} website`}
+                          <Tooltip
+                            content={`Visit ${provider.label} website`}
+                            position="top"
                           >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
+                            <a
+                              href={provider.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={`Visit ${provider.label} website`}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                              />
-                            </svg>
-                          </a>
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                                />
+                              </svg>
+                            </a>
+                          </Tooltip>
                         )}
                       </td>
                     </tr>
@@ -852,28 +857,34 @@ export function SpeechToTextEvaluation({
                           {provider.label}
                         </span>
                         {provider.website && (
-                          <a
-                            href={provider.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                            title={`Visit ${provider.label} website`}
+                          <Tooltip
+                            content={`Visit ${provider.label} website`}
+                            position="top"
+                            className="flex flex-shrink-0"
                           >
-                            <svg
-                              className="w-3.5 h-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
+                            <a
+                              href={provider.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={`Visit ${provider.label} website`}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                              />
-                            </svg>
-                          </a>
+                              <svg
+                                className="w-3.5 h-3.5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                                />
+                              </svg>
+                            </a>
+                          </Tooltip>
                         )}
                       </div>
                       <p className="text-[12px] text-muted-foreground font-mono truncate mt-0.5">

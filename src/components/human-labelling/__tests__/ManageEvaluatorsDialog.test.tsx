@@ -242,10 +242,39 @@ describe("ManageEvaluatorsDialog", () => {
     ).toBeInTheDocument();
     const saveBtn = screen.getByRole("button", { name: "Save changes" });
     expect(saveBtn).toBeDisabled();
-    expect(saveBtn).toHaveAttribute(
-      "title",
-      "A task must have at least one evaluator",
-    );
+    expect(saveBtn).not.toHaveAttribute("title");
+    // The hover text is on the wrapper, so it shows even though the button
+    // cannot be clicked.
+    await user.hover(saveBtn);
+    expect(
+      await screen.findByText("A task must have at least one evaluator"),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing on hover over Save while there is still an evaluator", async () => {
+    const user = setupUser();
+    renderDialog({ currentEvaluatorIds: ["ev-1"] });
+    await waitForCatalogueLoaded();
+
+    await user.click(catalogueCheckbox("Helpfulness"));
+    await user.hover(screen.getByRole("button", { name: "Save changes" }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(
+      screen.queryByText("A task must have at least one evaluator"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says on hover what the remove button beside a selected evaluator does", async () => {
+    const user = setupUser();
+    renderDialog({ currentEvaluatorIds: ["ev-1"] });
+    await waitForCatalogueLoaded();
+
+    const remove = screen.getByRole("button", { name: "Remove Correctness" });
+    expect(remove).not.toHaveAttribute("title");
+    await user.hover(remove);
+    expect(
+      await screen.findByText("Remove from selection"),
+    ).toBeInTheDocument();
   });
 
   it("removes a selected evaluator from the right column via its remove button", async () => {
