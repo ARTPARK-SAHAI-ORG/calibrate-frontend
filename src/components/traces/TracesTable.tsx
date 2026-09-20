@@ -6,7 +6,11 @@ import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { DeleteIconButton } from "@/components/ui";
-import type { TraceSummary, TraceToolCall } from "@/lib/tracesApi";
+import type {
+  TraceSortOrder,
+  TraceSummary,
+  TraceToolCall,
+} from "@/lib/tracesApi";
 import {
   TraceScoreCells,
   TraceScoreMark,
@@ -35,7 +39,63 @@ type TracesTableProps = {
   /** One column per evaluator that scores this agent's traces. None hides
    *  the score columns altogether. */
   scoreColumns?: TraceScoreColumn[];
+  /** The evaluator the list is ordered by, if any. */
+  sortByEvaluator?: string | null;
+  /** Which way that order runs. */
+  sortOrder?: TraceSortOrder;
+  /** Order the list by this evaluator's scores. Leaving it out keeps the
+   *  evaluator headings as plain text. */
+  onSortByEvaluator?: (evaluatorUuid: string) => void;
 };
+
+/** The heading of one evaluator column, which orders the list when clicked.
+ *  The arrow shows on the column the list is ordered by and points the way
+ *  that order runs. */
+function ScoreColumnHeading({
+  column,
+  sortByEvaluator,
+  sortOrder,
+  onSortByEvaluator,
+}: {
+  column: TraceScoreColumn;
+  sortByEvaluator?: string | null;
+  sortOrder?: TraceSortOrder;
+  onSortByEvaluator?: (evaluatorUuid: string) => void;
+}) {
+  const headingClass =
+    "text-sm font-medium text-muted-foreground whitespace-nowrap";
+  const isSorted = sortByEvaluator === column.evaluator_uuid;
+  if (!onSortByEvaluator)
+    return <div className={headingClass}>{column.name}</div>;
+  return (
+    <button
+      type="button"
+      onClick={() => onSortByEvaluator(column.evaluator_uuid)}
+      aria-label={
+        isSorted
+          ? `Sort traces by ${column.name}, ordered ${
+              sortOrder === "asc" ? "lowest first" : "highest first"
+            }`
+          : `Sort traces by ${column.name}`
+      }
+      className={`${headingClass} flex items-center gap-1 text-left hover:text-foreground transition-colors cursor-pointer`}
+    >
+      <span className="truncate">{column.name}</span>
+      <svg
+        aria-hidden
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        className={`w-3.5 h-3.5 flex-shrink-0 ${
+          isSorted ? "text-foreground" : "opacity-30"
+        } ${isSorted && sortOrder === "asc" ? "rotate-180" : ""}`}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
+    </button>
+  );
+}
 
 export function formatTraceDate(value: string): string {
   const date = new Date(value);
@@ -156,11 +216,15 @@ export function TracesTable({
   onOpen,
   onDelete,
   scoreColumns = [],
+  sortByEvaluator = null,
+  sortOrder = "desc",
+  onSortByEvaluator,
 }: TracesTableProps) {
-  // Each evaluator column is as wide as its own name, in the same template for
-  // every row, so nothing is cut and the columns still line up.
+  // Each evaluator column is as wide as its own name plus the arrow that
+  // orders it, in the same template for every row, so nothing is cut and the
+  // columns still line up.
   const evaluatorTracks = scoreColumns
-    .map((column) => `${Math.max(10, column.name.length + 1)}ch`)
+    .map((column) => `${Math.max(10, column.name.length + 3)}ch`)
     .join(" ");
   const ROW_STYLE = {
     // Every track is a fixed width, because each row is its own grid: a track
@@ -191,12 +255,13 @@ export function TracesTable({
             Output
           </div>
           {scoreColumns.map((column) => (
-            <div
+            <ScoreColumnHeading
               key={column.evaluator_uuid}
-              className="text-sm font-medium text-muted-foreground whitespace-nowrap"
-            >
-              {column.name}
-            </div>
+              column={column}
+              sortByEvaluator={sortByEvaluator}
+              sortOrder={sortOrder}
+              onSortByEvaluator={onSortByEvaluator}
+            />
           ))}
           <div className="text-sm font-medium text-muted-foreground">
             Created

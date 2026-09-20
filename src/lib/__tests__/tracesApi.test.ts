@@ -12,6 +12,7 @@ import {
   convertTracesErrorMessage,
   validateApiKeyForAgent,
   traceInputTurns,
+  traceScoreParams,
   MAX_TRACES_PAGE_SIZE,
   type TraceScoreAverage,
 } from "../tracesApi";
@@ -487,6 +488,27 @@ describe("selectAllBody", () => {
       agent_id: "ag-1",
     });
   });
+
+  it("carries the score conditions, and leaves them out when none are picked", () => {
+    expect(
+      selectAllBody({
+        agentId: "ag-1",
+        scores: { "ev-1": "failed", "ev-2": ">=4" },
+      }),
+    ).toEqual({
+      select_all: true,
+      agent_id: "ag-1",
+      score: ["ev-1:failed", "ev-2:>=4"],
+    });
+    expect(selectAllBody({ agentId: "ag-1", scores: {} })).toEqual({
+      select_all: true,
+      agent_id: "ag-1",
+    });
+    expect(selectAllBody({ agentId: "ag-1", scores: { "ev-1": "" } })).toEqual({
+      select_all: true,
+      agent_id: "ag-1",
+    });
+  });
 });
 
 describe("convertTracesToTests for every trace the list matches", () => {
@@ -650,5 +672,123 @@ describe("fetchTraces score averages", () => {
       includeScoreAverages: true,
     });
     expect(result.score_averages).toEqual(score_averages);
+  });
+});
+
+describe("traceScoreParams", () => {
+  it("writes one evaluator:condition entry per picked condition", () => {
+    expect(
+      traceScoreParams({ "ev-1": "passed", "ev-2": ">=4", "ev-3": "!=2" }),
+    ).toEqual(["ev-1:passed", "ev-2:>=4", "ev-3:!=2"]);
+  });
+
+  it("skips an evaluator with no condition picked", () => {
+    expect(traceScoreParams({ "ev-1": "failed", "ev-2": "" })).toEqual([
+      "ev-1:failed",
+    ]);
+  });
+
+  it("gives nothing back when nothing is filtered", () => {
+    expect(traceScoreParams({})).toEqual([]);
+    expect(traceScoreParams(undefined)).toEqual([]);
+  });
+});
+
+describe("fetchTraces with score filters", () => {
+  it("sends one score value per condition, and none when nothing is picked", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      scores: { "ev-1": "passed", "ev-2": "<3" },
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]).getAll(
+        "score",
+      ),
+    ).toEqual(["ev-1:passed", "ev-2:<3"]);
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      scores: {},
+    });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[1][0].split("?")[1]).has(
+        "score",
+      ),
+    ).toBe(false);
+
+    await fetchTraces("tok", { limit: 50, offset: 0, agentId: "ag-1" });
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[2][0].split("?")[1]).has(
+        "score",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("fetchTraces sorted by an evaluator", () => {
+  it("sends the evaluator to sort by and which way it runs", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      sortByEvaluator: "ev-1",
+      sortOrder: "asc",
+    });
+
+    const query = new URLSearchParams(
+      mockApiGet.mock.calls[0][0].split("?")[1],
+    );
+    expect(query.get("sort_by_evaluator")).toBe("ev-1");
+    expect(query.get("sort_order")).toBe("asc");
+  });
+
+  it("sorts highest first when only the evaluator is given", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      sortByEvaluator: "ev-1",
+    });
+
+    expect(
+      new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]).get(
+        "sort_order",
+      ),
+    ).toBe("desc");
+  });
+
+  it("sends neither when no evaluator is sorted by", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+
+    // A direction on its own means nothing without an evaluator to sort by.
+    await fetchTraces("tok", {
+      limit: 50,
+      offset: 0,
+      agentId: "ag-1",
+      sortByEvaluator: null,
+      sortOrder: "asc",
+    });
+    const first = new URLSearchParams(
+      mockApiGet.mock.calls[0][0].split("?")[1],
+    );
+    expect(first.has("sort_by_evaluator")).toBe(false);
+    expect(first.has("sort_order")).toBe(false);
+
+    await fetchTraces("tok", { limit: 50, offset: 0, agentId: "ag-1" });
+    const second = new URLSearchParams(
+      mockApiGet.mock.calls[1][0].split("?")[1],
+    );
+    expect(second.has("sort_by_evaluator")).toBe(false);
+    expect(second.has("sort_order")).toBe(false);
   });
 });

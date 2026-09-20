@@ -24,7 +24,12 @@ import {
   SubmitForLabellingButton,
   SUBMIT_FOR_LABELLING_CLASS,
 } from "@/components/human-labelling/labellingSubmit";
-import { TracesFilter } from "@/components/traces/TracesFilter";
+import {
+  TracesFilter,
+  type TraceScoreFilterEvaluator,
+} from "@/components/traces/TracesFilter";
+import { TracesSort } from "@/components/traces/TracesSort";
+import { useTraceView } from "@/components/traces/traceViewUrl";
 import { CodeIcon, SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
@@ -54,7 +59,6 @@ import {
   fetchTraces,
   type TraceUsage,
   type TraceDetail,
-  type TraceOutputFilter,
   type TraceSummary,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
@@ -125,7 +129,16 @@ export function TracesTabContent({
   // "tool_call" one that only called tools. Like the search, the backend does
   // the filtering, so the count and the pages cover every matching trace and
   // not just the ones on screen.
-  const [outputFilter, setOutputFilter] = useState<TraceOutputFilter>("all");
+  // The filters and the sort live in the address bar, so a reload or a
+  // shared link keeps the same view. `tab` and `traceId` are left alone.
+  const [view, setView] = useTraceView();
+  const {
+    outputType: outputFilter,
+    labels: labelFilter,
+    scores: scoreFilter,
+    sortByEvaluator,
+    sortOrder,
+  } = view;
 
   // The tags sent with the traces, and the ones picked to filter by. A trace
   // matches when it carries any of the picked ones. The whole set comes from
@@ -134,7 +147,24 @@ export function TracesTabContent({
     accessToken,
     agentUuid,
   );
-  const [labelFilter, setLabelFilter] = useState<string[]>([]);
+
+  // One condition per evaluator, all of which have to hold. They are picked
+  // in the same panel as the output kind and the labels, and applied with
+  // them. Clicking an evaluator column orders the list by its scores, lowest
+  // first, which is where the poor answers are and what every other sortable
+  // table here does; clicking it again turns the order round, and once more
+  // goes back to newest first.
+  const sortByEvaluatorScore = (evaluatorUuid: string) => {
+    if (sortByEvaluator !== evaluatorUuid) {
+      setView({ sortByEvaluator: evaluatorUuid, sortOrder: "asc" });
+      return;
+    }
+    if (sortOrder === "asc") {
+      setView({ sortOrder: "desc" });
+      return;
+    }
+    setView({ sortByEvaluator: null, sortOrder: "asc" });
+  };
 
   const {
     items,
@@ -142,6 +172,7 @@ export function TracesTabContent({
     loadedQ,
     loadedOutputType,
     loadedLabels,
+    loadedScores,
     scoreAverages,
     offset,
     setOffset,
@@ -161,6 +192,9 @@ export function TracesTabContent({
     q: search,
     outputType: outputFilter,
     labels: labelFilter,
+    scores: scoreFilter,
+    sortByEvaluator,
+    sortOrder,
     poll: isActive,
   });
 
@@ -173,6 +207,7 @@ export function TracesTabContent({
     q: search,
     outputType: outputFilter,
     labels: labelFilter,
+    scores: scoreFilter,
   };
 
   const deletion = useTraceDeletion({
@@ -369,6 +404,7 @@ export function TracesTabContent({
             agentId: agentUuid,
             q: search,
             labels: labelFilter,
+            scores: scoreFilter,
             outputType,
           }),
         ),
@@ -409,8 +445,11 @@ export function TracesTabContent({
     setWholeListKind(null);
     pickedRef.current.clear();
     deletion.clearSelection();
+    // Not the sort: ordering the list changes what is on the page in front of
+    // the reader, never which traces the list matches, so a tick survives it
+    // the same way it survives a page turn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, outputFilter, labelFilter]);
+  }, [search, outputFilter, labelFilter, scoreFilter]);
   // Unticking a row is the reader narrowing what they want, so the whole list
   // is no longer what they asked for.
   useEffect(() => {
@@ -449,6 +488,56 @@ export function TracesTabContent({
     }
     return [...byId.values()];
   }, [eligibility, items]);
+  // An evaluator taken off the agent takes its heading away with it, and with
+  // no heading there is nothing left on screen to turn its ordering off.
+  useEffect(() => {
+    if (!sortByEvaluator) return;
+    // Not before both the evaluator list AND the first page of traces are in:
+    // a column is drawn for an evaluator that merely scored a row on the page,
+    // so judging "this has no column" on either one alone throws away a sort
+    // restored from the address.
+    if (!eligibility || isLoading) return;
+    if (scoreColumns.some((c) => c.evaluator_uuid === sortByEvaluator)) return;
+    setView({ sortByEvaluator: null });
+  }, [eligibility, isLoading, scoreColumns, sortByEvaluator, setView]);
+  // How each evaluator judges, so a rating can be filtered by its own numbers
+  // rather than only by a verdict. Remembered for as long as the tab is open,
+  // because both places it can be read from, the running averages and the
+  // scores on the page, describe only the traces the filters match: a filter
+  // matching none of an evaluator's own traces would otherwise take its scale
+  // away, turn its picker back into a verdict, and leave the condition the
+  // reader already picked missing from the list, showing an empty box.
+  const knownEvaluatorsRef = useRef(
+    new Map<string, TraceScoreFilterEvaluator>(),
+  );
+  const knownEvaluators = knownEvaluatorsRef.current;
+  const rememberEvaluator = (next: TraceScoreFilterEvaluator) => {
+    const held = knownEvaluators.get(next.evaluator_uuid);
+    knownEvaluators.set(next.evaluator_uuid, {
+      ...held,
+      ...next,
+      // A name is always current; a scale, once known, is never unlearned.
+      output_type: next.output_type ?? held?.output_type ?? null,
+      scale_min: next.scale_min ?? held?.scale_min ?? null,
+      scale_max: next.scale_max ?? held?.scale_max ?? null,
+    });
+  };
+  scoreColumns.forEach(rememberEvaluator);
+  for (const average of scoreAverages) rememberEvaluator(average);
+  for (const trace of items) {
+    for (const result of trace.results ?? []) rememberEvaluator(result);
+  }
+  const scoreFilterEvaluators: TraceScoreFilterEvaluator[] = useMemo(() => {
+    const ids = new Set([
+      ...scoreColumns.map((column) => column.evaluator_uuid),
+      // An evaluator whose column has gone keeps its picker while its own
+      // condition is still narrowing the list, or the filter is on with
+      // nothing on screen able to turn it off.
+      ...Object.keys(scoreFilter),
+    ]);
+    return [...ids].flatMap((uuid) => knownEvaluators.get(uuid) ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scoreColumns, scoreFilter, scoreAverages, items]);
   // The backend marks a trace it could not score for the workspace cap, so the
   // page can say so without asking for the limit itself.
   // A trace's scores name each evaluator but not what it judges, so the words
@@ -588,10 +677,15 @@ export function TracesTabContent({
   // loaded back.
   const isFilteringOutput =
     outputFilter !== "all" || loadedOutputType !== "all";
-  // Picked labels narrow the list the same way, and the rows on screen are
-  // still the filtered ones until a cleared filter has loaded back.
+  // Picked labels and picked scores narrow the list the same way, and the rows
+  // on screen are still the filtered ones until a cleared filter has loaded
+  // back.
   const isFiltering =
-    isFilteringOutput || labelFilter.length > 0 || loadedLabels.length > 0;
+    isFilteringOutput ||
+    labelFilter.length > 0 ||
+    loadedLabels.length > 0 ||
+    Object.keys(scoreFilter).length > 0 ||
+    Object.keys(loadedScores).length > 0;
   const isNarrowed = isSearching || isFiltering;
   const noMatchMessage =
     isSearching && isFiltering
@@ -744,12 +838,32 @@ export function TracesTabContent({
           {/* One control for both the output kind and the labels, so the row
               stays the search box and the thing that narrows it. */}
           <TracesFilter
-            value={{ outputType: outputFilter, labels: labelFilter }}
-            labels={allLabels}
-            onApply={(next) => {
-              setOutputFilter(next.outputType);
-              setLabelFilter(next.labels);
+            value={{
+              outputType: outputFilter,
+              labels: labelFilter,
+              scores: scoreFilter,
             }}
+            labels={allLabels}
+            scoreEvaluators={scoreFilterEvaluators}
+            onApply={(next) =>
+              setView({
+                outputType: next.outputType,
+                labels: next.labels,
+                scores: next.scores,
+              })
+            }
+          />
+          {/* The column headings sort the list too, but their arrow is easy
+              to miss and they are gone altogether on a phone. */}
+          <TracesSort
+            value={{ evaluatorUuid: sortByEvaluator, order: sortOrder }}
+            evaluators={scoreColumns}
+            onChange={(next) =>
+              setView({
+                sortByEvaluator: next.evaluatorUuid,
+                sortOrder: next.order,
+              })
+            }
           />
           {/* Not a filter, so it sits apart from the two that are, at the
               far end of the row. */}
@@ -945,6 +1059,9 @@ export function TracesTabContent({
                 onOpen={itemPager.open}
                 onDelete={deletion.openDeleteDialog}
                 scoreColumns={scoreColumns}
+                sortByEvaluator={sortByEvaluator}
+                sortOrder={sortOrder}
+                onSortByEvaluator={sortByEvaluatorScore}
               />
             </div>
           )}

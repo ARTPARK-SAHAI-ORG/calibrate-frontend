@@ -566,6 +566,25 @@ export function FilterIcon({ className }: IconProps) {
   );
 }
 
+// Sort Icon (bars shortest to longest, for choosing how a list is ordered)
+export function SortIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 7h10M4 12h7M4 17h4M17 5v14m0 0l-3-3m3 3l3-3"
+      />
+    </svg>
+  );
+}
+
 // Code Icon (angle brackets, for anything that shows sending code)
 export function CodeIcon({ className }: IconProps) {
   return (

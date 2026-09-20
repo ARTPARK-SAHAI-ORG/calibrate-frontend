@@ -1,8 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TraceScoreAverage } from "@/lib/tracesApi";
-import { fetchTraces, TraceOutputFilter, TraceSummary } from "@/lib/tracesApi";
+import type {
+  TraceScoreAverage,
+  TraceScoreFilters,
+  TraceSortOrder,
+} from "@/lib/tracesApi";
+import {
+  fetchTraces,
+  traceScoreParams,
+  TraceOutputFilter,
+  TraceSummary,
+} from "@/lib/tracesApi";
 import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
@@ -10,6 +19,10 @@ import { reportError } from "@/lib/reportError";
 /** Shared empty default, so a caller with no labels does not hand the hook a
  *  new array on every render. */
 const EMPTY_LABELS: string[] = [];
+
+/** Same reason as EMPTY_LABELS: a caller filtering by no score must not hand
+ *  the hook a new object on every render. */
+const EMPTY_SCORES: TraceScoreFilters = {};
 
 type UseTracesArgs = {
   /** Backend JWT; the hook is idle until it's available. */
@@ -23,6 +36,13 @@ type UseTracesArgs = {
   outputType?: TraceOutputFilter;
   /** Keep only traces carrying any of these labels. Empty keeps everything. */
   labels?: string[];
+  /** One condition per evaluator, all of which must hold. Empty keeps
+   *  everything. */
+  scores?: TraceScoreFilters;
+  /** Order by this evaluator's score instead of newest first. */
+  sortByEvaluator?: string | null;
+  /** Which way that order runs. Ignored without `sortByEvaluator`. */
+  sortOrder?: TraceSortOrder;
   /** When false, skip polling open scoring runs (tab is off screen). */
   poll?: boolean;
 };
@@ -40,11 +60,18 @@ export function useTraces({
   q = "",
   outputType = "all",
   labels = EMPTY_LABELS,
+  scores = EMPTY_SCORES,
+  sortByEvaluator = null,
+  sortOrder = "desc",
   poll = true,
 }: UseTracesArgs) {
   // A new array on every render would restart the fetch forever, so the
   // effects and the fetch key on the labels' text rather than the array.
   const labelKey = labels.join("\u0000");
+  // Same trick for the score conditions: an object literal from the caller is
+  // new on every render, so the effects key on its text instead. Sorted, so
+  // the same set written in another order is the same key.
+  const scoreKey = traceScoreParams(scores).sort().join("\u0000");
   const [items, setItems] = useState<TraceSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -66,6 +93,10 @@ export function useTraces({
     useState<TraceOutputFilter>("all");
   // The labels the rows on screen came from, lagging `labels` the same way.
   const [loadedLabels, setLoadedLabels] = useState<string[]>([]);
+  // The score conditions the rows on screen came from, lagging `scores` the
+  // same way, so a caller can tell "this agent has no traces" from "no trace
+  // scored like that".
+  const [loadedScores, setLoadedScores] = useState<TraceScoreFilters>({});
   // Monotonic id so a slow, superseded response can never clobber the state
   // written by a newer request (filters change mid-flight, rapid paging).
   // Running averages over every matching trace, kept while paging through the
@@ -79,7 +110,16 @@ export function useTraces({
 
   useEffect(() => {
     setOffset(0);
-  }, [agentId, pageSize, q, outputType, labelKey]);
+  }, [
+    agentId,
+    pageSize,
+    q,
+    outputType,
+    labelKey,
+    scoreKey,
+    sortByEvaluator,
+    sortOrder,
+  ]);
 
   const load = useCallback(
     async (
@@ -102,7 +142,13 @@ export function useTraces({
         // The filters these rows come from. A new combination is worth the
         // extra pass over every matching trace; a new page of the same one
         // is not.
-        const filterKey = JSON.stringify([agentId, q, outputType, labelKey]);
+        const filterKey = JSON.stringify([
+          agentId,
+          q,
+          outputType,
+          labelKey,
+          scoreKey,
+        ]);
         const wantAverages =
           withAverages || averagesKeyRef.current !== filterKey;
         const page = await fetchTraces(accessToken, {
@@ -112,6 +158,9 @@ export function useTraces({
           q,
           outputType,
           labels,
+          scores,
+          sortByEvaluator,
+          sortOrder,
           includeScoreAverages: wantAverages,
         });
         if (requestId !== requestIdRef.current) return 0;
@@ -125,6 +174,7 @@ export function useTraces({
         setLoadedQ(q);
         setLoadedOutputType(outputType);
         setLoadedLabels(labels);
+        setLoadedScores(scores);
         setLoadedOffset(targetOffset);
         return nextTotal;
       } catch (err) {
@@ -144,7 +194,17 @@ export function useTraces({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [accessToken, pageSize, agentId, q, outputType, labelKey],
+    [
+      accessToken,
+      pageSize,
+      agentId,
+      q,
+      outputType,
+      labelKey,
+      scoreKey,
+      sortByEvaluator,
+      sortOrder,
+    ],
   );
 
   useEffect(() => {
@@ -207,6 +267,7 @@ export function useTraces({
     loadedQ,
     loadedOutputType,
     loadedLabels,
+    loadedScores,
     offset,
     setOffset,
     loadedOffset,
