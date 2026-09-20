@@ -133,7 +133,9 @@ jest.mock("../agent-tabs", () => ({
   },
   TracesTabContent: (props: any) => (
     <div data-testid="traces-tab-content">
-      TracesTabContent-{props.agentUuid}-{props.traceScoring?.enabled ? "scoring" : "off"}-{props.isActive ? "active" : "hidden"}
+      TracesTabContent-{props.agentUuid}-
+      {props.traceScoring?.enabled ? "scoring" : "off"}-
+      {props.isActive ? "active" : "hidden"}
       <button type="button" onClick={() => props.onGoToSettings?.()}>
         GoToSettings
       </button>
@@ -508,7 +510,7 @@ describe("AgentDetail", () => {
 
     await user.click(screen.getByText("Traces"));
     expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
-      `TracesTabContent-${buildAgent.uuid}-off-active`,
+      `TracesTabContent-${buildAgent.uuid}-scoring-active`,
     );
     expectVisibleTab("traces-tab-content", "tests-tab-content");
 
@@ -524,7 +526,13 @@ describe("AgentDetail", () => {
   });
 
   it("hands one trace scoring control to the Traces and Settings tabs", async () => {
-    mockFetchSequenceForAgent({ ...buildAgent, trace_scoring_enabled: true });
+    mockFetchSequenceForAgent({
+      ...buildAgent,
+      config: {
+        ...buildAgent.config,
+        traces: { scoring: { enabled: true } },
+      },
+    });
     const user = setupUser();
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
 
@@ -630,7 +638,7 @@ describe("AgentDetail", () => {
 
     await user.click(screen.getByText("Traces"));
     expect(screen.getByTestId("traces-tab-content")).toHaveTextContent(
-      `TracesTabContent-${connectionAgent.uuid}-off-active`,
+      `TracesTabContent-${connectionAgent.uuid}-scoring-active`,
     );
     expectVisibleTab("traces-tab-content", "runs-tab-content");
 
@@ -773,7 +781,9 @@ describe("AgentDetail", () => {
     });
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
   });
 
@@ -805,7 +815,9 @@ describe("AgentDetail", () => {
     });
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
   });
 
@@ -941,7 +953,9 @@ describe("AgentDetail", () => {
     );
     await clickLastSaveButton(user);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
 
     alertSpy.mockRestore();
@@ -1033,7 +1047,9 @@ describe("AgentDetail", () => {
     );
     await clickLastSaveButton(user);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
 
     alertSpy.mockRestore();
@@ -1552,7 +1568,9 @@ describe("AgentDetail — turning benchmarking on from the Tests tab", () => {
     await user.click(screen.getByText("Tests"));
     expect(screen.getByTestId("tests-verified-models")).toHaveTextContent("");
 
-    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(connectionAgent));
+    (global.fetch as jest.Mock).mockResolvedValue(
+      jsonResponse(connectionAgent),
+    );
     await user.click(screen.getByText("VerifyModelFromTests"));
 
     expect(screen.getByTestId("tests-verified-models")).toHaveTextContent(

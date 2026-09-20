@@ -10,6 +10,10 @@ jest.mock("../../lib/tracesApi", () => ({
   __esModule: true,
   fetchTraceScoringEligibility: jest.fn(),
   setAgentTraceScoring: jest.fn(),
+  // The reader is a plain rule over the config, so the real one is used.
+  traceScoringEnabled: (config?: Record<string, unknown>) =>
+    ((config?.traces as { scoring?: { enabled?: boolean } })?.scoring
+      ?.enabled ?? true) !== false,
 }));
 jest.mock("../../lib/reportError", () => ({
   __esModule: true,
@@ -70,7 +74,9 @@ beforeEach(() => {
   mockSetFlag.mockReset();
   mockReportError.mockReset();
   mockEligibility.mockResolvedValue(eligible);
-  mockSetFlag.mockResolvedValue({ trace_scoring_enabled: true });
+  mockSetFlag.mockResolvedValue({
+    config: { traces: { scoring: { enabled: true } } },
+  });
 });
 
 it("loads eligibility and allows enabling when at least one evaluator can score", async () => {
@@ -104,7 +110,9 @@ it("hard-blocks enabling when no evaluator is eligible", async () => {
 
 it("still allows turning scoring off after eligibility drifts", async () => {
   mockEligibility.mockResolvedValue(blocked);
-  mockSetFlag.mockResolvedValue({ trace_scoring_enabled: false });
+  mockSetFlag.mockResolvedValue({
+    config: { traces: { scoring: { enabled: false } } },
+  });
   const { result } = setup(true);
   await waitFor(() => expect(result.current.enabled).toBe(true));
   expect(result.current.enableBlocked).toBe(false);

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchTraceScoringEligibility,
   setAgentTraceScoring,
+  traceScoringEnabled,
   type TraceScoringEligibility,
 } from "@/lib/tracesApi";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
@@ -110,7 +111,7 @@ export function useAgentTraceScoring({
           config,
           next,
         );
-        onEnabledChange(!!updated.trace_scoring_enabled);
+        onEnabledChange(traceScoringEnabled(updated.config));
       } catch (err) {
         reportError("Error updating automatic trace scoring:", err);
         setSaveError(

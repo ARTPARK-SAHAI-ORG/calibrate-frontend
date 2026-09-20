@@ -8,7 +8,7 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { useAgentTraceScoring } from "@/hooks/useAgentTraceScoring";
-import { configWithTraceScoring } from "@/lib/tracesApi";
+import { configWithTraceScoring, traceScoringEnabled } from "@/lib/tracesApi";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 import {
   AgentTabContent,
@@ -76,8 +76,6 @@ type AgentData = {
   name: string;
   type?: "agent" | "connection";
   interaction_type?: "conversation" | "general";
-  /** Read-only: the backend reports the setting stored in config. */
-  trace_scoring_enabled?: boolean;
   config: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -182,14 +180,13 @@ export function AgentDetail({
   const traceScoring = useAgentTraceScoring({
     accessToken: backendAccessToken,
     agentUuid,
-    enabled: !!agent?.trace_scoring_enabled,
+    enabled: traceScoringEnabled(agent?.config),
     config: agent?.config ?? {},
     onEnabledChange: (enabled) => {
       setAgent((current) =>
         current
           ? {
               ...current,
-              trace_scoring_enabled: enabled,
               config: configWithTraceScoring(current.config, enabled),
             }
           : current,

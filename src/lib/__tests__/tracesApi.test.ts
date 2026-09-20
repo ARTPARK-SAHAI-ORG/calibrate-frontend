@@ -198,22 +198,28 @@ describe("fetchTraceScoringEligibility", () => {
 });
 
 describe("configWithTraceScoring", () => {
-  it("keeps everything already stored, inside and outside the scoring block", () => {
+  it("keeps everything already stored, inside and outside the traces block", () => {
     expect(
       configWithTraceScoring(
-        { system_prompt: "hi", trace_scoring: { last_run: "x" } },
+        {
+          system_prompt: "hi",
+          traces: { retention_days: 30, scoring: { last_run: "x" } },
+        },
         true,
       ),
     ).toEqual({
       system_prompt: "hi",
-      trace_scoring: { last_run: "x", enabled: true },
+      traces: {
+        retention_days: 30,
+        scoring: { last_run: "x", enabled: true },
+      },
     });
   });
 
   it("builds the block when the config has never held one", () => {
     expect(configWithTraceScoring({ system_prompt: "hi" }, false)).toEqual({
       system_prompt: "hi",
-      trace_scoring: { enabled: false },
+      traces: { scoring: { enabled: false } },
     });
   });
 });
@@ -226,7 +232,7 @@ describe("setAgentTraceScoring", () => {
       setAgentTraceScoring("tok", "ag-1", { system_prompt: "hi" }, true),
     ).resolves.toEqual({ trace_scoring_enabled: true });
     expect(mockApiPut).toHaveBeenCalledWith("/agents/ag-1", "tok", {
-      config: { system_prompt: "hi", trace_scoring: { enabled: true } },
+      config: { system_prompt: "hi", traces: { scoring: { enabled: true } } },
     });
   });
 });

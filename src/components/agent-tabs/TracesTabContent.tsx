@@ -595,18 +595,13 @@ export function TracesTabContent({
                 )}
               </span>
               {/* Nothing to turn on or off while no evaluator can score. */}
-              {nothingCanScore ? null : traceScoring.enabled ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  isLoading={traceScoring.saving}
-                  onClick={() => void traceScoring.setEnabled(false)}
-                >
-                  Turn off
-                </Button>
-              ) : (
+              {/* The switch itself lives in Settings, so both states send the
+                  reader to the same place rather than half of it living here. */}
+              {nothingCanScore ? null : (
                 <Button size="sm" variant="secondary" onClick={onGoToSettings}>
-                  Turn on in Settings
+                  {traceScoring.enabled
+                    ? "Turn off in Settings"
+                    : "Turn on in Settings"}
                 </Button>
               )}
             </div>

@@ -223,8 +223,25 @@ export function configWithTraceScoring(
   storedConfig: Record<string, unknown>,
   enabled: boolean,
 ): Record<string, unknown> {
-  const scoring = (storedConfig.trace_scoring ?? {}) as Record<string, unknown>;
-  return { ...storedConfig, trace_scoring: { ...scoring, enabled } };
+  const traces = (storedConfig.traces ?? {}) as Record<string, unknown>;
+  const scoring = (traces.scoring ?? {}) as Record<string, unknown>;
+  return {
+    ...storedConfig,
+    traces: { ...traces, scoring: { ...scoring, enabled } },
+  };
+}
+
+/**
+ * Whether this agent scores its new traces, read from its config the way the
+ * backend reads it: on unless it was explicitly turned off. Read from the
+ * config rather than a field beside it, because not every answer carries one.
+ */
+export function traceScoringEnabled(
+  config: Record<string, unknown> | null | undefined,
+): boolean {
+  const traces = (config?.traces ?? {}) as Record<string, unknown>;
+  const scoring = (traces.scoring ?? {}) as Record<string, unknown>;
+  return scoring.enabled !== false;
 }
 
 /** Turn automatic scoring of newly ingested traces on or off. */
@@ -233,8 +250,8 @@ export async function setAgentTraceScoring(
   agentUuid: string,
   storedConfig: Record<string, unknown>,
   enabled: boolean,
-): Promise<{ trace_scoring_enabled: boolean }> {
-  return apiPut<{ trace_scoring_enabled: boolean }>(
+): Promise<{ config?: Record<string, unknown> }> {
+  return apiPut<{ config?: Record<string, unknown> }>(
     `/agents/${encodeURIComponent(agentUuid)}`,
     accessToken,
     { config: configWithTraceScoring(storedConfig, enabled) },

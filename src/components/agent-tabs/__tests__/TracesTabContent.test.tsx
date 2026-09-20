@@ -455,16 +455,9 @@ describe("TracesTabContent", () => {
       expect(onGoToSettings).toHaveBeenCalled();
     });
 
-    it("says new traces are scored, and Turn off stays loading until the save answers", async () => {
+    it("says new traces are scored, and sends the reader to Settings to stop it", async () => {
       const user = setupUser();
-      let finish: () => void = () => {};
-      setEnabled.mockImplementationOnce(
-        () =>
-          new Promise<void>((resolve) => {
-            finish = resolve;
-          }),
-      );
-      const { rerender } = render(
+      render(
         <TracesTabContent
           {...tabProps}
           traceScoring={{ ...traceScoring, enabled: true }}
@@ -475,18 +468,16 @@ describe("TracesTabContent", () => {
           "New traces are scored automatically with this agent's evaluators.",
         ),
       ).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Turn off" }));
-      expect(setEnabled).toHaveBeenCalledWith(false);
-      // The parent reports the save in flight, and the button waits on it.
-      rerender(
-        <TracesTabContent
-          {...tabProps}
-          traceScoring={{ ...traceScoring, enabled: true, saving: true }}
-        />,
+      // The switch lives in Settings, so this only takes the reader there.
+      await user.click(
+        screen.getByRole("button", { name: "Turn off in Settings" }),
       );
-      expect(screen.getByRole("button", { name: "Turn off" })).toBeDisabled();
-      finish();
-      rerender(
+      expect(onGoToSettings).toHaveBeenCalled();
+      expect(setEnabled).not.toHaveBeenCalled();
+    });
+
+    it("shows a failed save from the Settings switch on this line too", () => {
+      render(
         <TracesTabContent
           {...tabProps}
           traceScoring={{
@@ -496,7 +487,6 @@ describe("TracesTabContent", () => {
           }}
         />,
       );
-      expect(screen.getByRole("button", { name: "Turn off" })).toBeEnabled();
       expect(screen.getByText("Could not save.")).toBeInTheDocument();
     });
 
