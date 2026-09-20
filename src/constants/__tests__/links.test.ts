@@ -1,11 +1,5 @@
-/**
- * Every documentation link in the app is built from DOCS_URL, so a self-hosted
- * copy can point them at its own docs site with one setting. These check the
- * two ways that goes wrong: no setting at all, and a setting with a trailing
- * slash, which used to put two slashes in the middle of every address.
- */
-
-const DOCS_MODULE = "../links";
+// Documentation links come from DOCS_URL; these cover no setting and a
+// trailing slash, the two ways it went wrong.
 
 function loadLinks(docsUrl?: string) {
   jest.resetModules();
@@ -16,7 +10,7 @@ function loadLinks(docsUrl?: string) {
     process.env.NEXT_PUBLIC_DOCS_URL = docsUrl;
   }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const links = require(DOCS_MODULE) as typeof import("../links");
+  const links = require("../links") as typeof import("../links");
   process.env.NEXT_PUBLIC_DOCS_URL = original;
   return links;
 }
@@ -39,15 +33,6 @@ describe("DOCS_URL", () => {
     expect(DOCS_URL).toBe("https://docs.example.com");
     expect(AGENT_CONNECTIONS_DOCS_URL).toBe(
       "https://docs.example.com/core-concepts/agent-connections",
-    );
-  });
-});
-
-describe("AGENT_CONNECTIONS_DOCS_URL", () => {
-  it("points at the agent connections page of the configured docs site", () => {
-    const { AGENT_CONNECTIONS_DOCS_URL } = loadLinks(undefined);
-    expect(AGENT_CONNECTIONS_DOCS_URL).toBe(
-      "https://docs.calibrate.artpark.ai/core-concepts/agent-connections",
     );
   });
 });

@@ -122,9 +122,6 @@ describe("AgentConnectionTabContent", () => {
       name: "Read how to connect your agent",
     });
     expect(link).toHaveAttribute("href", AGENT_CONNECTIONS_DOCS_URL);
-    expect(AGENT_CONNECTIONS_DOCS_URL).toMatch(
-      /\/core-concepts\/agent-connections$/,
-    );
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
