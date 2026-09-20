@@ -610,6 +610,39 @@ describe("TracesTabContent", () => {
       ).toBeTruthy();
     });
 
+    it("says the numbers cover the list below once it is narrowed", async () => {
+      const averages = [
+        {
+          evaluator_uuid: "ev-1",
+          name: "Tone",
+          output_type: "binary",
+          traces_scored: 4,
+          average: 0.5,
+        },
+      ];
+      mockUseTraces.mockReturnValue(
+        tracesResult([trace()], { scoreAverages: averages }),
+      );
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+
+      expect(
+        screen.getByText(
+          "Live average of the scores for each evaluator across all the production traces",
+        ),
+      ).toBeInTheDocument();
+
+      // The averages are read from whatever the list is showing, so with a
+      // filter on they no longer cover every trace.
+      await applyTraceFilter(user, { output: "Tool call" });
+
+      expect(
+        screen.getByText(
+          "Live average of the scores for each evaluator across the traces below",
+        ),
+      ).toBeInTheDocument();
+    });
+
     it("pulses beside the heading only while a trace is being scored", () => {
       const averages = [
         {

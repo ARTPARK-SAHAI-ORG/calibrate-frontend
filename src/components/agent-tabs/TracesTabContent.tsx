@@ -681,7 +681,13 @@ export function TracesTabContent({
       {hasLoaded && !showEmptyState && scoreCards.length > 0 && (
         <EvaluatorScoreCards
           heading="Production quality"
-          description="Live average of the scores for each evaluator across all the production traces"
+          description={
+            // The numbers are read from whatever the list is showing, so a
+            // search or a filter makes "all the production traces" untrue.
+            isNarrowed
+              ? "Live average of the scores for each evaluator across the traces below"
+              : "Live average of the scores for each evaluator across all the production traces"
+          }
           cards={scoreCards}
           singleRow
           headingAside={
