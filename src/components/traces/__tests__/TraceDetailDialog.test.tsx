@@ -743,9 +743,9 @@ it("refetches scores while a run is still in progress", async () => {
     />,
   );
   await waitFor(() =>
-    expect(screen.getAllByText("Scoring this trace.").length).toBeGreaterThan(
-      0,
-    ),
+    expect(
+      screen.getAllByText("Running the evaluators on this trace").length,
+    ).toBeGreaterThan(0),
   );
   const pollCall = setIntervalSpy.mock.calls.find((call) => call[1] === 3000);
   expect(pollCall).toBeDefined();
@@ -764,7 +764,9 @@ it("refetches scores while a run is still in progress", async () => {
     (pollCall![0] as () => void)();
   });
   await waitFor(() =>
-    expect(screen.queryByText("Scoring this trace.")).not.toBeInTheDocument(),
+    expect(
+      screen.queryByText("Running the evaluators on this trace"),
+    ).not.toBeInTheDocument(),
   );
   setIntervalSpy.mockRestore();
 });
@@ -812,16 +814,18 @@ it("keeps the last scores if a later poll fails", async () => {
     />,
   );
   await waitFor(() =>
-    expect(screen.getAllByText("Scoring this trace.").length).toBeGreaterThan(
-      0,
-    ),
+    expect(
+      screen.getAllByText("Running the evaluators on this trace").length,
+    ).toBeGreaterThan(0),
   );
   const pollCall = setIntervalSpy.mock.calls.find((call) => call[1] === 3000);
   mockFetchTraceScores.mockRejectedValue(new Error("poll failed"));
   await act(async () => {
     (pollCall![0] as () => void)();
   });
-  expect(screen.getAllByText("Scoring this trace.").length).toBeGreaterThan(0);
+  expect(
+    screen.getAllByText("Running the evaluators on this trace").length,
+  ).toBeGreaterThan(0);
   setIntervalSpy.mockRestore();
 });
 

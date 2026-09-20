@@ -40,8 +40,8 @@ function RunBody({
   if (isTraceScoringInProgress(run.status)) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        <SpinnerIcon className="w-4 h-4 animate-spin" />
-        Scoring this trace.
+        <SpinnerIcon className="w-4 h-4 animate-spin text-amber-500" />
+        Running the evaluators on this trace
       </p>
     );
   }
