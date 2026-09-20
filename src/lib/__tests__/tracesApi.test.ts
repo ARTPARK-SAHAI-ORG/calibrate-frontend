@@ -4,7 +4,9 @@ import {
   fetchTraceLabels,
   fetchTraceScores,
   fetchTraceScoringEligibility,
-  setAgentAutoScoreTraces,
+  setAgentTraceScoring,
+  configWithTraceScoring,
+  fetchTraceUsage,
   convertTracesToTests,
   selectAllBody,
   convertTracesErrorMessage,
@@ -195,19 +197,64 @@ describe("fetchTraceScoringEligibility", () => {
   });
 });
 
-describe("setAgentAutoScoreTraces", () => {
-  it("PUTs only the scoring flag so other agent fields are left alone", async () => {
-    mockApiPut.mockResolvedValue({ auto_score_traces: true });
-
-    await expect(setAgentAutoScoreTraces("tok", "ag-1", true)).resolves.toEqual({
-      auto_score_traces: true,
+describe("configWithTraceScoring", () => {
+  it("keeps everything already stored, inside and outside the traces block", () => {
+    expect(
+      configWithTraceScoring(
+        {
+          system_prompt: "hi",
+          traces: { retention_days: 30, scoring: { last_run: "x" } },
+        },
+        true,
+      ),
+    ).toEqual({
+      system_prompt: "hi",
+      traces: {
+        retention_days: 30,
+        scoring: { last_run: "x", enabled: true },
+      },
     });
-    expect(mockApiPut).toHaveBeenCalledWith("/agents/ag-1", "tok", {
-      auto_score_traces: true,
+  });
+
+  it("builds the block when the config has never held one", () => {
+    expect(configWithTraceScoring({ system_prompt: "hi" }, false)).toEqual({
+      system_prompt: "hi",
+      traces: { scoring: { enabled: false } },
     });
   });
 });
 
+describe("setAgentTraceScoring", () => {
+  it("sends the stored config back with the setting changed", async () => {
+    mockApiPut.mockResolvedValue({ trace_scoring_enabled: true });
+
+    await expect(
+      setAgentTraceScoring("tok", "ag-1", { system_prompt: "hi" }, true),
+    ).resolves.toEqual({ trace_scoring_enabled: true });
+    expect(mockApiPut).toHaveBeenCalledWith("/agents/ag-1", "tok", {
+      config: { system_prompt: "hi", traces: { scoring: { enabled: true } } },
+    });
+  });
+});
+
+describe("fetchTraceUsage", () => {
+  it("reads how much of the workspace limits is used", async () => {
+    mockApiGet.mockResolvedValue({
+      traces_stored: 412,
+      max_traces: 50000,
+      traces_scored: 100,
+      max_scored_traces: 100,
+    });
+
+    await expect(fetchTraceUsage("tok")).resolves.toEqual({
+      traces_stored: 412,
+      max_traces: 50000,
+      traces_scored: 100,
+      max_scored_traces: 100,
+    });
+    expect(mockApiGet).toHaveBeenCalledWith("/traces/usage", "tok");
+  });
+});
 
 describe("validateApiKeyForAgent", () => {
   const originalFetch = global.fetch;

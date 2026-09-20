@@ -39,9 +39,6 @@ describe("copy", () => {
     expect(scoringRunErrorCopy("unsupported_interaction_type")).toMatch(
       /cannot be scored yet/,
     );
-    expect(scoringRunErrorCopy("corrupt_snapshot")).toMatch(
-      /could not be completed/,
-    );
     expect(scoringRunErrorCopy("")).toBe("Scoring did not finish");
     expect(scoringRunErrorCopy(null)).toBe("Scoring did not finish");
     expect(scoringRunErrorCopy("over_limit")).toBe(

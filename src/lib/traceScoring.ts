@@ -40,8 +40,6 @@ export function scoringRunErrorCopy(error: string | null | undefined): string {
       return "This agent was deleted before scoring finished";
     case "unsupported_interaction_type":
       return "This kind of agent cannot be scored yet";
-    case "corrupt_snapshot":
-      return "This scoring run could not be completed";
     default:
       return "Scoring did not finish";
   }

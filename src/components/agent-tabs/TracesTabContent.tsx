@@ -45,7 +45,9 @@ import { ineligibleReasonCopy } from "@/lib/traceScoring";
 import { CONTACT_LINK } from "@/constants/limits";
 import {
   fetchTrace,
+  fetchTraceUsage,
   fetchTraces,
+  type TraceUsage,
   type TraceDetail,
   type TraceOutputFilter,
   type TraceSummary,
@@ -420,6 +422,21 @@ export function TracesTabContent({
   // The backend marks a trace it could not score for the workspace cap, so the
   // page can say so without asking for the limit itself.
   const overLimit = items.some((t) => t.latest_run_error === "over_limit");
+  // Only asked for once the cap has actually bitten, so the line carries the
+  // workspace's own number rather than a guess.
+  const [usage, setUsage] = useState<TraceUsage | null>(null);
+  useEffect(() => {
+    if (!overLimit || !accessToken || usage) return;
+    let cancelled = false;
+    fetchTraceUsage(accessToken)
+      .then((next) => {
+        if (!cancelled) setUsage(next);
+      })
+      .catch((err) => reportError("Error fetching trace usage:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [overLimit, accessToken, usage]);
 
   const handleRefresh = async () => {
     // A refresh can bring in traces of the other kind, which the counts read
@@ -540,8 +557,9 @@ export function TracesTabContent({
           {overLimit && (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
               <p className="text-sm text-amber-700 dark:text-amber-300">
-                Some traces were not scored because this workspace has scored as
-                many traces as its limit allows.{" "}
+                {usage
+                  ? `Some traces were not scored because this workspace has scored the ${usage.max_scored_traces} traces its limit allows.`
+                  : "Some traces were not scored because this workspace has scored as many traces as its limit allows."}{" "}
                 <a
                   href={CONTACT_LINK}
                   target="_blank"

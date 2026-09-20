@@ -34,9 +34,11 @@ jest.mock("../../../hooks", () => ({
 
 const fetchTrace = jest.fn();
 const fetchTraces = jest.fn();
+const fetchTraceUsage = jest.fn();
 jest.mock("../../../lib/tracesApi", () => ({
   fetchTrace: (...args: unknown[]) => fetchTrace(...args),
   fetchTraces: (...args: unknown[]) => fetchTraces(...args),
+  fetchTraceUsage: (...args: unknown[]) => fetchTraceUsage(...args),
   MAX_TRACES_PAGE_SIZE: 200,
 }));
 
@@ -442,7 +444,9 @@ describe("TracesTabContent", () => {
     it("says new traces are not scored and sends the reader to Settings", async () => {
       const user = setupUser();
       render(<TracesTabContent {...tabProps} />);
-      expect(screen.getByText("New traces are not scored automatically.")).toBeInTheDocument();
+      expect(
+        screen.getByText("New traces are not scored automatically."),
+      ).toBeInTheDocument();
       await user.click(
         screen.getByRole("button", { name: "Turn on in Settings" }),
       );
@@ -506,9 +510,6 @@ describe("TracesTabContent", () => {
       ).toBeInTheDocument();
     });
 
-
-
-
     it("names the evaluators that cannot score traces, with the reason", () => {
       render(
         <TracesTabContent
@@ -532,24 +533,40 @@ describe("TracesTabContent", () => {
         screen.getByText("These evaluators cannot score traces:"),
       ).toBeInTheDocument();
       expect(screen.getByText("Old judge")).toBeInTheDocument();
-      expect(
-        screen.getByText("Has no live version"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Has no live version")).toBeInTheDocument();
     });
 
-    it("says the workspace hit its scoring limit, with a way to ask for more", () => {
+    it("says the workspace hit its scoring limit, naming the number, with a way to ask for more", async () => {
+      fetchTraceUsage.mockResolvedValue({
+        traces_stored: 412,
+        max_traces: 50000,
+        traces_scored: 100,
+        max_scored_traces: 100,
+      });
       mockUseTraces.mockReturnValue(
         tracesResult([
-          trace({ latest_run_status: "skipped", latest_run_error: "over_limit" }),
+          trace({
+            latest_run_status: "skipped",
+            latest_run_error: "over_limit",
+          }),
         ]),
       );
       render(<TracesTabContent {...tabProps} />);
+      // Before the number arrives the line still says what happened.
       expect(
         screen.getByText(/this workspace has scored as many traces/i),
       ).toBeInTheDocument();
       expect(
+        await screen.findByText(/has scored the 100 traces its limit allows/i),
+      ).toBeInTheDocument();
+      expect(
         screen.getByRole("link", { name: "Click here" }),
       ).toBeInTheDocument();
+    });
+
+    it("does not ask how much of the limit is used until the cap bites", () => {
+      render(<TracesTabContent {...tabProps} />);
+      expect(fetchTraceUsage).not.toHaveBeenCalled();
     });
 
     it("says nothing about a limit when no trace was refused for one", () => {
@@ -580,7 +597,9 @@ describe("TracesTabContent", () => {
         />,
       );
       expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
-      expect(screen.queryByText("New traces are not scored automatically.")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("New traces are not scored automatically."),
+      ).not.toBeInTheDocument();
       expect(screen.queryByText("Old judge")).not.toBeInTheDocument();
     });
 

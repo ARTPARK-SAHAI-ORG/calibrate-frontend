@@ -524,7 +524,7 @@ describe("AgentDetail", () => {
   });
 
   it("hands one trace scoring control to the Traces and Settings tabs", async () => {
-    mockFetchSequenceForAgent({ ...buildAgent, auto_score_traces: true });
+    mockFetchSequenceForAgent({ ...buildAgent, trace_scoring_enabled: true });
     const user = setupUser();
     render(<AgentDetail agentUuid={buildAgent.uuid} />);
 

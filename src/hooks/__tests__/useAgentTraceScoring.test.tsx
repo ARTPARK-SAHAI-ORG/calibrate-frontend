@@ -2,14 +2,14 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { useAgentTraceScoring } from "../useAgentTraceScoring";
 import {
   fetchTraceScoringEligibility,
-  setAgentAutoScoreTraces,
+  setAgentTraceScoring,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
 jest.mock("../../lib/tracesApi", () => ({
   __esModule: true,
   fetchTraceScoringEligibility: jest.fn(),
-  setAgentAutoScoreTraces: jest.fn(),
+  setAgentTraceScoring: jest.fn(),
 }));
 jest.mock("../../lib/reportError", () => ({
   __esModule: true,
@@ -17,7 +17,7 @@ jest.mock("../../lib/reportError", () => ({
 }));
 
 const mockEligibility = fetchTraceScoringEligibility as jest.Mock;
-const mockSetFlag = setAgentAutoScoreTraces as jest.Mock;
+const mockSetFlag = setAgentTraceScoring as jest.Mock;
 const mockReportError = reportError as jest.Mock;
 
 const eligible = {
@@ -53,6 +53,7 @@ function setup(enabled = false, isActive = true) {
         accessToken: "tok",
         agentUuid: "ag-1",
         enabled: props.enabled,
+        config: { system_prompt: "hi" },
         onEnabledChange,
         isActive: props.isActive,
       }),
@@ -69,7 +70,7 @@ beforeEach(() => {
   mockSetFlag.mockReset();
   mockReportError.mockReset();
   mockEligibility.mockResolvedValue(eligible);
-  mockSetFlag.mockResolvedValue({ auto_score_traces: true });
+  mockSetFlag.mockResolvedValue({ trace_scoring_enabled: true });
 });
 
 it("loads eligibility and allows enabling when at least one evaluator can score", async () => {
@@ -80,7 +81,12 @@ it("loads eligibility and allows enabling when at least one evaluator can score"
   await act(async () => {
     await result.current.setEnabled(true);
   });
-  expect(mockSetFlag).toHaveBeenCalledWith("tok", "ag-1", true);
+  expect(mockSetFlag).toHaveBeenCalledWith(
+    "tok",
+    "ag-1",
+    { system_prompt: "hi" },
+    true,
+  );
   expect(result.current.enabled).toBe(true);
 });
 
@@ -98,7 +104,7 @@ it("hard-blocks enabling when no evaluator is eligible", async () => {
 
 it("still allows turning scoring off after eligibility drifts", async () => {
   mockEligibility.mockResolvedValue(blocked);
-  mockSetFlag.mockResolvedValue({ auto_score_traces: false });
+  mockSetFlag.mockResolvedValue({ trace_scoring_enabled: false });
   const { result } = setup(true);
   await waitFor(() => expect(result.current.enabled).toBe(true));
   expect(result.current.enableBlocked).toBe(false);
@@ -106,13 +112,18 @@ it("still allows turning scoring off after eligibility drifts", async () => {
   await act(async () => {
     await result.current.setEnabled(false);
   });
-  expect(mockSetFlag).toHaveBeenCalledWith("tok", "ag-1", false);
+  expect(mockSetFlag).toHaveBeenCalledWith(
+    "tok",
+    "ag-1",
+    { system_prompt: "hi" },
+    false,
+  );
   expect(result.current.enabled).toBe(false);
 });
 
 it("surfaces a generic error when enabling fails for another reason", async () => {
   mockSetFlag.mockRejectedValue(
-    new Error("Request failed: 500 - {\"detail\":\"boom\"}"),
+    new Error('Request failed: 500 - {"detail":"boom"}'),
   );
   const { result } = setup(false);
   await waitFor(() => expect(result.current.eligibility).not.toBeNull());
@@ -140,6 +151,7 @@ it("drops the refusal message when the reader comes back to the tab", async () =
         accessToken: "tok",
         agentUuid: "ag-1",
         enabled: false,
+        config: {},
         onEnabledChange: jest.fn(),
         isActive: props.isActive,
       }),
@@ -219,7 +231,8 @@ it("does nothing without an access token", async () => {
       accessToken: null,
       agentUuid: "ag-1",
       enabled: false,
-    onEnabledChange: jest.fn(),
+      config: {},
+      onEnabledChange: jest.fn(),
     }),
   );
   await act(async () => {
@@ -253,6 +266,7 @@ it("does not fetch until the traces tab is on screen, then refetches when it ret
         accessToken: "tok",
         agentUuid: "ag-1",
         enabled: false,
+        config: {},
         onEnabledChange: jest.fn(),
         isActive: props.isActive,
       }),
@@ -286,7 +300,8 @@ it("ignores a slower eligibility response after the agent changes", async () => 
         accessToken: "tok",
         agentUuid: props.agentUuid,
         enabled: false,
-      onEnabledChange: jest.fn(),
+        config: {},
+        onEnabledChange: jest.fn(),
       }),
     { initialProps: { agentUuid: "ag-a" } },
   );
@@ -318,7 +333,8 @@ it("ignores a slower eligibility failure after the agent changes", async () => {
         accessToken: "tok",
         agentUuid: props.agentUuid,
         enabled: false,
-      onEnabledChange: jest.fn(),
+        config: {},
+        onEnabledChange: jest.fn(),
       }),
     { initialProps: { agentUuid: "ag-a" } },
   );
@@ -353,4 +369,3 @@ it("keeps eligibility as checked when a validation 422 refuses the save", async 
   expect(result.current.eligibility?.eligible).toHaveLength(1);
   expect(result.current.saveError).toMatch(/Field required/);
 });
-

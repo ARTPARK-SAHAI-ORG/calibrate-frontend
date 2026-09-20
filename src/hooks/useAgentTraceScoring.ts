@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchTraceScoringEligibility,
-  setAgentAutoScoreTraces,
+  setAgentTraceScoring,
   type TraceScoringEligibility,
 } from "@/lib/tracesApi";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
@@ -12,8 +12,10 @@ import { reportError } from "@/lib/reportError";
 type UseAgentTraceScoringArgs = {
   accessToken: string | null;
   agentUuid: string;
-  /** Current flag from the agent record. The hook keeps a live copy after a toggle. */
+  /** Current setting, read from the agent record. */
   enabled: boolean;
+  /** The agent's stored config, sent back on every save. */
+  config: Record<string, unknown>;
   /** Required: the agent page saves the new value and feeds it back in as
    *  `enabled`, which is the only copy of the flag. */
   onEnabledChange: (enabled: boolean) => void;
@@ -47,12 +49,12 @@ export function useAgentTraceScoring({
   accessToken,
   agentUuid,
   enabled,
+  config,
   onEnabledChange,
   isActive = true,
 }: UseAgentTraceScoringArgs): TraceScoringControls {
-  const [eligibility, setEligibility] = useState<TraceScoringEligibility | null>(
-    null,
-  );
+  const [eligibility, setEligibility] =
+    useState<TraceScoringEligibility | null>(null);
   const [eligibilityError, setEligibilityError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -102,12 +104,13 @@ export function useAgentTraceScoring({
       setSaving(true);
       setSaveError(null);
       try {
-        const updated = await setAgentAutoScoreTraces(
+        const updated = await setAgentTraceScoring(
           accessToken,
           agentUuid,
+          config,
           next,
         );
-        onEnabledChange(!!updated.auto_score_traces);
+        onEnabledChange(!!updated.trace_scoring_enabled);
       } catch (err) {
         reportError("Error updating automatic trace scoring:", err);
         setSaveError(
@@ -127,6 +130,7 @@ export function useAgentTraceScoring({
       accessToken,
       agentUuid,
       canEnable,
+      config,
       enabled,
       loadEligibility,
       onEnabledChange,

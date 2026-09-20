@@ -63,7 +63,7 @@ const prior: TraceScoringRun = {
   status: "failed",
   created_at: "2026-08-28T12:00:00Z",
   completed_at: "2026-08-28T12:02:00Z",
-  error: "corrupt_snapshot",
+  error: "over_limit",
   results: [],
 };
 
@@ -135,7 +135,9 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
 
   rerender(<TraceScorePanel run={prior} />);
   expect(
-    screen.getByText("This scoring run could not be completed"),
+    screen.getByText(
+      "This workspace has scored as many traces as its limit allows",
+    ),
   ).toBeInTheDocument();
 
   rerender(

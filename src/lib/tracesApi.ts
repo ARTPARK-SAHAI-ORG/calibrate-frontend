@@ -214,17 +214,49 @@ export async function fetchTraceScoringEligibility(
   );
 }
 
+/**
+ * The setting's home inside the agent's config. Saving replaces the whole
+ * config rather than merging it, so everything already stored alongside the
+ * setting is carried over. The one place that knows the path.
+ */
+export function configWithTraceScoring(
+  storedConfig: Record<string, unknown>,
+  enabled: boolean,
+): Record<string, unknown> {
+  const traces = (storedConfig.traces ?? {}) as Record<string, unknown>;
+  const scoring = (traces.scoring ?? {}) as Record<string, unknown>;
+  return {
+    ...storedConfig,
+    traces: { ...traces, scoring: { ...scoring, enabled } },
+  };
+}
+
 /** Turn automatic scoring of newly ingested traces on or off. */
-export async function setAgentAutoScoreTraces(
+export async function setAgentTraceScoring(
   accessToken: string,
   agentUuid: string,
+  storedConfig: Record<string, unknown>,
   enabled: boolean,
-): Promise<{ auto_score_traces: boolean }> {
-  return apiPut<{ auto_score_traces: boolean }>(
+): Promise<{ trace_scoring_enabled: boolean }> {
+  return apiPut<{ trace_scoring_enabled: boolean }>(
     `/agents/${encodeURIComponent(agentUuid)}`,
     accessToken,
-    { auto_score_traces: enabled },
+    { config: configWithTraceScoring(storedConfig, enabled) },
   );
+}
+
+/** How many traces this workspace has stored and scored, against its limits. */
+export type TraceUsage = {
+  traces_stored: number;
+  max_traces: number;
+  traces_scored: number;
+  max_scored_traces: number;
+};
+
+export async function fetchTraceUsage(
+  accessToken: string,
+): Promise<TraceUsage> {
+  return apiGet<TraceUsage>("/traces/usage", accessToken);
 }
 
 /**

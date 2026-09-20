@@ -8,6 +8,7 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { useAgentTraceScoring } from "@/hooks/useAgentTraceScoring";
+import { configWithTraceScoring } from "@/lib/tracesApi";
 import { readNameConflictMessage } from "@/lib/parseBackendError";
 import {
   AgentTabContent,
@@ -75,7 +76,8 @@ type AgentData = {
   name: string;
   type?: "agent" | "connection";
   interaction_type?: "conversation" | "general";
-  auto_score_traces?: boolean;
+  /** Read-only: the backend reports the setting stored in config. */
+  trace_scoring_enabled?: boolean;
   config: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -180,11 +182,24 @@ export function AgentDetail({
   const traceScoring = useAgentTraceScoring({
     accessToken: backendAccessToken,
     agentUuid,
-    enabled: !!agent?.auto_score_traces,
-    onEnabledChange: (enabled) =>
+    enabled: !!agent?.trace_scoring_enabled,
+    config: agent?.config ?? {},
+    onEnabledChange: (enabled) => {
       setAgent((current) =>
-        current ? { ...current, auto_score_traces: enabled } : current,
-      ),
+        current
+          ? {
+              ...current,
+              trace_scoring_enabled: enabled,
+              config: configWithTraceScoring(current.config, enabled),
+            }
+          : current,
+      );
+      // A connection agent's Save sends this copy of the config back, so it
+      // must not hold the value the switch has just replaced.
+      setConnectionConfig(
+        (prev) => configWithTraceScoring(prev, enabled) as ConnectionConfig,
+      );
+    },
     isActive: activeTab === "traces" || activeTab === "settings",
   });
   // Keep-alive: track which tabs have been opened. Each tab is mounted the
