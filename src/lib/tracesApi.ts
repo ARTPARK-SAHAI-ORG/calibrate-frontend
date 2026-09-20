@@ -223,12 +223,8 @@ export function configWithTraceScoring(
   storedConfig: Record<string, unknown>,
   enabled: boolean,
 ): Record<string, unknown> {
-  const traces = (storedConfig.traces ?? {}) as Record<string, unknown>;
-  const scoring = (traces.scoring ?? {}) as Record<string, unknown>;
-  return {
-    ...storedConfig,
-    traces: { ...traces, scoring: { ...scoring, enabled } },
-  };
+  const scoring = (storedConfig.trace_scoring ?? {}) as Record<string, unknown>;
+  return { ...storedConfig, trace_scoring: { ...scoring, enabled } };
 }
 
 /** Turn automatic scoring of newly ingested traces on or off. */

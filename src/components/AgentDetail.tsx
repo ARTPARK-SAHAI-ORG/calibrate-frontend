@@ -1463,6 +1463,7 @@ export function AgentDetail({
               maxAssistantTurns={maxAssistantTurns}
               setMaxAssistantTurns={setMaxAssistantTurns}
               traceScoring={traceScoring}
+              onGoToEvaluators={() => performTabSwitch("evaluators")}
             />
           </div>
         )}

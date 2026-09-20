@@ -3,6 +3,7 @@
 import React from "react";
 import { Tooltip } from "@/components/Tooltip";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
+import { nothingCanScoreCopy } from "@/lib/traceScoring";
 
 type SettingsTabContentProps = {
   agentSpeaksFirst: boolean;
@@ -10,6 +11,8 @@ type SettingsTabContentProps = {
   maxAssistantTurns: number;
   setMaxAssistantTurns: (value: number) => void;
   traceScoring: TraceScoringControls;
+  /** Opens the Evaluators tab, where the set that can score is chosen. */
+  onGoToEvaluators: () => void;
 };
 
 export function SettingsTabContent({
@@ -18,16 +21,29 @@ export function SettingsTabContent({
   maxAssistantTurns,
   setMaxAssistantTurns,
   traceScoring,
+  onGoToEvaluators,
 }: SettingsTabContentProps) {
   const scoringDisabled =
     traceScoring.saving ||
     (!traceScoring.enabled &&
       (traceScoring.eligibility === null || traceScoring.enableBlocked));
-  // A disabled control has to say why, and the reason belongs on the control
-  // rather than in a line that makes this card taller than its neighbours.
-  const blockedReason = traceScoring.enableBlocked
-    ? "None of this agent's evaluators can score traces. Choose evaluators on the Evaluators tab."
-    : null;
+  // Not clickable when nothing can score, but drawn as usual: dimming it makes
+  // it hard to see that it is a switch at all. The reason rides on the control,
+  // where the tooltip stays open long enough to click through to Evaluators.
+  const blockedReason = traceScoring.enableBlocked ? (
+    <span>
+      {nothingCanScoreCopy(traceScoring.eligibility?.ineligible ?? [])} Choose
+      evaluators without variables in the{" "}
+      <button
+        type="button"
+        onClick={onGoToEvaluators}
+        className="font-semibold cursor-pointer hover:opacity-80"
+      >
+        Evaluators tab
+      </button>
+      .
+    </span>
+  ) : null;
   const scoringSwitch = (
     <button
       type="button"
@@ -36,7 +52,7 @@ export function SettingsTabContent({
       aria-label="Score new traces automatically"
       disabled={scoringDisabled}
       onClick={() => void traceScoring.setEnabled(!traceScoring.enabled)}
-      className={`relative w-11 md:w-12 h-6 md:h-7 rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 border-2 flex-shrink-0 ${
+      className={`relative w-11 md:w-12 h-6 md:h-7 rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed border-2 flex-shrink-0 ${
         traceScoring.enabled
           ? "bg-green-500 border-green-500"
           : "bg-muted border-muted-foreground/30"

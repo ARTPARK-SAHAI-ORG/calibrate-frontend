@@ -27,7 +27,7 @@ export function TraceIngestCodeDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-background rounded-xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-background rounded-xl w-full max-w-7xl h-[85vh] flex flex-col shadow-2xl">
         <div className="p-5 md:p-6 border-b border-border">
           <h2 className="text-base md:text-lg font-semibold text-foreground">
             Send your first trace
@@ -38,10 +38,14 @@ export function TraceIngestCodeDialog({
           </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 md:p-6">
+        <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden p-5 md:p-6">
           {/* No key here: the one made during setup is shown once and never
               stored, so the snippet keeps its placeholder. */}
-          <TraceIngestSnippet agentUuid={agentUuid} agentNature={agentNature} />
+          <TraceIngestSnippet
+            agentUuid={agentUuid}
+            agentNature={agentNature}
+            fillHeight
+          />
         </div>
 
         <div className="flex items-center justify-end p-5 md:p-6 border-t border-border">

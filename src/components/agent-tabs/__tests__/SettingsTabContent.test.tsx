@@ -187,7 +187,16 @@ describe("SettingsTabContent", () => {
   it("is disabled and says why on hover when no evaluator can score", async () => {
     const user = setupUser();
     const { switchEl } = renderScoring({
-      eligibility: { eligible: [], ineligible: [] },
+      eligibility: {
+        eligible: [],
+        ineligible: [
+          {
+            evaluator_uuid: "ev-2",
+            name: "Correctness",
+            reason: "declares_variables" as const,
+          },
+        ],
+      },
       enableBlocked: true,
     });
     expect(switchEl).toBeDisabled();
@@ -195,10 +204,9 @@ describe("SettingsTabContent", () => {
     // neighbours instead of carrying an extra line.
     await user.hover(switchEl);
     expect(
-      await screen.findByText(
-        "None of this agent's evaluators can score traces. Choose evaluators on the Evaluators tab.",
-      ),
-    ).toBeInTheDocument();
+      (await screen.findByRole("button", { name: "Evaluators tab" }))
+        .parentElement,
+    ).toHaveTextContent(/Every evaluator added to this agent uses variables/);
   });
 
   it("shows the save error", () => {

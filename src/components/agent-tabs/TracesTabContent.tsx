@@ -41,7 +41,7 @@ import {
   useTraces,
 } from "@/hooks";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
-import { ineligibleReasonCopy } from "@/lib/traceScoring";
+import { ineligibleReasonCopy, nothingCanScoreCopy } from "@/lib/traceScoring";
 import { CONTACT_LINK } from "@/constants/limits";
 import {
   fetchTrace,
@@ -554,14 +554,39 @@ export function TracesTabContent({
     <div className="flex flex-col space-y-4 md:space-y-6">
       {hasLoaded && !showEmptyState && (
         <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
+          <div
+            className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 rounded-md border px-3 py-2 ${
+              nothingCanScore
+                ? "border-amber-500/40 bg-amber-500/10"
+                : "border-border bg-muted/30"
+            }`}
+          >
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <span className="text-sm text-muted-foreground">
-                {nothingCanScore
-                  ? "New traces are not being scored because none of this agent's evaluators can score traces."
-                  : traceScoring.enabled
-                    ? "New traces are scored automatically with this agent's evaluators."
-                    : "New traces are not scored automatically."}
+              <span
+                className={`text-sm ${
+                  nothingCanScore
+                    ? "text-amber-700 dark:text-amber-300"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {nothingCanScore ? (
+                  <>
+                    {nothingCanScoreCopy(ineligible)} Choose evaluators without
+                    variables in the{" "}
+                    <button
+                      type="button"
+                      onClick={onGoToEvaluators}
+                      className="font-semibold cursor-pointer hover:opacity-80"
+                    >
+                      Evaluators tab
+                    </button>
+                    .
+                  </>
+                ) : traceScoring.enabled ? (
+                  "New traces are scored automatically with this agent's evaluators."
+                ) : (
+                  "New traces are not scored automatically."
+                )}
                 {traceScoring.saveError && (
                   <span className="text-red-600 dark:text-red-400">
                     {" "}
@@ -569,14 +594,8 @@ export function TracesTabContent({
                   </span>
                 )}
               </span>
-              <button
-                type="button"
-                onClick={onGoToEvaluators}
-                className="text-sm underline text-muted-foreground hover:text-foreground cursor-pointer"
-              >
-                Choose the evaluators
-              </button>
-              {traceScoring.enabled ? (
+              {/* Nothing to turn on or off while no evaluator can score. */}
+              {nothingCanScore ? null : traceScoring.enabled ? (
                 <Button
                   size="sm"
                   variant="secondary"
@@ -610,7 +629,9 @@ export function TracesTabContent({
               </p>
             </div>
           )}
-          {ineligible.length > 0 && (
+          {/* When nothing can score, the line above already says why, so the
+              list of evaluators would only repeat it. */}
+          {!nothingCanScore && ineligible.length > 0 && (
             <div className="rounded-md border border-border bg-muted/30 px-3 py-2 space-y-2">
               <p className="text-sm text-muted-foreground">
                 These evaluators cannot score traces:

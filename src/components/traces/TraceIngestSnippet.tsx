@@ -92,11 +92,15 @@ export function TraceIngestSnippet({
   agentUuid,
   apiKey,
   agentNature = "conversation",
+  fillHeight = false,
 }: {
   agentUuid: string;
   /** The key created during setup, when there is one. */
   apiKey?: string | null;
   agentNature?: AgentNature;
+  /** Fit a fixed-height box: the code stays put and the notes scroll beside
+   *  it. Off on the setup steps, where the page scrolls as one. */
+  fillHeight?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [language, setLanguage] = useState<SnippetLanguage>("curl");
@@ -126,8 +130,12 @@ export function TraceIngestSnippet({
   return (
     // The code gets the larger share: a key and a URL on one line need the room
     // more than the explanations do.
-    <div className="flex flex-col lg:grid lg:grid-cols-[3fr_2fr] gap-4">
-      <div className="min-w-0">
+    <div
+      className={`flex flex-col lg:grid lg:grid-cols-[3fr_2fr] gap-4 ${
+        fillHeight ? "lg:h-full lg:min-h-0" : ""
+      }`}
+    >
+      <div className={`min-w-0 ${fillHeight ? "lg:overflow-y-auto" : ""}`}>
         {/* Tabs on the left of the header bar, copy on the right, code below. */}
         <div className="border border-border rounded-lg overflow-hidden bg-muted/40">
           <div className="flex items-center justify-between gap-2 pl-1 pr-1 py-1 border-b border-border">
@@ -165,7 +173,11 @@ export function TraceIngestSnippet({
         </div>
       </div>
 
-      <div className="min-w-0 space-y-3">
+      <div
+        className={`min-w-0 space-y-3 ${
+          fillHeight ? "lg:overflow-y-auto lg:min-h-0" : ""
+        }`}
+      >
         {!apiKey && (
           <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-muted-foreground">
             <svg

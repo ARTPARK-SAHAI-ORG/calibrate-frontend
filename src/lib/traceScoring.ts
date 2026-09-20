@@ -21,10 +21,27 @@ export function ineligibleReasonCopy(
     case "no_live_version":
       return "Has no live version";
     case "declares_variables":
-      return "Uses variables, which cannot be filled in for a trace";
+      return "Uses variables, which cannot be filled for a trace automatically";
     default:
       return "Cannot score traces for this agent";
   }
+}
+
+/**
+ * Why an agent with evaluators still cannot score its traces. The usual cause
+ * is variables, which have nowhere to be filled in for a trace, so that case
+ * says so plainly rather than leaving the reader to guess.
+ */
+export function nothingCanScoreCopy(
+  ineligible: { reason: string }[],
+): string {
+  if (ineligible.length === 0) {
+    return "This agent has no evaluators, so its traces are not scored.";
+  }
+  if (ineligible.every((item) => item.reason === "declares_variables")) {
+    return "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically.";
+  }
+  return "None of this agent's evaluators can score traces.";
 }
 
 /** Why a scoring run was skipped or failed. */

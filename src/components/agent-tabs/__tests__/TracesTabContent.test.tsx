@@ -519,7 +519,13 @@ describe("TracesTabContent", () => {
           traceScoring={{
             ...traceScoring,
             eligibility: {
-              eligible: [],
+              eligible: [
+                {
+                  evaluator_uuid: "ev-1",
+                  evaluator_version_id: "v1",
+                  name: "Tone",
+                },
+              ],
               ineligible: [
                 {
                   evaluator_uuid: "ev-2",
@@ -666,18 +672,32 @@ describe("TracesTabContent", () => {
           traceScoring={{
             ...traceScoring,
             enabled: true,
-            eligibility: { eligible: [], ineligible: [] },
+            eligibility: {
+              eligible: [],
+              ineligible: [
+                {
+                  evaluator_uuid: "ev-2",
+                  name: "Correctness",
+                  reason: "declares_variables" as const,
+                },
+              ],
+            },
           }}
         />,
       );
+      // The sentence and the link share one line, so read the whole line.
       expect(
-        screen.getByText(
-          "New traces are not being scored because none of this agent's evaluators can score traces.",
-        ),
-      ).toBeInTheDocument();
-      await user.click(
-        screen.getByRole("button", { name: "Choose the evaluators" }),
-      );
+        screen.getByRole("button", { name: "Evaluators tab" }).parentElement,
+      ).toHaveTextContent(/Every evaluator added to this agent uses variables/);
+      // The switch cannot be turned on, so nothing offers to.
+      expect(
+        screen.queryByRole("button", { name: "Turn on in Settings" }),
+      ).not.toBeInTheDocument();
+      // The line says why, so the list of evaluators would only repeat it.
+      expect(
+        screen.queryByText("These evaluators cannot score traces:"),
+      ).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
       expect(onGoToEvaluators).toHaveBeenCalled();
     });
   });
