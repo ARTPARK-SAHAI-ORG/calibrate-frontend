@@ -1,9 +1,12 @@
 "use client";
 
-/** One choice in the row of pills. */
+import React from "react";
+
+/** One choice in the row of pills. A label can carry an icon beside its
+ *  words, which is how a pair of opposites is told apart at a glance. */
 export interface SegmentedFilterOption<T extends string> {
   value: T;
-  label: string;
+  label: React.ReactNode;
 }
 
 interface SegmentedFilterProps<T extends string> {

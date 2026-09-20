@@ -28,6 +28,8 @@ import {
   TracesFilter,
   type TraceScoreFilterEvaluator,
 } from "@/components/traces/TracesFilter";
+import { TracesSort } from "@/components/traces/TracesSort";
+import { useTraceView } from "@/components/traces/traceViewUrl";
 import { CodeIcon, SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
@@ -58,9 +60,6 @@ import {
   fetchTraces,
   type TraceUsage,
   type TraceDetail,
-  type TraceOutputFilter,
-  type TraceScoreFilters,
-  type TraceSortOrder,
   type TraceSummary,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
@@ -123,7 +122,16 @@ export function TracesTabContent({
   // "tool_call" one that only called tools. Like the search, the backend does
   // the filtering, so the count and the pages cover every matching trace and
   // not just the ones on screen.
-  const [outputFilter, setOutputFilter] = useState<TraceOutputFilter>("all");
+  // The filters and the sort live in the address bar, so a reload or a
+  // shared link keeps the same view. `tab` and `traceId` are left alone.
+  const [view, setView] = useTraceView();
+  const {
+    outputType: outputFilter,
+    labels: labelFilter,
+    scores: scoreFilter,
+    sortByEvaluator,
+    sortOrder,
+  } = view;
 
   // The tags sent with the traces, and the ones picked to filter by. A trace
   // matches when it carries any of the picked ones. The whole set comes from
@@ -132,7 +140,6 @@ export function TracesTabContent({
     accessToken,
     agentUuid,
   );
-  const [labelFilter, setLabelFilter] = useState<string[]>([]);
 
   // One condition per evaluator, all of which have to hold. They are picked
   // in the same panel as the output kind and the labels, and applied with
@@ -140,20 +147,16 @@ export function TracesTabContent({
   // first, which is where the poor answers are and what every other sortable
   // table here does; clicking it again turns the order round, and once more
   // goes back to newest first.
-  const [scoreFilter, setScoreFilter] = useState<TraceScoreFilters>({});
-  const [sortByEvaluator, setSortByEvaluator] = useState<string | null>(null);
-  const [sortOrder, setSortOrder] = useState<TraceSortOrder>("asc");
   const sortByEvaluatorScore = (evaluatorUuid: string) => {
     if (sortByEvaluator !== evaluatorUuid) {
-      setSortByEvaluator(evaluatorUuid);
-      setSortOrder("asc");
+      setView({ sortByEvaluator: evaluatorUuid, sortOrder: "asc" });
       return;
     }
     if (sortOrder === "asc") {
-      setSortOrder("desc");
+      setView({ sortOrder: "desc" });
       return;
     }
-    setSortByEvaluator(null);
+    setView({ sortByEvaluator: null, sortOrder: "asc" });
   };
 
   const {
@@ -482,9 +485,14 @@ export function TracesTabContent({
   // no heading there is nothing left on screen to turn its ordering off.
   useEffect(() => {
     if (!sortByEvaluator) return;
+    // Not before both the evaluator list AND the first page of traces are in:
+    // a column is drawn for an evaluator that merely scored a row on the page,
+    // so judging "this has no column" on either one alone throws away a sort
+    // restored from the address.
+    if (!eligibility || isLoading) return;
     if (scoreColumns.some((c) => c.evaluator_uuid === sortByEvaluator)) return;
-    setSortByEvaluator(null);
-  }, [scoreColumns, sortByEvaluator]);
+    setView({ sortByEvaluator: null });
+  }, [eligibility, isLoading, scoreColumns, sortByEvaluator, setView]);
   // How each evaluator judges, so a rating can be filtered by its own numbers
   // rather than only by a verdict. Remembered for as long as the tab is open,
   // because both places it can be read from, the running averages and the
@@ -758,11 +766,25 @@ export function TracesTabContent({
             }}
             labels={allLabels}
             scoreEvaluators={scoreFilterEvaluators}
-            onApply={(next) => {
-              setOutputFilter(next.outputType);
-              setLabelFilter(next.labels);
-              setScoreFilter(next.scores);
-            }}
+            onApply={(next) =>
+              setView({
+                outputType: next.outputType,
+                labels: next.labels,
+                scores: next.scores,
+              })
+            }
+          />
+          {/* The column headings sort the list too, but their arrow is easy
+              to miss and they are gone altogether on a phone. */}
+          <TracesSort
+            value={{ evaluatorUuid: sortByEvaluator, order: sortOrder }}
+            evaluators={scoreColumns}
+            onChange={(next) =>
+              setView({
+                sortByEvaluator: next.evaluatorUuid,
+                sortOrder: next.order,
+              })
+            }
           />
           {/* Not a filter, so it sits apart from the two that are, at the
               far end of the row. */}

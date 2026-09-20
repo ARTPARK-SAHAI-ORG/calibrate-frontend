@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, setupUser } from "@/test-utils";
+import { act, render, screen, waitFor, within, setupUser } from "@/test-utils";
 jest.mock("sonner", () => ({
   toast: { error: jest.fn(), success: jest.fn() },
 }));
@@ -356,6 +356,9 @@ const tabProps = {
 beforeEach(() => {
   jest.clearAllMocks();
   window.localStorage.clear();
+  // The filters and the sort are kept in the address, so each test starts on
+  // a clean one rather than the last test's.
+  window.history.replaceState(null, "", "/");
   mockUseTraces.mockReturnValue(tracesResult([trace()]));
   mockUseTraceLabels.mockReturnValue({ labels: [], refetch: refetchLabels });
   fetchAgentEvaluators.mockResolvedValue([]);
@@ -385,6 +388,11 @@ async function applyTraceFilter(
     await user.click(screen.getByRole("checkbox", { name: label }));
   }
   for (const [name, condition] of Object.entries(scores)) {
+    // An evaluator nothing has been picked for yet is a chip carrying its
+    // name; clicking it is what puts its dropdown on the panel.
+    if (!screen.queryByLabelText(`Filter traces by ${name}`)) {
+      await user.click(scoreChip(name));
+    }
     await user.selectOptions(
       screen.getByLabelText(`Filter traces by ${name}`),
       condition,
@@ -396,6 +404,15 @@ async function applyTraceFilter(
 /** The panel the pickers live in, for a test that only reads what is offered. */
 const openTraceFilter = (user: ReturnType<typeof setupUser>) =>
   user.click(screen.getByRole("button", { name: "Filter traces" }));
+
+/** The chip that adds one evaluator to the open filter panel. Looked for
+ *  inside the scores section, since the evaluator's name is also on its card
+ *  above the list and on its column heading. */
+const scoreChip = (name: string) =>
+  within(screen.getByText("Filter by scores").parentElement!).getByRole(
+    "button",
+    { name },
+  );
 
 function lastTracesArgs() {
   return mockUseTraces.mock.calls[mockUseTraces.mock.calls.length - 1][0];
@@ -2278,17 +2295,14 @@ describe("TracesTabContent", () => {
       render(<TracesTabContent {...tabProps} />);
 
       await openTraceFilter(user);
+      await user.click(scoreChip("Tone"));
       const picker = screen.getByLabelText("Filter traces by Tone");
       // Each score on the scale, and the middle ones with everything below.
+      // Nothing stands for "any score": taking the evaluator off the panel is
+      // how its condition is cleared.
       expect(
         Array.from(picker.querySelectorAll("option")).map((o) => o.textContent),
-      ).toEqual([
-        "Any score",
-        "Scored 1",
-        "Scored 2",
-        "Scored 3",
-        "Scored 2 or below",
-      ]);
+      ).toEqual(["1", "2", "3", "2 or below"]);
 
       await user.selectOptions(picker, "<=2");
       await user.click(screen.getByRole("button", { name: /^Apply/ }));
@@ -2318,6 +2332,133 @@ describe("TracesTabContent", () => {
 
       await user.click(heading());
       await waitFor(() => expect(lastTracesArgs().sortByEvaluator).toBeNull());
+    });
+
+    it("asks for nothing until the picked score is applied", async () => {
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+
+      await openTraceFilter(user);
+      // Picking the evaluator sets its first condition, and picking another
+      // changes it. Neither reaches the list.
+      await user.click(scoreChip("Tone"));
+      await user.selectOptions(
+        screen.getByLabelText("Filter traces by Tone"),
+        "failed",
+      );
+      expect(lastTracesArgs().scores).toEqual({});
+
+      await user.click(screen.getByRole("button", { name: /^Apply/ }));
+
+      await waitFor(() =>
+        expect(lastTracesArgs().scores).toEqual({ "ev-1": "failed" }),
+      );
+    });
+
+    it("takes an evaluator off the filter, which is how its condition is cleared", async () => {
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+
+      await applyTraceFilter(user, { scores: { Tone: "failed" } });
+      await waitFor(() =>
+        expect(lastTracesArgs().scores).toEqual({ "ev-1": "failed" }),
+      );
+
+      await openTraceFilter(user);
+      await user.click(
+        screen.getByRole("button", { name: "Remove the Tone filter" }),
+      );
+      await user.click(screen.getByRole("button", { name: /^Apply/ }));
+
+      await waitFor(() => expect(lastTracesArgs().scores).toEqual({}));
+    });
+
+    it("sorts by a named evaluator, highest first, in one click", async () => {
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+
+      await user.click(screen.getByRole("button", { name: "Sort traces" }));
+      await user.click(
+        within(
+          screen.getByRole("group", { name: "Sort traces by Tone" }),
+        ).getByRole("button", { name: "High to low" }),
+      );
+
+      // Both directions are on screen, so highest first is never two clicks.
+      await waitFor(() =>
+        expect(lastTracesArgs()).toMatchObject({
+          sortByEvaluator: "ev-1",
+          sortOrder: "desc",
+        }),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Newest first" }));
+
+      await waitFor(() => expect(lastTracesArgs().sortByEvaluator).toBeNull());
+    });
+
+    it("keeps a sort read from the address bar through the first render", async () => {
+      window.history.replaceState(null, "", "/?sort=ev-1&dir=desc");
+      // The evaluators have not been read yet, so there are no columns at all:
+      // the moment the sort used to be thrown away.
+      const { rerender } = render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, eligibility: null }}
+        />,
+      );
+
+      expect(lastTracesArgs()).toMatchObject({
+        sortByEvaluator: "ev-1",
+        sortOrder: "desc",
+      });
+
+      rerender(<TracesTabContent {...tabProps} />);
+
+      await waitFor(() =>
+        expect(lastTracesArgs()).toMatchObject({
+          sortByEvaluator: "ev-1",
+          sortOrder: "desc",
+        }),
+      );
+    });
+
+    it("clears a sort whose evaluator no longer has a column", async () => {
+      window.history.replaceState(null, "", "/?sort=ev-gone&dir=desc");
+      render(<TracesTabContent {...tabProps} />);
+
+      // Nothing on screen orders by that evaluator any more, so nothing could
+      // turn the ordering off again.
+      await waitFor(() => expect(lastTracesArgs().sortByEvaluator).toBeNull());
+    });
+
+    it("puts the applied filter and the sort in the address bar", async () => {
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+
+      await applyTraceFilter(user, {
+        output: "Tool call",
+        scores: { Tone: "failed" },
+      });
+
+      await waitFor(() => {
+        const params = new URLSearchParams(window.location.search);
+        expect(params.get("output")).toBe("tool_call");
+        expect(params.getAll("score")).toEqual(["ev-1:failed"]);
+      });
+
+      await user.click(screen.getByRole("button", { name: "Sort traces" }));
+      await user.click(
+        within(
+          screen.getByRole("group", { name: "Sort traces by Tone" }),
+        ).getByRole("button", { name: "Low to high" }),
+      );
+
+      await waitFor(() => {
+        const params = new URLSearchParams(window.location.search);
+        expect(params.get("sort")).toBe("ev-1");
+        expect(params.get("dir")).toBe("asc");
+      });
     });
 
     it("says nothing matched instead of the setup steps when a score is picked", async () => {
@@ -2446,7 +2587,7 @@ describe("TracesTabContent", () => {
     await openTraceFilter(user);
     expect(picker()).toHaveValue("<=2");
     expect(
-      screen.getByRole("option", { name: "Scored 2 or below" }),
+      screen.getByRole("option", { name: "2 or below" }),
     ).toBeInTheDocument();
   });
 

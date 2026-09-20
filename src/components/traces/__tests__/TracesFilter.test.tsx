@@ -21,6 +21,20 @@ const EVALUATORS = [
   },
 ];
 
+/** A third one, so the order the reader adds them in can differ from this list. */
+const THREE_EVALUATORS: TraceScoreFilterEvaluator[] = [
+  ...EVALUATORS,
+  { evaluator_uuid: "ev-3", name: "Safety", output_type: "binary" as const },
+];
+
+/** Each evaluator whose condition is on the panel, top to bottom. */
+const evaluatorRowNames = () =>
+  screen
+    .getAllByRole("combobox")
+    .map((el) =>
+      el.getAttribute("aria-label")?.replace("Filter traces by ", ""),
+    );
+
 function setup(
   value: TracesFilterValue = NONE,
   labels: string[] = ["production", "staging"],
@@ -189,7 +203,7 @@ it("leaves the labels out when the traces carry none", async () => {
 
   await openPanel(user);
 
-  expect(screen.queryByText("Labels")).not.toBeInTheDocument();
+  expect(screen.queryByText("Filter by trace labels")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Response" })).toBeInTheDocument();
 });
 
@@ -227,8 +241,8 @@ it("offers no search box for a handful of labels", async () => {
 describe("scoreConditionOptions", () => {
   it("offers the two verdicts for a yes-or-no evaluator", () => {
     expect(scoreConditionOptions(EVALUATORS[0])).toEqual([
-      { value: "passed", label: "Correct" },
-      { value: "failed", label: "Wrong" },
+      { value: "passed", label: "Correct", tone: "pass" },
+      { value: "failed", label: "Wrong", tone: "fail" },
     ]);
   });
 
@@ -251,16 +265,16 @@ describe("scoreConditionOptions", () => {
 
   it("offers every score on a rating's scale, and the middle ones with everything below them", () => {
     expect(scoreConditionOptions(EVALUATORS[1])).toEqual([
-      { value: "=1", label: "Scored 1" },
-      { value: "=2", label: "Scored 2" },
-      { value: "=3", label: "Scored 3" },
-      { value: "=4", label: "Scored 4" },
-      { value: "=5", label: "Scored 5" },
-      // No "1 or below": on the lowest score it would mean the same as
-      // "Scored 1". No "5 or below" either: that is the whole scale.
-      { value: "<=2", label: "Scored 2 or below" },
-      { value: "<=3", label: "Scored 3 or below" },
-      { value: "<=4", label: "Scored 4 or below" },
+      { value: "=1", label: "1", tone: "neutral" },
+      { value: "=2", label: "2", tone: "neutral" },
+      { value: "=3", label: "3", tone: "neutral" },
+      { value: "=4", label: "4", tone: "neutral" },
+      { value: "=5", label: "5", tone: "neutral" },
+      // No "1 or below": on the lowest score it would mean the same as "1".
+      // No "5 or below" either: that is the whole scale.
+      { value: "<=2", label: "2 or below", tone: "neutral" },
+      { value: "<=3", label: "3 or below", tone: "neutral" },
+      { value: "<=4", label: "4 or below", tone: "neutral" },
     ]);
   });
 
@@ -275,6 +289,19 @@ describe("scoreConditionOptions", () => {
       }).map((option) => option.value),
     ).toEqual(["passed", "failed"]);
   });
+
+  it("reads a yes-or-no evaluator's verdicts as a pass and a fail", () => {
+    expect(scoreConditionOptions(EVALUATORS[0]).map((o) => o.tone)).toEqual([
+      "pass",
+      "fail",
+    ]);
+  });
+
+  it("gives a rating's scores no pass or fail colour of their own", () => {
+    const tones = scoreConditionOptions(EVALUATORS[1]).map((o) => o.tone);
+    expect(tones).toHaveLength(8);
+    expect(new Set(tones)).toEqual(new Set(["neutral"]));
+  });
 });
 
 describe("narrowing by what the evaluators scored", () => {
@@ -282,6 +309,7 @@ describe("narrowing by what the evaluators scored", () => {
     const { user, onApply } = setup(NONE, [], EVALUATORS);
 
     await openPanel(user);
+    await user.click(screen.getByRole("button", { name: "Accuracy" }));
     await user.selectOptions(
       screen.getByLabelText("Filter traces by Accuracy"),
       "<=2",
@@ -295,7 +323,30 @@ describe("narrowing by what the evaluators scored", () => {
     });
   });
 
-  it("takes an evaluator back out when its condition is set to any score", async () => {
+  it("adds an evaluator with its first condition already set", async () => {
+    const { user, onApply } = setup(NONE, [], EVALUATORS);
+
+    await openPanel(user);
+    await user.click(screen.getByRole("button", { name: "Tone" }));
+
+    // The evaluator is now a row, so there is nothing left to add it with.
+    expect(
+      screen.queryByRole("button", { name: "Tone" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Filter traces by Tone")).toHaveValue(
+      "passed",
+    );
+
+    await user.click(applyButton());
+
+    expect(onApply).toHaveBeenCalledWith({
+      outputType: "all",
+      labels: [],
+      scores: { "ev-1": "passed" },
+    });
+  });
+
+  it("takes an evaluator out of the filters when it is removed", async () => {
     const { user, onApply } = setup(
       { outputType: "all", labels: [], scores: { "ev-1": "failed" } },
       [],
@@ -303,19 +354,49 @@ describe("narrowing by what the evaluators scored", () => {
     );
 
     await openPanel(user);
-    await user.selectOptions(
-      screen.getByLabelText("Filter traces by Tone"),
-      "",
+    await user.click(
+      screen.getByRole("button", { name: "Remove the Tone filter" }),
     );
+
+    // Removing is the only way to clear one: there is no "any score" to
+    // go back to, and a blank condition would narrow the list to nothing.
+    expect(
+      screen.queryByLabelText("Filter traces by Tone"),
+    ).not.toBeInTheDocument();
+
     await user.click(applyButton());
 
-    // Left behind as a blank condition it would still be sent, and narrow
-    // the list to nothing.
     expect(onApply).toHaveBeenCalledWith({
       outputType: "all",
       labels: [],
       scores: {},
     });
+  });
+
+  it("keeps the rows in the order the reader added them", async () => {
+    const { user } = setup(NONE, [], THREE_EVALUATORS);
+
+    await openPanel(user);
+    await user.click(screen.getByRole("button", { name: "Safety" }));
+    await user.click(screen.getByRole("button", { name: "Tone" }));
+
+    // Safety is last in the evaluator list and first on the panel.
+    expect(evaluatorRowNames()).toEqual(["Safety", "Tone"]);
+  });
+
+  it("colours a picked verdict the way it reads in the table", async () => {
+    const { user } = setup(NONE, [], EVALUATORS);
+
+    await openPanel(user);
+    await user.click(screen.getByRole("button", { name: "Tone" }));
+
+    const dropdown = screen.getByLabelText("Filter traces by Tone");
+    expect(dropdown).toHaveClass("bg-green-100");
+
+    await user.selectOptions(dropdown, "failed");
+
+    expect(dropdown).toHaveClass("bg-red-100");
+    expect(dropdown).not.toHaveClass("bg-green-100");
   });
 
   it("counts each evaluator the reader has set a condition on", () => {
@@ -337,6 +418,54 @@ describe("narrowing by what the evaluators scored", () => {
 
     await openPanel(user);
 
-    expect(screen.queryByText("Scores")).not.toBeInTheDocument();
+    expect(screen.queryByText("Filter by scores")).not.toBeInTheDocument();
+  });
+
+  it("shows a condition the evaluator no longer offers, rather than a blank box", async () => {
+    // Conditions come back from the address bar, where one can name a score
+    // this evaluator does not have any more.
+    const { user } = setup(
+      { outputType: "all", labels: [], scores: { "ev-1": "<=2" } },
+      [],
+      EVALUATORS,
+    );
+
+    await openPanel(user);
+
+    expect(screen.getByLabelText("Filter traces by Tone")).toHaveValue("<=2");
+    expect(screen.getByRole("option", { name: "<=2" })).toBeInTheDocument();
+  });
+
+  it("lets go of a condition whose evaluator this agent no longer has", async () => {
+    // Nothing would be on screen to switch it off, so opening the panel drops
+    // it and Apply clears it.
+    const { user, onApply } = setup(
+      { outputType: "all", labels: [], scores: { "gone-1": "failed" } },
+      [],
+      EVALUATORS,
+    );
+
+    await openPanel(user);
+    // No score row at all: nothing on screen could switch it off.
+    expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+    await user.click(applyButton());
+
+    expect(onApply).toHaveBeenCalledWith({
+      outputType: "all",
+      labels: [],
+      scores: {},
+    });
+  });
+
+  it("offers the two verdicts when a rating's scale is not whole numbers", () => {
+    expect(
+      scoreConditionOptions({
+        evaluator_uuid: "ev-5",
+        name: "Fractional",
+        output_type: "rating",
+        scale_min: 1,
+        scale_max: 4.5,
+      }).map((option) => option.value),
+    ).toEqual(["passed", "failed"]);
   });
 });
