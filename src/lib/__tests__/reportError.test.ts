@@ -5,7 +5,7 @@ jest.mock("@sentry/nextjs", () => ({
   captureException: (...args: unknown[]) => captureException(...args),
 }));
 
-import { reportError } from "../reportError";
+import { reportError, SESSION_EXPIRED_MESSAGE } from "../reportError";
 
 describe("reportError", () => {
   const originalNodeEnv = process.env.NODE_ENV;
@@ -72,6 +72,12 @@ describe("reportError", () => {
 
     const [capturedErr] = captureException.mock.calls[0];
     expect(capturedErr).toBe(err);
+  });
+
+  it("does not send an expired login to Sentry", () => {
+    reportError("Error fetching organizations:", new Error(SESSION_EXPIRED_MESSAGE));
+
+    expect(captureException).not.toHaveBeenCalled();
   });
 
   it("works with no details at all", () => {
