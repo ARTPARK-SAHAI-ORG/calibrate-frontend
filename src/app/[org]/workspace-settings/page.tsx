@@ -352,15 +352,10 @@ function MembersSection({
 
   return (
     <section className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base md:text-lg font-semibold text-foreground">
-            Members
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Invite team members and collaborators
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Invite team members and collaborators
+        </p>
         <button
           type="button"
           onClick={() => setIsInviteOpen(true)}

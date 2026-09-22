@@ -113,7 +113,7 @@ it("opens on the Members tab, with the name kept to General", () => {
   window.history.replaceState(null, "", "/");
   render(<WorkspaceSettingsPage />);
 
-  expect(screen.getByRole("heading", { name: "Members" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Invite" })).toBeInTheDocument();
   expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull();
 });
 
