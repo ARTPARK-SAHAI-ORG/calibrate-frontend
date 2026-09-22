@@ -152,7 +152,7 @@ export default function WorkspaceSettingsPage() {
             No active workspace selected.
           </p>
         ) : (
-          <div className="space-y-6 md:space-y-8">
+          <div className="space-y-4 md:space-y-6">
             <div className="flex items-center gap-4 md:gap-6 border-b border-border overflow-x-auto hide-scrollbar">
               {SETTINGS_TABS.map((tab) => {
                 const isActive = activeTab === tab.id;
@@ -352,8 +352,8 @@ function MembersSection({
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p className="text-sm md:text-base text-muted-foreground">
           Invite team members and collaborators
         </p>
         <button
@@ -520,15 +520,11 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
   return (
     <section className="space-y-4">
       {hasKeys && (
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base md:text-lg font-semibold text-foreground">
-              API keys
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Authenticate Calibrate (e.g. for Github Actions)
-            </p>
-          </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-sm md:text-base text-muted-foreground">
+            Let tools like Claude Code, Codex, Cursor or GitHub Actions use
+            Calibrate on behalf of this workspace
+          </p>
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}
@@ -563,7 +559,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
             </svg>
           }
           title="No API keys yet"
-          description="Create an API key to authenticate Calibrate (e.g. for Github Actions)"
+          description="Create a key so tools like Claude Code, Codex, Cursor or GitHub Actions can use Calibrate on behalf of this workspace"
           action={{
             label: "Create key",
             onClick: () => setIsCreateOpen(true),
