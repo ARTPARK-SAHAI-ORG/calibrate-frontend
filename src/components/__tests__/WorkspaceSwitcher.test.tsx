@@ -111,7 +111,7 @@ describe("WorkspaceSwitcher", () => {
         screen.getByRole("link", { name: "Workspace settings" }),
       ).toHaveAttribute(
         "href",
-        `/${PERSONAL}/workspace-settings?tab=admin`,
+        `/${PERSONAL}/workspace-settings?tab=members`,
       );
       expect(screen.getByRole("link", { name: "API keys" })).toHaveAttribute(
         "href",

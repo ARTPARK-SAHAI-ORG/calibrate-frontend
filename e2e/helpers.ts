@@ -60,21 +60,21 @@ export async function waitForOrgReady(page: Page): Promise<void> {
  */
 export async function openWorkspaceSettings(
   page: Page,
-  tab: "Admin" | "API keys" | "General" = "Admin",
+  tab: "Members" | "API keys" | "General" = "Members",
 ): Promise<void> {
   await page.goto("/workspace-settings");
   await waitForOrgReady(page);
 
-  const adminTab = page.getByRole("button", { name: "Admin", exact: true });
+  const membersTab = page.getByRole("button", { name: "Members", exact: true });
   try {
-    await expect(adminTab).toBeVisible({ timeout: 12_000 });
+    await expect(membersTab).toBeVisible({ timeout: 12_000 });
   } catch {
     await page.reload();
     await waitForOrgReady(page);
-    await expect(adminTab).toBeVisible({ timeout: 30_000 });
+    await expect(membersTab).toBeVisible({ timeout: 30_000 });
   }
 
-  if (tab !== "Admin") {
+  if (tab !== "Members") {
     await page.getByRole("button", { name: tab, exact: true }).click();
   }
 }

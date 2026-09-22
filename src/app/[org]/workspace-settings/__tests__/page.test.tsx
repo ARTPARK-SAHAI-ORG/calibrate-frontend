@@ -1,6 +1,6 @@
 /**
- * The General tab on the workspace settings page: how a model comparison
- * runs its models for every agent in this workspace.
+ * The workspace settings page: Members opens first, and the General tab holds
+ * the workspace name and how a model comparison runs its models.
  *
  * The page's hooks are mocked so the test drives one workspace and watches the
  * save call, the same way the workspace switcher test does.
@@ -21,6 +21,7 @@ jest.mock("../../../../components/AppLayout", () => ({
 }));
 
 const updateOrganizationMock = jest.fn();
+const renameOrganizationMock = jest.fn();
 let mockOrganizations: Organization[] = [];
 
 jest.mock("../../../../hooks", () => ({
@@ -30,7 +31,7 @@ jest.mock("../../../../hooks", () => ({
   useOrganizations: () => ({
     organizations: mockOrganizations,
     isLoading: false,
-    renameOrganization: jest.fn(),
+    renameOrganization: renameOrganizationMock,
     updateOrganization: updateOrganizationMock,
   }),
   useOrgMembers: () => ({
@@ -79,6 +80,7 @@ function openSettingsTab() {
 beforeEach(() => {
   mockOrganizations = [makeOrg()];
   updateOrganizationMock.mockReset();
+  renameOrganizationMock.mockReset();
   (toast.success as jest.Mock).mockReset();
 });
 
@@ -105,6 +107,31 @@ it("has a General tab that opens from a click", async () => {
       name: "Benchmarking",
     }),
   ).toBeInTheDocument();
+});
+
+it("opens on the Members tab, with the name kept to General", () => {
+  window.history.replaceState(null, "", "/");
+  render(<WorkspaceSettingsPage />);
+
+  expect(screen.getByRole("button", { name: "Invite" })).toBeInTheDocument();
+  expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull();
+});
+
+it("renames the workspace from the General tab", async () => {
+  const user = setupUser();
+  renameOrganizationMock.mockResolvedValue(undefined);
+  openSettingsTab();
+
+  const nameInput = screen.getByRole("textbox", { name: "Name" });
+  expect(nameInput).toHaveValue("Acme Health");
+  await user.clear(nameInput);
+  await user.type(nameInput, "Acme Clinics");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+
+  expect(renameOrganizationMock).toHaveBeenCalledWith("org-1", "Acme Clinics");
+  await waitFor(() =>
+    expect(toast.success).toHaveBeenCalledWith("Workspace name updated"),
+  );
 });
 
 it("shows the workspace's saved choice", () => {
