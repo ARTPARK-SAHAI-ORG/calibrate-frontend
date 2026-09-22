@@ -49,8 +49,8 @@ export function RunModelsSection({ org }: { org: Organization }) {
   };
 
   return (
-    <section className="flex flex-col gap-3 md:flex-row md:items-center md:gap-10">
-      <div className="md:max-w-2xl">
+    <section className="space-y-3">
+      <div>
         <h2 className="text-base md:text-lg font-semibold text-foreground">
           Benchmarking
         </h2>
@@ -61,7 +61,7 @@ export function RunModelsSection({ org }: { org: Organization }) {
         </p>
         {error && <p className="text-[13px] text-red-500 mt-1">{error}</p>}
       </div>
-      <div className="md:flex-shrink-0">
+      <div>
         <RunModelsChoice
           value={value}
           onChange={handleChange}

@@ -181,8 +181,8 @@ export default function WorkspaceSettingsPage() {
                 />
               </div>
             ) : activeTab === "general" ? (
-              <div className="space-y-8">
-                <div className="max-w-2xl">
+              <div className="max-w-2xl space-y-8">
+                <div>
                   <section className="space-y-3">
                     <h2 className="text-base md:text-lg font-semibold text-foreground">
                       <label htmlFor="workspace-name">Name</label>
@@ -523,7 +523,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <p className="text-sm md:text-base text-muted-foreground">
             Authenticate your Calibrate workspace with Claude Code, Codex, Cursor,
-            GitHub Actions and more
+            GitHub Action and more
           </p>
           <button
             type="button"
@@ -559,7 +559,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
             </svg>
           }
           title="No API keys yet"
-          description="Create an API key to authenticate your Calibrate workspace with Claude Code, Codex, Cursor, GitHub Actions and more"
+          description="Create an API key to authenticate your Calibrate workspace with Claude Code, Codex, Cursor, GitHub Action and more"
           action={{
             label: "Create key",
             onClick: () => setIsCreateOpen(true),
