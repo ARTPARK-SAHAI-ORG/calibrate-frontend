@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Fragment,
   Suspense,
   useCallback,
   useEffect,
@@ -10,7 +9,6 @@ import {
   useState,
 } from "react";
 import {
-  replaceUrl,
   useParams,
   useRouter,
   useSearchParams,
@@ -44,6 +42,10 @@ import {
   type LabellingJobSettings,
 } from "@/components/human-labelling/AssignAnnotatorsDialog";
 import { EditTaskDialog } from "@/components/human-labelling/EditTaskDialog";
+import {
+  latestRequestGuard,
+  waitForTaskEvaluators,
+} from "@/components/human-labelling/taskItemsFetch";
 import { ItemDetailDialog } from "@/components/human-labelling/ItemDetailDialog";
 import {
   JobsCreatedDialog,
@@ -58,6 +60,22 @@ import {
   type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
+import {
+  ItemValueFilter,
+  usableValueFilters,
+} from "@/components/human-labelling/ItemValueFilter";
+import {
+  readUrlParam,
+  scoreFilterParams,
+  useUrlValueFilters,
+  writeUrlParam,
+} from "@/components/human-labelling/valueFilterUrl";
+import {
+  buildItemScores,
+  type ItemScoreEvaluator,
+} from "@/components/human-labelling/itemScores";
+import { TaskItemsTable } from "@/components/human-labelling/TaskItemsTable";
+import { Select } from "@/components/ui/Select";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
   hasTaskOverviewData,
@@ -826,31 +844,6 @@ function EvaluatorRunsList({
   );
 }
 
-function SortIndicator({
-  direction,
-}: {
-  direction: "asc" | "desc" | null;
-}) {
-  return (
-    <svg
-      className={`w-3 h-3 transition-transform ${
-        direction === "asc" ? "rotate-180" : ""
-      } ${direction ? "text-foreground" : "text-muted-foreground/40"}`}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19 9l-7 7-7-7"
-      />
-    </svg>
-  );
-}
-
 function formatItemUpdatedAt(item: {
   updated_at?: string;
   created_at?: string;
@@ -1164,9 +1157,9 @@ function LabellingTaskPageInner() {
   const handleTabChange = useCallback(
     (tab: Tab) => {
       setActiveTab(tab);
-      replaceUrl(`/human-alignment/tasks/${uuid}?tab=${tab}`);
+      writeUrlParam("tab", tab);
     },
-    [uuid],
+    [],
   );
 
   // After landing on the task page for the first time, if the task has
@@ -1296,6 +1289,61 @@ function LabellingTaskPageInner() {
     }, 250);
     return () => window.clearTimeout(handle);
   }, [itemsSearchInput]);
+
+  // The Items tab filters live in the address, so a reload or a shared link
+  // keeps them. Every place that reads "all matching items" sends the same
+  // values: the list itself and the three select-all actions.
+  const [scoreFilters, setScoreFilters] = useUrlValueFilters();
+  const [itemsLabelled, setItemsLabelled] = useState<"yes" | "no" | null>(
+    () => {
+      const v = readUrlParam("labelled");
+      return v === "yes" || v === "no" ? v : null;
+    },
+  );
+  const taskEvaluators = useMemo<ItemScoreEvaluator[]>(
+    () =>
+      (task?.evaluators ?? []).map((ev) => ({
+        uuid: ev.uuid,
+        name: ev.name,
+        output_type: ev.output_type,
+        scale_min: typeof ev.scale_min === "number" ? ev.scale_min : null,
+        scale_max: typeof ev.scale_max === "number" ? ev.scale_max : null,
+        output_config: ev.output_config,
+      })),
+    [task?.evaluators],
+  );
+  // Held as a string so a fresh copy of the same task does not reload the
+  // list.
+  const itemScoreParamsKey = JSON.stringify(
+    scoreFilterParams(usableValueFilters(scoreFilters, taskEvaluators)),
+  );
+  const itemScoreParams = useMemo<string[]>(
+    () => JSON.parse(itemScoreParamsKey),
+    [itemScoreParamsKey],
+  );
+  const itemFiltersOn = itemScoreParams.length > 0 || itemsLabelled !== null;
+  // Until the task's evaluators arrive, every score filter in the address
+  // would be dropped as unknown, so the list waits for them.
+  const waitingForTaskEvaluators = waitForTaskEvaluators(
+    scoreFilters.length,
+    !!task,
+    taskFetchCompleted,
+  );
+  const selectAllBody = {
+    select_all: true,
+    ...(itemsSearch ? { q: itemsSearch } : {}),
+    ...(itemScoreParams.length > 0 ? { score: itemScoreParams } : {}),
+    ...(itemsLabelled ? { labelled: itemsLabelled === "yes" } : {}),
+  };
+  const changeScoreFilters = (next: typeof scoreFilters) => {
+    setScoreFilters(next);
+    setItemsOffset(0);
+  };
+  const changeItemsLabelled = (next: "yes" | "no" | null) => {
+    setItemsLabelled(next);
+    writeUrlParam("labelled", next);
+    setItemsOffset(0);
+  };
 
   useEffect(() => {
     if (task?.name) document.title = `${task.name} | Calibrate`;
@@ -1542,8 +1590,11 @@ function LabellingTaskPageInner() {
    * populating). */
   const [summaryFetchCompleted, setSummaryFetchCompleted] = useState(false);
 
+  // Only the latest request may write the list.
+  const summaryRequests = useRef(latestRequestGuard()).current;
   const fetchTaskSummary = useCallback(async () => {
-    if (!accessToken || !uuid) return;
+    if (!accessToken || !uuid || waitingForTaskEvaluators) return;
+    const isLatest = summaryRequests.start();
     setTaskSummaryError(null);
     setSummaryLoading(true);
     const params = new URLSearchParams({
@@ -1553,19 +1604,36 @@ function LabellingTaskPageInner() {
       order: itemsSort,
     });
     if (itemsSearch) params.set("q", itemsSearch);
+    for (const score of itemScoreParams) params.append("score", score);
+    if (itemsLabelled) params.set("labelled", String(itemsLabelled === "yes"));
     try {
       const data = await apiClient<TaskSummaryResponse>(
         `/annotation-tasks/${uuid}/summary?${params.toString()}`,
         accessToken,
       );
+      if (!isLatest()) return;
       setTaskSummary(data);
     } catch (err) {
+      if (!isLatest()) return;
       setTaskSummaryError(parseApiError(err, "Failed to load task summary"));
     } finally {
-      setSummaryLoading(false);
-      setSummaryFetchCompleted(true);
+      if (isLatest()) {
+        setSummaryLoading(false);
+        setSummaryFetchCompleted(true);
+      }
     }
-  }, [accessToken, uuid, itemsLimit, itemsOffset, itemsSort, itemsSearch]);
+  }, [
+    accessToken,
+    uuid,
+    itemsLimit,
+    itemsOffset,
+    itemsSort,
+    itemsSearch,
+    itemScoreParams,
+    itemsLabelled,
+    waitingForTaskEvaluators,
+    summaryRequests,
+  ]);
 
   useEffect(() => {
     fetchTaskSummary();
@@ -1679,7 +1747,6 @@ function LabellingTaskPageInner() {
   useEffect(() => {
     fetchRuns();
   }, [fetchRuns]);
-  void activeTab;
 
   // Items shown on the current page are driven by the (paginated /
   // sorted / searched) summary endpoint. We unique summary rows by
@@ -1717,6 +1784,21 @@ function LabellingTaskPageInner() {
     }
     return out;
   }, [taskSummary, itemMetaByUuid]);
+  // One column per evaluator on the task. The version whose scores are shown
+  // is the live one, which only the summary knows.
+  const itemScoreEvaluators = useMemo<ItemScoreEvaluator[]>(() => {
+    const liveVersion = new Map(
+      (taskSummary?.evaluators ?? []).map((ev) => [ev.uuid, ev.live_version_id]),
+    );
+    return taskEvaluators.map((ev) => ({
+      ...ev,
+      live_version_id: liveVersion.get(ev.uuid) ?? null,
+    }));
+  }, [taskEvaluators, taskSummary?.evaluators]);
+  const itemScores = useMemo(
+    () => buildItemScores(taskSummary?.rows ?? [], itemScoreEvaluators),
+    [taskSummary?.rows, itemScoreEvaluators],
+  );
   const jobs = task?.jobs ?? [];
   // First-load spinner only — paginated refetches keep the table
   // visible and surface their loading state via the refresh button.
@@ -1738,7 +1820,7 @@ function LabellingTaskPageInner() {
   const hasAnyItems =
     (task?.item_count ?? 0) > 0 ||
     (taskSummary?.pagination?.total ?? 0) > 0 ||
-    (itemsSearch ? false : items.length > 0);
+    (itemsSearch || itemFiltersOn ? false : items.length > 0);
   const jobsCount = jobs.length;
   // Falls back to the kind of the task's first evaluator. Tool call
   // correctness is never a task kind of its own, so it is skipped: a task
@@ -1761,15 +1843,6 @@ function LabellingTaskPageInner() {
   const [lastSelectedItemUuid, setLastSelectedItemUuid] = useState<
     string | null
   >(null);
-
-  /**
-   * `onChange` on a checkbox doesn't carry `shiftKey`, and calling
-   * `e.preventDefault()` on the checkbox's `onClick` desyncs React's
-   * controlled `checked` prop from the DOM (state updates but the visual
-   * tick doesn't appear). So we capture shift state on `mousedown` into a
-   * ref and read it inside `onChange`, leaving the native toggle alone.
-   */
-  const pendingShiftRef = useRef(false);
 
   /**
    * "Select all N rows across pages" mode. When true, bulk actions send
@@ -1896,7 +1969,7 @@ function LabellingTaskPageInner() {
    */
   useEffect(() => {
     setSelectAllTotal(false);
-  }, [itemsSearch]);
+  }, [itemsSearch, itemScoreParams, itemsLabelled]);
 
   // Drop selections that no longer exist in the items list (after delete or refetch).
   useEffect(() => {
@@ -1957,9 +2030,9 @@ function LabellingTaskPageInner() {
    * `{ select_all: true, q? }` instead of `item_ids`. Reset every time
    * the run dialog is opened so a stale flag doesn't leak between flows.
    */
-  const [runDialogSelectAll, setRunDialogSelectAll] = useState<{
-    q?: string;
-  } | null>(null);
+  const [runDialogSelectAll, setRunDialogSelectAll] = useState<
+    typeof selectAllBody | null
+  >(null);
   const [runDialogSubmitError, setRunDialogSubmitError] = useState<
     string | null
   >(null);
@@ -1970,7 +2043,7 @@ function LabellingTaskPageInner() {
   >(0);
 
   const handleRunEvaluators = async (
-    target?: string[] | string | { selectAll: true; q?: string },
+    target?: string[] | string | { selectAll: true },
   ) => {
     if (!accessToken || !uuid || startingRun) return;
     // Evaluators aren't picked yet, so this can only check the item count on
@@ -2000,7 +2073,7 @@ function LabellingTaskPageInner() {
       "selectAll" in target
     ) {
       setRunDialogItemUuids(null);
-      setRunDialogSelectAll({ q: target.q });
+      setRunDialogSelectAll(selectAllBody);
       // Select-all reaches rows beyond the page in hand, so the rows cannot
       // be counted. The note is still shown, without a number: the backend
       // leaves those rows out, and refuses a run with nothing else in it.
@@ -2058,8 +2131,7 @@ function LabellingTaskPageInner() {
     try {
       const body: Record<string, unknown> = { evaluators: selections };
       if (selectAll) {
-        body.select_all = true;
-        if (selectAll.q) body.q = selectAll.q;
+        Object.assign(body, selectAll);
       } else if (ids && ids.length > 0) {
         body.item_ids = ids;
       }
@@ -2195,10 +2267,7 @@ function LabellingTaskPageInner() {
     setDeletingSelected(true);
     try {
       const body: Record<string, unknown> = selectAllTotal
-        ? {
-            select_all: true,
-            ...(itemsSearch ? { q: itemsSearch } : {}),
-          }
+        ? selectAllBody
         : { item_ids: Array.from(selectedItemIds) };
       await apiClient<{ deleted_count: number }>(
         `/annotation-tasks/${uuid}/items`,
@@ -2408,10 +2477,7 @@ function LabellingTaskPageInner() {
       annotator_ids: annotatorIds,
       ...(evaluatorIds.length > 0 ? { evaluator_ids: evaluatorIds } : {}),
       ...(selectAllTotal
-        ? {
-            select_all: true,
-            ...(itemsSearch ? { q: itemsSearch } : {}),
-          }
+        ? selectAllBody
         : { item_ids: Array.from(selectedItemIds) }),
       ...settings,
     };
@@ -3050,6 +3116,7 @@ function LabellingTaskPageInner() {
           ) : (
             <div ref={itemsSectionTopRef} className="space-y-3 scroll-mt-4">
               <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex flex-1 items-center gap-2 flex-wrap min-w-0">
                 <div className="relative flex-1 min-w-[200px] max-w-sm">
                   <svg
                     className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
@@ -3073,6 +3140,30 @@ function LabellingTaskPageInner() {
                     aria-label="Search items by name"
                     className="h-9 w-full pl-8 pr-3 rounded-md border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
+                </div>
+                <Select
+                  value={itemsLabelled ?? ""}
+                  onChange={(e) =>
+                    changeItemsLabelled(
+                      e.target.value === "yes" || e.target.value === "no"
+                        ? e.target.value
+                        : null,
+                    )
+                  }
+                  aria-label="Filter items by labels"
+                  className="cursor-pointer"
+                  wrapperClassName="w-44"
+                >
+                  <option value="">All items</option>
+                  <option value="yes">Labelled</option>
+                  <option value="no">Not labelled yet</option>
+                </Select>
+                <ItemValueFilter
+                  showSource
+                  evaluators={taskEvaluators}
+                  filters={scoreFilters}
+                  onChange={changeScoreFilters}
+                />
                 </div>
                 <div className="flex items-center gap-2">
                   <RefreshButton
@@ -3247,10 +3338,7 @@ function LabellingTaskPageInner() {
                     <button
                       onClick={() => {
                         if (selectAllTotal) {
-                          handleRunEvaluators({
-                            selectAll: true,
-                            q: itemsSearch || undefined,
-                          });
+                          handleRunEvaluators({ selectAll: true });
                         } else {
                           handleRunEvaluators(Array.from(selectedItemIds));
                         }
@@ -3315,361 +3403,199 @@ function LabellingTaskPageInner() {
               />
               {items.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
-                  {itemsSearch
-                    ? `No items match "${itemsSearch}".`
-                    : "No items on this page."}
-                </div>
-              ) : taskType === "stt" || taskType === "tts" ? (
-                <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someSelected;
-                      }}
-                      onChange={toggleSelectAll}
-                      aria-label="Select all"
-                      className="w-5 h-5 cursor-pointer accent-foreground"
-                    />
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Name
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Labelled by
-                    </div>
-                    <button
-                      type="button"
-                      onClick={toggleItemsSort}
-                      className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-left"
-                      aria-label="Sort by updated at"
-                    >
-                      <span>Updated at</span>
-                      <SortIndicator direction={itemsSort} />
-                    </button>
-                    <div className="text-sm font-medium text-muted-foreground text-center">
-                      Actions
-                    </div>
-                  </div>
-                  {items.map((item) => {
-                    const p = (item.payload ?? {}) as Record<string, unknown>;
-                    const name = typeof p.name === "string" ? p.name : "";
-                    const isSelected =
-                      selectAllTotal || selectedItemIds.has(item.uuid);
-                    const labellerIds = labellersByItem.get(item.uuid);
-                    return (
-                      <Fragment key={item.uuid}>
-                        <div
-                          onMouseDown={(e) => {
-                            // Shift+click on text triggers a browser text-selection
-                            // range; suppress it so range-selecting rows stays clean.
-                            if (e.shiftKey) e.preventDefault();
-                          }}
-                          onClick={(e) => {
-                            if (e.shiftKey) {
-                              e.preventDefault();
-                              selectRangeTo(item.uuid);
-                              return;
-                            }
-                            openItemDetail(item.uuid);
-                          }}
-                          className={`grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
-                            isSelected ? "bg-muted/30" : "hover:bg-muted/20"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onMouseDown={(e) => {
-                              pendingShiftRef.current = e.shiftKey;
-                            }}
-                            onChange={() => {
-                              if (pendingShiftRef.current) {
-                                selectRangeTo(item.uuid);
-                              } else {
-                                toggleItem(item.uuid);
-                              }
-                              pendingShiftRef.current = false;
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Select item ${item.id}`}
-                            className="w-5 h-5 cursor-pointer accent-foreground"
-                          />
-                          <p className="text-sm text-foreground line-clamp-2">
-                            {name || "—"}
-                          </p>
-                          <LabelledByCell
-                            labellers={labellerIds}
-                            annotatorNameById={annotatorNameById}
-                          />
-                          <div className="text-sm text-muted-foreground whitespace-nowrap">
-                            {formatItemUpdatedAt(item)}
-                          </div>
-                          <ItemRowActions
-                            itemUuid={item.uuid}
-                            onDelete={requestDeleteOneItem}
-                            onLabel={
-                              selectedItemIds.size === 0 && !selectAllTotal
-                                ? (uuid) => {
-                                    // Sole row → skip the select-then-bulk
-                                    // dance and open the assign dialog
-                                    // straight on this item.
-                                    if (items.length === 1) {
-                                      setSelectedItemIds(new Set([uuid]));
-                                      setAssignOpen(true);
-                                    } else {
-                                      enterBulkModeWithScroll(uuid);
-                                    }
-                                  }
-                                : undefined
-                            }
-                            onEdit={(uuid) => {
-                              if (taskType === "tts") {
-                                setEditTtsSingleItemUuid(uuid);
-                                setEditTtsItemsOpen(true);
-                              } else {
-                                setEditSttSingleItemUuid(uuid);
-                                setEditSttItemsOpen(true);
-                              }
-                            }}
-                            onDuplicate={(uuid) => {
-                              const item = items.find((i) => i.uuid === uuid);
-                              if (!item) return;
-                              const p = (item.payload ?? {}) as Record<
-                                string,
-                                unknown
-                              >;
-                              const nm =
-                                typeof p.name === "string"
-                                  ? (p.name as string)
-                                  : `Item ${item.id}`;
-                              if (taskType === "tts") {
-                                setDuplicateTtsRows([
-                                  {
-                                    uuid: item.uuid,
-                                    name: `Copy of ${nm}`,
-                                    text:
-                                      typeof p.text === "string"
-                                        ? (p.text as string)
-                                        : "",
-                                    audio:
-                                      typeof p.audio_path === "string"
-                                        ? (p.audio_path as string)
-                                        : "",
-                                  },
-                                ]);
-                                setAddTtsItemsOpen(true);
-                              } else {
-                                setDuplicateSttRows([
-                                  {
-                                    uuid: item.uuid,
-                                    name: `Copy of ${nm}`,
-                                    actual:
-                                      typeof p.reference_transcript === "string"
-                                        ? (p.reference_transcript as string)
-                                        : "",
-                                    predicted:
-                                      typeof p.predicted_transcript === "string"
-                                        ? (p.predicted_transcript as string)
-                                        : "",
-                                  },
-                                ]);
-                                setAddSttItemsOpen(true);
-                              }
-                            }}
-                            onEvaluate={
-                              selectedItemIds.size === 0 && !selectAllTotal
-                                ? (uuid) => {
-                                    if (items.length === 1) {
-                                      setSelectedItemIds(new Set([uuid]));
-                                      handleRunEvaluators([uuid]);
-                                    } else {
-                                      enterBulkModeWithScroll(uuid);
-                                    }
-                                  }
-                                : undefined
-                            }
-                            evaluateDisabled={item.is_tool_call === true}
-                          />
-                        </div>
-                      </Fragment>
-                    );
-                  })}
+                  {itemFiltersOn
+                    ? "No items match these filters."
+                    : itemsSearch
+                      ? `No items match "${itemsSearch}".`
+                      : "No items on this page."}
                 </div>
               ) : (
-                <div className="border border-border rounded-xl overflow-hidden">
-                  <div className="grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someSelected;
-                      }}
-                      onChange={toggleSelectAll}
-                      aria-label="Select all"
-                      className="w-5 h-5 cursor-pointer accent-foreground"
-                    />
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Name
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Labelled by
-                    </div>
-                    <button
-                      type="button"
-                      onClick={toggleItemsSort}
-                      className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-left"
-                      aria-label="Sort by updated at"
-                    >
-                      <span>Updated at</span>
-                      <SortIndicator direction={itemsSort} />
-                    </button>
-                    <div className="text-sm font-medium text-muted-foreground text-center">
-                      Actions
-                    </div>
-                  </div>
-                  {items.map((item) => {
-                    const isSelected =
-                      selectAllTotal || selectedItemIds.has(item.uuid);
-                    const labellerIds = labellersByItem.get(item.uuid);
+                <TaskItemsTable
+                  items={items}
+                  evaluators={itemScoreEvaluators}
+                  scores={itemScores}
+                  isSelected={(item) =>
+                    selectAllTotal || selectedItemIds.has(item.uuid)
+                  }
+                  allSelected={allSelected}
+                  someSelected={someSelected}
+                  onToggleAll={toggleSelectAll}
+                  onToggleRow={(item) => toggleItem(item.uuid)}
+                  onSelectRange={(item) => selectRangeTo(item.uuid)}
+                  onOpen={(item) => openItemDetail(item.uuid)}
+                  sortDirection={itemsSort}
+                  onToggleSort={toggleItemsSort}
+                  itemLabel={(item) => item.id}
+                  renderName={(item) => {
+                    if (taskType === "stt" || taskType === "tts") {
+                      const p = (item.payload ?? {}) as Record<string, unknown>;
+                      return (
+                        <p className="text-sm text-foreground line-clamp-2">
+                          {(typeof p.name === "string" && p.name) || "—"}
+                        </p>
+                      );
+                    }
                     return (
-                      <Fragment key={item.uuid}>
-                        <div
-                          onMouseDown={(e) => {
-                            // Shift+click on text triggers a browser text-selection
-                            // range; suppress it so range-selecting rows stays clean.
-                            if (e.shiftKey) e.preventDefault();
-                          }}
-                          onClick={(e) => {
-                            if (e.shiftKey) {
-                              e.preventDefault();
-                              selectRangeTo(item.uuid);
-                              return;
-                            }
-                            openItemDetail(item.uuid);
-                          }}
-                          className={`grid grid-cols-[40px_minmax(0,1fr)_200px_180px_300px] gap-6 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center cursor-pointer ${
-                            isSelected ? "bg-muted/30" : "hover:bg-muted/20"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onMouseDown={(e) => {
-                              pendingShiftRef.current = e.shiftKey;
-                            }}
-                            onChange={() => {
-                              if (pendingShiftRef.current) {
-                                selectRangeTo(item.uuid);
+                      <p className="text-sm text-foreground line-clamp-1">
+                        {previewItemPayload(item.payload, taskType)}
+                      </p>
+                    );
+                  }}
+                  renderLabelledBy={(item) => (
+                    <LabelledByCell
+                      labellers={labellersByItem.get(item.uuid)}
+                      annotatorNameById={annotatorNameById}
+                    />
+                  )}
+                  renderUpdatedAt={(item) => (
+                    <div className="text-sm text-muted-foreground whitespace-nowrap">
+                      {formatItemUpdatedAt(item)}
+                    </div>
+                  )}
+                  renderActions={(item) => (
+                    <ItemRowActions
+                      itemUuid={item.uuid}
+                      onDelete={requestDeleteOneItem}
+                      onLabel={
+                        selectedItemIds.size === 0 && !selectAllTotal
+                          ? (uuid) => {
+                              // Sole row → skip the select-then-bulk
+                              // dance and open the assign dialog
+                              // straight on this item.
+                              if (items.length === 1) {
+                                setSelectedItemIds(new Set([uuid]));
+                                setAssignOpen(true);
                               } else {
-                                toggleItem(item.uuid);
+                                enterBulkModeWithScroll(uuid);
                               }
-                              pendingShiftRef.current = false;
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Select item ${item.id}`}
-                            className="w-5 h-5 cursor-pointer accent-foreground"
-                          />
-                          <p className="text-sm text-foreground line-clamp-1">
-                            {previewItemPayload(item.payload, taskType)}
-                          </p>
-                          <LabelledByCell
-                            labellers={labellerIds}
-                            annotatorNameById={annotatorNameById}
-                          />
-                          <div className="text-sm text-muted-foreground whitespace-nowrap">
-                            {formatItemUpdatedAt(item)}
-                          </div>
-                          <ItemRowActions
-                            itemUuid={item.uuid}
-                            onDelete={requestDeleteOneItem}
-                            onLabel={
-                              selectedItemIds.size === 0 && !selectAllTotal
-                                ? (uuid) => {
-                                    // Sole row → skip the select-then-bulk
-                                    // dance and open the assign dialog
-                                    // straight on this item.
-                                    if (items.length === 1) {
-                                      setSelectedItemIds(new Set([uuid]));
-                                      setAssignOpen(true);
-                                    } else {
-                                      enterBulkModeWithScroll(uuid);
-                                    }
-                                  }
-                                : undefined
                             }
-                            onEdit={(uuid) => {
-                              if (taskType === "llm-general") {
-                                setEditLlmGeneralSingleItemUuid(uuid);
-                                setEditLlmGeneralItemsOpen(true);
-                              } else {
-                                setEditLlmItemUuid(uuid);
-                              }
-                            }}
-                            onDuplicate={(uuid) => {
-                              const item = items.find((i) => i.uuid === uuid);
-                              if (!item) return;
-                              const p = (item.payload ?? null) as Record<
-                                string,
-                                unknown
-                              > | null;
-                              const name =
-                                typeof p?.name === "string"
-                                  ? (p.name as string)
-                                  : `Item ${item.id}`;
-                              if (taskType === "llm-general") {
-                                setDuplicateLlmGeneralRows([
-                                  {
-                                    uuid: item.uuid,
-                                    name: `Copy of ${name}`,
-                                    description:
-                                      typeof p?.description === "string"
-                                        ? (p.description as string)
-                                        : "",
-                                    input:
-                                      typeof p?.input === "string"
-                                        ? (p.input as string)
-                                        : "",
-                                    output:
-                                      typeof p?.output === "string"
-                                        ? (p.output as string)
-                                        : "",
-                                    varValues: readEvaluatorVariables(p),
-                                  },
-                                ]);
-                                setAddLlmGeneralItemsOpen(true);
-                                return;
-                              }
-                              const desc =
+                          : undefined
+                      }
+                      onEdit={(uuid) => {
+                        if (taskType === "stt" || taskType === "tts") {
+                          if (taskType === "tts") {
+                            setEditTtsSingleItemUuid(uuid);
+                            setEditTtsItemsOpen(true);
+                          } else {
+                            setEditSttSingleItemUuid(uuid);
+                            setEditSttItemsOpen(true);
+                          }
+                          return;
+                        }
+                        if (taskType === "llm-general") {
+                          setEditLlmGeneralSingleItemUuid(uuid);
+                          setEditLlmGeneralItemsOpen(true);
+                        } else {
+                          setEditLlmItemUuid(uuid);
+                        }
+                      }}
+                      onDuplicate={(uuid) => {
+                        if (taskType === "stt" || taskType === "tts") {
+                          const item = items.find((i) => i.uuid === uuid);
+                          if (!item) return;
+                          const p = (item.payload ?? {}) as Record<
+                            string,
+                            unknown
+                          >;
+                          const nm =
+                            typeof p.name === "string"
+                              ? (p.name as string)
+                              : `Item ${item.id}`;
+                          if (taskType === "tts") {
+                            setDuplicateTtsRows([
+                              {
+                                uuid: item.uuid,
+                                name: `Copy of ${nm}`,
+                                text:
+                                  typeof p.text === "string"
+                                    ? (p.text as string)
+                                    : "",
+                                audio:
+                                  typeof p.audio_path === "string"
+                                    ? (p.audio_path as string)
+                                    : "",
+                              },
+                            ]);
+                            setAddTtsItemsOpen(true);
+                          } else {
+                            setDuplicateSttRows([
+                              {
+                                uuid: item.uuid,
+                                name: `Copy of ${nm}`,
+                                actual:
+                                  typeof p.reference_transcript === "string"
+                                    ? (p.reference_transcript as string)
+                                    : "",
+                                predicted:
+                                  typeof p.predicted_transcript === "string"
+                                    ? (p.predicted_transcript as string)
+                                    : "",
+                              },
+                            ]);
+                            setAddSttItemsOpen(true);
+                          }
+                          return;
+                        }
+                        const item = items.find((i) => i.uuid === uuid);
+                        if (!item) return;
+                        const p = (item.payload ?? null) as Record<
+                          string,
+                          unknown
+                        > | null;
+                        const name =
+                          typeof p?.name === "string"
+                            ? (p.name as string)
+                            : `Item ${item.id}`;
+                        if (taskType === "llm-general") {
+                          setDuplicateLlmGeneralRows([
+                            {
+                              uuid: item.uuid,
+                              name: `Copy of ${name}`,
+                              description:
                                 typeof p?.description === "string"
                                   ? (p.description as string)
-                                  : "";
-                              setNewItemName(`Copy of ${name}`);
-                              setNewItemDescription(desc);
-                              setDuplicateSourcePayload(p);
-                              setCreateItemError(null);
-                              setValidationAttempted(false);
-                              setAddItemOpen(true);
-                            }}
-                            onEvaluate={
-                              selectedItemIds.size === 0 && !selectAllTotal
-                                ? (uuid) => {
-                                    if (items.length === 1) {
-                                      setSelectedItemIds(new Set([uuid]));
-                                      handleRunEvaluators([uuid]);
-                                    } else {
-                                      enterBulkModeWithScroll(uuid);
-                                    }
-                                  }
-                                : undefined
+                                  : "",
+                              input:
+                                typeof p?.input === "string"
+                                  ? (p.input as string)
+                                  : "",
+                              output:
+                                typeof p?.output === "string"
+                                  ? (p.output as string)
+                                  : "",
+                              varValues: readEvaluatorVariables(p),
+                            },
+                          ]);
+                          setAddLlmGeneralItemsOpen(true);
+                          return;
+                        }
+                        const desc =
+                          typeof p?.description === "string"
+                            ? (p.description as string)
+                            : "";
+                        setNewItemName(`Copy of ${name}`);
+                        setNewItemDescription(desc);
+                        setDuplicateSourcePayload(p);
+                        setCreateItemError(null);
+                        setValidationAttempted(false);
+                        setAddItemOpen(true);
+                      }}
+                      onEvaluate={
+                        selectedItemIds.size === 0 && !selectAllTotal
+                          ? (uuid) => {
+                              if (items.length === 1) {
+                                setSelectedItemIds(new Set([uuid]));
+                                handleRunEvaluators([uuid]);
+                              } else {
+                                enterBulkModeWithScroll(uuid);
+                              }
                             }
-                            evaluateDisabled={item.is_tool_call === true}
-                          />
-                        </div>
-                      </Fragment>
-                    );
-                  })}
-                </div>
+                          : undefined
+                      }
+                      evaluateDisabled={item.is_tool_call === true}
+                    />
+                  )}
+                />
               )}
               </div>
               {/* Bottom padding clears the fixed Talk-to-us FAB (bottom-6 right-6). */}

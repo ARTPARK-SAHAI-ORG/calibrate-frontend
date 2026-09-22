@@ -6,6 +6,7 @@ import {
   decodeValueFilters,
   encodeValueFilters,
   readUrlParam,
+  scoreFilterParams,
   useUrlValueFilters,
   writeUrlParam,
 } from "../valueFilterUrl";
@@ -36,6 +37,36 @@ describe("encodeValueFilters / decodeValueFilters", () => {
     expect(decodeValueFilters("")).toEqual([]);
     expect(decodeValueFilters("ev-1,:true,ev-2:")).toEqual([]);
     expect(decodeValueFilters("ev-1:abc")).toEqual([]);
+  });
+});
+
+describe("whose answer in the address", () => {
+  it("round-trips a filter with a source next to one without", () => {
+    const filters = [
+      { evaluatorId: "ev-1", values: [false], source: "either" as const },
+      { evaluatorId: "ev-2", values: [1, 4] },
+    ];
+    const raw = encodeValueFilters(filters);
+    expect(raw).toBe("ev-1:false:either,ev-2:1.4");
+    expect(decodeValueFilters(raw)).toEqual(filters);
+  });
+
+  it("keeps the filter but drops a source it does not know", () => {
+    expect(decodeValueFilters("ev-1:true:robot")).toEqual([
+      { evaluatorId: "ev-1", values: [true] },
+    ]);
+  });
+});
+
+describe("scoreFilterParams", () => {
+  it("writes one score value per filter, defaulting to either", () => {
+    expect(
+      scoreFilterParams([
+        { evaluatorId: "ev-1", values: [true, false], source: "human" },
+        { evaluatorId: "ev-2", values: [3] },
+        { evaluatorId: "ev-3", values: [] },
+      ]),
+    ).toEqual(["ev-1:true.false:human", "ev-2:3:either"]);
   });
 });
 

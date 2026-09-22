@@ -188,6 +188,16 @@ describe("describeValueFilter", () => {
     ).toBe("Helpfulness is 3 of 3 scores");
   });
 
+  it("adds whose answer it reads when the filter has a source", () => {
+    expect(
+      describeValueFilter(binary, {
+        evaluatorId: "ev-binary",
+        values: [false],
+        source: "human",
+      }),
+    ).toBe("Correctness is Wrong by a human");
+  });
+
   it("falls back to the evaluator name when nothing is picked", () => {
     expect(
       describeValueFilter(binary, { evaluatorId: "ev-binary", values: [] }),
@@ -447,5 +457,199 @@ describe("ItemValueFilter", () => {
     expect(screen.getByRole("button", { name: /Correctness/ })).toBeVisible();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("button", { name: /Correctness/ })).toBeNull();
+  });
+
+  it("draws the add button solid blue with white text, and it still opens", async () => {
+    const user = setupUser();
+    render(
+      <ItemValueFilter evaluators={[binary]} filters={[]} onChange={noop} />,
+    );
+    const add = screen.getByRole("button", { name: "+ Add filter" });
+    expect(add).toHaveClass("bg-blue-600", "text-white", "cursor-pointer");
+    await user.click(add);
+    expect(add).toHaveClass("bg-blue-700");
+    expect(screen.getByRole("button", { name: /Correctness/ })).toBeVisible();
+  });
+
+  describe("with showSource", () => {
+    it("is off by default: no source is asked or added", async () => {
+      const user = setupUser();
+      const onChange = jest.fn();
+      render(
+        <ItemValueFilter evaluators={[binary]} filters={[]} onChange={onChange} />,
+      );
+      await user.click(screen.getByRole("button", { name: "+ Add filter" }));
+      await user.click(screen.getByRole("button", { name: /Correctness/ }));
+      expect(screen.queryByText("Whose answer")).toBeNull();
+      await user.click(screen.getByRole("button", { name: "Wrong" }));
+      expect(onChange).toHaveBeenCalledWith([
+        { evaluatorId: "ev-binary", values: [false] },
+      ]);
+    });
+
+    it("starts a new tag on either, with that choice shown as picked", async () => {
+      const user = setupUser();
+      const onChange = jest.fn();
+      render(
+        <ItemValueFilter
+          evaluators={[binary]}
+          filters={[]}
+          onChange={onChange}
+          showSource
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "+ Add filter" }));
+      await user.click(screen.getByRole("button", { name: /Correctness/ }));
+      expect(screen.getByText("Whose answer")).toBeInTheDocument();
+      expect(
+        screen.getAllByRole("radio").map((r) => r.textContent),
+      ).toEqual([
+        "By the evaluator or a human",
+        "By the evaluator",
+        "By a human",
+        "By the evaluator and a human",
+      ]);
+      expect(
+        screen.getByRole("radio", { name: "By the evaluator or a human" }),
+      ).toHaveAttribute("aria-checked", "true");
+      await user.click(screen.getByRole("button", { name: "Wrong" }));
+      expect(onChange).toHaveBeenCalledWith([
+        { evaluatorId: "ev-binary", values: [false], source: "either" },
+      ]);
+    });
+
+    it("changing whose answer keeps the tag in its place", async () => {
+      const user = setupUser();
+      const onChange = jest.fn();
+      const other = { evaluatorId: "ev-rating", values: [1], source: "either" as const };
+      render(
+        <ItemValueFilter
+          evaluators={[binary, rating]}
+          filters={[
+            { evaluatorId: "ev-binary", values: [false], source: "either" },
+            other,
+          ]}
+          onChange={onChange}
+          showSource
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", {
+          name: "Correctness is Wrong by the evaluator or a human",
+        }),
+      );
+      await user.click(screen.getByRole("radio", { name: "By a human" }));
+      expect(onChange).toHaveBeenCalledWith([
+        { evaluatorId: "ev-binary", values: [false], source: "human" },
+        other,
+      ]);
+    });
+
+    it("keeps the tag's source when a value is added", async () => {
+      const user = setupUser();
+      const onChange = jest.fn();
+      render(
+        <ItemValueFilter
+          evaluators={[binary]}
+          filters={[{ evaluatorId: "ev-binary", values: [false], source: "both" }]}
+          onChange={onChange}
+          showSource
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", {
+          name: "Correctness is Wrong by the evaluator and a human",
+        }),
+      );
+      expect(
+        screen.getByRole("radio", { name: "By the evaluator and a human" }),
+      ).toHaveAttribute("aria-checked", "true");
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      expect(onChange).toHaveBeenCalledWith([
+        { evaluatorId: "ev-binary", values: [false, true], source: "both" },
+      ]);
+    });
+
+    it("names whose answer on the remove button", () => {
+      render(
+        <ItemValueFilter
+          evaluators={[binary]}
+          filters={[{ evaluatorId: "ev-binary", values: [false], source: "evaluator" }]}
+          onChange={noop}
+          showSource
+        />,
+      );
+      expect(
+        screen.getByRole("button", {
+          name: "Remove Correctness is Wrong by the evaluator",
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps the source when the last value is unticked", async () => {
+      const user = setupUser();
+      const onChange = jest.fn();
+      render(
+        <ItemValueFilter
+          evaluators={[binary]}
+          filters={[{ evaluatorId: "ev-binary", values: [false], source: "human" }]}
+          onChange={onChange}
+          showSource
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Correctness is Wrong by a human" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Wrong" }));
+      expect(onChange).toHaveBeenLastCalledWith([
+        { evaluatorId: "ev-binary", values: [], source: "human" },
+      ]);
+    });
+
+    it("the remove button drops the whole tag", async () => {
+      const user = setupUser();
+      const onChange = jest.fn();
+      render(
+        <ItemValueFilter
+          evaluators={[binary]}
+          filters={[{ evaluatorId: "ev-binary", values: [false], source: "human" }]}
+          onChange={onChange}
+          showSource
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Remove Correctness is Wrong by a human" }),
+      );
+      expect(onChange).toHaveBeenLastCalledWith([]);
+    });
+
+    it("reads a tag with no source as the default", () => {
+      render(
+        <ItemValueFilter
+          evaluators={[binary]}
+          filters={[{ evaluatorId: "ev-binary", values: [false] }]}
+          onChange={noop}
+          showSource
+        />,
+      );
+      expect(
+        screen.getByRole("button", {
+          name: "Correctness is Wrong by the evaluator or a human",
+        }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("does not name a source on a page that does not offer the choice", () => {
+    render(
+      <ItemValueFilter
+        evaluators={[binary]}
+        filters={[{ evaluatorId: "ev-binary", values: [false], source: "human" }]}
+        onChange={noop}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Correctness is Wrong" }),
+    ).toBeInTheDocument();
   });
 });
