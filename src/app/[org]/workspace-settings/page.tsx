@@ -522,8 +522,8 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
       {hasKeys && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <p className="text-sm md:text-base text-muted-foreground">
-            Let tools like Claude Code, Codex, Cursor or GitHub Actions use
-            Calibrate on behalf of this workspace
+            Authenticate your Calibrate workspace with Claude Code, Codex, Cursor,
+            GitHub Actions and more
           </p>
           <button
             type="button"
@@ -559,7 +559,7 @@ function ApiKeysSection({ orgUuid }: { orgUuid: string }) {
             </svg>
           }
           title="No API keys yet"
-          description="Create a key so tools like Claude Code, Codex, Cursor or GitHub Actions can use Calibrate on behalf of this workspace"
+          description="Create an API key to authenticate your Calibrate workspace with Claude Code, Codex, Cursor, GitHub Actions and more"
           action={{
             label: "Create key",
             onClick: () => setIsCreateOpen(true),
