@@ -285,7 +285,7 @@ function DropdownPanel({
         {activeOrg && (
           <Link
             onClick={onNavigate}
-            href="/workspace-settings?tab=admin"
+            href="/workspace-settings?tab=members"
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-foreground hover:bg-accent/50 transition-colors cursor-pointer"
           >
             <svg

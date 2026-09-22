@@ -1,4 +1,4 @@
-// Backend-backed workspace-settings flows: rename the workspace (Admin tab),
+// Backend-backed workspace-settings flows: rename the workspace (General tab),
 // create + revoke an API key (API keys tab), and create a new workspace via the
 // sidebar switcher. Exercises useOrganizations, useWorkspaceApiKeys,
 // CreateApiKeyDialog, CreateWorkspaceDialog, and the settings tab layout. Run
@@ -7,12 +7,12 @@ import { test, expect } from "./fixtures";
 import { openWorkspaceSettings, waitForOrgReady } from "./helpers";
 
 test.describe("Workspace settings (authenticated, real backend)", () => {
-  test("renames the active workspace on the Admin tab", async ({ page }) => {
-    await openWorkspaceSettings(page, "Admin");
+  test("renames the active workspace on the General tab", async ({ page }) => {
+    await openWorkspaceSettings(page, "General");
 
-    // The Admin "Name" input is pre-filled with the current name; Save enables
-    // once it differs. It's the only textbox on the tab.
-    const nameInput = page.getByRole("textbox").first();
+    // The "Name" input is pre-filled with the current name; Save enables once
+    // it differs.
+    const nameInput = page.getByRole("textbox", { name: "Name" });
     await expect(nameInput).toBeVisible({ timeout: 15000 });
     await nameInput.fill(`E2E WS ${Date.now()}`);
     await page.getByRole("button", { name: "Save", exact: true }).click();
@@ -23,16 +23,16 @@ test.describe("Workspace settings (authenticated, real backend)", () => {
     });
   });
 
-  test("the API keys entry in the sidebar menu switches the tab from Admin", async ({
+  test("the API keys entry in the sidebar menu switches the tab from Members", async ({
     page,
   }) => {
     // Opening API keys while already on this page changes only the part of the
     // address after the "?", which leaves the page itself on screen. The page
     // has to notice that and switch tab; a check that fails if it only ever
     // reads the address when it first opens.
-    await openWorkspaceSettings(page, "Admin");
+    await openWorkspaceSettings(page, "Members");
     await expect(
-      page.getByRole("textbox").first(),
+      page.getByRole("button", { name: "Invite", exact: true }),
     ).toBeVisible({ timeout: 15000 });
 
     await page.locator('button[aria-haspopup="menu"]').first().click();

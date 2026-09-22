@@ -34,7 +34,7 @@ import {
 } from "@/lib/orgs";
 
 const SETTINGS_TABS = [
-  { id: "admin", label: "Admin" },
+  { id: "members", label: "Members" },
   { id: "api-keys", label: "API keys" },
   { id: "general", label: "General" },
 ] as const;
@@ -45,14 +45,14 @@ export default function WorkspaceSettingsPage() {
   const searchParams = useSearchParams();
   const accessToken = useAccessToken();
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
-  const [activeTab, setActiveTab] = useState<SettingsTab>("admin");
+  const [activeTab, setActiveTab] = useState<SettingsTab>("members");
 
   useEffect(() => {
     document.title = "Workspace settings | Calibrate";
   }, []);
 
   // Open the tab named by `?tab=`, so a reload or a shared link keeps the user
-  // on the same one. Init defaults to "admin" so the first client render
+  // on the same one. Init defaults to "members" so the first client render
   // matches the prerendered HTML (no hydration mismatch); this effect then
   // syncs to the address.
   //
@@ -60,7 +60,7 @@ export default function WorkspaceSettingsPage() {
   // API keys entry in the sidebar and profile menus points at
   // `?tab=api-keys`, and opening it from the settings page changes only the
   // part after the "?", which leaves the page itself mounted. Reading the
-  // address once on load would leave the user staring at the Admin tab.
+  // address once on load would leave the user staring at the Members tab.
   //
   // The popstate listener covers the back button and address-bar edits. Tab
   // clicks use replaceState below, which neither of these two sees, so they
@@ -173,45 +173,8 @@ export default function WorkspaceSettingsPage() {
               })}
             </div>
 
-            {activeTab === "admin" ? (
-              <div className="max-w-2xl space-y-8">
-                <section className="space-y-3">
-                  <label className="block text-sm font-medium text-foreground">
-                    Name
-                  </label>
-                  <div>
-                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                      <input
-                        type="text"
-                        value={nameInput}
-                        onChange={(e) => {
-                          setNameInput(e.target.value);
-                          setRenameError(null);
-                        }}
-                        disabled={isRenaming}
-                        className={`flex-1 h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${
-                          renameError
-                            ? "border-red-500/60 focus:ring-red-500/20"
-                            : "border-border focus:ring-foreground/10"
-                        }`}
-                      />
-                      <button
-                        type="button"
-                        onClick={handleRename}
-                        disabled={!isDirty || isRenaming || !nameInput.trim()}
-                        className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isRenaming ? "Saving..." : "Save"}
-                      </button>
-                    </div>
-                    {renameError && (
-                      <p className="mt-1 text-[13px] text-red-500">
-                        {renameError}
-                      </p>
-                    )}
-                  </div>
-                </section>
-
+            {activeTab === "members" ? (
+              <div className="max-w-2xl">
                 <MembersSection
                   orgUuid={activeOrg.uuid}
                   orgName={activeOrg.name}
@@ -219,6 +182,45 @@ export default function WorkspaceSettingsPage() {
               </div>
             ) : activeTab === "general" ? (
               <div className="space-y-8">
+                <div className="max-w-2xl">
+                  <section className="space-y-3">
+                    <h2 className="text-base md:text-lg font-semibold text-foreground">
+                      <label htmlFor="workspace-name">Name</label>
+                    </h2>
+                    <div>
+                      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                        <input
+                          id="workspace-name"
+                          type="text"
+                          value={nameInput}
+                          onChange={(e) => {
+                            setNameInput(e.target.value);
+                            setRenameError(null);
+                          }}
+                          disabled={isRenaming}
+                          className={`flex-1 h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                            renameError
+                              ? "border-red-500/60 focus:ring-red-500/20"
+                              : "border-border focus:ring-foreground/10"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleRename}
+                          disabled={!isDirty || isRenaming || !nameInput.trim()}
+                          className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isRenaming ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                      {renameError && (
+                        <p className="mt-1 text-[13px] text-red-500">
+                          {renameError}
+                        </p>
+                      )}
+                    </div>
+                  </section>
+                </div>
                 <RunModelsSection org={activeOrg} />
               </div>
             ) : (
