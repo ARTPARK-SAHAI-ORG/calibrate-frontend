@@ -339,22 +339,40 @@ describe("BenchmarkDialog", () => {
     ).toHaveLength(1);
   });
 
-  it("excludes already-selected models from other rows but keeps the current row's own selection available", async () => {
+  it("still offers a model that is already on another row, so it can be compared against itself", async () => {
     const user = setupUser();
     render(<BenchmarkDialog {...baseProps()} />);
 
     await user.click(screen.getByText("Select a model"));
     await user.click(screen.getByText("select-openai/gpt-4o"));
 
-    // Open row 1's selector - gpt-4o should not appear (already selected elsewhere)
+    // The second row offers it again: two rows of one model under different
+    // thinking levels is the comparison this exists for.
     await user.click(screen.getByText("Select a model"));
-    expect(screen.queryByText("select-openai/gpt-4o")).not.toBeInTheDocument();
+    expect(screen.getByText("select-openai/gpt-4o")).toBeInTheDocument();
     expect(screen.getByText("select-openai/gpt-4o-mini")).toBeInTheDocument();
     await user.click(screen.getByText("close-selector"));
 
-    // Re-open row 0's selector (which has gpt-4o selected) - gpt-4o should still be selectable
-    await user.click(screen.getByText("GPT-4o"));
+    // And the row that already holds it can still swap it for itself.
+    await user.click(screen.getAllByText("GPT-4o")[0]);
     expect(screen.getByText("select-openai/gpt-4o")).toBeInTheDocument();
+  });
+
+  it("holds the run while two rows ask for the same model the same way", async () => {
+    const user = setupUser();
+    render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+
+    expect(
+      screen.getByText(/Two models are set up the same way/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Run comparison/ }),
+    ).toBeDisabled();
   });
 
   it("filters providers by benchmarkProvider when set to a non-openrouter value", async () => {
@@ -1508,6 +1526,238 @@ describe("BenchmarkDialog", () => {
           "The workspace default was not saved.",
         ),
       );
+    });
+  });
+
+  describe("the settings one model is compared under", () => {
+    /** The props the results window was opened with. */
+    const startedComparison = async () =>
+      JSON.parse(
+        (
+          await screen.findByTestId("benchmark-results-dialog")
+        ).textContent!.split("results-close")[0],
+      );
+
+    it("offers the settings on a connection agent only", async () => {
+      const user = setupUser();
+      const { unmount } = render(
+        <BenchmarkDialog {...baseProps({ agentType: "agent" })} />,
+      );
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      // A build agent's models are called by the platform, so there is no
+      // server of the reader's to pass anything on to.
+      expect(
+        screen.queryByRole("button", { name: "Model settings" }),
+      ).not.toBeInTheDocument();
+      unmount();
+
+      render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      expect(
+        screen.getByRole("button", { name: "Model settings" }),
+      ).toBeInTheDocument();
+    });
+
+    it("says on the row what the model is being compared under", async () => {
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(screen.getByRole("button", { name: "Model settings" }));
+      await user.selectOptions(
+        screen.getByLabelText("Thinking level"),
+        "high",
+      );
+
+      expect(screen.getByText("high thinking")).toBeInTheDocument();
+    });
+
+    it("sends the thinking level with the model", async () => {
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      // Nothing was picked, so the request is exactly what it always was.
+      expect((await startedComparison()).models).toEqual(["openai/gpt-4o"]);
+    });
+
+    it("compares one model against itself at two thinking levels", async () => {
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(screen.getByRole("button", { name: "Model settings" }));
+      await user.selectOptions(
+        screen.getByLabelText("Thinking level"),
+        "high",
+      );
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(
+        screen.getAllByRole("button", { name: "Model settings" })[1],
+      );
+      await user.selectOptions(screen.getByLabelText("Thinking level"), "low");
+
+      // Both rows survived, and neither is flagged as a repeat.
+      expect(
+        screen.queryByText(/Two models are set up the same way/),
+      ).not.toBeInTheDocument();
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true }),
+      });
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      expect((await startedComparison()).models).toEqual([
+        {
+          id: "openai/gpt-4o::thinking-high",
+          model: "openai/gpt-4o",
+          extra: { reasoning: { effort: "high" } },
+        },
+        {
+          id: "openai/gpt-4o::thinking-low",
+          model: "openai/gpt-4o",
+          extra: { reasoning: { effort: "low" } },
+        },
+      ]);
+    });
+
+    it("checks the agent's server with the settings, not just the model", async () => {
+      const user = setupUser();
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true }),
+      });
+      render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(screen.getByRole("button", { name: "Model settings" }));
+      await user.selectOptions(screen.getByLabelText("Hosted by"), "azure");
+
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+      const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toContain("/agents/agent-1/verify-connection");
+      // The model itself, never the row's own name, and the settings beside it
+      // so a server that refuses an unknown field fails here.
+      expect(JSON.parse(init.body)).toEqual({
+        model: "openai/gpt-4o",
+        extra: { provider: { only: ["azure"], allow_fallbacks: false } },
+      });
+    });
+
+    it("reopens a past comparison with its thinking levels already chosen", async () => {
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "connection",
+            initialModels: [
+              "openai/gpt-4o::thinking-high",
+              "openai/gpt-4o::thinking-low",
+            ],
+          })}
+        />,
+      );
+
+      expect(await screen.findByText("high thinking")).toBeInTheDocument();
+      expect(screen.getByText("low thinking")).toBeInTheDocument();
+      expect(screen.getAllByText("GPT-4o")).toHaveLength(2);
+    });
+
+    it("clears a setting back off, and sends the plain model again", async () => {
+      const user = setupUser();
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true }),
+      });
+      render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(screen.getByRole("button", { name: "Model settings" }));
+      await user.selectOptions(screen.getByLabelText("Thinking level"), "high");
+      await user.selectOptions(screen.getByLabelText("Hosted by"), "azure");
+      expect(screen.getByText("high thinking, on Azure")).toBeInTheDocument();
+
+      await user.selectOptions(screen.getByLabelText("Thinking level"), "");
+      await user.selectOptions(screen.getByLabelText("Hosted by"), "");
+      expect(
+        screen.queryByText(/high thinking|on Azure/),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      // Back to the plain list, so nothing new reaches the backend.
+      expect((await startedComparison()).models).toEqual(["openai/gpt-4o"]);
+      // And the check goes back to the model on its own, with no extra.
+      expect(
+        JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body),
+      ).toEqual({ model: "openai/gpt-4o" });
+    });
+
+    it("keeps only one panel open beside the rows", async () => {
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(screen.getByRole("button", { name: "Model settings" }));
+      expect(screen.getByLabelText("Thinking level")).toBeInTheDocument();
+
+      // The panel for how the models run opens in the same place, so the
+      // model's own settings close rather than sitting on top of it.
+      await user.click(
+        screen.getByRole("button", { name: "How to run the models" }),
+      );
+      expect(screen.queryByLabelText("Thinking level")).not.toBeInTheDocument();
+    });
+
+    it("does not offer a host when the agent does not route through OpenRouter", async () => {
+      const user = setupUser();
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "connection",
+            benchmarkProvider: "anthropic",
+          })}
+        />,
+      );
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-anthropic/claude-3-haiku"));
+      await user.click(screen.getByRole("button", { name: "Model settings" }));
+
+      expect(screen.getByLabelText("Thinking level")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Hosted by")).not.toBeInTheDocument();
     });
   });
 });

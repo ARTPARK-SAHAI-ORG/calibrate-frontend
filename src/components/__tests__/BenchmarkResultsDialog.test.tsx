@@ -471,6 +471,68 @@ describe("BenchmarkResultsDialog", () => {
     expect(await startedBenchmarkBody()).not.toHaveProperty("parallel_models");
   });
 
+  // The same model run twice under different settings. The window must hand
+  // these to the backend untouched: rebuilding the list would lose the settings.
+  const GPT5_VARIANTS = [
+    {
+      id: "openai/gpt-5::thinking-high",
+      model: "openai/gpt-5",
+      extra: { reasoning: { effort: "high" } },
+    },
+    {
+      id: "openai/gpt-5::thinking-low",
+      model: "openai/gpt-5",
+      extra: { reasoning: { effort: "low" } },
+    },
+  ];
+
+  it("posts model variants exactly as they were given", async () => {
+    mockBenchmarkStart();
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={GPT5_VARIANTS}
+      />,
+    );
+
+    expect(await startedBenchmarkBody()).toEqual({
+      models: GPT5_VARIANTS,
+      test_uuids: defaultProps.testUuids,
+    });
+  });
+
+  it("counts one unit of work per variant, not per model", async () => {
+    // Two tests under three variants is six test runs, over a limit of five.
+    // Counting distinct models would have counted two and let the run start.
+    getMaxRowsPerEvalMock.mockResolvedValueOnce(5);
+    const onGoBack = jest.fn();
+    (global.fetch as jest.Mock).mockImplementation((url: string) =>
+      Promise.reject(new Error(`Unexpected fetch ${url}`)),
+    );
+
+    render(
+      <BenchmarkResultsDialog
+        {...defaultProps}
+        isOpen
+        models={[
+          ...GPT5_VARIANTS,
+          { id: "openai/gpt-5::thinking-medium", model: "openai/gpt-5" },
+        ]}
+        onGoBack={onGoBack}
+      />,
+    );
+
+    await waitFor(() => expect(onGoBack).toHaveBeenCalled());
+    expect(toast.error).toHaveBeenCalled();
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).endsWith("/agent-tests/agent/agent-1/benchmark"),
+      ),
+    ).toHaveLength(0);
+  });
+
   it("starts a new benchmark run, polls, and stays on the tests when done", async () => {
     jest.useFakeTimers({ advanceTimers: true });
     const onBenchmarkCreated = jest.fn();
@@ -1447,6 +1509,41 @@ describe("BenchmarkResultsDialog", () => {
       );
     });
 
+    it("keys the placeholder rows on the variant id", async () => {
+      // Two rows of one model. Keyed by the model they would collapse into one
+      // row; keyed by the variant id the reader sees both, as the results will.
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (url.endsWith("/agent-tests/agent/agent-1/benchmark")) {
+          return Promise.resolve(
+            jsonResponse({ task_id: "task-var", status: "queued" }),
+          );
+        }
+        if (isBenchmarkDetail(url, "task-var")) {
+          return Promise.resolve(
+            jsonResponse({ task_id: "task-var", status: "in_progress" }),
+          );
+        }
+        return Promise.reject(new Error(`Unexpected fetch ${url}`));
+      });
+
+      render(
+        <BenchmarkResultsDialog
+          {...defaultProps}
+          isOpen
+          models={GPT5_VARIANTS}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("outputs-panel-models").textContent).toBe(
+          JSON.stringify([
+            "openai/gpt-5::thinking-high",
+            "openai/gpt-5::thinking-low",
+          ]),
+        ),
+      );
+    });
+
     it("merges placeholders only for models missing from partial results", async () => {
       let pollCount = 0;
       (global.fetch as jest.Mock).mockImplementation((url: string) => {
@@ -1685,6 +1782,50 @@ describe("BenchmarkResultsDialog", () => {
         parallelModels: undefined,
       });
       expect(onGoBack).not.toHaveBeenCalled();
+    });
+
+    it("hands the rerun the variant ids the comparison ran", async () => {
+      // The picker reads each id back into the model and its settings, so the
+      // rerun opens with the same thinking levels already chosen.
+      const { onRerun } = await clickRerunOnPastRun({
+        model_results: [
+          {
+            model: "openai/gpt-5::thinking-high",
+            success: true,
+            message: "",
+            total_tests: 1,
+            passed: 1,
+            failed: 0,
+            test_results: [{ name: "Test One", passed: true }],
+          },
+          {
+            model: "openai/gpt-5::thinking-low",
+            success: true,
+            message: "",
+            total_tests: 1,
+            passed: 1,
+            failed: 0,
+            test_results: [{ name: "Test One", passed: true }],
+          },
+        ],
+      });
+
+      expect(onRerun.mock.calls[0][0].models).toEqual([
+        "openai/gpt-5::thinking-high",
+        "openai/gpt-5::thinking-low",
+      ]);
+    });
+
+    it("hands the rerun the variant ids it was opened with", async () => {
+      const { onRerun } = await clickRerunOnPastRun(
+        {},
+        { models: GPT5_VARIANTS },
+      );
+
+      expect(onRerun.mock.calls[0][0].models).toEqual([
+        "openai/gpt-5::thinking-high",
+        "openai/gpt-5::thinking-low",
+      ]);
     });
 
     it.each([true, false])(

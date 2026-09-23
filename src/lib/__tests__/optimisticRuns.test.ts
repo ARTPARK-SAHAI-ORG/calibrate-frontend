@@ -55,4 +55,30 @@ describe("makeOptimisticBenchmarkRun", () => {
     const run = makeOptimisticBenchmarkRun("task-4", [], NOW);
     expect(run.model_results).toEqual([]);
   });
+
+  it("keeps two rows of one model apart when they carry their settings", () => {
+    // The row has to key on the same string the results come back under, or the
+    // two thinking levels collapse into one row that then never matches.
+    const run = makeOptimisticBenchmarkRun(
+      "task-5",
+      [
+        {
+          id: "openai/gpt-5::thinking-high",
+          model: "openai/gpt-5",
+          extra: { reasoning: { effort: "high" } },
+        },
+        {
+          id: "openai/gpt-5::thinking-low",
+          model: "openai/gpt-5",
+          extra: { reasoning: { effort: "low" } },
+        },
+      ],
+      NOW,
+    );
+
+    expect(run.model_results).toEqual([
+      { model: "openai/gpt-5::thinking-high" },
+      { model: "openai/gpt-5::thinking-low" },
+    ]);
+  });
 });
