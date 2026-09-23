@@ -1,5 +1,6 @@
 ## September 2026
 
+- The Back button on an evaluator's page no longer shows up when there is nowhere to go back to, such as when the page was opened from a preview in a new tab ([#655](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/655))
 - In a model comparison, you can now see passed, failed and not run counts for a model while it is still running, instead of waiting for it to finish ([#651](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/651))
 - In a model comparison, filtering to failed tests now hides models that have none, instead of leaving them on the list with an empty, misaligned row ([#646](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/646))
 - The first tab in workspace settings now shows only the member list, and the workspace name has moved up to the top of the General tab ([#637](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/637))
