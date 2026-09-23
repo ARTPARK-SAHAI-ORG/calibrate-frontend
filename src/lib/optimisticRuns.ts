@@ -3,6 +3,8 @@
 // tab (`TestRun`) and the global Tests page (`AllRun`) — `AllRun` is a superset,
 // so callers needing it spread the result and add their extra fields.
 
+import type { BenchmarkModelVariant } from "./benchmarkModelSettings";
+
 export type OptimisticRunResult = {
   name?: string;
   passed: boolean | null;
@@ -54,10 +56,15 @@ export function makeOptimisticTestRun(
  * Optimistic row for a just-started benchmark. `models` may be empty when the
  * caller doesn't yet know them (the row then shows "0 models" until the poller
  * fills it in).
+ *
+ * A comparison can run the same model twice under different settings, so a
+ * model may arrive as a variant. The row stores the variant's id, the same
+ * string every result of that row comes back keyed by, so the optimistic row
+ * and the polled one are the same row.
  */
 export function makeOptimisticBenchmarkRun(
   taskId: string,
-  models: string[],
+  models: string[] | BenchmarkModelVariant[],
   updatedAt: string,
 ): OptimisticRun {
   return {
@@ -69,6 +76,8 @@ export function makeOptimisticBenchmarkRun(
     total_tests: null,
     passed: null,
     failed: null,
-    model_results: models.map((m) => ({ model: m })),
+    model_results: (models as (string | BenchmarkModelVariant)[]).map((m) => ({
+      model: typeof m === "string" ? m : m.id,
+    })),
   };
 }
