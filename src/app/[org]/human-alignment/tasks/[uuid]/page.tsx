@@ -2909,30 +2909,32 @@ function LabellingTaskPageInner() {
                     judgedEvaluators,
                   ) && (
                     <div className="flex flex-wrap items-stretch gap-3 mt-3">
-                      {agreement.human_human?.current != null && (
+                      <AgreementStatCard
+                        staticPillText="Annotator agreement"
+                        value={
+                          agreement.human_human?.current != null
+                            ? `${Math.round(agreement.human_human.current * 100)}%`
+                            : "—"
+                        }
+                        valueClassName={agreementColor(
+                          agreement.human_human?.current,
+                        )}
+                      />
+                      {judgedEvaluators.map((ev) => (
                         <AgreementStatCard
-                          staticPillText="Annotator agreement"
-                          value={`${Math.round(agreement.human_human.current * 100)}%`}
-                          valueClassName={agreementColor(
-                            agreement.human_human.current,
-                          )}
+                          key={ev.evaluator_id}
+                          evaluatorPill={{
+                            uuid: ev.evaluator_id,
+                            name: ev.name,
+                          }}
+                          value={
+                            ev.current != null
+                              ? `${Math.round(ev.current * 100)}%`
+                              : "—"
+                          }
+                          valueClassName={agreementColor(ev.current)}
                         />
-                      )}
-                      {judgedEvaluators.flatMap((ev) =>
-                        ev.current == null
-                          ? []
-                          : [
-                              <AgreementStatCard
-                                key={ev.evaluator_id}
-                                evaluatorPill={{
-                                  uuid: ev.evaluator_id,
-                                  name: ev.name,
-                                }}
-                                value={`${Math.round(ev.current * 100)}%`}
-                                valueClassName={agreementColor(ev.current)}
-                              />,
-                            ],
-                      )}
+                      ))}
                     </div>
                   )}
                 </section>

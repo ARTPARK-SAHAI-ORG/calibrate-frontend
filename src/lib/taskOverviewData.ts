@@ -46,10 +46,11 @@ export function hasTaskOverviewData(
 /**
  * Does the "Score reliability" row have a single number in it?
  *
- * Same rule as the evaluator score cards below: a card with no number is not
- * drawn, and when none of them has one the whole row goes. The note above the
- * row already says why the numbers are missing, and a line of dashes reads as
- * a failure rather than an absence.
+ * When none of them has one, the whole row goes: the note above it already
+ * says why the numbers are missing, and a line of dashes reads as a failure
+ * rather than an absence. The cards themselves stay as they are, dash and
+ * all, as soon as one number is there, because a dash beside a real number
+ * says which evaluator the note is about.
  */
 export function hasReliabilityNumber(
   humanHuman: { current?: number | null } | null | undefined,

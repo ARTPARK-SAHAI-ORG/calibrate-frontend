@@ -195,7 +195,7 @@ export function AgreementStatCard(
                   name: props.evaluatorPill.name,
                 })
               }
-              className={`${evaluatorAgreementPillLink} shrink-0 hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
+              className={`${evaluatorAgreementPillLink} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
             >
               <span className="break-words whitespace-normal">
                 {props.evaluatorPill.name}

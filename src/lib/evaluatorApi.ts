@@ -328,4 +328,3 @@ export function supportsEvaluatorVariables(
 ): boolean {
   return type === "llm" || type === "llm-general";
 }
-
