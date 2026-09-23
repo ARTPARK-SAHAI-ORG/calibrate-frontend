@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import type { LLMModel } from "./agent-tabs/constants/providers";
 import { LLMSelectorModal } from "./agent-tabs/LLMSelectorModal";
+import { ModelServingProviderSelect } from "./agent-tabs/ModelServingProviderSelect";
 import { RunModelsChoice } from "./workspace/RunModelsChoice";
 import { toast } from "sonner";
 import {
@@ -14,6 +15,10 @@ import {
   useOrganizations,
 } from "@/hooks";
 import { workspaceRunModelsInParallel } from "@/lib/orgs";
+import {
+  splitServingProvider,
+  withServingProvider,
+} from "@/lib/modelServingProvider";
 import { overEvalLimit } from "@/lib/evalLimit";
 import { reportError } from "@/lib/reportError";
 import { getDefaultHeaders } from "@/lib/api";
@@ -113,6 +118,10 @@ export function BenchmarkDialog({
   onCompareTests,
 }: BenchmarkDialogProps) {
   useHideFloatingButton(isOpen);
+  // Only a build agent's models are called by Calibrate itself, so only there
+  // can the company serving them be pinned. A connection agent's own server
+  // makes that call, and all Calibrate sends it is a model name.
+  const canPinServingProvider = agentType !== "connection";
   const { providers: llmProviders } = useOpenRouterModels();
   const backendAccessToken = useAccessToken();
   const [activeOrgUuid] = useActiveOrgUuid();
@@ -130,6 +139,11 @@ export function BenchmarkDialog({
   const openingRunOrder = initialParallelModels ?? workspaceDefault;
 
   const [selectedModels, setSelectedModels] = useState<LLMModel[]>([]);
+  // The company serving each row's model on OpenRouter, by the row's position.
+  // Null means whichever one OpenRouter picks, which is what every comparison
+  // did before there was a choice. Kept beside the models rather than inside
+  // them so the same model can sit in two rows on two different companies.
+  const [rowProviders, setRowProviders] = useState<(string | null)[]>([]);
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
@@ -177,20 +191,23 @@ export function BenchmarkDialog({
     const byId = new Map(
       llmProviders.flatMap((p) => p.models).map((m) => [m.id, m] as const),
     );
+    const picked = Array.from(new Set(initialModels))
+      .slice(0, maxModels)
+      .map(splitServingProvider);
     setSelectedModels(
-      Array.from(new Set(initialModels))
-        .slice(0, maxModels)
-        // A model that has since been retired is no longer in the list. It
-        // still gets a row, named by its id, so the reader can see what the
-        // earlier comparison used and swap it for one that still exists.
-        .map((id) => byId.get(id) ?? { id, name: id }),
+      // A model that has since been retired is no longer in the list. It
+      // still gets a row, named by its id, so the reader can see what the
+      // earlier comparison used and swap it for one that still exists.
+      picked.map(({ model }) => byId.get(model) ?? { id: model, name: model }),
     );
+    setRowProviders(picked.map(({ provider }) => provider));
   }, [isOpen, initialModels, llmProviders]);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
     setSelectedModels([]);
+    setRowProviders([]);
     // Closing puts the window back to how it opened, so the next open fills in
     // from the same props again rather than starting empty.
     filledInModels.current = false;
@@ -358,10 +375,26 @@ export function BenchmarkDialog({
       newModels[index] = model;
       return newModels;
     });
+    // A different model is served by different companies, so the row starts
+    // again on whichever one OpenRouter picks.
+    setRowProviders((prev) => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
   };
 
   const handleRemoveModel = (index: number) => {
     setSelectedModels((prev) => prev.filter((_, i) => i !== index));
+    setRowProviders((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSelectServingProvider = (index: number, slug: string | null) => {
+    setRowProviders((prev) => {
+      const next = [...prev];
+      next[index] = slug;
+      return next;
+    });
   };
 
   const openModelSelector = (index: number) => {
@@ -400,7 +433,13 @@ export function BenchmarkDialog({
       ...provider,
       models: provider.models.filter(
         (model) =>
-          (!selectedModelIds.has(model.id) ||
+          // A model already picked is left out, so the same comparison never
+          // runs it twice. A build agent is the exception: its rows can pin
+          // different companies to the same model, which is the whole point
+          // of comparing them, and two rows that end up identical are caught
+          // before the comparison starts.
+          (canPinServingProvider ||
+            !selectedModelIds.has(model.id) ||
             (currentModel && model.id === currentModel.id)) &&
           (benchmarkProvider === "openrouter" ||
             !benchmarkProvider ||
@@ -410,6 +449,25 @@ export function BenchmarkDialog({
   };
 
   const chosenModels = selectedModels.filter((m): m is LLMModel => m !== null);
+  // A model carries the company serving it after an "@", so a row is one
+  // string and the same model on two companies is two ordinary rows.
+  const benchmarkModels = selectedModels
+    .map((m, index) =>
+      m ? withServingProvider(m.id, rowProviders[index] ?? null) : null,
+    )
+    .filter((model): model is string => model !== null);
+  // What each row reads as in the question asked before a comparison starts.
+  const chosenModelLabels = selectedModels
+    .map((m, index) => {
+      if (!m) return null;
+      const servedBy = rowProviders[index];
+      return servedBy ? `${m.name} (${servedBy})` : m.name;
+    })
+    .filter((label): label is string => label !== null);
+  // Two rows that come out as the same string would be one model run twice
+  // under one name, and the results would land on top of each other.
+  const hasRepeatedModel =
+    new Set(benchmarkModels).size !== benchmarkModels.length;
   // The same rule `handleRunBenchmark` runs on: a connection agent has to pass
   // a check with each model it has not been verified with yet, so the question
   // says so before the reader agrees to it.
@@ -685,6 +743,19 @@ export function BenchmarkDialog({
                     </Tooltip>
                   )}
                 </div>
+                {/* Which company serves this model. Only a build agent can
+                    pin one, and only once a model has been picked. */}
+                {canPinServingProvider && selectedModel && (
+                  <div className="pr-10">
+                    <ModelServingProviderSelect
+                      modelId={selectedModel.id}
+                      value={rowProviders[index] ?? null}
+                      onChange={(slug) =>
+                        handleSelectServingProvider(index, slug)
+                      }
+                    />
+                  </div>
+                )}
                 {/* Why the check failed. Beside the box on a wide screen, so
                     the rows never move.
                     On a narrow screen it sits under the row instead. */}
@@ -716,6 +787,12 @@ export function BenchmarkDialog({
                   )}
               </div>
             ))}
+            {hasRepeatedModel && (
+              <p className="text-xs text-red-500">
+                Two rows are the same model served by the same company. Change
+                one of them
+              </p>
+            )}
           </div>
         </div>
 
@@ -765,7 +842,7 @@ export function BenchmarkDialog({
               }
               setConfirmOpen(true);
             }}
-            disabled={!canRunBenchmark || isVerifying}
+            disabled={!canRunBenchmark || isVerifying || hasRepeatedModel}
             className="flex items-center gap-2"
           >
             <PlayIcon className="w-4 h-4" />
@@ -798,7 +875,7 @@ export function BenchmarkDialog({
         testUuids={tests.map((t) => t.uuid)}
         testNames={tests.map((t) => t.name)}
         totalTests={tests.length > 0 ? tests.length : totalTests}
-        models={selectedModels.filter((m) => m !== null).map((m) => m!.id)}
+        models={benchmarkModels}
         parallelModels={
           agentType === "connection" ? runModelsTogether : undefined
         }
@@ -820,7 +897,7 @@ export function BenchmarkDialog({
           benchmarkTestCount === undefined
             ? "every test linked to this agent"
             : `${benchmarkTestCount} ${benchmarkTestCount === 1 ? "test" : "tests"}`
-        } with ${chosenModels.map((m) => m.name).join(", ")}. Each test calls your agent once per model, evaluates its response against the evaluation criteria and reports the metrics.`}
+        } with ${chosenModelLabels.join(", ")}. Each test calls your agent once per model, evaluates its response against the evaluation criteria and reports the metrics.`}
         confirmText="Start the comparison"
       />
 
