@@ -1724,6 +1724,104 @@ describe("BenchmarkDialog", () => {
       ).toEqual({ model: "openai/gpt-4o" });
     });
 
+    it("saves a passing check against the model, not the row", async () => {
+      const user = setupUser();
+      const onModelVerified = jest.fn();
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true }),
+      });
+      render(
+        <BenchmarkDialog
+          {...baseProps({ agentType: "connection", onModelVerified })}
+        />,
+      );
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(screen.getByRole("button", { name: "Model settings" }));
+      await user.selectOptions(screen.getByLabelText("Thinking level"), "high");
+
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+      await user.click(screen.getByText("Confirm"));
+
+      await waitFor(() => expect(onModelVerified).toHaveBeenCalled());
+      // The backend keeps its record of checked models by model name and
+      // refuses a comparison naming one it has no passing check for. Saving
+      // this under the row's id would leave gpt-4o looking unchecked.
+      expect(onModelVerified.mock.calls[0][0]).toBe("openai/gpt-4o");
+    });
+
+    it("checks a row with settings again even when the model already passed", async () => {
+      const user = setupUser();
+      const alreadyVerified = {
+        "openai/gpt-4o": {
+          verified: true,
+          verified_at: "2026-01-01T00:00:00Z",
+          error: null,
+        },
+      };
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true }),
+      });
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "connection",
+            benchmarkModelsVerified: alreadyVerified,
+          })}
+        />,
+      );
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(screen.getByRole("button", { name: "Model settings" }));
+      await user.selectOptions(screen.getByLabelText("Thinking level"), "high");
+
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      // The earlier pass was for the bare model and says nothing about whether
+      // the agent accepts the extra field, so the check runs again.
+      expect(await screen.findByTestId("verify-dialog")).toBeInTheDocument();
+    });
+
+    it("goes straight to the run when the model passed and nothing is set", async () => {
+      const user = setupUser();
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "connection",
+            benchmarkModelsVerified: {
+              "openai/gpt-4o": {
+                verified: true,
+                verified_at: "2026-01-01T00:00:00Z",
+                error: null,
+              },
+            },
+          })}
+        />,
+      );
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      expect(screen.queryByTestId("verify-dialog")).not.toBeInTheDocument();
+      expect((await startedComparison()).models).toEqual(["openai/gpt-4o"]);
+    });
+
     it("keeps only one panel open beside the rows", async () => {
       const user = setupUser();
       render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);

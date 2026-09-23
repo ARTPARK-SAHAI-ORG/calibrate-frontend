@@ -19,6 +19,7 @@ import {
   benchmarkVariantId,
   describeSettings,
   duplicateModelRows,
+  hasModelSettings,
   modelSettingsExtra,
   rowsFromModelIds,
   type BenchmarkModelSettings,
@@ -96,11 +97,38 @@ type ModelVerifications = Record<
  *  which is the point of a thinking level. */
 type ModelRow = { model: LLMModel; settings: BenchmarkModelSettings };
 
-/** Everything a row is keyed by in this window, and in the results afterwards.
- *  A row with no settings keys on the plain model id, so saved connection
- *  checks and every existing comparison are untouched. */
+/** What this row is called in the results, and what its own badge and failure
+ *  panel are keyed by in this window. Two rows of one model must not share
+ *  either. A row with no settings keys on the plain model id. */
 function rowKey(row: ModelRow): string {
   return benchmarkVariantId(row.model.id, row.settings);
+}
+
+/** What a passed check is SAVED against, which is the model, never the row.
+ *  The backend keeps `benchmark_models_verified` keyed by model name and
+ *  refuses a comparison naming a model it has no passing check for, so saving
+ *  a check under a row's own id would leave the model looking unchecked and
+ *  the comparison refused. */
+function savedCheckKey(row: ModelRow): string {
+  return row.model.id;
+}
+
+/**
+ * Whether this row still has to be checked before the comparison starts.
+ *
+ * A row carrying settings is always checked, even when the model itself passed
+ * before: what is unproven is whether the agent's server accepts these extra
+ * fields, and a check of the bare model says nothing about that.
+ */
+function rowNeedsCheck(
+  row: ModelRow,
+  saved: ModelVerifications,
+  statusThisTime: Record<string, ModelVerificationStatus>,
+): boolean {
+  if (hasModelSettings(row.settings)) {
+    return statusThisTime[rowKey(row)] !== "verified";
+  }
+  return !saved[savedCheckKey(row)]?.verified;
 }
 
 const maxModels = 5;
@@ -176,6 +204,12 @@ export function BenchmarkDialog({
   const [modelSampleResponses, setModelSampleResponses] = useState<
     Record<string, Record<string, unknown>>
   >({});
+  // Why this row's check failed, keyed by the row. The saved map below is keyed
+  // by model, so reading an error out of it would paint both rows of one model
+  // with a failure only one of them had.
+  const [rowCheckError, setRowCheckError] = useState<
+    Record<string, string | null>
+  >({});
   const [benchmarkModelsVerified, setBenchmarkModelsVerified] = useState<
     Record<
       string,
@@ -238,6 +272,7 @@ export function BenchmarkDialog({
     // beside a model nobody has picked yet.
     setBenchmarkModelsVerified(keepVerified(initialBenchmarkModelsVerified));
     setModelSampleResponses({});
+    setRowCheckError({});
     setExpandedModelError(null);
     setConfirmOpen(false);
     setVerifyDialogOpen(false);
@@ -253,9 +288,12 @@ export function BenchmarkDialog({
     row: ModelRow,
     messages?: MessageRow[],
   ): Promise<{ verified: boolean; error?: string }> => {
-    const modelId = rowKey(row);
+    // Two keys on purpose: what this row shows is its own, what is saved
+    // belongs to the model, because that is what the backend checks against.
+    const rowId = rowKey(row);
+    const savedId = savedCheckKey(row);
     const extra = modelSettingsExtra(row.settings);
-    setModelVerifyStatus((prev) => ({ ...prev, [modelId]: "verifying" }));
+    setModelVerifyStatus((prev) => ({ ...prev, [rowId]: "verifying" }));
 
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -289,38 +327,40 @@ export function BenchmarkDialog({
       const error: string | null = result.error ?? null;
 
       const entry = { verified, verified_at: new Date().toISOString(), error };
-      setBenchmarkModelsVerified((prev) => ({ ...prev, [modelId]: entry }));
-      if (verified) onModelVerified?.(modelId, entry);
+      setRowCheckError((prev) => ({ ...prev, [rowId]: verified ? null : error }));
+      setBenchmarkModelsVerified((prev) => ({ ...prev, [savedId]: entry }));
+      if (verified) onModelVerified?.(savedId, entry);
       if (result.sample_response) {
         setModelSampleResponses((prev) => ({
           ...prev,
-          [modelId]: result.sample_response,
+          [rowId]: result.sample_response,
         }));
       }
       if (verified) {
-        setExpandedModelError((prev) => (prev === modelId ? null : prev));
+        setExpandedModelError((prev) => (prev === rowId ? null : prev));
         setModelSampleResponses((prev) => {
           const next = { ...prev };
-          delete next[modelId];
+          delete next[rowId];
           return next;
         });
       }
       setModelVerifyStatus((prev) => ({
         ...prev,
-        [modelId]: verified ? "verified" : "failed",
+        [rowId]: verified ? "verified" : "failed",
       }));
       return { verified, error: error || undefined };
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Verification failed";
+      setRowCheckError((prev) => ({ ...prev, [rowId]: errMsg }));
       setBenchmarkModelsVerified((prev) => ({
         ...prev,
-        [modelId]: {
+        [savedId]: {
           verified: false,
           verified_at: new Date().toISOString(),
           error: errMsg,
         },
       }));
-      setModelVerifyStatus((prev) => ({ ...prev, [modelId]: "failed" }));
+      setModelVerifyStatus((prev) => ({ ...prev, [rowId]: "failed" }));
       return { verified: false, error: errMsg };
     }
   };
@@ -349,10 +389,9 @@ export function BenchmarkDialog({
   const handleRunBenchmark = async () => {
     setConfirmOpen(false);
     if (agentType === "connection") {
-      const modelsToVerify = selectedModels.filter((row) => {
-        const existing = benchmarkModelsVerified[rowKey(row)];
-        return !existing || !existing.verified;
-      });
+      const modelsToVerify = selectedModels.filter((row) =>
+        rowNeedsCheck(row, benchmarkModelsVerified, modelVerifyStatus),
+      );
 
       if (modelsToVerify.length > 0) {
         setVerifyDialogOpen(true);
@@ -365,10 +404,9 @@ export function BenchmarkDialog({
   };
 
   const runVerificationWithMessages = async (messages: MessageRow[]) => {
-    const modelsToVerify = selectedModels.filter((row) => {
-      const existing = benchmarkModelsVerified[rowKey(row)];
-      return !existing || !existing.verified;
-    });
+    const modelsToVerify = selectedModels.filter((row) =>
+      rowNeedsCheck(row, benchmarkModelsVerified, modelVerifyStatus),
+    );
 
     const results = await Promise.all(
       modelsToVerify.map((row) => verifyModel(row, messages)),
@@ -461,7 +499,9 @@ export function BenchmarkDialog({
   // says so before the reader agrees to it.
   const needsVerification =
     agentType === "connection" &&
-    chosenModels.some((row) => !benchmarkModelsVerified[rowKey(row)]?.verified);
+    chosenModels.some((row) =>
+      rowNeedsCheck(row, benchmarkModelsVerified, modelVerifyStatus),
+    );
   // Two rows asking for the same model under the same settings would draw two
   // identical columns, which says nothing.
   const hasDuplicateRows = duplicateModelRows(
@@ -476,10 +516,11 @@ export function BenchmarkDialog({
   const isVerifying = Object.values(modelVerifyStatus).some(
     (s) => s === "verifying",
   );
-  const hasFailedModels = selectedModels.some((row) => {
-    const existing = benchmarkModelsVerified[rowKey(row)];
-    return existing && !existing.verified;
-  });
+  // A failure belongs to the row that produced it, so a second row of the same
+  // model under different settings is not painted as failed too.
+  const hasFailedModels = selectedModels.some(
+    (row) => modelVerifyStatus[rowKey(row)] === "failed",
+  );
   // The checks only have something to say once a model is picked, so a window
   // that is still empty gives the whole width to the picker.
   const showStatusColumn =
@@ -491,9 +532,16 @@ export function BenchmarkDialog({
       ? [...selectedModels, null]
       : selectedModels;
 
-  const getModelVerificationBadge = (modelId: string) => {
+  /**
+   * How this row's check stands. It reads two maps on purpose: what happened
+   * this time is the row's own, and a check that passed earlier belongs to the
+   * model. A row carrying settings never claims an earlier pass, because that
+   * pass says nothing about whether the agent accepts these extra fields.
+   */
+  const getModelVerificationBadge = (row: ModelRow) => {
     if (agentType !== "connection") return null;
 
+    const modelId = rowKey(row);
     const liveStatus = modelVerifyStatus[modelId];
     if (liveStatus === "verifying") {
       return (
@@ -518,7 +566,11 @@ export function BenchmarkDialog({
       );
     }
 
-    const existing = benchmarkModelsVerified[modelId];
+    const existing = hasModelSettings(row.settings)
+      ? liveStatus === "failed"
+        ? { verified: false, error: rowCheckError[modelId] ?? null }
+        : undefined
+      : benchmarkModelsVerified[savedCheckKey(row)];
     if (!existing) {
       return (
         <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
@@ -548,7 +600,7 @@ export function BenchmarkDialog({
       );
     }
     const isExpanded = expandedModelError === modelId;
-    const hasDetails = existing.error || modelSampleResponses[modelId];
+    const hasDetails = rowCheckError[modelId] || modelSampleResponses[modelId];
     return (
       <span className="text-xs text-red-500 flex items-center gap-1 shrink-0">
         <svg
@@ -735,7 +787,7 @@ export function BenchmarkDialog({
                         remove button, so its picker runs the full width. */}
                     {showStatusColumn && selectedRow && (
                       <div className="min-w-20 shrink-0 flex items-center">
-                        {getModelVerificationBadge(rowKey(selectedRow))}
+                        {getModelVerificationBadge(selectedRow)}
                       </div>
                     )}
                   </div>
@@ -797,12 +849,11 @@ export function BenchmarkDialog({
                     On a narrow screen it sits under the row instead. */}
                 {selectedRow &&
                   expandedModelError === rowKey(selectedRow) &&
-                  benchmarkModelsVerified[rowKey(selectedRow)] &&
-                  !benchmarkModelsVerified[rowKey(selectedRow)].verified && (
+                  modelVerifyStatus[rowKey(selectedRow)] === "failed" && (
                     <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-2 space-y-1 md:absolute md:left-full md:top-0 md:ml-9 md:w-80 md:max-h-80 md:overflow-y-auto md:rounded-xl md:border-0 md:bg-background md:p-4 md:shadow-2xl">
-                      {benchmarkModelsVerified[rowKey(selectedRow)]?.error && (
+                      {rowCheckError[rowKey(selectedRow)] && (
                         <p className="text-xs text-red-400 break-words">
-                          {benchmarkModelsVerified[rowKey(selectedRow)].error}
+                          {rowCheckError[rowKey(selectedRow)]}
                         </p>
                       )}
                       {modelSampleResponses[rowKey(selectedRow)] && (
