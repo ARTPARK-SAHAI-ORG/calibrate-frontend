@@ -411,7 +411,6 @@ export function BenchmarkResultView({
       onClearSelection={() => setSelectedTest(null)}
       onNavChange={handleNavChange}
       testNames={testNames}
-      showControls={isDone}
       showRunningSpinner={surface === "window" && !isDone}
       evaluatorsByUuid={evaluatorsByUuid(evaluators)}
       enableEvaluatorLinks={surface === "window"}

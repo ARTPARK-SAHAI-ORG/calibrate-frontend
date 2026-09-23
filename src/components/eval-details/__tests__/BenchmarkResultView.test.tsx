@@ -32,7 +32,6 @@ jest.mock("../../eval-details", () => {
         </div>
         <div data-testid="panel-flags">
           {JSON.stringify({
-            showControls: !!props.showControls,
             evaluatorLinks: !!props.enableEvaluatorLinks,
             spinner: !!props.showRunningSpinner,
             runOver: !!props.runOver,
@@ -341,9 +340,6 @@ describe("BenchmarkResultView", () => {
     expect(
       screen.queryByRole("button", { name: "Results" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("panel-flags")).toHaveTextContent(
-      '"showControls":false',
-    );
   });
 
   it("waits for no test once the run has ended", () => {
