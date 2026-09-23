@@ -789,6 +789,27 @@ describe("BenchmarkOutputsPanel", () => {
       expect(screen.queryByText("1 passed")).not.toBeInTheDocument();
       expect(screen.getByText("1 not run")).toBeInTheDocument();
     });
+  
+    it("leaves out a model with no tests in the filtered status", async () => {
+      const user = setupUser();
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={twoModels}
+          expandedModels={expandedAll}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+        />,
+      );
+      expect(screen.getByText("model-b")).toBeInTheDocument();
+
+      // model-b has nothing failed, so the whole model goes rather than
+      // showing a header that reads "0 failed" over an empty list.
+      await user.click(screen.getByText("Failed"));
+      expect(screen.getByText("model-a")).toBeInTheDocument();
+      expect(screen.queryByText("model-b")).not.toBeInTheDocument();
+      expect(screen.queryByText("0 failed")).not.toBeInTheDocument();
+    });
   });
 
   describe("search filter", () => {
@@ -808,6 +829,26 @@ describe("BenchmarkOutputsPanel", () => {
       expect(screen.getByText("Beta Passed")).toBeInTheDocument();
       expect(screen.queryByText("Alpha Passed")).not.toBeInTheDocument();
       expect(screen.queryByText("Beta Running")).not.toBeInTheDocument();
+    });
+
+    it("says nothing matched, and lists no models, when the search finds nothing", async () => {
+      const user = setupUser();
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={twoModels}
+          expandedModels={expandedAll}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+        />,
+      );
+      await user.type(screen.getByPlaceholderText("Search tests"), "nothing here");
+      expect(
+        screen.getByText((content) => content.includes("No tests match")),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("model-a")).not.toBeInTheDocument();
+      expect(screen.queryByText("model-b")).not.toBeInTheDocument();
+      expect(screen.queryByText("Waiting for results...")).not.toBeInTheDocument();
     });
   });
 
@@ -886,6 +927,26 @@ describe("BenchmarkOutputsPanel", () => {
       const collapseAllBtn = screen.getByText("Collapse all");
       await user.click(collapseAllBtn);
       expect(onSetExpandedModels).toHaveBeenCalledWith(new Set());
+    });
+
+    it("expands only the models the filter leaves on screen", async () => {
+      const user = setupUser();
+      const onSetExpandedModels = jest.fn();
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={twoModels}
+          expandedModels={new Set()}
+          onToggleModel={jest.fn()}
+          onSetExpandedModels={onSetExpandedModels}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+        />,
+      );
+      await user.click(screen.getByText("Failed"));
+      // model-b has nothing failed and is off the list, so expanding every
+      // model on screen must not quietly expand it too.
+      await user.click(screen.getByText("Expand all"));
+      expect(onSetExpandedModels).toHaveBeenCalledWith(new Set(["model-a"]));
     });
 
     it("falls back to onToggleModel per model needing a flip when onSetExpandedModels is not provided", async () => {
