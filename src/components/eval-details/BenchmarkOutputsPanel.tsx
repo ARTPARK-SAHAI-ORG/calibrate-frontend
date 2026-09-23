@@ -197,31 +197,18 @@ function visibleRowIndices(
   return indices;
 }
 
-function collectModelLabellingKeys(
+// The tests of one model a select-all should tick: the rows it is showing,
+// minus any that would be skipped on submission anyway.
+function labellingKeysForRows(
   modelResult: BenchmarkModelResult,
-  testNames: string[],
-  statusFilter: "all" | "passed" | "failed" | "errored",
-  searchQuery: string,
-  runStopped = false,
-  runOver = runStopped,
+  rowIndices: number[],
 ): string[] {
-  const query = searchQuery.trim().toLowerCase();
-  const resultsCount = modelResult.test_results?.length ?? 0;
-  const totalTests = modelResult.total_tests ?? testNames.length;
-  const expectedCount = Math.max(totalTests, testNames.length, resultsCount);
-  const keys: string[] = [];
-  for (let index = 0; index < expectedCount; index++) {
-    const testResult = modelResult.test_results?.[index];
-    if (!testResult) continue;
-    // A test that would always be skipped on submission is not tickable and
-    // must not be swept up by a select-all either.
-    if (!isLabellingEligibleRaw(testResult)) continue;
-    const status = benchmarkTestStatus(testResult, runStopped, runOver);
-    const testName = benchmarkTestName(testResult, index, testNames);
-    if (!matchesBenchmarkFilters(status, testName, statusFilter, query)) continue;
-    keys.push(benchmarkLabellingKey(modelResult.model, index));
-  }
-  return keys;
+  return rowIndices
+    .filter((index) => {
+      const testResult = modelResult.test_results?.[index];
+      return !!testResult && isLabellingEligibleRaw(testResult);
+    })
+    .map((index) => benchmarkLabellingKey(modelResult.model, index));
 }
 
 export function BenchmarkOutputsPanel({
@@ -256,45 +243,29 @@ export function BenchmarkOutputsPanel({
   const runStopped = runStoppedProp || runFailed;
   const runOver = runOverProp || runStopped;
 
-  const visibleLabellingKeys = useMemo(() => {
-    const keys: string[] = [];
-    for (const mr of modelResults) {
-      keys.push(
-        ...collectModelLabellingKeys(
-          mr,
-          testNames,
-          statusFilter,
-          searchQuery,
-          runStopped,
-          runOver,
-        ),
-      );
-    }
-    return keys;
-  }, [
-    modelResults,
-    testNames,
-    statusFilter,
-    searchQuery,
-    runStopped,
-    runOver,
-  ]);
-  // A model with nothing matching the filter or the search is left out
-  // entirely, rather than listed with a count of zero and an empty body.
+  // The models on screen, each with the rows it is showing. One pass, read by
+  // the list, the select-all buttons and the sections themselves, so none of
+  // them can disagree about what is on screen. A model with nothing matching
+  // the filter or the search is left out entirely, rather than listed with a
+  // count of zero over an empty body.
   const visibleModels = useMemo(() => {
-    if (statusFilter === "all" && !searchQuery.trim()) return modelResults;
-    return modelResults.filter(
-      (mr) =>
-        visibleRowIndices(
-          mr,
+    const unfiltered = statusFilter === "all" && !searchQuery.trim();
+    return modelResults
+      .map((modelResult) => ({
+        modelResult,
+        rowIndices: visibleRowIndices(
+          modelResult,
           testNames,
           statusFilter,
           searchQuery,
           runStopped,
           runOver,
           showRunningSpinner,
-        ).length > 0,
-    );
+        ),
+      }))
+      // With nothing filtered a model with no rows still belongs on the list:
+      // it is where "could not be run" and "no test results" are said.
+      .filter(({ rowIndices }) => unfiltered || rowIndices.length > 0);
   }, [
     modelResults,
     testNames,
@@ -304,6 +275,13 @@ export function BenchmarkOutputsPanel({
     runOver,
     showRunningSpinner,
   ]);
+  const visibleLabellingKeys = useMemo(
+    () =>
+      visibleModels.flatMap(({ modelResult, rowIndices }) =>
+        labellingKeysForRows(modelResult, rowIndices),
+      ),
+    [visibleModels],
+  );
   const allVisibleLabellingSelected =
     visibleLabellingKeys.length > 0 &&
     visibleLabellingKeys.every((key) => labellingSelection?.has(key));
@@ -497,14 +475,17 @@ export function BenchmarkOutputsPanel({
       `Test ${selectedTest.testIndex + 1}`
     : "";
 
+  // The models on screen, so "Expand all" is never a click that changes
+  // nothing because a model the filter hid is the one still collapsed.
+  const visibleModelNames = visibleModels.map(({ modelResult }) => modelResult.model);
   const allModelsExpanded =
-    modelResults.length > 0 &&
-    modelResults.every((m) => expandedModels.has(m.model));
+    visibleModelNames.length > 0 &&
+    visibleModelNames.every((model) => expandedModels.has(model));
   const showBulkSelect =
     showLabellingCheckboxes &&
     !!onLabellingBulkToggle &&
     visibleLabellingKeys.length > 0;
-  const showBulkExpand = showControls && modelResults.length > 0;
+  const showBulkExpand = showControls && visibleModelNames.length > 0;
 
   return (
     <div className="flex h-full overflow-hidden" style={height ? { height } : undefined}>
@@ -544,7 +525,7 @@ export function BenchmarkOutputsPanel({
               <button
                 type="button"
                 onClick={() => {
-                  const allModels = modelResults.map((m) => m.model);
+                  const allModels = visibleModelNames;
                   if (onSetExpandedModels) {
                     onSetExpandedModels(
                       allModelsExpanded ? new Set() : new Set(allModels),
@@ -628,24 +609,23 @@ export function BenchmarkOutputsPanel({
               Waiting for results...
             </div>
           )}
-          {modelResults.length > 0 && visibleModels.length === 0 && (
+          {visibleModels.length === 0 && searchQuery.trim() !== "" && (
             <div className="p-4 text-sm text-muted-foreground">
               No tests match &ldquo;{searchQuery.trim()}&rdquo;
             </div>
           )}
-          {visibleModels.map((modelResult) => (
+          {visibleModels.map(({ modelResult, rowIndices }) => (
             <ModelSection
               key={modelResult.model}
               modelResult={modelResult}
+              rowIndices={rowIndices}
               isExpanded={expandedModels.has(modelResult.model)}
               onToggle={() => onToggleModel(modelResult.model)}
               selectedTest={selectedTest}
               onTestSelect={(testIndex) => onSelectTest(modelResult.model, testIndex)}
               testNames={testNames}
               statusFilter={statusFilter}
-              searchQuery={searchQuery}
               formatModelName={formatModelName}
-              showRunningSpinner={showRunningSpinner}
               runStopped={runStopped}
               runFailed={runFailed}
               runOver={runOver}
@@ -774,15 +754,14 @@ export function BenchmarkOutputsPanel({
 // Model Section with toggle and nested test list
 function ModelSection({
   modelResult,
+  rowIndices,
   isExpanded,
   onToggle,
   selectedTest,
   onTestSelect,
   testNames,
   statusFilter,
-  searchQuery,
   formatModelName,
-  showRunningSpinner = false,
   runStopped = false,
   runFailed = false,
   runOver = runStopped,
@@ -793,15 +772,15 @@ function ModelSection({
   showLabellingCheckboxes = false,
 }: {
   modelResult: BenchmarkModelResult;
+  /** The rows this model is showing under the current filter and search. */
+  rowIndices: number[];
   isExpanded: boolean;
   onToggle: () => void;
   selectedTest: { model: string; testIndex: number } | null;
   onTestSelect: (testIndex: number) => void;
   testNames: string[];
   statusFilter: "all" | "passed" | "failed" | "errored";
-  searchQuery: string;
   formatModelName: (name: string) => string;
-  showRunningSpinner?: boolean;
   runStopped?: boolean;
   runFailed?: boolean;
   runOver?: boolean;
@@ -842,23 +821,7 @@ function ModelSection({
     testNames.length,
     modelResult.test_results?.length ?? 0,
   );
-  const rowIndices = visibleRowIndices(
-    modelResult,
-    testNames,
-    statusFilter,
-    searchQuery,
-    runStopped,
-    runOver,
-    showRunningSpinner,
-  );
-  const modelLabellingKeys = collectModelLabellingKeys(
-    modelResult,
-    testNames,
-    statusFilter,
-    searchQuery,
-    runStopped,
-    runOver,
-  );
+  const modelLabellingKeys = labellingKeysForRows(modelResult, rowIndices);
   const modelAllSelected =
     modelLabellingKeys.length > 0 &&
     modelLabellingKeys.every((key) => labellingSelection?.has(key));

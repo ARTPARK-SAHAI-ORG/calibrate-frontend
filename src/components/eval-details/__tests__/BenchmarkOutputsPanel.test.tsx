@@ -929,6 +929,26 @@ describe("BenchmarkOutputsPanel", () => {
       expect(onSetExpandedModels).toHaveBeenCalledWith(new Set());
     });
 
+    it("expands only the models the filter leaves on screen", async () => {
+      const user = setupUser();
+      const onSetExpandedModels = jest.fn();
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={twoModels}
+          expandedModels={new Set()}
+          onToggleModel={jest.fn()}
+          onSetExpandedModels={onSetExpandedModels}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+        />,
+      );
+      await user.click(screen.getByText("Failed"));
+      // model-b has nothing failed and is off the list, so expanding every
+      // model on screen must not quietly expand it too.
+      await user.click(screen.getByText("Expand all"));
+      expect(onSetExpandedModels).toHaveBeenCalledWith(new Set(["model-a"]));
+    });
+
     it("falls back to onToggleModel per model needing a flip when onSetExpandedModels is not provided", async () => {
       const user = setupUser();
       const onToggleModel = jest.fn();
