@@ -147,7 +147,7 @@ describe("AgreementStatCard", () => {
     expect(screen.getByText("90%")).toBeInTheDocument();
   });
 
-  it("says on hover that the pill opens the evaluator", async () => {
+  it("shows no hover text on the pill, which already names the evaluator", async () => {
     const user = setupUser();
     render(
       <AgreementStatCard
@@ -157,7 +157,7 @@ describe("AgreementStatCard", () => {
     );
 
     await user.hover(screen.getByRole("button", { name: /Correctness/ }));
-    expect(await screen.findByText("Open Correctness")).toBeInTheDocument();
+    expect(screen.queryByText("Open Correctness")).toBeNull();
   });
 
   it("says on hover how many items the score counts", async () => {

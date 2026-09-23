@@ -398,3 +398,4 @@ describe("supportsEvaluatorVariables", () => {
     expect(supportsEvaluatorVariables(null)).toBe(false);
   });
 });
+

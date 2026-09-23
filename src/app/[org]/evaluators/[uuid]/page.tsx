@@ -426,19 +426,25 @@ function EvaluatorDetailPageInner() {
     }
   };
 
+  // The evaluator previews open this page in a new tab, and a new tab has no
+  // earlier page, so Back would do nothing at all. Rather than send the
+  // reader somewhere invented, the button is not drawn in that case: the
+  // sidebar is on the page and goes anywhere. Read after mounting, since the
+  // server has no history to read.
+  const [canGoBack, setCanGoBack] = useState(false);
+  useEffect(() => {
+    setCanGoBack(window.history.length > 1);
+  }, []);
+
   const confirmDelete = async () => {
     if (!backendAccessToken || !uuid || !evaluator) return;
     try {
       setDeleting(true);
       await deleteEvaluatorRequest(uuid, backendAccessToken);
-      // Return to the page the reader came from, the same way Back does,
-      // rather than the evaluator list, which has no sidebar entry. Going
-      // back does nothing when the address was opened straight into this tab,
-      // which would leave the confirmation on screen with no way out, so
-      // that case goes to the agents page instead.
-      const cameFromAnotherPage =
-        typeof window !== "undefined" && window.history.length > 1;
-      if (cameFromAnotherPage) {
+      // The evaluator is gone, so the page cannot stay: back to where the
+      // reader came from, or the agents page when this tab has no earlier
+      // page, rather than leaving the confirmation on screen with no way out.
+      if (canGoBack) {
         router.back();
       } else {
         router.push("/agents");
@@ -791,7 +797,7 @@ function EvaluatorDetailPageInner() {
   // This page is reached from an agent, an evaluation, a simulation run or a
   // labelling task, so it goes back to wherever that was. It sits in the top
   // bar, where other pages show their trail.
-  const backButton = (
+  const backButton = !canGoBack ? null : (
     <button
       onClick={() => router.back()}
       className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
@@ -857,12 +863,14 @@ function EvaluatorDetailPageInner() {
             <p className="text-sm md:text-base text-red-500 mb-2">
               {error ?? "Evaluator not found"}
             </p>
-            <button
-              onClick={() => router.back()}
-              className="text-sm md:text-base text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            >
-              Back to evaluators
-            </button>
+            {canGoBack && (
+              <button
+                onClick={() => router.back()}
+                className="text-sm md:text-base text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                Back to evaluators
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -870,7 +878,9 @@ function EvaluatorDetailPageInner() {
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div className="min-w-0 flex-1">
                 {/* AppLayout hides `customHeader` below md. */}
-                <div className="md:hidden mb-3">{backButton}</div>
+                {backButton && (
+                  <div className="md:hidden mb-3">{backButton}</div>
+                )}
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl md:text-2xl font-semibold text-foreground">
                     {evaluator.name}

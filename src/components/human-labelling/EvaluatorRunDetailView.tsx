@@ -1996,24 +1996,19 @@ export function EvaluatorRunDetailView({
                 );
                 if (linkEvaluators) {
                   return (
-                    <Tooltip
+                    <button
                       key={`${e.evaluator_id}-${e.evaluator_version_id ?? ""}`}
-                      content={`Open ${name}`}
-                      className="shrink-0"
+                      type="button"
+                      onClick={() =>
+                        setPreviewEvaluator({
+                          uuid: e.evaluator_id,
+                          name,
+                        })
+                      }
+                      className={`${pillClass} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
                     >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPreviewEvaluator({
-                            uuid: e.evaluator_id,
-                            name,
-                          })
-                        }
-                        className={`${pillClass} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
-                      >
-                        {inner}
-                      </button>
-                    </Tooltip>
+                      {inner}
+                    </button>
                   );
                 }
                 return (

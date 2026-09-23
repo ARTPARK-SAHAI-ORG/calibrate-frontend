@@ -430,6 +430,17 @@ describe("getting back out of the page", () => {
     // The evaluator list has no sidebar entry, so the page never links to it.
     expect(screen.queryByRole("link", { name: "Evaluators" })).toBeNull();
   });
+
+  it("does not draw Back when the tab was opened straight on this address", async () => {
+    // The evaluator previews open this page in a new tab, and a new tab has
+    // no earlier page, so Back would do nothing at all. The sidebar is still
+    // there to get anywhere.
+    setHistoryLength(1);
+    render(<EvaluatorDetailPage />);
+
+    await screen.findByRole("heading", { name: "Refund policy" });
+    expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+  });
 });
 
 describe("deleting with nowhere to go back to", () => {

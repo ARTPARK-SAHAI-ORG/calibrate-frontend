@@ -61,6 +61,7 @@ import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScore
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
   hasTaskOverviewData,
+  hasReliabilityNumber,
   taskEvaluatorScoreCards,
 } from "@/lib/taskOverviewData";
 import { evaluatorRunLimitMessage } from "@/lib/evaluatorRunLimit";
@@ -2555,66 +2556,57 @@ function LabellingTaskPageInner() {
                     evDragSourceIdx !== null &&
                     evDragSourceIdx !== idx;
                   return (
-                    <Tooltip
+                    <button
                       key={ev.uuid}
-                      content={
-                        evaluatorsList.length > 1
-                          ? `Open ${ev.name} · drag to reorder`
-                          : `Open ${ev.name}`
+                      type="button"
+                      onClick={() =>
+                        setPreviewEvaluator({ uuid: ev.uuid, name: ev.name })
                       }
-                      position="top"
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPreviewEvaluator({ uuid: ev.uuid, name: ev.name })
+                      draggable={!evReordering && evaluatorsList.length > 1}
+                      onDragStart={(e) => {
+                        if (evReordering || evaluatorsList.length <= 1) {
+                          e.preventDefault();
+                          return;
                         }
-                        draggable={!evReordering && evaluatorsList.length > 1}
-                        onDragStart={(e) => {
-                          if (evReordering || evaluatorsList.length <= 1) {
-                            e.preventDefault();
-                            return;
-                          }
-                          setEvDragSourceIdx(idx);
-                          e.dataTransfer.effectAllowed = "move";
-                          // Firefox requires data to be set or drag is
-                          // cancelled.
-                          e.dataTransfer.setData("text/plain", ev.uuid);
-                        }}
-                        onDragOver={(e) => {
-                          if (evDragSourceIdx === null) return;
-                          e.preventDefault();
-                          e.dataTransfer.dropEffect = "move";
-                          if (evDragOverIdx !== idx) setEvDragOverIdx(idx);
-                        }}
-                        onDragLeave={() => {
-                          if (evDragOverIdx === idx) setEvDragOverIdx(null);
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const source = evDragSourceIdx;
-                          setEvDragSourceIdx(null);
-                          setEvDragOverIdx(null);
-                          if (source === null || source === idx) return;
-                          const next = evaluatorsList.map((x) => x.uuid);
-                          const [moved] = next.splice(source, 1);
-                          next.splice(idx, 0, moved);
-                          void reorderEvaluators(next);
-                        }}
-                        onDragEnd={() => {
-                          setEvDragSourceIdx(null);
-                          setEvDragOverIdx(null);
-                        }}
-                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer select-none ${
-                          isDropTarget
-                            ? "border-foreground/60 ring-2 ring-foreground/20"
-                            : "border-border"
-                        } ${isDragging ? "opacity-50" : ""}`}
-                      >
-                        {ev.name}
-                      </button>
-                    </Tooltip>
+                        setEvDragSourceIdx(idx);
+                        e.dataTransfer.effectAllowed = "move";
+                        // Firefox requires data to be set or drag is
+                        // cancelled.
+                        e.dataTransfer.setData("text/plain", ev.uuid);
+                      }}
+                      onDragOver={(e) => {
+                        if (evDragSourceIdx === null) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (evDragOverIdx !== idx) setEvDragOverIdx(idx);
+                      }}
+                      onDragLeave={() => {
+                        if (evDragOverIdx === idx) setEvDragOverIdx(null);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const source = evDragSourceIdx;
+                        setEvDragSourceIdx(null);
+                        setEvDragOverIdx(null);
+                        if (source === null || source === idx) return;
+                        const next = evaluatorsList.map((x) => x.uuid);
+                        const [moved] = next.splice(source, 1);
+                        next.splice(idx, 0, moved);
+                        void reorderEvaluators(next);
+                      }}
+                      onDragEnd={() => {
+                        setEvDragSourceIdx(null);
+                        setEvDragOverIdx(null);
+                      }}
+                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer select-none ${
+                        isDropTarget
+                          ? "border-foreground/60 ring-2 ring-foreground/20"
+                          : "border-border"
+                      } ${isDragging ? "opacity-50" : ""}`}
+                    >
+                      {ev.name}
+                    </button>
                   );
                 })}
               </div>
@@ -2912,34 +2904,39 @@ function LabellingTaskPageInner() {
                       <span>{humanLabelNote}</span>
                     </div>
                   )}
-                  <div className="flex flex-wrap items-stretch gap-3 mt-3">
-                    <AgreementStatCard
-                      staticPillText="Annotator agreement"
-                      value={
-                        agreement.human_human?.current != null
-                          ? `${Math.round(agreement.human_human.current * 100)}%`
-                          : "—"
-                      }
-                      valueClassName={agreementColor(
-                        agreement.human_human?.current,
-                      )}
-                    />
-                    {judgedEvaluators.map((ev) => (
+                  {hasReliabilityNumber(
+                    agreement.human_human,
+                    judgedEvaluators,
+                  ) && (
+                    <div className="flex flex-wrap items-stretch gap-3 mt-3">
                       <AgreementStatCard
-                        key={ev.evaluator_id}
-                        evaluatorPill={{
-                          uuid: ev.evaluator_id,
-                          name: ev.name,
-                        }}
+                        staticPillText="Annotator agreement"
                         value={
-                          ev.current != null
-                            ? `${Math.round(ev.current * 100)}%`
+                          agreement.human_human?.current != null
+                            ? `${Math.round(agreement.human_human.current * 100)}%`
                             : "—"
                         }
-                        valueClassName={agreementColor(ev.current)}
+                        valueClassName={agreementColor(
+                          agreement.human_human?.current,
+                        )}
                       />
-                    ))}
-                  </div>
+                      {judgedEvaluators.map((ev) => (
+                        <AgreementStatCard
+                          key={ev.evaluator_id}
+                          evaluatorPill={{
+                            uuid: ev.evaluator_id,
+                            name: ev.name,
+                          }}
+                          value={
+                            ev.current != null
+                              ? `${Math.round(ev.current * 100)}%`
+                              : "—"
+                          }
+                          valueClassName={agreementColor(ev.current)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </section>
               </div>
             )}

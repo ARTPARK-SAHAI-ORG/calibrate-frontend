@@ -1,4 +1,5 @@
 import {
+  hasReliabilityNumber,
   hasTaskOverviewData,
   taskEvaluatorScoreCards,
 } from "../taskOverviewData";
@@ -144,5 +145,25 @@ describe("taskEvaluatorScoreCards", () => {
 
   it("has no cards when nothing has run", () => {
     expect(taskEvaluatorScoreCards(evaluators, {})).toEqual([]);
+  });
+});
+
+describe("hasReliabilityNumber", () => {
+  it("is false when nothing has been labelled, so the row of dashes goes", () => {
+    expect(
+      hasReliabilityNumber({ current: null }, [
+        { current: null },
+        { current: null },
+      ]),
+    ).toBe(false);
+    expect(hasReliabilityNumber(null, [])).toBe(false);
+    expect(hasReliabilityNumber(undefined, [{}])).toBe(false);
+  });
+
+  it("is true as soon as one card has a number", () => {
+    expect(hasReliabilityNumber({ current: 0.5 }, [{ current: null }])).toBe(
+      true,
+    );
+    expect(hasReliabilityNumber(null, [{ current: 0 }])).toBe(true);
   });
 });
