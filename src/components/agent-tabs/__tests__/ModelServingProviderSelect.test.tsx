@@ -139,4 +139,32 @@ describe("ModelServingProviderSelect", () => {
 
     expect(screen.getByLabelText(LABEL)).toBeDisabled();
   });
+
+  it("keeps a company OpenRouter no longer lists, so the box matches the run", async () => {
+    hookReturns([
+      { slug: "deepinfra", name: "DeepInfra", pricePerMillionInput: 0.25 },
+      { slug: "novita", name: "Novita", pricePerMillionInput: 0.27 },
+    ]);
+    const onChange = renderSelect({ value: "sambanova" });
+
+    const select = screen.getByLabelText(LABEL);
+    expect(select).toHaveValue("sambanova");
+    expect(select).not.toBeDisabled();
+
+    // And the reader can move off it.
+    const user = setupUser();
+    await user.selectOptions(select, "novita");
+    expect(onChange).toHaveBeenCalledWith("novita");
+  });
+
+  it("lets a company be changed when the only one listed is not the one pinned", () => {
+    hookReturns([
+      { slug: "novita", name: "Novita", pricePerMillionInput: 0.27 },
+    ]);
+    renderSelect({ value: "deepinfra" });
+
+    const select = screen.getByLabelText(LABEL);
+    expect(select).toHaveValue("deepinfra");
+    expect(select).not.toBeDisabled();
+  });
 });

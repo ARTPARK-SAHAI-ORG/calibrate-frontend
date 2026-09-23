@@ -42,12 +42,20 @@ export function ModelServingProviderSelect({
 
   if (providers.length === 0) return null;
 
-  const only = providers.length === 1 ? providers[0] : null;
+  // A comparison being run again can name a company OpenRouter no longer
+  // serves this model from. It still gets a row of its own, named by the
+  // company, so the box never shows one company while the run uses another,
+  // and the reader can move off it.
+  const missing =
+    value && !providers.some((p) => p.slug === value) ? value : null;
+  // With one company there is nothing to choose, so the box is shown only to
+  // say who serves the model.
+  const only = providers.length === 1 && !missing ? providers[0] : null;
 
   return (
     <Select
       aria-label="Who serves this model"
-      value={only ? only.slug : (value ?? "")}
+      value={value ?? (only ? only.slug : "")}
       onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
       disabled={disabled || only !== null}
       className="h-8 text-xs text-muted-foreground cursor-pointer"
@@ -58,6 +66,7 @@ export function ModelServingProviderSelect({
           {optionLabel(provider)}
         </option>
       ))}
+      {missing && <option value={missing}>{missing}</option>}
     </Select>
   );
 }
