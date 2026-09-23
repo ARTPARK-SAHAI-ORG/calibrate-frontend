@@ -161,6 +161,42 @@ function matchesBenchmarkFilters(
   return true;
 }
 
+// The rows one model lists under the current filter and search. The model
+// header and the list below read the same function, so a model whose tests are
+// all filtered out is never listed with nothing in it.
+function visibleRowIndices(
+  modelResult: BenchmarkModelResult,
+  testNames: string[],
+  statusFilter: "all" | "passed" | "failed" | "errored",
+  searchQuery: string,
+  runStopped = false,
+  runOver = runStopped,
+  showRunningSpinner = false,
+): number[] {
+  const query = searchQuery.trim().toLowerCase();
+  const expectedCount = Math.max(
+    modelResult.total_tests ?? testNames.length,
+    testNames.length,
+    modelResult.test_results?.length ?? 0,
+  );
+  const indices: number[] = [];
+  for (let index = 0; index < expectedCount; index++) {
+    const testResult = modelResult.test_results?.[index];
+    // A test the backend sent no row for is still listed once the run is over:
+    // it never ran, and the note above points the reader here to find it.
+    if (!testResult && !showRunningSpinner && !runOver) continue;
+    const status = testResult
+      ? benchmarkTestStatus(testResult, runStopped, runOver)
+      : runOver
+        ? "not_run"
+        : "running";
+    const testName = benchmarkTestName(testResult, index, testNames);
+    if (!matchesBenchmarkFilters(status, testName, statusFilter, query)) continue;
+    indices.push(index);
+  }
+  return indices;
+}
+
 function collectModelLabellingKeys(
   modelResult: BenchmarkModelResult,
   testNames: string[],
@@ -242,6 +278,31 @@ export function BenchmarkOutputsPanel({
     searchQuery,
     runStopped,
     runOver,
+  ]);
+  // A model with nothing matching the filter or the search is left out
+  // entirely, rather than listed with a count of zero and an empty body.
+  const visibleModels = useMemo(() => {
+    if (statusFilter === "all" && !searchQuery.trim()) return modelResults;
+    return modelResults.filter(
+      (mr) =>
+        visibleRowIndices(
+          mr,
+          testNames,
+          statusFilter,
+          searchQuery,
+          runStopped,
+          runOver,
+          showRunningSpinner,
+        ).length > 0,
+    );
+  }, [
+    modelResults,
+    testNames,
+    statusFilter,
+    searchQuery,
+    runStopped,
+    runOver,
+    showRunningSpinner,
   ]);
   const allVisibleLabellingSelected =
     visibleLabellingKeys.length > 0 &&
@@ -562,35 +623,39 @@ export function BenchmarkOutputsPanel({
           </div>
         )}
         <div ref={listContainerRef} className="flex-1 overflow-y-auto">
-          {modelResults.length > 0 ? (
-            modelResults.map((modelResult) => (
-              <ModelSection
-                key={modelResult.model}
-                modelResult={modelResult}
-                isExpanded={expandedModels.has(modelResult.model)}
-                onToggle={() => onToggleModel(modelResult.model)}
-                selectedTest={selectedTest}
-                onTestSelect={(testIndex) => onSelectTest(modelResult.model, testIndex)}
-                testNames={testNames}
-                statusFilter={statusFilter}
-                searchQuery={searchQuery}
-                formatModelName={formatModelName}
-                showRunningSpinner={showRunningSpinner}
-                runStopped={runStopped}
-                runFailed={runFailed}
-                runOver={runOver}
-                selectedRowRef={selectedRowRef}
-                labellingSelection={labellingSelection}
-                onToggleLabellingSelection={onToggleLabellingSelection}
-                onLabellingBulkToggle={onLabellingBulkToggle}
-                showLabellingCheckboxes={showLabellingCheckboxes}
-              />
-            ))
-          ) : (
+          {modelResults.length === 0 && (
             <div className="p-4 text-sm text-muted-foreground">
               Waiting for results...
             </div>
           )}
+          {modelResults.length > 0 && visibleModels.length === 0 && (
+            <div className="p-4 text-sm text-muted-foreground">
+              No tests match &ldquo;{searchQuery.trim()}&rdquo;
+            </div>
+          )}
+          {visibleModels.map((modelResult) => (
+            <ModelSection
+              key={modelResult.model}
+              modelResult={modelResult}
+              isExpanded={expandedModels.has(modelResult.model)}
+              onToggle={() => onToggleModel(modelResult.model)}
+              selectedTest={selectedTest}
+              onTestSelect={(testIndex) => onSelectTest(modelResult.model, testIndex)}
+              testNames={testNames}
+              statusFilter={statusFilter}
+              searchQuery={searchQuery}
+              formatModelName={formatModelName}
+              showRunningSpinner={showRunningSpinner}
+              runStopped={runStopped}
+              runFailed={runFailed}
+              runOver={runOver}
+              selectedRowRef={selectedRowRef}
+              labellingSelection={labellingSelection}
+              onToggleLabellingSelection={onToggleLabellingSelection}
+              onLabellingBulkToggle={onLabellingBulkToggle}
+              showLabellingCheckboxes={showLabellingCheckboxes}
+            />
+          ))}
         </div>
       </div>
 
@@ -777,7 +842,15 @@ function ModelSection({
     testNames.length,
     modelResult.test_results?.length ?? 0,
   );
-  const query = searchQuery.trim().toLowerCase();
+  const rowIndices = visibleRowIndices(
+    modelResult,
+    testNames,
+    statusFilter,
+    searchQuery,
+    runStopped,
+    runOver,
+    showRunningSpinner,
+  );
   const modelLabellingKeys = collectModelLabellingKeys(
     modelResult,
     testNames,
@@ -793,10 +866,12 @@ function ModelSection({
 
   return (
     <div className="border-b border-border">
-      <div className="sticky top-0 z-10 bg-background border-b border-border flex items-center">
+      {/* The hover shade sits on the whole row, not on the toggle alone, so it
+          never stops short of the select-all checkbox beside it. */}
+      <div className="sticky top-0 z-10 bg-background border-b border-border flex items-center transition-colors hover:bg-muted/50">
         <button
           onClick={onToggle}
-          className="flex-1 px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer min-w-0"
+          className="flex-1 px-4 py-3 flex items-center justify-between cursor-pointer min-w-0"
         >
           <div className="flex items-center gap-2 min-w-0">
             <svg
@@ -850,7 +925,11 @@ function ModelSection({
         </button>
         {showLabellingCheckboxes &&
           onLabellingBulkToggle &&
-          modelLabellingKeys.length > 0 && (
+          (modelLabellingKeys.length === 0 ? (
+            // Keeps every model's counts ending at the same place when only
+            // some of the models have tests that can be ticked.
+            <span className="hidden md:block w-11 shrink-0" />
+          ) : (
             <Tooltip
               content={modelSelectAllLabel}
               position="top"
@@ -865,7 +944,7 @@ function ModelSection({
                 <LabellingRowCheckbox checked={modelAllSelected} />
               </button>
             </Tooltip>
-          )}
+          ))}
       </div>
 
       {isExpanded && (
@@ -900,24 +979,15 @@ function ModelSection({
 
             return (
               <div className="space-y-1">
-                {Array.from({ length: expectedCount }).map((_, index) => {
+                {rowIndices.map((index) => {
                   const testResult = modelResult.test_results?.[index];
                   const hasResult = !!testResult;
-
-                  // A test the backend sent no row for is still listed once
-                  // the run is over: it never ran, and the note above points
-                  // the reader here to find it.
-                  if (!hasResult && !showRunningSpinner && !runOver) return null;
-
                   const status = hasResult
                     ? benchmarkTestStatus(testResult, runStopped, runOver)
                     : runOver
                       ? "not_run"
                       : "running";
                   const testName = benchmarkTestName(testResult, index, testNames);
-
-                  if (!matchesBenchmarkFilters(status, testName, statusFilter, query))
-                    return null;
 
                   const isSelected =
                     selectedTest?.model === modelResult.model &&
