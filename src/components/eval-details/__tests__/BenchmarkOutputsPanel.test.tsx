@@ -558,7 +558,8 @@ describe("BenchmarkOutputsPanel", () => {
     expect(screen.getByText("Alpha Failed")).toBeInTheDocument();
     expect(screen.getByText("Alpha Errored")).toBeInTheDocument();
     // header counts: passedCount=1, erroredCount=1, failedCount = max(2-1,0)=1
-    expect(screen.getByText("1 passed")).toBeInTheDocument();
+    // Model A has finished; model B is still going and shows its live count too.
+    expect(screen.getAllByText("1 passed")).toHaveLength(2);
     // there may be multiple "1 failed" (model-a) - assert at least one exists
     expect(screen.getAllByText("1 failed").length).toBeGreaterThan(0);
     expect(screen.getByText("1 not run")).toBeInTheDocument();
@@ -986,7 +987,7 @@ describe("BenchmarkOutputsPanel", () => {
       expect(onToggleModel).toHaveBeenCalledWith("model-b");
     });
 
-    it("does not render bulk expand controls when showControls is false", () => {
+    it("keeps the expand and filter controls while the comparison is still going", () => {
       render(
         <BenchmarkOutputsPanel
           modelResults={twoModels}
@@ -994,12 +995,12 @@ describe("BenchmarkOutputsPanel", () => {
           onToggleModel={jest.fn()}
           selectedTest={null}
           onSelectTest={jest.fn()}
-          showControls={false}
+          showRunningSpinner
         />,
       );
-      expect(screen.queryByText("Expand all")).not.toBeInTheDocument();
-      // filter pills also require showControls
-      expect(screen.queryByText("Passed")).not.toBeInTheDocument();
+      expect(screen.getByText("Expand all")).toBeInTheDocument();
+      expect(screen.getByText("Passed")).toBeInTheDocument();
+      expect(screen.getByText("Failed")).toBeInTheDocument();
     });
   });
 
@@ -1473,6 +1474,82 @@ describe("BenchmarkOutputsPanel", () => {
       );
       fireEvent.keyDown(window, { key: "ArrowDown" });
       expect(onSelectTest).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("a model still running", () => {
+    const running = makeModel({
+      model: "m1",
+      success: null,
+      total_tests: 5,
+      passed: null,
+      failed: null,
+      test_results: [
+        { name: "One", passed: true },
+        { name: "Two", passed: false, reasoning: "bad" },
+        { name: "Three", passed: true },
+        { name: "Four", passed: false, unanswered: true, reasoning: "boom" },
+        { name: "Five", passed: null },
+      ],
+    });
+
+    it("splits what has finished into passed, failed and not run beside the progress", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[running]}
+          expandedModels={new Set(["m1"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          showRunningSpinner
+        />,
+      );
+      expect(screen.getByText("2 passed")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
+      expect(screen.getByText("1 not run")).toBeInTheDocument();
+      expect(screen.getByText("4 of 5 done")).toBeInTheDocument();
+    });
+
+    it("shows only the progress until the first test has finished", () => {
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[
+            makeModel({
+              model: "m1",
+              success: null,
+              total_tests: 3,
+              test_results: [{ name: "One", passed: null }],
+            }),
+          ]}
+          expandedModels={new Set(["m1"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          showRunningSpinner
+        />,
+      );
+      expect(screen.getByText("0 of 3 done")).toBeInTheDocument();
+      expect(screen.queryByText("0 passed")).not.toBeInTheDocument();
+      expect(screen.queryByText("0 failed")).not.toBeInTheDocument();
+    });
+
+    it("narrows the live counts to the chosen filter", async () => {
+      const user = setupUser();
+      render(
+        <BenchmarkOutputsPanel
+          modelResults={[running]}
+          expandedModels={new Set(["m1"])}
+          onToggleModel={jest.fn()}
+          selectedTest={null}
+          onSelectTest={jest.fn()}
+          showRunningSpinner
+        />,
+      );
+      await user.click(screen.getByText("Failed"));
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
+      expect(screen.queryByText("2 passed")).not.toBeInTheDocument();
+      expect(screen.queryByText("1 not run")).not.toBeInTheDocument();
+      expect(screen.getByText("4 of 5 done")).toBeInTheDocument();
     });
   });
 

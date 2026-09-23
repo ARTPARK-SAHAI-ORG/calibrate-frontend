@@ -87,7 +87,6 @@ type BenchmarkOutputsPanelProps = {
   testNames?: string[];
   formatModelName?: (name: string) => string;
   /** Show filter pills + collapse/expand controls */
-  showControls?: boolean;
   /** Show spinner for running tests */
   showRunningSpinner?: boolean;
   /** True when someone stopped the run before it finished. Tests it never
@@ -221,7 +220,6 @@ export function BenchmarkOutputsPanel({
   onClearSelection,
   testNames = [],
   formatModelName = displayModelName,
-  showControls = true,
   showRunningSpinner = false,
   runStopped: runStoppedProp = false,
   runFailed = false,
@@ -485,7 +483,7 @@ export function BenchmarkOutputsPanel({
     showLabellingCheckboxes &&
     !!onLabellingBulkToggle &&
     visibleLabellingKeys.length > 0;
-  const showBulkExpand = showControls && visibleModelNames.length > 0;
+  const showBulkExpand = visibleModelNames.length > 0;
 
   return (
     <div className="flex h-full overflow-hidden" style={height ? { height } : undefined}>
@@ -558,7 +556,7 @@ export function BenchmarkOutputsPanel({
           </div>
         )}
         {/* Filter pills */}
-        {showControls && modelResults.length > 0 && showFilterPills && (
+        {modelResults.length > 0 && showFilterPills && (
           <div className="shrink-0 border-b border-border flex items-center px-3 py-2">
             <div className="flex items-center gap-1.5">
               {showFilterPills && statusCounts.passed > 0 && (
@@ -800,11 +798,17 @@ function ModelSection({
   // rows behind is not this: it keeps its counts and its rows are listed.
   const couldNotRun = modelResult.success === false && !hasResults;
   // Rows land one by one while the model runs, so count the ones that already
-  // have a verdict (or errored) for the live "x of y done" header.
-  const finishedCount = (modelResult.test_results ?? []).filter((t) => {
-    const status = t && benchmarkTestStatus(t, runStopped, runOver);
-    return status && status !== "running" && status !== "not_run";
-  }).length;
+  // have a verdict (or errored) for the live "x of y done" header, and split
+  // them the way the finished header does so the reader can see how the model
+  // is doing before it is through.
+  const rowStatuses = (modelResult.test_results ?? []).map(
+    (t) => t && benchmarkTestStatus(t, runStopped, runOver),
+  );
+  const finishedCount = rowStatuses.filter(
+    (status) => status && status !== "running" && status !== "not_run",
+  ).length;
+  const livePassedCount = rowStatuses.filter((s) => s === "passed").length;
+  const liveFailedCount = rowStatuses.filter((s) => s === "failed").length;
   const passedCount = modelResult.passed ?? 0;
   const erroredCount = (modelResult.test_results ?? []).filter(
     (t) => t && isUnanswered(t),
@@ -854,8 +858,19 @@ function ModelSection({
             )}
           </div>
           {isProcessing && expectedCount > 0 && (
-            <div className="text-xs text-muted-foreground flex-shrink-0 ml-4">
-              {finishedCount} of {expectedCount} done
+            <div className="flex items-center gap-2 text-xs flex-shrink-0 ml-4">
+              {finishedCount > 0 && (statusFilter === "all" || statusFilter === "passed") && (
+                <span className="text-green-500">{livePassedCount} passed</span>
+              )}
+              {finishedCount > 0 && (statusFilter === "all" || statusFilter === "failed") && (
+                <span className="text-red-500">{liveFailedCount} failed</span>
+              )}
+              {(statusFilter === "all" || statusFilter === "errored") && erroredCount > 0 && (
+                <span className="text-amber-500">{erroredCount} not run</span>
+              )}
+              <span className="text-muted-foreground">
+                {finishedCount} of {expectedCount} done
+              </span>
             </div>
           )}
           {unfinished && (
