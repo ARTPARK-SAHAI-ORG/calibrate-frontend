@@ -925,11 +925,7 @@ function ModelSection({
         </button>
         {showLabellingCheckboxes &&
           onLabellingBulkToggle &&
-          (modelLabellingKeys.length === 0 ? (
-            // Keeps every model's counts ending at the same place when only
-            // some of the models have tests that can be ticked.
-            <span className="hidden md:block w-11 shrink-0" />
-          ) : (
+          modelLabellingKeys.length > 0 && (
             <Tooltip
               content={modelSelectAllLabel}
               position="top"
@@ -944,7 +940,7 @@ function ModelSection({
                 <LabellingRowCheckbox checked={modelAllSelected} />
               </button>
             </Tooltip>
-          ))}
+          )}
       </div>
 
       {isExpanded && (
