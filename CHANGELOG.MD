@@ -1,5 +1,6 @@
 ## September 2026
 
+- In a model comparison, you can now see passed, failed and not run counts for a model while it is still running, instead of waiting for it to finish ([#651](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/651))
 - In a model comparison, filtering to failed tests now hides models that have none, instead of leaving them on the list with an empty, misaligned row ([#646](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/646))
 - The first tab in workspace settings now shows only the member list, and the workspace name has moved up to the top of the General tab ([#637](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/637))
 - On the Monitoring tab you can now narrow the trace list by what each evaluator scored and sort it by one evaluator's scores, with the counts and averages updating to match and the choices kept when you reload or share the link ([#633](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/633))
