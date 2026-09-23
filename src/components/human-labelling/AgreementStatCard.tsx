@@ -45,9 +45,10 @@ function Stat({
     </div>
   );
   // The hover text says what the number counts, e.g. "8 of 10 items", which
-  // is nowhere on screen, so it is always worth showing.
+  // is nowhere on screen, so it is always worth showing. It sits below: above
+  // the number is the evaluator's own name, and the box covered it.
   return title ? (
-    <Tooltip content={title} position="top" className="min-w-0">
+    <Tooltip content={title} position="bottom" className="min-w-0">
       {body}
     </Tooltip>
   ) : (
@@ -240,8 +241,9 @@ export function AgreementStatCard(
           </div>
         ) : result?.title ? (
           // The hover text says what the number counts, which is nowhere on
-          // screen, so it is always worth showing.
-          <Tooltip content={result.title} position="top">
+          // screen, so it is always worth showing. Below the number, since
+          // above it is the evaluator's own name.
+          <Tooltip content={result.title} position="bottom">
             {singleNumber}
           </Tooltip>
         ) : (

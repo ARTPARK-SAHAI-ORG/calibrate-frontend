@@ -44,6 +44,23 @@ export function hasTaskOverviewData(
 }
 
 /**
+ * Does the "Score reliability" row have a single number in it?
+ *
+ * Same rule as the evaluator score cards below: a card with no number is not
+ * drawn, and when none of them has one the whole row goes. The note above the
+ * row already says why the numbers are missing, and a line of dashes reads as
+ * a failure rather than an absence.
+ */
+export function hasReliabilityNumber(
+  humanHuman: { current?: number | null } | null | undefined,
+  evaluators: readonly { current?: number | null }[],
+): boolean {
+  return (
+    humanHuman?.current != null || evaluators.some((ev) => ev.current != null)
+  );
+}
+
+/**
  * The cards under "Evaluator scores" on the task overview.
  *
  * An evaluator with no score to show has no card: it has never run, and an
