@@ -25,9 +25,22 @@ jobs:
       - run: npm ci
       - run: npm test -- src/app/__tests__/seo.test.ts
 
-  component:
-    name: Component tests (Jest)
+  # Split across four runners in parallel. The suite is ~5,900 tests and
+  # coverage more than doubles the processor time it needs, which on one
+  # 4-core runner came to eleven minutes. Codecov merges the four uploads
+  # under the shared `component` flag, so the reported number is unchanged.
+  #
+  # GitHub draws one row on the pull request per job, so these four show up
+  # as four rows. `component` below gathers them into the single "Component
+  # tests (Jest)" row that is the one to read and the one to require.
+  component-shard:
+    name: Component tests (Jest) part ${{ matrix.shard }} of 4
     runs-on: ubuntu-latest
+    strategy:
+      # Let every shard finish, so one failure still reports the rest.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,7 +48,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run test:coverage
+      - run: npm run test:coverage -- --shard=${{ matrix.shard }}/4 --maxWorkers=4
         env:
           SKIP_SEO_TESTS: "1"
       - name: Upload component coverage
@@ -45,6 +58,19 @@ jobs:
           files: ./coverage/component/lcov.info
           flags: component
           fail_ci_if_error: false
+
+  # One row for the four shards above: green only when every shard passed.
+  component:
+    name: Component tests (Jest)
+    needs: component-shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report the shards as one result
+        if: needs.component-shard.result != 'success'
+        run: |
+          echo "A component test shard did not pass: ${{ needs.component-shard.result }}"
+          exit 1
 
   e2e:
     name: E2E tests (public, no backend)
