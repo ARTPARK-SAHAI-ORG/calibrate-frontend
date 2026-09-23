@@ -328,3 +328,19 @@ export function supportsEvaluatorVariables(
 ): boolean {
   return type === "llm" || type === "llm-general";
 }
+
+/**
+ * The page that lists evaluators of this kind, for when there is nowhere to go
+ * back to. The evaluator page is opened in a new tab from the evaluator
+ * previews, and a new tab has no earlier page, so its Back button did nothing
+ * at all. `/evaluators` is deliberately not used: nothing links to it and it
+ * has no sidebar entry.
+ */
+export function evaluatorLibraryPath(
+  type: EvaluatorType | undefined | null,
+): string {
+  if (type === "conversation") return "/simulation-evaluators";
+  if (type === "stt") return "/stt?tab=evaluators";
+  if (type === "tts") return "/tts?tab=evaluators";
+  return "/agent-evaluators";
+}

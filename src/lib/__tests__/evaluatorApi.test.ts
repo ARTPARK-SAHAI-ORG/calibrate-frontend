@@ -12,6 +12,7 @@ import {
   deleteEvaluator,
   deleteEvaluatorVersion,
   supportsEvaluatorVariables,
+  evaluatorLibraryPath,
   type EvaluatorData,
 } from "../evaluatorApi";
 import { clearAllRequestCaches } from "../requestCache";
@@ -396,5 +397,21 @@ describe("supportsEvaluatorVariables", () => {
     expect(supportsEvaluatorVariables("conversation")).toBe(false);
     expect(supportsEvaluatorVariables(undefined)).toBe(false);
     expect(supportsEvaluatorVariables(null)).toBe(false);
+  });
+});
+
+describe("evaluatorLibraryPath", () => {
+  it("sends each kind of evaluator to the list it appears in", () => {
+    expect(evaluatorLibraryPath("llm")).toBe("/agent-evaluators");
+    expect(evaluatorLibraryPath("llm-general")).toBe("/agent-evaluators");
+    expect(evaluatorLibraryPath("tool-call")).toBe("/agent-evaluators");
+    expect(evaluatorLibraryPath("conversation")).toBe("/simulation-evaluators");
+    expect(evaluatorLibraryPath("stt")).toBe("/stt?tab=evaluators");
+    expect(evaluatorLibraryPath("tts")).toBe("/tts?tab=evaluators");
+  });
+
+  it("falls back to the agent evaluators when the kind is not known yet", () => {
+    expect(evaluatorLibraryPath(undefined)).toBe("/agent-evaluators");
+    expect(evaluatorLibraryPath(null)).toBe("/agent-evaluators");
   });
 });

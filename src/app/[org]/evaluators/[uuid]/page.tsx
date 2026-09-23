@@ -52,6 +52,7 @@ import {
   canDeleteEvaluator,
   deleteEvaluator as deleteEvaluatorRequest,
   deleteEvaluatorVersion,
+  evaluatorLibraryPath,
   supportsEvaluatorVariables,
 } from "@/lib/evaluatorApi";
 
@@ -426,23 +427,25 @@ function EvaluatorDetailPageInner() {
     }
   };
 
+  // Where Back, and a finished delete, send the reader. Going back does
+  // nothing when the address was opened straight into a new tab, which the
+  // evaluator previews do, so that case goes to the list this evaluator
+  // belongs to instead.
+  const leavePage = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push(evaluatorLibraryPath(evaluator?.evaluator_type));
+    }
+  }, [router, evaluator]);
+
   const confirmDelete = async () => {
     if (!backendAccessToken || !uuid || !evaluator) return;
     try {
       setDeleting(true);
       await deleteEvaluatorRequest(uuid, backendAccessToken);
-      // Return to the page the reader came from, the same way Back does,
-      // rather than the evaluator list, which has no sidebar entry. Going
-      // back does nothing when the address was opened straight into this tab,
-      // which would leave the confirmation on screen with no way out, so
-      // that case goes to the agents page instead.
-      const cameFromAnotherPage =
-        typeof window !== "undefined" && window.history.length > 1;
-      if (cameFromAnotherPage) {
-        router.back();
-      } else {
-        router.push("/agents");
-      }
+      // Return to the page the reader came from, the same way Back does.
+      leavePage();
     } catch (err) {
       reportError("Error deleting evaluator:", err);
       // Say why, reading the backend's own wording, rather than leaving the
@@ -793,7 +796,7 @@ function EvaluatorDetailPageInner() {
   // bar, where other pages show their trail.
   const backButton = (
     <button
-      onClick={() => router.back()}
+      onClick={leavePage}
       className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
     >
       <svg
@@ -858,7 +861,7 @@ function EvaluatorDetailPageInner() {
               {error ?? "Evaluator not found"}
             </p>
             <button
-              onClick={() => router.back()}
+              onClick={leavePage}
               className="text-sm md:text-base text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
               Back to evaluators
