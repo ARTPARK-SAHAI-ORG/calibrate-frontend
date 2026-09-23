@@ -1477,7 +1477,7 @@ describe("EvaluatorRunDetailView", () => {
     expect(screen.getByText("v1")).toBeInTheDocument();
   });
 
-  it("says on hover that the linked pill opens the evaluator", async () => {
+  it("shows no hover text on the linked pill, which already names the evaluator", async () => {
     const user = setupUser();
     const job = makeJob({ runs: [], items: [] });
     render(
@@ -1492,9 +1492,7 @@ describe("EvaluatorRunDetailView", () => {
     const pill = screen.getByRole("button", { name: /Binary Evaluator/i });
     expect(pill).not.toHaveAttribute("title");
     await user.hover(pill);
-    expect(
-      await screen.findByText("Open Binary Evaluator"),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("Open Binary Evaluator")).toBeNull();
   });
 
   it("opens the evaluator preview modal when the linked pill is clicked", async () => {
@@ -1587,10 +1585,6 @@ describe("EvaluatorRunDetailView", () => {
 
     const pill = screen.getByRole("button", { name: /Binary Evaluator/i });
     expect(pill).not.toHaveAttribute("title");
-    await user.hover(pill);
-    expect(
-      await screen.findByText("Open Binary Evaluator"),
-    ).toBeInTheDocument();
 
     await user.click(pill);
     expect(

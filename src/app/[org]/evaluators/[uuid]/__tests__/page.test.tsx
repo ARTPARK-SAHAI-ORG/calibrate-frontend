@@ -431,28 +431,15 @@ describe("getting back out of the page", () => {
     expect(screen.queryByRole("link", { name: "Evaluators" })).toBeNull();
   });
 
-  it("goes to the evaluator's own list when the tab was opened straight here", async () => {
+  it("does not draw Back when the tab was opened straight on this address", async () => {
     // The evaluator previews open this page in a new tab, and a new tab has
-    // no earlier page, so going back would do nothing at all.
+    // no earlier page, so Back would do nothing at all. The sidebar is still
+    // there to get anywhere.
     setHistoryLength(1);
-    const user = setupUser();
     render(<EvaluatorDetailPage />);
 
-    await user.click(await screen.findByRole("button", { name: "Back" }));
-
-    expect(push).toHaveBeenCalledWith("/agent-evaluators");
-    expect(back).not.toHaveBeenCalled();
-  });
-
-  it("goes to the simulation evaluators for a conversation evaluator", async () => {
-    setHistoryLength(1);
-    mockEvaluator({ evaluator_type: "conversation" });
-    const user = setupUser();
-    render(<EvaluatorDetailPage />);
-
-    await user.click(await screen.findByRole("button", { name: "Back" }));
-
-    expect(push).toHaveBeenCalledWith("/simulation-evaluators");
+    await screen.findByRole("heading", { name: "Refund policy" });
+    expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
   });
 });
 
@@ -467,7 +454,7 @@ describe("deleting with nowhere to go back to", () => {
     await user.click(await screen.findByLabelText("Delete evaluator"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/agent-evaluators"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/agents"));
     expect(back).not.toHaveBeenCalled();
   });
 });

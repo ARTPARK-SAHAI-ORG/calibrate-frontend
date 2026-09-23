@@ -940,24 +940,18 @@ export default function TTSEvaluationDetailPage() {
                       evaluatorRows={visibleAboutEvaluators.map((e) => ({
                         key: e.uuid,
                         metric: (
-                          <Tooltip
-                            content={`Open evaluator: ${e.name}`}
-                            position="top"
-                            className="inline-block"
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPreviewEvaluator({
+                                uuid: e.uuid,
+                                name: e.name,
+                              })
+                            }
+                            className="text-foreground underline-offset-2 hover:underline cursor-pointer"
                           >
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setPreviewEvaluator({
-                                  uuid: e.uuid,
-                                  name: e.name,
-                                })
-                              }
-                              className="text-foreground underline-offset-2 hover:underline cursor-pointer"
-                            >
-                              {e.name}
-                            </button>
-                          </Tooltip>
+                            {e.name}
+                          </button>
                         ),
                         description:
                           e.description ||

@@ -186,30 +186,25 @@ export function AgreementStatCard(
           </div>
         ) : (
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            <Tooltip
-              content={`Open ${props.evaluatorPill.name}`}
-              className="shrink-0"
+            <button
+              type="button"
+              onClick={() =>
+                setPreviewEvaluator({
+                  uuid: props.evaluatorPill.uuid,
+                  name: props.evaluatorPill.name,
+                })
+              }
+              className={`${evaluatorAgreementPillLink} shrink-0 hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
             >
-              <button
-                type="button"
-                onClick={() =>
-                  setPreviewEvaluator({
-                    uuid: props.evaluatorPill.uuid,
-                    name: props.evaluatorPill.name,
-                  })
-                }
-                className={`${evaluatorAgreementPillLink} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
-              >
-                <span className="break-words whitespace-normal">
-                  {props.evaluatorPill.name}
+              <span className="break-words whitespace-normal">
+                {props.evaluatorPill.name}
+              </span>
+              {props.evaluatorPill.versionLabel && (
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {props.evaluatorPill.versionLabel}
                 </span>
-                {props.evaluatorPill.versionLabel && (
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    {props.evaluatorPill.versionLabel}
-                  </span>
-                )}
-              </button>
-            </Tooltip>
+              )}
+            </button>
             {!result && showAlignmentLabel && (
               <span className="text-sm font-medium text-foreground shrink-0">
                 alignment
