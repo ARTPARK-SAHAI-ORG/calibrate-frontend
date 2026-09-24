@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { ValueFilter } from "./ItemValueFilter";
+import {
+  VALUE_FILTER_SOURCES,
+  type ValueFilter,
+  type ValueFilterSource,
+} from "./ItemValueFilter";
 
 /**
  * Keeps the item filters of the evaluation run page and the labelling job
@@ -47,14 +51,36 @@ export function writeUrlParam(param: string, value: string | null): void {
 }
 
 /**
- * `evaluatorId:value.value,evaluatorId:value`. A score is a number or the
- * words true / false, matching the two shapes `ValueFilter.values` holds.
+ * `evaluatorId:value.value,evaluatorId:value:source`. A score is a number or
+ * the words true / false, matching the two shapes `ValueFilter.values` holds.
+ * The source is only written when the filter has one.
  */
 export function encodeValueFilters(filters: readonly ValueFilter[]): string {
   return filters
     .filter((f) => f.values.length > 0)
-    .map((f) => `${f.evaluatorId}:${f.values.map(String).join(".")}`)
+    .map(
+      (f) =>
+        `${f.evaluatorId}:${f.values.map(String).join(".")}` +
+        (f.source ? `:${f.source}` : ""),
+    )
     .join(",");
+}
+
+/**
+ * The backend's `score` values, one per filter with picked values:
+ * `evaluatorId:value.value:source`, with no source meaning either.
+ */
+export function scoreFilterParams(filters: readonly ValueFilter[]): string[] {
+  return filters
+    .filter((f) => f.values.length > 0)
+    .map(
+      (f) =>
+        `${f.evaluatorId}:${f.values.map(String).join(".")}:${f.source ?? "either"}`,
+    );
+}
+
+function isValueFilterSource(v: string): v is ValueFilterSource {
+  return VALUE_FILTER_SOURCES.some((s) => s.value === v);
 }
 
 export function decodeValueFilters(raw: string | null): ValueFilter[] {
@@ -64,8 +90,12 @@ export function decodeValueFilters(raw: string | null): ValueFilter[] {
     const at = part.indexOf(":");
     if (at <= 0) continue;
     const evaluatorId = part.slice(0, at);
-    const values = part
-      .slice(at + 1)
+    // An unknown source is dropped rather than the whole filter, so a link
+    // from an older or newer build still keeps its scores.
+    const [rawValues, rawSource] = part.slice(at + 1).split(":");
+    const source =
+      rawSource && isValueFilterSource(rawSource) ? rawSource : undefined;
+    const values = rawValues
       .split(".")
       .map((v): boolean | number | null => {
         if (v === "true") return true;
@@ -74,7 +104,8 @@ export function decodeValueFilters(raw: string | null): ValueFilter[] {
         return v.trim() !== "" && Number.isFinite(n) ? n : null;
       })
       .filter((v): v is boolean | number => v !== null);
-    if (values.length > 0) filters.push({ evaluatorId, values });
+    if (values.length > 0)
+      filters.push(source ? { evaluatorId, values, source } : { evaluatorId, values });
   }
   return filters;
 }

@@ -38,10 +38,28 @@ export type ValueFilterOption = {
   shortLabel: string;
 };
 
+/** Whose answer a filter reads: the evaluator's, a human's, or a mix. */
+export type ValueFilterSource = "evaluator" | "human" | "either" | "both";
+
+export const VALUE_FILTER_SOURCES: readonly {
+  value: ValueFilterSource;
+  /** For the picker. */
+  label: string;
+  /** For the tag, read after the value: "Correctness is Wrong by a human". */
+  phrase: string;
+}[] = [
+  { value: "either", label: "By the evaluator or a human", phrase: "by the evaluator or a human" },
+  { value: "evaluator", label: "By the evaluator", phrase: "by the evaluator" },
+  { value: "human", label: "By a human", phrase: "by a human" },
+  { value: "both", label: "By the evaluator and a human", phrase: "by the evaluator and a human" },
+];
+
 export type ValueFilter = {
   evaluatorId: string;
   /** Empty means "no value picked yet" — the filter is inert. */
   values: (boolean | number)[];
+  /** Only set where the caller asks whose answer to read (`showSource`). */
+  source?: ValueFilterSource;
 };
 
 /**
@@ -123,16 +141,19 @@ export function evaluatorFilterName(ev: ValueFilterEvaluator): string {
 export function valueFilterTagParts(
   ev: ValueFilterEvaluator,
   filter: ValueFilter,
-): { name: string; values: string | null } {
+): { name: string; values: string | null; source: string | null } {
   const options = valueFilterOptions(ev);
   const labels = filter.values.map(
     (v) => options.find((o) => o.value === v)?.shortLabel ?? String(v),
   );
   const name = evaluatorFilterName(ev);
-  if (labels.length === 0) return { name, values: null };
-  if (labels.length === 1) return { name, values: labels[0] };
-  if (labels.length === 2) return { name, values: `${labels[0]} or ${labels[1]}` };
-  return { name, values: `${labels.length} of ${options.length} scores` };
+  const source =
+    VALUE_FILTER_SOURCES.find((s) => s.value === filter.source)?.phrase ?? null;
+  if (labels.length === 0) return { name, values: null, source };
+  if (labels.length === 1) return { name, values: labels[0], source };
+  if (labels.length === 2)
+    return { name, values: `${labels[0]} or ${labels[1]}`, source };
+  return { name, values: `${labels.length} of ${options.length} scores`, source };
 }
 
 /** The same wording as one string, for labels read out to screen readers. */
@@ -140,8 +161,9 @@ export function describeValueFilter(
   ev: ValueFilterEvaluator,
   filter: ValueFilter,
 ): string {
-  const { name, values } = valueFilterTagParts(ev, filter);
-  return values ? `${name} is ${values}` : name;
+  const { name, values, source } = valueFilterTagParts(ev, filter);
+  if (!values) return name;
+  return source ? `${name} is ${values} ${source}` : `${name} is ${values}`;
 }
 
 /**
@@ -223,10 +245,13 @@ export function ItemValueFilter({
   evaluators,
   filters,
   onChange,
+  showSource = false,
 }: {
   evaluators: readonly ValueFilterEvaluator[];
   filters: readonly ValueFilter[];
   onChange: (next: ValueFilter[]) => void;
+  /** Ask whose answer each filter reads. Off where there is only one kind. */
+  showSource?: boolean;
 }) {
   const filterable = valueFilterEvaluators(evaluators);
   // `null` closed; a uuid opens straight onto that evaluator's scores,
@@ -261,23 +286,41 @@ export function ItemValueFilter({
   const openEvaluator = filterable.find((ev) => ev.uuid === openFor) ?? null;
   const active = usableValueFilters(filters, evaluators);
 
-  const valuesFor = (evaluatorId: string) =>
-    filters.find((f) => f.evaluatorId === evaluatorId)?.values ?? [];
+  const filterFor = (evaluatorId: string) =>
+    filters.find((f) => f.evaluatorId === evaluatorId);
+  const valuesFor = (evaluatorId: string) => filterFor(evaluatorId)?.values ?? [];
+  const sourceFor = (evaluatorId: string): ValueFilterSource =>
+    filterFor(evaluatorId)?.source ?? "either";
+
+  // Replace in place when the tag already exists, so editing it does not
+  // shuffle it to the end of the bar under the user's cursor.
+  const upsert = (next: ValueFilter) =>
+    onChange(
+      filterFor(next.evaluatorId)
+        ? filters.map((f) => (f.evaluatorId === next.evaluatorId ? next : f))
+        : [...filters, next],
+    );
+
+  const remove = (evaluatorId: string) =>
+    onChange(filters.filter((f) => f.evaluatorId !== evaluatorId));
+
+  // Only a page that offers the source choice names it, and there a filter
+  // with none (an older link) reads as the default it is sent as.
+  const shownFilter = (f: ValueFilter): ValueFilter =>
+    showSource ? { ...f, source: f.source ?? "either" } : { ...f, source: undefined };
 
   const setValues = (evaluatorId: string, values: (boolean | number)[]) => {
-    if (values.length === 0) {
-      onChange(filters.filter((f) => f.evaluatorId !== evaluatorId));
+    // With the source choice on, an emptied tag keeps its entry so the source
+    // picked in the open panel survives. An entry with no values filters
+    // nothing and is never sent or written to the address.
+    if (values.length === 0 && !showSource) {
+      remove(evaluatorId);
       return;
     }
-    // Replace in place when the tag already exists, so editing it does not
-    // shuffle it to the end of the bar under the user's cursor.
-    const existing = filters.some((f) => f.evaluatorId === evaluatorId);
-    onChange(
-      existing
-        ? filters.map((f) =>
-            f.evaluatorId === evaluatorId ? { evaluatorId, values } : f,
-          )
-        : [...filters, { evaluatorId, values }],
+    upsert(
+      showSource
+        ? { evaluatorId, values, source: sourceFor(evaluatorId) }
+        : { evaluatorId, values },
     );
   };
 
@@ -316,7 +359,7 @@ export function ItemValueFilter({
               className="cursor-pointer"
             >
               {(() => {
-                const { name, values } = valueFilterTagParts(ev, f);
+                const { name, values, source } = valueFilterTagParts(ev, shownFilter(f));
                 return (
                   <>
                     <span className="font-semibold">{name}</span>
@@ -324,6 +367,12 @@ export function ItemValueFilter({
                       <>
                         <span className="font-normal opacity-60"> is </span>
                         <span className="font-semibold">{values}</span>
+                        {source && (
+                          <span className="font-normal opacity-60">
+                            {" "}
+                            {source}
+                          </span>
+                        )}
                       </>
                     )}
                   </>
@@ -332,10 +381,10 @@ export function ItemValueFilter({
             </button>
             <button
               type="button"
-              aria-label={`Remove ${describeValueFilter(ev, f)}`}
+              aria-label={`Remove ${describeValueFilter(ev, shownFilter(f))}`}
               onClick={() => {
                 if (openFor === f.evaluatorId) close();
-                setValues(f.evaluatorId, []);
+                remove(f.evaluatorId);
               }}
               className="w-4 h-4 rounded-full inline-flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-background/25 transition-opacity cursor-pointer"
             >
@@ -360,10 +409,10 @@ export function ItemValueFilter({
             setOpenFor(null);
             setPicking((p) => !p);
           }}
-          className={`h-7 px-3 rounded-full text-xs font-medium border border-dashed transition-colors cursor-pointer ${
+          className={`h-7 px-3 rounded-full text-xs font-medium text-white border transition-colors cursor-pointer ${
             picking
-              ? "border-foreground text-foreground"
-              : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+              ? "bg-blue-700 border-blue-700"
+              : "bg-blue-600 border-blue-600 hover:bg-blue-700 hover:border-blue-700"
           }`}
         >
           + Add filter
@@ -384,7 +433,7 @@ export function ItemValueFilter({
         // ponytail: absolutely positioned, not portalled. It opens downward
         // from a bar near the top of a tall container, so there is room.
         // Switch to a portal if it ever gets clipped.
-        <div className="absolute left-0 top-full z-30 mt-1.5 w-60 rounded-lg border border-border bg-background shadow-lg p-1">
+        <div className={`absolute left-0 top-full z-30 mt-1.5 ${showSource ? "w-72" : "w-60"} rounded-lg border border-border bg-background shadow-lg p-1`}>
           {picking ? (
             <>
               <p className="px-2.5 pt-1.5 pb-1 text-[11px] text-muted-foreground">
@@ -464,6 +513,50 @@ export function ItemValueFilter({
                     </button>
                   );
                 })}
+                {showSource && (
+                  <div
+                    role="radiogroup"
+                    aria-label="Whose answer"
+                    className="mt-1 pt-1 border-t border-border"
+                  >
+                    <p className="px-2.5 pt-1.5 pb-1 text-[11px] text-muted-foreground">
+                      Whose answer
+                    </p>
+                    {VALUE_FILTER_SOURCES.map((s) => {
+                      const selected = sourceFor(openEvaluator.uuid) === s.value;
+                      return (
+                        <button
+                          key={s.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() =>
+                            upsert({
+                              evaluatorId: openEvaluator.uuid,
+                              values: valuesFor(openEvaluator.uuid),
+                              source: s.value,
+                            })
+                          }
+                          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm text-left hover:bg-muted/60 transition-colors cursor-pointer"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`w-4 h-4 shrink-0 rounded-full border inline-flex items-center justify-center ${
+                              selected
+                                ? "border-foreground"
+                                : "border-foreground/40"
+                            }`}
+                          >
+                            {selected && (
+                              <span className="w-2 h-2 rounded-full bg-foreground" />
+                            )}
+                          </span>
+                          <span className="truncate">{s.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </>
             )
           )}
