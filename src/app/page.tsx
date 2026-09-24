@@ -128,7 +128,7 @@ function LandingFeatureImageColumn(props: {
  */
 function UseCaseStoryLink(props: { href: string; className?: string }) {
   const { href, className = "" } = props;
-  const style = `${className} inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer`;
+  const style = `${className} inline-flex items-center px-4 py-2.5 text-sm font-medium bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 transition-colors cursor-pointer`;
 
   if (href.startsWith("/")) {
     return (
@@ -1179,7 +1179,7 @@ export default function HomePage() {
                     {useCase.storyHref && (
                       <UseCaseStoryLink
                         href={useCase.storyHref}
-                        className={useCase.quote ? "mt-3" : ""}
+                        className={useCase.quote ? "mt-4" : ""}
                       />
                     )}
                   </div>
