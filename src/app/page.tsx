@@ -100,9 +100,8 @@ const USE_CASES: {
       "AI coach that generates tailored coaching messages for field agents supporting smallholder farmers in rural Uganda",
     useCase: [
       "Using an LLM judge to check that every part of a coaching message is grounded in the program guidelines",
-      "Comparing OpenAI models on coaching message quality before generating 130,000 messages",
-      "Running an expert labelling workshop with experienced field agents and measuring agreement between them",
-      "Calibrating the LLM judge against the experts' labels",
+      "Benchmarking different LLMs on coaching message quality to find the best tradeoff across accuracy and cost",
+      "Collecting feedback from expert field agents, identifying and resolving disagreements, and aligning LLM judges to the experts",
     ],
   },
 ];
