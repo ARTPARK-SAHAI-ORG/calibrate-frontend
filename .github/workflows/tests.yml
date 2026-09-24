@@ -100,9 +100,21 @@ jobs:
           flags: e2e
           fail_ci_if_error: false
 
-  e2e-integration:
-    name: E2E integration tests (real backend)
+  # Split across three runners in parallel, the same way the component tests
+  # are. The test step alone took six and a half minutes on one runner. Each
+  # shard boots its own backend with its own throwaway database and signs up
+  # its own account, so shards never see each other's data, and `--workers=1`
+  # still holds inside each one. Codecov merges the three uploads under the
+  # shared `e2e` flag. `e2e-integration` below gathers them into the single
+  # "E2E integration tests (real backend)" row that is the one to require.
+  e2e-integration-shard:
+    name: E2E integration tests (real backend) part ${{ matrix.shard }} of 3
     runs-on: ubuntu-latest
+    strategy:
+      # Let every shard finish, so one failure still reports the rest.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
       AUTH_SECRET: ci-placeholder-secret-not-used
       GOOGLE_CLIENT_ID: ci-placeholder
@@ -152,9 +164,16 @@ jobs:
         working-directory: backend
 
       - name: Run integration E2E with coverage
-        # Same command developers run locally — the script boots the fake-AI
-        # backend, waits for health, runs the specs, and tears it down.
-        run: npm run test:e2e:integration:coverage
+        # The same thing `npm run test:e2e:integration:coverage` does, spelled
+        # out so the shard flag reaches Playwright: `npm run ... -- --shard`
+        # would tack it onto the lcov cleanup command instead. The script
+        # boots the fake-AI backend, waits for health, runs the specs, and
+        # tears it down.
+        env:
+          E2E_COVERAGE: "1"
+        run: |
+          scripts/e2e-fake-backend.sh npx playwright test --project=authenticated --workers=1 --shard=${{ matrix.shard }}/3
+          node scripts/clean-e2e-lcov.mjs
       - name: Upload E2E coverage
         uses: codecov/codecov-action@v5
         with:
@@ -165,3 +184,16 @@ jobs:
       - name: Backend log (on failure)
         if: failure()
         run: cat "$RUNNER_TEMP/backend.log" || true
+
+  # One row for the three shards above: green only when every shard passed.
+  e2e-integration:
+    name: E2E integration tests (real backend)
+    needs: e2e-integration-shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report the shards as one result
+        if: needs.e2e-integration-shard.result != 'success'
+        run: |
+          echo "An E2E integration shard did not pass: ${{ needs.e2e-integration-shard.result }}"
+          exit 1
