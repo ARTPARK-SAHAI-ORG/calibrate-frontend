@@ -93,6 +93,17 @@ const USE_CASES: {
     ],
     storyHref: "/blog/evaluating-a-form-filling-voice-agent",
   },
+  {
+    name: "Raising The Village",
+    logo: "/use-cases/raising-the-village.svg",
+    whatTheyDo:
+      "AI coach that generates tailored coaching messages for field agents supporting smallholder farmers in rural Uganda",
+    useCase: [
+      "Using an LLM judge to check that every part of a coaching message is grounded in the program guidelines",
+      "Benchmarking different LLMs on coaching message quality to find the best tradeoff across accuracy and cost",
+      "Collecting feedback from expert field agents, identifying and resolving disagreements, and aligning LLM judges to the experts",
+    ],
+  },
 ];
 
 function LandingFeatureImageColumn(props: {
@@ -117,7 +128,7 @@ function LandingFeatureImageColumn(props: {
  */
 function UseCaseStoryLink(props: { href: string; className?: string }) {
   const { href, className = "" } = props;
-  const style = `${className} inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer`;
+  const style = `${className} inline-flex items-center px-4 py-2.5 text-sm font-medium bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 transition-colors cursor-pointer`;
 
   if (href.startsWith("/")) {
     return (
@@ -1103,11 +1114,13 @@ export default function HomePage() {
               How non-profits use Calibrate to build AI products responsibly
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+          {/* Stacked on a phone. On a desktop, one row that scrolls sideways:
+              three cards fit and the fourth peeks in from the right. */}
+          <div className="flex flex-col gap-4 md:flex-row md:gap-6 md:overflow-x-auto md:snap-x md:snap-mandatory md:pb-4">
             {USE_CASES.map((useCase) => (
               <div
                 key={useCase.name}
-                className="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 md:p-7 shadow-sm text-left"
+                className="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 md:p-7 shadow-sm text-left md:w-[20rem] md:shrink-0 md:snap-start"
               >
                 <img
                   src={useCase.logo}
@@ -1166,7 +1179,7 @@ export default function HomePage() {
                     {useCase.storyHref && (
                       <UseCaseStoryLink
                         href={useCase.storyHref}
-                        className={useCase.quote ? "mt-3" : ""}
+                        className={useCase.quote ? "mt-4" : ""}
                       />
                     )}
                   </div>
