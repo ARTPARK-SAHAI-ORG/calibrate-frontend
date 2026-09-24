@@ -93,6 +93,18 @@ const USE_CASES: {
     ],
     storyHref: "/blog/evaluating-a-form-filling-voice-agent",
   },
+  {
+    name: "Raising The Village",
+    logo: "/use-cases/raising-the-village.svg",
+    whatTheyDo:
+      "AI coach that generates tailored coaching messages for field agents supporting smallholder farmers in rural Uganda",
+    useCase: [
+      "Using an LLM judge to check that every part of a coaching message is grounded in the program guidelines",
+      "Comparing OpenAI models on coaching message quality before generating 130,000 messages",
+      "Running an expert labelling workshop with experienced field agents and measuring agreement between them",
+      "Calibrating the LLM judge against the experts' labels",
+    ],
+  },
 ];
 
 function LandingFeatureImageColumn(props: {
@@ -1103,11 +1115,13 @@ export default function HomePage() {
               How non-profits use Calibrate to build AI products responsibly
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+          {/* One row that scrolls sideways: three cards fit on a desktop and the
+              fourth peeks in from the right, which is what says there is more. */}
+          <div className="flex gap-4 md:gap-6 overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4 md:mx-0 md:px-0">
             {USE_CASES.map((useCase) => (
               <div
                 key={useCase.name}
-                className="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 md:p-7 shadow-sm text-left"
+                className="flex w-[85vw] max-w-[22rem] shrink-0 snap-start flex-col rounded-2xl border border-gray-200 bg-white p-6 md:p-7 shadow-sm text-left md:w-[20rem]"
               >
                 <img
                   src={useCase.logo}
