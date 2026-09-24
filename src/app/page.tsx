@@ -1115,13 +1115,13 @@ export default function HomePage() {
               How non-profits use Calibrate to build AI products responsibly
             </p>
           </div>
-          {/* One row that scrolls sideways: three cards fit on a desktop and the
-              fourth peeks in from the right, which is what says there is more. */}
-          <div className="flex gap-4 md:gap-6 overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4 md:mx-0 md:px-0">
+          {/* Stacked on a phone. On a desktop, one row that scrolls sideways:
+              three cards fit and the fourth peeks in from the right. */}
+          <div className="flex flex-col gap-4 md:flex-row md:gap-6 md:overflow-x-auto md:snap-x md:snap-mandatory md:pb-4">
             {USE_CASES.map((useCase) => (
               <div
                 key={useCase.name}
-                className="flex w-[85vw] max-w-[22rem] shrink-0 snap-start flex-col rounded-2xl border border-gray-200 bg-white p-6 md:p-7 shadow-sm text-left md:w-[20rem]"
+                className="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 md:p-7 shadow-sm text-left md:w-[20rem] md:shrink-0 md:snap-start"
               >
                 <img
                   src={useCase.logo}
