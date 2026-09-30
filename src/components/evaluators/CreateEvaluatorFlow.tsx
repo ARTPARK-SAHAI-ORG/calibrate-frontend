@@ -10,10 +10,12 @@ import { reportError } from "@/lib/reportError";
 import { getBackendUrl, getDefaultHeaders } from "@/lib/api";
 import {
   type EvaluatorData,
+  type EvaluatorDetail,
   getEvaluatorErrorMessage,
   isEvaluatorNameConflict,
   supportsEvaluatorVariables,
 } from "@/lib/evaluatorApi";
+import { liveVersionOf } from "@/lib/evaluatorVersions";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { type EvaluatorType } from "@/components/EvaluatorPills";
 import { LLMSelectorModal } from "@/components/agent-tabs/LLMSelectorModal";
@@ -96,6 +98,8 @@ type CreateEvaluatorFlowProps = {
   useCaseGroups?: EvaluatorUseCaseOption["group"][];
   /** Further narrow the picker to specific evaluator types (e.g. `llm` on next-reply tests). */
   useCaseTypes?: EvaluatorType[];
+  /** Open the form already filled in from this evaluator, as a copy of it. */
+  duplicateOf?: EvaluatorDetail | null;
 };
 
 /**
@@ -111,6 +115,7 @@ export function CreateEvaluatorFlow({
   onCreated,
   useCaseGroups,
   useCaseTypes,
+  duplicateOf,
 }: CreateEvaluatorFlowProps) {
   const backendAccessToken = useAccessToken();
   const { providers: llmProviders } = useOpenRouterModels();
@@ -179,6 +184,54 @@ export function CreateEvaluatorFlow({
       setNewEvaluatorOutputType("binary");
       setNewEvaluatorScale(initialScale());
       setNewEvaluatorBinaryScale(defaultBinaryScale());
+      // Copying an evaluator: the form opens filled in from it, and the
+      // reader changes what they like before pressing Create.
+      if (duplicateOf?.evaluator_type) {
+        const live = liveVersionOf(duplicateOf);
+        const outputType = duplicateOf.output_type ?? "binary";
+        const scale = live?.output_config?.scale;
+        setNewEvaluatorType(duplicateOf.evaluator_type);
+        setUseCasePickerOpen(false);
+        setSidebarOpen(true);
+        setEvaluatorName(`Copy of ${duplicateOf.name}`);
+        setEvaluatorDescription(duplicateOf.description ?? "");
+        setNewEvaluatorOutputType(outputType);
+        setNewEvaluatorSystemPrompt(live?.system_prompt ?? "");
+        setNewEvaluatorVariableDescriptions(
+          Object.fromEntries(
+            (live?.variables ?? []).map((v) => [v.name, v.description ?? ""]),
+          ),
+        );
+        if (live?.judge_model) {
+          const found =
+            llmProviders.length > 0
+              ? findModelInProviders(llmProviders, live.judge_model)
+              : null;
+          setNewEvaluatorJudgeModel(
+            found ?? { id: live.judge_model, name: live.judge_model },
+          );
+        }
+        if (outputType === "rating" && scale && scale.length >= 2) {
+          setNewEvaluatorScale(
+            scale.map((row) => ({
+              value: typeof row.value === "number" ? row.value : 0,
+              name: row.name ?? "",
+              description: row.description ?? "",
+            })),
+          );
+        } else if (outputType === "binary" && scale) {
+          const rows = scale.map((row) => ({
+            value: Boolean(row.value),
+            name: row.name ?? "",
+            description: row.description ?? "",
+          }));
+          setNewEvaluatorBinaryScale([
+            ...rows.filter((r) => r.value),
+            ...rows.filter((r) => !r.value),
+          ]);
+        }
+        return;
+      }
       // With one use case to choose from there is nothing to ask: go straight
       // to the form with that purpose already set.
       if (onlyUseCase) {
@@ -196,7 +249,7 @@ export function CreateEvaluatorFlow({
       setLlmModalOpen(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, onlyUseCase?.value]);
+  }, [open, onlyUseCase?.value, duplicateOf]);
 
   // Once OpenRouter providers load, upgrade a stub `{ id, name: id }` judge
   // model (seeded from the default-prompt response) to the full LLMModel.

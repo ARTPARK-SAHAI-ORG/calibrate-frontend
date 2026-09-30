@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { CreateEvaluatorFlow } from "../CreateEvaluatorFlow";
+import type { EvaluatorDetail } from "@/lib/evaluatorApi";
 
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
@@ -235,5 +236,184 @@ describe("CreateEvaluatorFlow", () => {
     expect(await screen.findByText("Name is required")).toBeInTheDocument();
     expect(screen.getByLabelText("Name")).toHaveFocus();
     expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  describe("with duplicateOf", () => {
+    const source: EvaluatorDetail = {
+      uuid: "ev-src",
+      name: "Tone check",
+      description: "Is the reply polite",
+      evaluator_type: "llm",
+      output_type: "binary",
+      live_version_index: 0,
+      versions: [
+        {
+          uuid: "v1",
+          version_number: 1,
+          judge_model: "gpt-4",
+          system_prompt: "Was the reply polite?",
+          output_config: null,
+        },
+      ],
+    };
+
+    const fetchCalls = () => (global.fetch as jest.Mock).mock.calls;
+    const postBody = () => {
+      const call = fetchCalls().find(
+        ([url, init]) =>
+          String(url).endsWith("/evaluators") && init?.method === "POST",
+      );
+      return JSON.parse(call![1].body);
+    };
+
+    it("opens the form filled in as a copy, without asking the use case", async () => {
+      render(
+        <CreateEvaluatorFlow
+          open
+          onClose={jest.fn()}
+          existingEvaluators={[]}
+          onCreated={jest.fn()}
+          // One use case on offer is the path that would otherwise fetch the
+          // default prompt, so this is where the copy must not.
+          useCaseTypes={["llm"]}
+          duplicateOf={source}
+        />,
+      );
+
+      expect(
+        screen.queryByText("What is this evaluator for?"),
+      ).not.toBeInTheDocument();
+      expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
+      expect(screen.getByLabelText("Name")).toHaveValue("Copy of Tone check");
+      expect(screen.getByTestId("prompt-field")).toHaveTextContent(
+        "Was the reply polite?",
+      );
+      expect(
+        fetchCalls().some(([url]) =>
+          String(url).includes("/evaluators/default-prompt"),
+        ),
+      ).toBe(false);
+    });
+
+    it("creates the copy from the prefilled form", async () => {
+      const user = setupUser();
+      const onCreated = jest.fn();
+
+      render(
+        <CreateEvaluatorFlow
+          open
+          onClose={jest.fn()}
+          existingEvaluators={[]}
+          onCreated={onCreated}
+          duplicateOf={source}
+        />,
+      );
+
+      await user.click(await screen.findByText("Submit create"));
+
+      await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+      expect(postBody()).toMatchObject({
+        name: "Copy of Tone check",
+        description: "Is the reply polite",
+        evaluator_type: "llm",
+        output_type: "binary",
+        version: {
+          judge_model: "gpt-4",
+          system_prompt: "Was the reply polite?",
+        },
+      });
+    });
+
+    it("carries a binary source's labels and variable descriptions into the copy", async () => {
+      const user = setupUser();
+      const onCreated = jest.fn();
+      const binarySource: EvaluatorDetail = {
+        ...source,
+        versions: [
+          {
+            ...source.versions![0],
+            system_prompt: "Was the reply polite to {{caller}}?",
+            variables: [{ name: "caller", description: "Who called" }],
+            output_config: {
+              // The false row first, to check the copy puts true first.
+              scale: [
+                { value: false, name: "Rude" },
+                { value: true, name: "Polite", description: "Greets them" },
+              ],
+            },
+          },
+        ],
+      };
+
+      render(
+        <CreateEvaluatorFlow
+          open
+          onClose={jest.fn()}
+          existingEvaluators={[]}
+          onCreated={onCreated}
+          duplicateOf={binarySource}
+        />,
+      );
+
+      await user.click(await screen.findByText("Submit create"));
+
+      await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+      expect(postBody().version).toMatchObject({
+        variables: [{ name: "caller", description: "Who called" }],
+        output_config: {
+          scale: [
+            { value: true, name: "Polite", description: "Greets them" },
+            { value: false, name: "Rude" },
+          ],
+        },
+      });
+    });
+
+    it("carries a rating source's scale rows into the copy", async () => {
+      const user = setupUser();
+      const onCreated = jest.fn();
+      const ratingSource: EvaluatorDetail = {
+        ...source,
+        output_type: "rating",
+        versions: [
+          {
+            ...source.versions![0],
+            output_config: {
+              scale: [
+                { value: 1, name: "Rude", description: "Insults the caller" },
+                { value: 2, name: "Neutral" },
+                { value: 3, name: "Warm", description: "Goes out of its way" },
+              ],
+            },
+          },
+        ],
+      };
+
+      render(
+        <CreateEvaluatorFlow
+          open
+          onClose={jest.fn()}
+          existingEvaluators={[]}
+          onCreated={onCreated}
+          duplicateOf={ratingSource}
+        />,
+      );
+
+      await user.click(await screen.findByText("Submit create"));
+
+      await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+      expect(postBody()).toMatchObject({
+        output_type: "rating",
+        version: {
+          output_config: {
+            scale: [
+              { value: 1, name: "Rude", description: "Insults the caller" },
+              { value: 2, name: "Neutral" },
+              { value: 3, name: "Warm", description: "Goes out of its way" },
+            ],
+          },
+        },
+      });
+    });
   });
 });
