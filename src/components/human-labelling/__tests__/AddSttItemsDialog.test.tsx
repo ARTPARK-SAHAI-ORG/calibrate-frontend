@@ -284,7 +284,32 @@ describe("AddSttItemsDialog", () => {
         name: "Clip 1",
         actual_transcript: "hello",
         predicted_transcript: "helo",
+        metadata: [],
       },
+    ]);
+    expect(screen.getByText("Metadata")).toBeInTheDocument();
+  });
+
+  it("keeps the metadata of a duplicated item when adding it", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn().mockResolvedValue(undefined);
+    renderDialog({
+      onSubmit,
+      initialRows: [
+        {
+          uuid: "u1",
+          name: "Clip 1 copy",
+          actual: "hello",
+          predicted: "helo",
+          metadata: [{ key: "speaker", value: "A" }],
+        },
+      ],
+    });
+    expect(screen.getByDisplayValue("speaker")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0][0].metadata).toEqual([
+      { key: "speaker", value: "A" },
     ]);
   });
 
@@ -478,7 +503,7 @@ describe("AddSttItemsDialog", () => {
       expect(screen.getByText("Edit items")).toBeInTheDocument();
       expect(
         screen.getByText(
-          "Update the name, reference, and predicted transcripts for each row",
+          "Update the name, reference and predicted transcripts, and metadata for each row",
         ),
       ).toBeInTheDocument();
       expect(screen.getAllByDisplayValue(/Clip \d/)).toHaveLength(2);
@@ -510,14 +535,75 @@ describe("AddSttItemsDialog", () => {
           name: "Clip 1 renamed",
           actual_transcript: "hello",
           predicted_transcript: "helo",
+          metadata: [],
         },
         {
           uuid: "u2",
           name: "Clip 2",
           actual_transcript: "world",
           predicted_transcript: "wrld",
+          metadata: [],
         },
       ]);
+    });
+
+    it("shows each row's metadata and submits the edited fields", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({
+        mode: "edit",
+        onSubmit,
+        initialRows: [
+          { ...initialRows[0], metadata: [{ key: "speaker", value: "A" }] },
+          { ...initialRows[1], metadata: null },
+        ],
+      });
+
+      expect(screen.getAllByText("Metadata")).toHaveLength(2);
+      expect(screen.getByDisplayValue("speaker")).toBeInTheDocument();
+      const value = screen.getByDisplayValue("A");
+      await user.clear(value);
+      await user.type(value, "B");
+
+      await user.click(screen.getByRole("button", { name: "Save 2 items" }));
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit.mock.calls[0][0].map((r: { metadata: unknown }) => r.metadata)).toEqual([
+        [{ key: "speaker", value: "B" }],
+        [],
+      ]);
+    });
+
+    it("does not save while two metadata fields share a name", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({
+        mode: "edit",
+        onSubmit,
+        initialRows: [
+          { ...initialRows[0], metadata: [{ key: "speaker", value: "A" }] },
+        ],
+      });
+
+      await user.click(screen.getByRole("button", { name: "Add field" }));
+      await user.type(screen.getByLabelText("Metadata field name 2"), "speaker");
+      expect(screen.getByText("Field names must be unique")).toBeInTheDocument();
+
+      const save = screen.getByRole("button", { name: "Save item" });
+      expect(save).toBeDisabled();
+      await user.click(save);
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("does not count an empty added metadata field as a change", async () => {
+      const user = setupUser();
+      const { onClose } = renderDialog({
+        mode: "edit",
+        initialRows: [initialRows[0]],
+      });
+      await user.click(screen.getByRole("button", { name: "Add field" }));
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
     });
 
     it("treats a single-row edit as dirty only when a field differs from the seed", async () => {

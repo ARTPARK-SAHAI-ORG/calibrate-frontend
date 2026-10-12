@@ -21,6 +21,11 @@ import {
   matchesDefaultSlug,
 } from "@/lib/defaultEvaluators";
 import { DialogNavRow, showsDialogNav } from "@/components/ui";
+import {
+  MetadataFieldsEditor,
+  metadataRowErrors,
+  type MetadataRow,
+} from "@/components/human-labelling/MetadataFieldsEditor";
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
@@ -700,6 +705,8 @@ type AddTestDialogProps = {
    */
   itemDescription?: string;
   setItemDescription?: (description: string) => void;
+  itemMetadata?: MetadataRow[];
+  setItemMetadata?: (rows: MetadataRow[]) => void;
   validationAttempted: boolean;
   onSubmit: (
     config: TestConfig,
@@ -819,6 +826,8 @@ export function AddTestDialog({
   setTestName,
   itemDescription,
   setItemDescription,
+  itemMetadata,
+  setItemMetadata,
   validationAttempted,
   onSubmit,
   initialTab,
@@ -3184,6 +3193,12 @@ export function AddTestDialog({
       if (!testName.trim()) {
         return; // Don't submit if validation fails
       }
+      if (
+        isLabelItem &&
+        Object.keys(metadataRowErrors(itemMetadata ?? [])).length > 0
+      ) {
+        return;
+      }
       // At least one evaluator and every variable on every attached evaluator
       // must have a non-empty value.
       if (attachedEvaluators.length === 0) {
@@ -3324,6 +3339,374 @@ export function AddTestDialog({
     hasNext,
     onNext: showRunUnsavedConfirm ? undefined : navNext,
   });
+
+  // Shown in its own right-hand column for a labelling item, in the left
+  // column otherwise.
+  const renderEvaluatorsSection = () => (
+    <div className="relative flex flex-col flex-1 min-h-0 min-w-0">
+      <div className="flex items-center justify-between mb-2 shrink-0">
+        <label className="text-base font-medium text-foreground">
+          Evaluators
+        </label>
+        {!isLabelItem && (
+          <button
+            onClick={() => {
+              if (evaluatorPickerOpen) {
+                closeEvaluatorPicker();
+              } else {
+                setEvaluatorPickerSelectedIds(new Set());
+                setEvaluatorPickerOpen(true);
+              }
+            }}
+            // Not disabled when the pool is empty: the
+            // dropdown explains what to do about it,
+            // which a greyed-out button cannot.
+            disabled={evaluatorsLoading || isLoading}
+            // Tinted violet so the action stands out from
+            // the neutral form chrome around it. Validation
+            // error state overrides border/text to red.
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-500/12 border-violet-500/45 text-violet-950 dark:text-violet-100 hover:bg-violet-500/22 dark:hover:bg-violet-500/18 ${
+              localValidationAttempted &&
+              isEvaluatorTab &&
+              attachedEvaluators.length === 0
+                ? "!border-red-500 !text-red-500 !bg-red-500/10"
+                : ""
+            }`}
+          >
+            Add evaluator
+          </button>
+        )}
+      </div>
+
+      {/* Evaluator picker dropdown */}
+      {evaluatorPickerOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-[99]"
+            onClick={closeEvaluatorPicker}
+          />
+          <div className="absolute right-0 top-9 mt-1 w-[26rem] max-w-[calc(100vw-2rem)] max-h-80 flex flex-col bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
+            {/* Sticky search bar */}
+            <div className="p-2 border-b border-border bg-background">
+              <input
+                type="text"
+                value={evaluatorPickerSearch}
+                onChange={(e) =>
+                  setEvaluatorPickerSearch(e.target.value)
+                }
+                placeholder="Search evaluators"
+                autoFocus
+                className="w-full h-9 px-3 rounded-md text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {(() => {
+                const remaining = availableLLMEvaluators.filter(
+                  (o) =>
+                    !attachedEvaluators.some(
+                      (a) => a.evaluator_uuid === o.uuid,
+                    ) &&
+                    (activeTab === "conversation"
+                      ? o.evaluator_type ===
+                        CONVERSATION_EVALUATOR_TYPE
+                      : o.evaluator_type ===
+                        nextReplyEvaluatorType),
+                );
+                if (remaining.length === 0) {
+                  const wantedType =
+                    activeTab === "conversation"
+                      ? CONVERSATION_EVALUATOR_TYPE
+                      : nextReplyEvaluatorType;
+                  const anyOfType = availableLLMEvaluators.some(
+                    (o) => o.evaluator_type === wantedType,
+                  );
+                  return (
+                    <div className="px-4 py-6 text-sm text-muted-foreground text-center">
+                      {anyOfType
+                        ? "Every evaluator of this type is already added to this test."
+                        : "No evaluators of this type yet. Create one on the agent's Evaluators tab, then come back here."}
+                    </div>
+                  );
+                }
+                const matches = getAvailablePickerEvaluators();
+                if (matches.length === 0) {
+                  return (
+                    <div className="px-4 py-6 text-sm text-muted-foreground text-center">
+                      No evaluators match &ldquo;
+                      {evaluatorPickerSearch}&rdquo;.
+                    </div>
+                  );
+                }
+                const defaults =
+                  matches.filter(isDefaultEvaluator);
+                const mine = matches.filter(isOwnedEvaluator);
+                const showSections =
+                  defaults.length > 0 && mine.length > 0;
+                const renderRow = (o: LLMEvaluatorOption) => {
+                  const checked =
+                    evaluatorPickerSelectedIds.has(o.uuid);
+                  return (
+                    <div
+                      key={o.uuid}
+                      className="flex items-start gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors"
+                    >
+                      <span className="flex h-5 items-center flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${o.name}`}
+                          checked={checked}
+                          onChange={() =>
+                            toggleEvaluatorPickerSelection(
+                              o.uuid,
+                            )
+                          }
+                          className="w-4 h-4 cursor-pointer accent-foreground"
+                        />
+                      </span>
+                      {/* Opens the prompt on top rather than
+                          ticking the box, so an evaluator can
+                          be read before it is added. */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPreviewEvaluator({
+                            uuid: o.uuid,
+                            name: o.name,
+                          })
+                        }
+                        className="min-w-0 flex-1 text-left cursor-pointer focus:outline-none"
+                      >
+                        <div className="text-sm font-medium text-foreground">
+                          {o.name}
+                        </div>
+                        {o.description && (
+                          <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                            {o.description}
+                          </div>
+                        )}
+                      </button>
+                    </div>
+                  );
+                };
+                const renderSection = (
+                  label: string,
+                  options: LLMEvaluatorOption[],
+                ) => (
+                  <div>
+                    {showSections && (
+                      <div className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {label}
+                      </div>
+                    )}
+                    {options.map(renderRow)}
+                  </div>
+                );
+                return (
+                  <>
+                    {mine.length > 0 &&
+                      renderSection("My evaluators", mine)}
+                    {defaults.length > 0 &&
+                      renderSection("Default", defaults)}
+                  </>
+                );
+              })()}
+            </div>
+            <div className="flex items-center justify-between gap-2 border-t border-border p-2 bg-background">
+              <button
+                type="button"
+                onClick={() => {
+                  closeEvaluatorPicker();
+                  setCreateEvaluatorOpen(true);
+                }}
+                className="h-8 px-3 rounded-md text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+              >
+                Create evaluator
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const selected =
+                    getAvailablePickerEvaluators().filter((o) =>
+                      evaluatorPickerSelectedIds.has(o.uuid),
+                    );
+                  attachEvaluatorsFromOptions(selected);
+                }}
+                disabled={evaluatorPickerSelectedIds.size === 0}
+                className="h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {evaluatorPickerSelectedIds.size > 0
+                  ? `Add (${evaluatorPickerSelectedIds.size})`
+                  : "Add"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Empty / loading state */}
+      {evaluatorsLoading && attachedEvaluators.length === 0 && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+          <svg
+            className="w-4 h-4 animate-spin"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+          Loading evaluators
+        </div>
+      )}
+      {!evaluatorsLoading &&
+        attachedEvaluators.length === 0 && (
+          <div
+            className={`text-sm py-4 ${
+              localValidationAttempted && isEvaluatorTab
+                ? "text-red-500"
+                : "text-muted-foreground"
+            }`}
+          >
+            {activeTab === "conversation"
+              ? "Add at least one evaluator to grade the full conversation"
+              : "Add at least one evaluator to grade the agent's next reply"}
+          </div>
+        )}
+
+      {/* Attached evaluator cards */}
+      <div
+        ref={evaluatorsContainerRef}
+        data-tour="test-evaluators-area"
+        className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1"
+      >
+        {attachedEvaluators.map((ev) => (
+          <div
+            key={ev.evaluator_uuid}
+            className="border border-border rounded-lg p-4 bg-background"
+          >
+            {/* The gap below only separates the name from the
+                variable fields, so a card with no variables
+                does not carry it. */}
+            <div
+              className={`flex items-start justify-between gap-2 ${
+                ev.variables.length > 0 ? "mb-3" : ""
+              }`}
+            >
+              {/* Opens the prompt on top, so how this
+                  evaluator judges can be read without leaving
+                  the test. */}
+              <button
+                type="button"
+                onClick={() =>
+                  setPreviewEvaluator({
+                    uuid: ev.evaluator_uuid,
+                    name: ev.name,
+                  })
+                }
+                className="min-w-0 flex-1 text-left cursor-pointer focus:outline-none"
+              >
+                <div className="text-sm font-semibold text-foreground">
+                  {ev.name}
+                </div>
+                {ev.description && (
+                  <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                    {ev.description}
+                  </div>
+                )}
+              </button>
+              {!isLabelItem && (
+                <button
+                  onClick={() =>
+                    removeAttachedEvaluator(ev.evaluator_uuid)
+                  }
+                  className="text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+                  aria-label={`Remove ${ev.name}`}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {ev.variables.length > 0 && (
+              <div className="space-y-3">
+                {ev.variables.map((v) => {
+                  // Uniform rendering for every evaluator variable:
+                  // a small `{{name}}` monospace hint + textarea
+                  // whose placeholder is the variable's
+                  // `description` (falling back to `default`, then
+                  // a generic prompt). No special-case label —
+                  // the description carries the user-facing copy.
+                  const placeholder =
+                    v.description && v.description.length > 0
+                      ? v.description
+                      : v.default && v.default.length > 0
+                        ? v.default
+                        : `Enter value for {{${v.name}}}`;
+                  const value =
+                    ev.variable_values[v.name] ?? "";
+                  const isMissing =
+                    localValidationAttempted &&
+                    isEvaluatorTab &&
+                    value.trim().length === 0;
+                  return (
+                    <div key={v.name}>
+                      <div className="text-xs text-muted-foreground mb-1.5">
+                        <code className="font-mono">{`{{${v.name}}}`}</code>
+                      </div>
+                      <textarea
+                        value={value}
+                        onChange={(e) =>
+                          updateEvaluatorVariableValue(
+                            ev.evaluator_uuid,
+                            v.name,
+                            e.target.value,
+                          )
+                        }
+                        placeholder={placeholder}
+                        rows={4}
+                        className={`w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-none ${
+                          isMissing
+                            ? "border-red-500"
+                            : "border-border"
+                        }`}
+                      />
+                      {isMissing && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Value cannot be empty
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   if (!isOpen) return null;
 
@@ -3490,13 +3873,17 @@ export function AddTestDialog({
             {/* Left Column - Form */}
             <div
               className={`w-full ${
-                hasCustomInputs ? "md:w-[35%]" : "md:w-1/2"
+                isLabelItem
+                  ? "md:w-[30%]"
+                  : hasCustomInputs
+                    ? "md:w-[35%]"
+                    : "md:w-1/2"
               } flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-border`}
             >
               {/* Content */}
               <div
                 className={`flex-1 min-h-0 overflow-x-visible p-4 md:p-6 ${
-                  isEvaluatorTab && !isLoading
+                  isEvaluatorTab && !isLoading && !isLabelItem
                     ? "flex flex-col overflow-hidden"
                     : "overflow-y-auto"
                 }`}
@@ -3560,386 +3947,32 @@ export function AddTestDialog({
                     {/* Description (labelling items only) */}
                     {isLabelItem && setItemDescription && (
                       <div className="shrink-0">
-                        <label className="block text-base font-medium text-foreground mb-2">
+                        <label className="block text-base font-medium text-foreground">
                           Description
                         </label>
+                        <p className="text-xs text-muted-foreground mt-1 mb-2">
+                          Any details about this item to help annotators while labelling
+                        </p>
                         <textarea
                           value={itemDescription ?? ""}
                           onChange={(e) => setItemDescription(e.target.value)}
-                          placeholder="(Optional) What is this item about? Shown to annotators alongside the evaluators."
+                          placeholder="Mother asks when her baby's next vaccine is due"
                           rows={3}
                           className="w-full px-4 py-2.5 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-y"
                         />
                       </div>
                     )}
 
-                    {/* Evaluators (next-reply tab only) */}
-                    <div className="relative flex flex-col flex-1 min-h-0 min-w-0">
-                      <div className="flex items-center justify-between mb-2 shrink-0">
-                        <label className="text-base font-medium text-foreground">
-                          Evaluators
-                        </label>
-                        {!isLabelItem &&
-                          (() => {
-                            return (
-                              <button
-                                onClick={() => {
-                                  if (evaluatorPickerOpen) {
-                                    closeEvaluatorPicker();
-                                  } else {
-                                    setEvaluatorPickerSelectedIds(new Set());
-                                    setEvaluatorPickerOpen(true);
-                                  }
-                                }}
-                                // Not disabled when the pool is empty: the
-                                // dropdown explains what to do about it,
-                                // which a greyed-out button cannot.
-                                disabled={evaluatorsLoading || isLoading}
-                                // Tinted violet so the action stands out from
-                                // the neutral form chrome around it. Validation
-                                // error state overrides border/text to red.
-                                className={`px-3 py-1.5 text-sm font-medium rounded-lg border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-violet-500/12 border-violet-500/45 text-violet-950 dark:text-violet-100 hover:bg-violet-500/22 dark:hover:bg-violet-500/18 ${
-                                  localValidationAttempted &&
-                                  isEvaluatorTab &&
-                                  attachedEvaluators.length === 0
-                                    ? "!border-red-500 !text-red-500 !bg-red-500/10"
-                                    : ""
-                                }`}
-                              >
-                                Add evaluator
-                              </button>
-                            );
-                          })()}
+                    {isLabelItem && setItemMetadata && (
+                      <div className="shrink-0">
+                        <MetadataFieldsEditor
+                          rows={itemMetadata ?? []}
+                          onRowsChange={setItemMetadata}
+                        />
                       </div>
+                    )}
 
-                      {/* Evaluator picker dropdown */}
-                      {evaluatorPickerOpen && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-[99]"
-                            onClick={closeEvaluatorPicker}
-                          />
-                          <div className="absolute right-0 top-9 mt-1 w-[26rem] max-w-[calc(100vw-2rem)] max-h-80 flex flex-col bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
-                            {/* Sticky search bar */}
-                            <div className="p-2 border-b border-border bg-background">
-                              <input
-                                type="text"
-                                value={evaluatorPickerSearch}
-                                onChange={(e) =>
-                                  setEvaluatorPickerSearch(e.target.value)
-                                }
-                                placeholder="Search evaluators"
-                                autoFocus
-                                className="w-full h-9 px-3 rounded-md text-sm bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-1 focus:ring-accent"
-                              />
-                            </div>
-                            <div className="flex-1 overflow-y-auto">
-                              {(() => {
-                                const remaining = availableLLMEvaluators.filter(
-                                  (o) =>
-                                    !attachedEvaluators.some(
-                                      (a) => a.evaluator_uuid === o.uuid,
-                                    ) &&
-                                    (activeTab === "conversation"
-                                      ? o.evaluator_type ===
-                                        CONVERSATION_EVALUATOR_TYPE
-                                      : o.evaluator_type ===
-                                        nextReplyEvaluatorType),
-                                );
-                                if (remaining.length === 0) {
-                                  const wantedType =
-                                    activeTab === "conversation"
-                                      ? CONVERSATION_EVALUATOR_TYPE
-                                      : nextReplyEvaluatorType;
-                                  const anyOfType = availableLLMEvaluators.some(
-                                    (o) => o.evaluator_type === wantedType,
-                                  );
-                                  return (
-                                    <div className="px-4 py-6 text-sm text-muted-foreground text-center">
-                                      {anyOfType
-                                        ? "Every evaluator of this type is already added to this test."
-                                        : "No evaluators of this type yet. Create one on the agent's Evaluators tab, then come back here."}
-                                    </div>
-                                  );
-                                }
-                                const matches = getAvailablePickerEvaluators();
-                                if (matches.length === 0) {
-                                  return (
-                                    <div className="px-4 py-6 text-sm text-muted-foreground text-center">
-                                      No evaluators match &ldquo;
-                                      {evaluatorPickerSearch}&rdquo;.
-                                    </div>
-                                  );
-                                }
-                                const defaults =
-                                  matches.filter(isDefaultEvaluator);
-                                const mine = matches.filter(isOwnedEvaluator);
-                                const showSections =
-                                  defaults.length > 0 && mine.length > 0;
-                                const renderRow = (o: LLMEvaluatorOption) => {
-                                  const checked =
-                                    evaluatorPickerSelectedIds.has(o.uuid);
-                                  return (
-                                    <div
-                                      key={o.uuid}
-                                      className="flex items-start gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors"
-                                    >
-                                      <span className="flex h-5 items-center flex-shrink-0">
-                                        <input
-                                          type="checkbox"
-                                          aria-label={`Select ${o.name}`}
-                                          checked={checked}
-                                          onChange={() =>
-                                            toggleEvaluatorPickerSelection(
-                                              o.uuid,
-                                            )
-                                          }
-                                          className="w-4 h-4 cursor-pointer accent-foreground"
-                                        />
-                                      </span>
-                                      {/* Opens the prompt on top rather than
-                                          ticking the box, so an evaluator can
-                                          be read before it is added. */}
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setPreviewEvaluator({
-                                            uuid: o.uuid,
-                                            name: o.name,
-                                          })
-                                        }
-                                        className="min-w-0 flex-1 text-left cursor-pointer focus:outline-none"
-                                      >
-                                        <div className="text-sm font-medium text-foreground">
-                                          {o.name}
-                                        </div>
-                                        {o.description && (
-                                          <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                                            {o.description}
-                                          </div>
-                                        )}
-                                      </button>
-                                    </div>
-                                  );
-                                };
-                                const renderSection = (
-                                  label: string,
-                                  options: LLMEvaluatorOption[],
-                                ) => (
-                                  <div>
-                                    {showSections && (
-                                      <div className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                        {label}
-                                      </div>
-                                    )}
-                                    {options.map(renderRow)}
-                                  </div>
-                                );
-                                return (
-                                  <>
-                                    {mine.length > 0 &&
-                                      renderSection("My evaluators", mine)}
-                                    {defaults.length > 0 &&
-                                      renderSection("Default", defaults)}
-                                  </>
-                                );
-                              })()}
-                            </div>
-                            <div className="flex items-center justify-between gap-2 border-t border-border p-2 bg-background">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  closeEvaluatorPicker();
-                                  setCreateEvaluatorOpen(true);
-                                }}
-                                className="h-8 px-3 rounded-md text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
-                              >
-                                Create evaluator
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const selected =
-                                    getAvailablePickerEvaluators().filter((o) =>
-                                      evaluatorPickerSelectedIds.has(o.uuid),
-                                    );
-                                  attachEvaluatorsFromOptions(selected);
-                                }}
-                                disabled={evaluatorPickerSelectedIds.size === 0}
-                                className="h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {evaluatorPickerSelectedIds.size > 0
-                                  ? `Add (${evaluatorPickerSelectedIds.size})`
-                                  : "Add"}
-                              </button>
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {/* Empty / loading state */}
-                      {evaluatorsLoading && attachedEvaluators.length === 0 && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-                          <svg
-                            className="w-4 h-4 animate-spin"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            />
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            />
-                          </svg>
-                          Loading evaluators
-                        </div>
-                      )}
-                      {!evaluatorsLoading &&
-                        attachedEvaluators.length === 0 && (
-                          <div
-                            className={`text-sm py-4 ${
-                              localValidationAttempted && isEvaluatorTab
-                                ? "text-red-500"
-                                : "text-muted-foreground"
-                            }`}
-                          >
-                            {activeTab === "conversation"
-                              ? "Add at least one evaluator to grade the full conversation"
-                              : "Add at least one evaluator to grade the agent's next reply"}
-                          </div>
-                        )}
-
-                      {/* Attached evaluator cards */}
-                      <div
-                        ref={evaluatorsContainerRef}
-                        data-tour="test-evaluators-area"
-                        className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1"
-                      >
-                        {attachedEvaluators.map((ev) => (
-                          <div
-                            key={ev.evaluator_uuid}
-                            className="border border-border rounded-lg p-4 bg-background"
-                          >
-                            {/* The gap below only separates the name from the
-                                variable fields, so a card with no variables
-                                does not carry it. */}
-                            <div
-                              className={`flex items-start justify-between gap-2 ${
-                                ev.variables.length > 0 ? "mb-3" : ""
-                              }`}
-                            >
-                              {/* Opens the prompt on top, so how this
-                                  evaluator judges can be read without leaving
-                                  the test. */}
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setPreviewEvaluator({
-                                    uuid: ev.evaluator_uuid,
-                                    name: ev.name,
-                                  })
-                                }
-                                className="min-w-0 flex-1 text-left cursor-pointer focus:outline-none"
-                              >
-                                <div className="text-sm font-semibold text-foreground">
-                                  {ev.name}
-                                </div>
-                                {ev.description && (
-                                  <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                                    {ev.description}
-                                  </div>
-                                )}
-                              </button>
-                              {!isLabelItem && (
-                                <button
-                                  onClick={() =>
-                                    removeAttachedEvaluator(ev.evaluator_uuid)
-                                  }
-                                  className="text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
-                                  aria-label={`Remove ${ev.name}`}
-                                >
-                                  <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={2}
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="M6 18L18 6M6 6l12 12"
-                                    />
-                                  </svg>
-                                </button>
-                              )}
-                            </div>
-
-                            {ev.variables.length > 0 && (
-                              <div className="space-y-3">
-                                {ev.variables.map((v) => {
-                                  // Uniform rendering for every evaluator variable:
-                                  // a small `{{name}}` monospace hint + textarea
-                                  // whose placeholder is the variable's
-                                  // `description` (falling back to `default`, then
-                                  // a generic prompt). No special-case label —
-                                  // the description carries the user-facing copy.
-                                  const placeholder =
-                                    v.description && v.description.length > 0
-                                      ? v.description
-                                      : v.default && v.default.length > 0
-                                        ? v.default
-                                        : `Enter value for {{${v.name}}}`;
-                                  const value =
-                                    ev.variable_values[v.name] ?? "";
-                                  const isMissing =
-                                    localValidationAttempted &&
-                                    isEvaluatorTab &&
-                                    value.trim().length === 0;
-                                  return (
-                                    <div key={v.name}>
-                                      <div className="text-xs text-muted-foreground mb-1.5">
-                                        <code className="font-mono">{`{{${v.name}}}`}</code>
-                                      </div>
-                                      <textarea
-                                        value={value}
-                                        onChange={(e) =>
-                                          updateEvaluatorVariableValue(
-                                            ev.evaluator_uuid,
-                                            v.name,
-                                            e.target.value,
-                                          )
-                                        }
-                                        placeholder={placeholder}
-                                        rows={4}
-                                        className={`w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-none ${
-                                          isMissing
-                                            ? "border-red-500"
-                                            : "border-border"
-                                        }`}
-                                      />
-                                      {isMissing && (
-                                        <p className="text-xs text-red-500 mt-1">
-                                          Value cannot be empty
-                                        </p>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    {!isLabelItem && renderEvaluatorsSection()}
                   </div>
                 ) : (
                   <div className="space-y-6">
@@ -4254,7 +4287,11 @@ export function AddTestDialog({
             {/* Middle Column - Chat Messages */}
             <div
               className={`w-full ${
-                hasCustomInputs ? "md:w-[40%]" : "md:w-1/2"
+                isLabelItem
+                  ? "md:w-[45%]"
+                  : hasCustomInputs
+                    ? "md:w-[40%]"
+                    : "md:w-1/2"
               } flex flex-col min-h-0 bg-muted/30 overflow-visible`}
             >
               {/* Info banner */}
@@ -5262,6 +5299,15 @@ export function AddTestDialog({
                 )}
               </div>
             </div>
+
+            {isLabelItem && (
+              <div
+                data-testid="label-item-evaluators-column"
+                className="w-full md:w-[25%] flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 md:border-l border-border p-4 md:p-6"
+              >
+                {!isLoading && renderEvaluatorsSection()}
+              </div>
+            )}
 
             {/* Right Column - Custom inputs (only when the agent has fields) */}
             {hasCustomInputs && (

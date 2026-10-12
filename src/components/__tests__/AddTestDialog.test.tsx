@@ -1536,7 +1536,7 @@ describe("AddTestDialog", () => {
         />,
       );
       const descriptionBox = screen.getByPlaceholderText(
-        /\(Optional\) What is this item about/,
+        /Mother asks when her baby/,
       );
       await user.type(descriptionBox, "Some notes");
       expect(descriptionBox).toHaveValue("Some notes");
@@ -1556,6 +1556,115 @@ describe("AddTestDialog", () => {
       expect(
         screen.queryByRole("button", { name: /Run test/ }),
       ).not.toBeInTheDocument();
+    });
+
+    it("renders the metadata editor and reports typed rows", async () => {
+      const user = setupUser();
+      const setItemMetadata = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            mode: "labelItem",
+            setItemDescription: jest.fn(),
+            itemMetadata: [{ key: "source", value: "chat" }],
+            setItemMetadata,
+          })}
+        />,
+      );
+      expect(screen.getByText("Metadata")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Add field" }),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Metadata field name 1")).toHaveValue(
+        "source",
+      );
+      expect(screen.getByLabelText("Metadata value 1")).toHaveValue("chat");
+      await user.type(screen.getByLabelText("Metadata value 1"), "!");
+      expect(setItemMetadata).toHaveBeenCalledWith([
+        { key: "source", value: "chat!" },
+      ]);
+    });
+
+    it("renders nothing about metadata without setItemMetadata", () => {
+      render(
+        <ControlledDialog
+          {...baseProps({ mode: "labelItem", setItemDescription: jest.fn() })}
+        />,
+      );
+      expect(screen.queryByText("Metadata")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Add field" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("puts the evaluators in their own right column, away from the name", () => {
+      render(
+        <ControlledDialog
+          {...baseProps({ mode: "labelItem", setItemDescription: jest.fn() })}
+        />,
+      );
+      const column = screen.getByTestId("label-item-evaluators-column");
+      expect(within(column).getByText("Evaluators")).toBe(
+        screen.getByText("Evaluators"),
+      );
+      expect(
+        within(column).queryByPlaceholderText("Your item name"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Your item name")).toBeInTheDocument();
+    });
+
+    async function fillLabelItem(user: ReturnType<typeof setupUser>) {
+      await user.type(screen.getByPlaceholderText("Your item name"), "Item");
+      const textareas = document.querySelectorAll("textarea[data-msg-id]");
+      await user.type(textareas[0], "User asks");
+      await user.type(textareas[1], "Agent replies");
+      const criteria = screen.queryByPlaceholderText(
+        "Enter value for {{criteria}}",
+      );
+      if (criteria) await user.type(criteria, "Reply is helpful");
+      await user.click(screen.getByRole("button", { name: "Create" }));
+    }
+
+    it("does not save while two metadata rows share a field name", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            mode: "labelItem",
+            onSubmit,
+            setItemDescription: jest.fn(),
+            requireAssistantLastMessage: true,
+            itemMetadata: [
+              { key: "source", value: "chat" },
+              { key: "source", value: "email" },
+            ],
+            setItemMetadata: jest.fn(),
+          })}
+        />,
+      );
+      await fillLabelItem(user);
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByText("Field names must be unique")).toBeInTheDocument();
+    });
+
+    it("saves when every metadata row has its own field name", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            mode: "labelItem",
+            onSubmit,
+            setItemDescription: jest.fn(),
+            requireAssistantLastMessage: true,
+            itemMetadata: [{ key: "source", value: "chat" }],
+            setItemMetadata: jest.fn(),
+          })}
+        />,
+      );
+      await fillLabelItem(user);
+      expect(onSubmit).toHaveBeenCalledTimes(1);
     });
   });
 

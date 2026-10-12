@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, render, screen, setupUser } from "@/test-utils";
+import { cleanup, render, screen, setupUser, within } from "@/test-utils";
 
 // AnnotationJobView pulls in canvas-confetti and backend API helpers that
 // are irrelevant to this presentational view; stub ItemPane with a simple
@@ -2081,18 +2081,6 @@ describe("EvaluatorResultsPane", () => {
     expect(screen.getByText("No evaluators in this run.")).toBeInTheDocument();
   });
 
-  it("renders the item description when provided", () => {
-    render(
-      <EvaluatorResultsPane
-        {...baseProps}
-        evaluators={[]}
-        runs={[]}
-        itemDescription="  Some description  "
-      />,
-    );
-    expect(screen.getByText("Some description")).toBeInTheDocument();
-  });
-
   it("renders a comments block with pills that switch the active comment", async () => {
     const user = setupUser();
     render(
@@ -2863,15 +2851,18 @@ describe("ItemDetailPane expected tool calls", () => {
   });
 });
 
-describe("ItemDetailPane metadata", () => {
-  const renderPane = (metadata?: { key: string; value: string }[]) =>
+describe("ItemDetailPane about column", () => {
+  const renderPane = (
+    payload: Record<string, unknown>,
+    metadata?: { key: string; value: string }[],
+  ) =>
     render(
       <ItemDetailPane
         item={{
           id: 0,
           uuid: "item-1",
           task_id: "task-1",
-          payload: { description: "Desc here" },
+          payload,
           created_at: "",
           deleted_at: null,
           metadata,
@@ -2890,15 +2881,37 @@ describe("ItemDetailPane metadata", () => {
       />,
     );
 
-  it("shows the item's metadata under a Metadata heading", () => {
-    renderPane([{ key: "source", value: "crm" }]);
-    expect(screen.getByText("Metadata")).toBeInTheDocument();
-    expect(screen.getByText("source")).toBeInTheDocument();
-    expect(screen.getByText("crm")).toBeInTheDocument();
+  it("draws the description and the metadata in a column of their own", () => {
+    renderPane({ description: "  Desc here  " }, [{ key: "source", value: "crm" }]);
+    const pane = screen.getByTestId("item-detail-about-pane");
+    expect(within(pane).getByText("Description")).toBeInTheDocument();
+    expect(within(pane).getByText("Desc here")).toBeInTheDocument();
+    expect(within(pane).getByText("Metadata")).toBeInTheDocument();
+    expect(within(pane).getByText("source")).toBeInTheDocument();
+    expect(within(pane).getByText("crm")).toBeInTheDocument();
   });
 
-  it("shows no Metadata heading for an item without metadata", () => {
-    renderPane();
+  it("keeps the column for a description alone", () => {
+    renderPane({ description: "Desc here" });
+    const pane = screen.getByTestId("item-detail-about-pane");
+    expect(within(pane).getByText("Desc here")).toBeInTheDocument();
+    expect(screen.queryByText("Metadata")).not.toBeInTheDocument();
+  });
+
+  it("keeps the column for metadata alone", () => {
+    renderPane({}, [{ key: "source", value: "crm" }]);
+    const pane = screen.getByTestId("item-detail-about-pane");
+    expect(within(pane).getByText("crm")).toBeInTheDocument();
+    expect(screen.queryByText("Description")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["nothing", {}, undefined],
+    ["a blank description and an empty metadata list", { description: "   " }, []],
+  ])("draws no column for an item with %s", (_label, payload, metadata) => {
+    renderPane(payload, metadata);
+    expect(screen.queryByTestId("item-detail-about-pane")).not.toBeInTheDocument();
+    expect(screen.queryByText("Description")).not.toBeInTheDocument();
     expect(screen.queryByText("Metadata")).not.toBeInTheDocument();
   });
 
