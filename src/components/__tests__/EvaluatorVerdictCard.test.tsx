@@ -655,7 +655,11 @@ describe("EvaluatorVerdictCard - write mode rating", () => {
     expect(onValueChange).toHaveBeenCalledWith(2);
   });
 
-  it("highlights the currently active rating value", () => {
+  it.each([
+    [1, "bg-red-600"],
+    [2, "bg-amber-600"],
+    [3, "bg-green-600"],
+  ])("colours the picked rating %i with %s", (value, colour) => {
     render(
       <EvaluatorVerdictCard
         mode="write"
@@ -663,12 +667,17 @@ describe("EvaluatorVerdictCard - write mode rating", () => {
         outputType="rating"
         scaleMin={1}
         scaleMax={3}
-        value={2}
+        value={value}
       />,
     );
-    expect(screen.getByRole("button", { name: "2" })).toHaveClass(
-      "bg-foreground",
+    expect(screen.getByRole("button", { name: String(value) })).toHaveClass(
+      colour,
     );
+    for (const other of [1, 2, 3].filter((n) => n !== value)) {
+      expect(screen.getByRole("button", { name: String(other) })).toHaveClass(
+        "bg-background",
+      );
+    }
   });
 
   it("renders per-level labels beneath the numbers when ratingScale has names", () => {

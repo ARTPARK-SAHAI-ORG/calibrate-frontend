@@ -143,6 +143,13 @@ export function evaluatorCardSurfaceClass(tone: Tone): string {
   }
 }
 
+const RATING_ACTIVE_CLASS: Record<Tone, string> = {
+  green: "border-green-600 bg-green-600 text-white",
+  red: "border-red-600 bg-red-600 text-white",
+  amber: "border-amber-600 bg-amber-600 text-white",
+  neutral: "border-foreground bg-foreground text-background",
+};
+
 export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
   const tone: Tone = props.mode === "read" ? readVerdictTone(props) : "neutral";
 
@@ -569,6 +576,11 @@ function WriteControls({
         const entry = ratingScale?.find((e) => e.value === n);
         const label = entry?.name?.trim() || null;
         const text = entry?.description?.trim() || null;
+        // The picked level wears the same colour the read view gives it.
+        const activeClass =
+          RATING_ACTIVE_CLASS[
+            readVerdictTone({ score: n, scaleMin, scaleMax })
+          ];
         return (
           <button
             key={n}
@@ -584,7 +596,7 @@ function WriteControls({
                   : "w-9 h-9 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             } text-sm font-medium ${
               active
-                ? "border-foreground bg-foreground text-background"
+                ? activeClass
                 : "border-border bg-background hover:bg-muted/50"
             }`}
           >
@@ -598,13 +610,13 @@ function WriteControls({
                   <OptionDescription
                     text={text}
                     active={active}
-                    activeClass="text-background/80"
+                    activeClass="text-white/80"
                   />
                 )
               : hasLabels && (
                   <span
                     className={`text-[10px] font-normal leading-tight ${
-                      active ? "text-background/80" : "text-muted-foreground"
+                      active ? "text-white/80" : "text-muted-foreground"
                     }`}
                   >
                     {label ?? ""}
