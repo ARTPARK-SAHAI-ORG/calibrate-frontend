@@ -71,7 +71,12 @@ import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
 import { ServerPaginatedListBar } from "@/components/ui/ServerPaginatedListBar";
-import { Breadcrumbs, CopyLinkButton, type Crumb } from "@/components/ui";
+import {
+  Breadcrumbs,
+  CopyLinkButton,
+  type Crumb,
+  type MetadataEntry,
+} from "@/components/ui";
 import {
   useAccessToken,
   useItemPager,
@@ -164,6 +169,7 @@ type SummaryAnnotation = {
 type SummaryRow = {
   item_id: string;
   payload: Record<string, unknown> | null;
+  metadata?: MetadataEntry[] | null;
   evaluator_id: string;
   evaluator_version_id?: string | null;
   evaluator_value: boolean | number | null;
@@ -261,6 +267,7 @@ type LabellingItem = {
   /** True when this row's answer was a tool call rather than a written
    * reply. Set by the backend, the same field the labelling job sends. */
   is_tool_call?: boolean;
+  metadata?: MetadataEntry[] | null;
   created_at: string;
   updated_at?: string;
   deleted_at: string | null;
@@ -1710,6 +1717,7 @@ function LabellingTaskPageInner() {
               uuid: row.item_id,
               task_id: taskSummary.task_id,
               payload: row.payload,
+              metadata: row.metadata,
               created_at: "",
               updated_at: undefined,
               deleted_at: null,
@@ -3141,6 +3149,7 @@ function LabellingTaskPageInner() {
                                   uuid: row.item_id,
                                   task_id: batch.task_id,
                                   payload: row.payload,
+                                  metadata: row.metadata,
                                   created_at: "",
                                   updated_at: undefined,
                                   deleted_at: null,

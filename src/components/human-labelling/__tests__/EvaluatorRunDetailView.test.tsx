@@ -105,6 +105,7 @@ describe("snapshotToItem", () => {
       payload: { a: 1 },
       created_at: "",
       deleted_at: null,
+      metadata: undefined,
     });
   });
 });
@@ -2859,5 +2860,52 @@ describe("ItemDetailPane expected tool calls", () => {
   it("shows no heading for an item without expected tool calls", () => {
     renderPane({ description: "Desc here" });
     expect(screen.queryByText("Expected tool calls")).not.toBeInTheDocument();
+  });
+});
+
+describe("ItemDetailPane metadata", () => {
+  const renderPane = (metadata?: { key: string; value: string }[]) =>
+    render(
+      <ItemDetailPane
+        item={{
+          id: 0,
+          uuid: "item-1",
+          task_id: "task-1",
+          payload: { description: "Desc here" },
+          created_at: "",
+          deleted_at: null,
+          metadata,
+        }}
+        taskType="llm"
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
+        evaluatorNamesById={{ "ev-bin": "Binary Evaluator" }}
+        getJobEvaluator={() => evaluatorBinary}
+        runs={[makeRun()]}
+        versionLabels={{}}
+        jobStatus="completed"
+        humanAgreementForItem={null}
+        evaluatorVariablesByEvaluatorId={{}}
+      />,
+    );
+
+  it("shows the item's metadata under a Metadata heading", () => {
+    renderPane([{ key: "source", value: "crm" }]);
+    expect(screen.getByText("Metadata")).toBeInTheDocument();
+    expect(screen.getByText("source")).toBeInTheDocument();
+    expect(screen.getByText("crm")).toBeInTheDocument();
+  });
+
+  it("shows no Metadata heading for an item without metadata", () => {
+    renderPane();
+    expect(screen.queryByText("Metadata")).not.toBeInTheDocument();
+  });
+
+  it("carries a snapshot's metadata onto the item", () => {
+    const metadata = [{ key: "source", value: "crm" }];
+    expect(
+      snapshotToItem({ uuid: "u1", payload: {}, metadata }, "task-1").metadata,
+    ).toEqual(metadata);
   });
 });

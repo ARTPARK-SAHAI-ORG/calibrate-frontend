@@ -5,6 +5,7 @@ import confetti from "canvas-confetti";
 import { getBackendUrl } from "@/lib/api";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
+import { MetadataTable, type MetadataEntry } from "@/components/ui";
 import {
   getBinaryDescription,
   getBinaryLabel,
@@ -118,6 +119,7 @@ export type Item = {
   /** True when this row's answer was a tool call rather than a written
    * reply. Set by the backend; absent on an older response. */
   is_tool_call?: boolean;
+  metadata?: MetadataEntry[] | null;
 };
 
 type Annotation = {
@@ -1395,6 +1397,7 @@ function EvaluatorsPane({
       <div className="space-y-3">
         <ExpectedToolCalls payload={itemPayload} />
         {descriptionBlock}
+        <MetadataTable entries={item.metadata} />
         {commentBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
           No evaluators are attached to this task.
@@ -1424,6 +1427,7 @@ function EvaluatorsPane({
     <div className="space-y-3 pb-4 md:pb-6">
       <ExpectedToolCalls payload={itemPayload} />
       {descriptionBlock}
+      <MetadataTable entries={item.metadata} />
       {commentBlock}
       {evaluatorsForItem(evaluators, item).map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);

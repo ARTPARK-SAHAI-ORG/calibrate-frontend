@@ -6,6 +6,8 @@
 // inline in sits outside what the coverage setup measures, and dropping a
 // field silently here is exactly the bug that made the dialog draw every
 // evaluator on a tool-call item instead of just Tool call correctness.
+import type { MetadataEntry } from "@/components/ui";
+
 export type ItemDetailSourceItem = {
   id: number;
   uuid: string;
@@ -14,6 +16,7 @@ export type ItemDetailSourceItem = {
   created_at: string;
   deleted_at: string | null;
   is_tool_call?: boolean;
+  metadata?: MetadataEntry[] | null;
 };
 
 export function toItemDetailItem(
@@ -27,6 +30,7 @@ export function toItemDetailItem(
     created_at: match.created_at,
     deleted_at: match.deleted_at,
     is_tool_call: match.is_tool_call,
+    metadata: match.metadata,
   };
 }
 

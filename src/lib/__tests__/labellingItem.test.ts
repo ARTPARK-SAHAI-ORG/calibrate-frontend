@@ -38,6 +38,12 @@ describe("toItemDetailItem", () => {
   it("leaves is_tool_call undefined when the source item has none", () => {
     expect(toItemDetailItem(base).is_tool_call).toBeUndefined();
   });
+
+  it("carries metadata through, and leaves it undefined when absent", () => {
+    const metadata = [{ key: "source", value: "crm" }];
+    expect(toItemDetailItem({ ...base, metadata }).metadata).toEqual(metadata);
+    expect(toItemDetailItem(base).metadata).toBeUndefined();
+  });
 });
 
 describe("runEvaluatorsDecision", () => {

@@ -1637,6 +1637,44 @@ describe("AnnotationJobView", () => {
       expect(screen.getByText("Some context")).toBeInTheDocument(),
     );
   });
+
+  it("shows the item's metadata when it carries some", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        jobResponse({
+          items: [
+            {
+              ...items[0],
+              metadata: [
+                { key: "source", value: "support-chat" },
+                { key: "language", value: "hindi" },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Metadata")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("source")).toBeInTheDocument();
+    expect(screen.getByText("support-chat")).toBeInTheDocument();
+    expect(screen.getByText("language")).toBeInTheDocument();
+    expect(screen.getByText("hindi")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["an empty list", { ...items[0], metadata: [] }],
+    ["no metadata field", items[0]],
+  ])("shows no metadata heading for an item with %s", async (_label, item) => {
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse({ items: [item] })));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item One")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Metadata")).not.toBeInTheDocument();
+  });
 });
 
 describe("AnnotationJobView expected tool calls", () => {

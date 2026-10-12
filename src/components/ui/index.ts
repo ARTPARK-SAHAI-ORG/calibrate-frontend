@@ -40,3 +40,4 @@ export {
   InteractionTypeChooser,
   type InteractionType,
 } from "./InteractionTypeChooser";
+export { MetadataTable, type MetadataEntry } from "./MetadataTable";

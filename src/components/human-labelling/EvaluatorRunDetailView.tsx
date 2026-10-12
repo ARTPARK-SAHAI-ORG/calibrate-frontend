@@ -45,6 +45,7 @@ import {
   writeUrlParam,
 } from "@/components/human-labelling/valueFilterUrl";
 import { ExpectedToolCalls } from "@/components/human-labelling/item-panes/ExpectedToolCalls";
+import { MetadataTable, type MetadataEntry } from "@/components/ui";
 import type { ReviewItem } from "./SendForReviewFlow";
 
 // ---------------------------------------------------------------------------
@@ -107,6 +108,7 @@ export type JobEvaluator = {
 export type EvaluatorRunItemSnapshot = {
   uuid: string;
   payload: unknown;
+  metadata?: MetadataEntry[] | null;
 };
 
 export type HumanAnnotationValue = {
@@ -212,6 +214,7 @@ export function snapshotToItem(
     payload: snap.payload,
     created_at: "",
     deleted_at: null,
+    metadata: snap.metadata,
   };
 }
 
@@ -692,6 +695,7 @@ export function EvaluatorResultsPane({
   filterDisagreements,
   linkEvaluators,
   itemDescription,
+  itemMetadata,
   hideAgreementGlyph = false,
   alwaysShowSourcePills = false,
   showVersionInSourcePill = false,
@@ -729,6 +733,7 @@ export function EvaluatorResultsPane({
   filterDisagreements: boolean;
   linkEvaluators: boolean;
   itemDescription?: string | null;
+  itemMetadata?: MetadataEntry[] | null;
   /** Suppress the per-evaluator agreement tick/cross next to the source pills. */
   hideAgreementGlyph?: boolean;
   /** Always render the source-pill row even when no human annotations exist. */
@@ -759,11 +764,19 @@ export function EvaluatorResultsPane({
     Record<string, string>
   >({});
 
-  const descriptionBlock = itemDescription?.trim() ? (
-    <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-      {itemDescription.trim()}
-    </p>
-  ) : null;
+  const itemHeader = (
+    <>
+      {itemDescription?.trim() ? (
+        <div className="space-y-1.5">
+          <h3 className="text-sm font-semibold">Description</h3>
+          <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+            {itemDescription.trim()}
+          </p>
+        </div>
+      ) : null}
+      <MetadataTable entries={itemMetadata} />
+    </>
+  );
 
   const commentsBlock =
     itemComments.length > 0 ? (
@@ -776,7 +789,7 @@ export function EvaluatorResultsPane({
   if (evaluators.length === 0) {
     return (
       <div className="space-y-3">
-        {descriptionBlock}
+        {itemHeader}
         {commentsBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
           No evaluators in this run.
@@ -817,7 +830,7 @@ export function EvaluatorResultsPane({
   if (visibleEvaluators.length === 0) {
     return (
       <div className="space-y-3">
-        {descriptionBlock}
+        {itemHeader}
         {commentsBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
           {filterDisagreements
@@ -1094,7 +1107,7 @@ export function EvaluatorResultsPane({
     }
     return (
       <div className="space-y-4">
-        {descriptionBlock}
+        {itemHeader}
         {commentsBlock}
         {order.map((id) => (
           <GroupedEvaluatorCard
@@ -1117,7 +1130,7 @@ export function EvaluatorResultsPane({
 
   return (
     <div className="space-y-4">
-      {descriptionBlock}
+      {itemHeader}
       {commentsBlock}
       {visibleEvaluators.map((ev) => renderEvaluatorCard(ev))}
     </div>
@@ -1510,6 +1523,7 @@ export function ItemDetailPane({
           filterDisagreements={filterDisagreements}
           linkEvaluators={linkEvaluators}
           itemDescription={itemDescription}
+          itemMetadata={item.metadata}
           hideAgreementGlyph={hideAgreementGlyph}
           alwaysShowSourcePills={alwaysShowSourcePills}
           showVersionInSourcePill={showVersionInSourcePill}
