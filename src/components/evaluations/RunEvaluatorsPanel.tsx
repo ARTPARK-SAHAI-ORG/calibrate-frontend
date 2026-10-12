@@ -3,8 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
+import {
+  DuplicateEvaluatorButton,
+  EVALUATOR_CARD_BUTTON_CLASS,
+} from "@/components/evaluators/DuplicateEvaluatorButton";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { PreBuiltPill } from "@/components/EvaluatorPills";
+import { EyeIcon, XIcon } from "@/components/icons";
 import { Tooltip } from "@/components/Tooltip";
 import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
@@ -190,10 +195,23 @@ export function RunEvaluatorsPanel({
                         name: evaluator.name,
                       })
                     }
-                    className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
+                    className={EVALUATOR_CARD_BUTTON_CLASS}
                   >
+                    <EyeIcon className="w-4 h-4" />
                     View
                   </button>
+                  {/* Copying adds to this run, so it goes with Remove. */}
+                  {!readOnly && (
+                    <DuplicateEvaluatorButton
+                      evaluator={evaluator}
+                      onCreated={(created) => {
+                        // The copy is chosen for this run and the library
+                        // re-read, the same as Create evaluator.
+                        onSelectedChange([...selectedUuids, created.uuid]);
+                        onRefresh();
+                      }}
+                    />
+                  )}
                   {!readOnly && (
                     <Tooltip content="Remove from this run" position="top">
                       <button
@@ -205,8 +223,9 @@ export function RunEvaluatorsPanel({
                             ),
                           )
                         }
-                        className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                        className={EVALUATOR_CARD_BUTTON_CLASS}
                       >
+                        <XIcon className="w-4 h-4" />
                         Remove
                       </button>
                     </Tooltip>

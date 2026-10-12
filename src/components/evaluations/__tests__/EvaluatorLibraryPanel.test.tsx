@@ -51,6 +51,24 @@ jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
     ) : null,
 }));
 
+// Duplicate reads the evaluator and opens the create form on its own; here we
+// only care that every card offers it and that a finished copy re-reads the
+// list.
+jest.mock("../../evaluators/DuplicateEvaluatorButton", () => ({
+  ...jest.requireActual("../../evaluators/DuplicateEvaluatorButton"),
+  DuplicateEvaluatorButton: ({
+    evaluator,
+    onCreated,
+  }: {
+    evaluator: { name: string };
+    onCreated?: (e: { uuid: string }) => void;
+  }) => (
+    <button onClick={() => onCreated?.({ uuid: "ev-copy" })}>
+      Duplicate {evaluator.name}
+    </button>
+  ),
+}));
+
 const mockFetch = fetchAllEvaluators as jest.MockedFunction<
   typeof fetchAllEvaluators
 >;
@@ -284,7 +302,10 @@ test("draws the page header when it is the whole page", async () => {
 
 // The same card the agent Evaluators tab draws: clicking it, or View, opens
 // how the evaluator judges over the list, with a link to its own page.
-test.each([["the card itself", "Open Word accuracy"], ["View", "View"]])(
+test.each([
+  ["the card itself", "Open Word accuracy"],
+  ["View", "View"],
+])(
   "opens the evaluator preview from %s, linking to the evaluator page",
   async (_where, buttonName) => {
     mockFetch.mockResolvedValue([evaluator("ev-1", "Word accuracy", "stt")]);
@@ -313,3 +334,28 @@ test.each([["the card itself", "Open Word accuracy"], ["View", "View"]])(
     ).not.toBeInTheDocument();
   },
 );
+
+test("every card offers Duplicate, and a finished copy re-reads the list", async () => {
+  mockFetch.mockResolvedValue([
+    evaluator("ev-1", "Word accuracy", "stt"),
+    // Pre-built, so it cannot be deleted, but it can still be copied.
+    { ...evaluator("ev-2", "Clarity", "stt"), is_protected: true },
+  ]);
+  const user = setupUser();
+
+  render(
+    <EvaluatorLibraryPanel
+      evaluatorTypes={["stt"]}
+      description="Score transcripts"
+    />,
+  );
+
+  expect(
+    await screen.findByRole("button", { name: "Duplicate Clarity" }),
+  ).toBeInTheDocument();
+  await user.click(
+    screen.getByRole("button", { name: "Duplicate Word accuracy" }),
+  );
+
+  await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+});

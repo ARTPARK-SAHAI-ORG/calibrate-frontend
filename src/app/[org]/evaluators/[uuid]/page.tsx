@@ -32,6 +32,7 @@ import type { EvaluatorType } from "@/components/EvaluatorPills";
 import { LLMSelectorModal } from "@/components/agent-tabs/LLMSelectorModal";
 import type { LLMModel } from "@/components/agent-tabs/constants/providers";
 import { RatingScaleEditor } from "@/components/evaluators/RatingScaleEditor";
+import { DuplicateEvaluatorButton } from "@/components/evaluators/DuplicateEvaluatorButton";
 import {
   BinaryScaleEditor,
   defaultBinaryScale,
@@ -938,6 +939,13 @@ function EvaluatorDetailPageInner() {
                   </svg>
                   Edit
                 </button>
+                <DuplicateEvaluatorButton
+                  evaluator={evaluator}
+                  className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
+                  onCreated={(created) =>
+                    router.push(`/evaluators/${created.uuid}`)
+                  }
+                />
                 {canDeleteEvaluator(evaluator) && (
                   <HoverText content="Delete evaluator" position="top">
                     <button

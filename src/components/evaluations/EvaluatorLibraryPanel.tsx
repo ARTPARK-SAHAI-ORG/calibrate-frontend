@@ -6,6 +6,11 @@ import { reportError } from "@/lib/reportError";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { EvaluatorCard } from "@/components/evaluators/EvaluatorCard";
+import {
+  DuplicateEvaluatorButton,
+  EVALUATOR_CARD_BUTTON_CLASS,
+} from "@/components/evaluators/DuplicateEvaluatorButton";
+import { TrashIcon } from "@/components/icons";
 import { SearchInput } from "@/components/ui";
 import {
   canDeleteEvaluator,
@@ -198,18 +203,25 @@ export function EvaluatorLibraryPanel({
               key={evaluator.uuid}
               evaluator={evaluator}
               actions={
-                canDeleteEvaluator(evaluator) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDeleteError(null);
-                      setDeleteTarget(evaluator);
-                    }}
-                    className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                  >
-                    Delete
-                  </button>
-                )
+                <>
+                  <DuplicateEvaluatorButton
+                    evaluator={evaluator}
+                    onCreated={() => load()}
+                  />
+                  {canDeleteEvaluator(evaluator) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setDeleteTarget(evaluator);
+                      }}
+                      className={EVALUATOR_CARD_BUTTON_CLASS}
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                      Delete
+                    </button>
+                  )}
+                </>
               }
             />
           ))}

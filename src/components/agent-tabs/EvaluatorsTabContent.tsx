@@ -9,6 +9,11 @@ import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { EvaluatorCard } from "@/components/evaluators/EvaluatorCard";
 import {
+  DuplicateEvaluatorButton,
+  EVALUATOR_CARD_BUTTON_CLASS,
+} from "@/components/evaluators/DuplicateEvaluatorButton";
+import { XIcon } from "@/components/icons";
+import {
   type EvaluatorData,
   fetchAllEvaluators,
   fetchAgentEvaluators,
@@ -343,14 +348,21 @@ export function EvaluatorsTabContent({
               data-tour="evaluator-card"
               data-evaluator-name={evaluator.name}
               actions={
-                <Tooltip content="Remove from agent" position="top">
-                  <button
-                    onClick={() => openRemoveDialog(evaluator)}
-                    className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                  >
-                    Remove
-                  </button>
-                </Tooltip>
+                <>
+                  <DuplicateEvaluatorButton
+                    evaluator={evaluator}
+                    onCreated={handleCreated}
+                  />
+                  <Tooltip content="Remove from agent" position="top">
+                    <button
+                      onClick={() => openRemoveDialog(evaluator)}
+                      className={EVALUATOR_CARD_BUTTON_CLASS}
+                    >
+                      <XIcon className="w-4 h-4" />
+                      Remove
+                    </button>
+                  </Tooltip>
+                </>
               }
             />
           ))}

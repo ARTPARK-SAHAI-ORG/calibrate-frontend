@@ -1,6 +1,7 @@
 "use client";
 
 import { Link } from "@/lib/nav";
+import { DuplicateEvaluatorButton } from "./DuplicateEvaluatorButton";
 import { EvaluatorPromptPreview } from "./EvaluatorPromptPreview";
 
 /**
@@ -68,6 +69,13 @@ export function EvaluatorPreviewModal({
               </svg>
               Open
             </Link>
+            <DuplicateEvaluatorButton
+              evaluator={{
+                uuid: evaluatorUuid,
+                name: evaluatorName ?? "Evaluator",
+              }}
+              className="h-8 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
+            />
             <Link
               href={`/evaluators/${evaluatorUuid}?edit=1`}
               target="_blank"
