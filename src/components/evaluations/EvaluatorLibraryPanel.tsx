@@ -1,18 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "@/lib/nav";
 import { useAccessToken } from "@/hooks";
 import { reportError } from "@/lib/reportError";
-import { PreBuiltPill } from "@/components/EvaluatorPills";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
+import { EvaluatorCard } from "@/components/evaluators/EvaluatorCard";
 import { SearchInput } from "@/components/ui";
 import {
   canDeleteEvaluator,
   deleteEvaluator,
+  deleteEvaluatorWarning,
   fetchAllEvaluators,
-  isDefaultEvaluator,
   type EvaluatorData,
 } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
@@ -36,8 +35,8 @@ type EvaluatorLibraryPanelProps = {
 };
 
 /**
- * Every evaluator of one kind, with view, delete and create, laid out like the
- * cards shown when choosing evaluators for a run. Used by the Evaluators tab
+ * Every evaluator of one kind, with view, delete and create, drawn with the
+ * same `EvaluatorCard` the agent Evaluators tab uses. Used by the Evaluators tab
  * on the Speech-to-Text and Text-to-Speech pages, so evaluators can be managed
  * without starting a run.
  */
@@ -195,53 +194,24 @@ export function EvaluatorLibraryPanel({
       ) : (
         <div className="space-y-3 md:space-y-4">
           {shown.map((evaluator) => (
-            <div
+            <EvaluatorCard
               key={evaluator.uuid}
-              className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-3 md:px-5 md:py-3 transition-colors cursor-pointer hover:bg-muted/20 dark:hover:bg-accent"
-            >
-              {/* Covers the whole card so it behaves like a link: clicking anywhere
-                  opens the evaluator, and the buttons still sit above it. */}
-              <Link
-                href={`/evaluators/${evaluator.uuid}`}
-                aria-label={`Open ${evaluator.name}`}
-                className="absolute inset-0 rounded-xl z-0"
-              />
-              <div className="relative z-10 pointer-events-none flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base font-semibold text-foreground">
-                      {evaluator.name}
-                    </h3>
-                    {isDefaultEvaluator(evaluator) && <PreBuiltPill />}
-                  </div>
-                  {evaluator.description && (
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      {evaluator.description}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0 pointer-events-auto">
-                  <Link
-                    href={`/evaluators/${evaluator.uuid}`}
-                    className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
+              evaluator={evaluator}
+              actions={
+                canDeleteEvaluator(evaluator) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteError(null);
+                      setDeleteTarget(evaluator);
+                    }}
+                    className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
                   >
-                    View
-                  </Link>
-                  {canDeleteEvaluator(evaluator) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDeleteError(null);
-                        setDeleteTarget(evaluator);
-                      }}
-                      className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
+                    Delete
+                  </button>
+                )
+              }
+            />
           ))}
         </div>
       )}
@@ -255,7 +225,7 @@ export function EvaluatorLibraryPanel({
         }}
         onConfirm={handleConfirmDelete}
         title="Delete evaluator"
-        message={`Permanently deleting "${deleteTarget?.name ?? ""}" will remove it from everywhere it is used and cannot be undone.`}
+        message={deleteEvaluatorWarning(deleteTarget?.name ?? "")}
         confirmText="Delete"
         isDeleting={isDeleting}
         extraContent={
