@@ -1,10 +1,4 @@
-import {
-  evaluatorsThatCanBeRun,
-  isSkippedRunResult,
-  runEvaluatorsDecision,
-  toItemDetailItem,
-  toolCallNotEvaluatedMessage,
-} from "../labellingItem";
+import { evaluatorsThatCanBeRun, isSkippedRunResult, runEvaluatorsDecision, toItemDetailItem, toolCallNotEvaluatedMessage, itemEditForm } from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
 // field by field, and is_tool_call was left off the list. The dialog then
@@ -131,5 +125,17 @@ describe("toolCallNotEvaluatedMessage", () => {
     ).toBe(
       "2 of the chosen items evaluate one or more tool calls, which only supports human review today. Evaluators do not run on them, so they will be left out of this run.",
     );
+  });
+});
+
+describe("itemEditForm", () => {
+  it.each([
+    ["tts", "tts"],
+    ["stt", "stt"],
+    ["llm-general", "llm-general"],
+    ["llm", "chat"],
+    ["conversation", "chat"],
+  ])("opens a %s item in the %s form", (taskType, form) => {
+    expect(itemEditForm(taskType)).toBe(form);
   });
 });

@@ -69,6 +69,7 @@ describe("MetadataFieldsEditor", () => {
     await user.click(screen.getByRole("button", { name: "Remove metadata field 2" }));
     expect(screen.getAllByLabelText(/Metadata field name/)).toHaveLength(1);
     expect(screen.queryByText(/is already used by another field/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Metadata field name 1")).toHaveValue("source");
     expect(screen.getByLabelText("Metadata value 1")).toHaveValue("crm");
   });
 

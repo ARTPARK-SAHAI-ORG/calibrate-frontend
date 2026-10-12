@@ -88,3 +88,14 @@ export function toolCallNotEvaluatedMessage(
 ): string {
   return `${subject} one or more tool calls, which only supports human review today. Evaluators do not run on them${tail}.`;
 }
+
+export type ItemEditForm = "tts" | "stt" | "llm-general" | "chat";
+
+/** Which edit form opens an item of a task type. `llm` and `conversation`
+ *  items share the chat form. */
+export function itemEditForm(taskType: string | undefined): ItemEditForm {
+  if (taskType === "tts" || taskType === "stt" || taskType === "llm-general") {
+    return taskType;
+  }
+  return "chat";
+}

@@ -93,6 +93,7 @@ import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import {
   evaluatorsThatCanBeRun,
+  itemEditForm,
   runEvaluatorsDecision,
   toItemDetailItem,
   toolCallNotEvaluatedMessage,
@@ -2390,13 +2391,14 @@ function LabellingTaskPageInner() {
   };
 
   const openItemEdit = (uuid: string) => {
-    if (taskType === "tts") {
+    const form = itemEditForm(taskType);
+    if (form === "tts") {
       setEditTtsSingleItemUuid(uuid);
       setEditTtsItemsOpen(true);
-    } else if (taskType === "stt") {
+    } else if (form === "stt") {
       setEditSttSingleItemUuid(uuid);
       setEditSttItemsOpen(true);
-    } else if (taskType === "llm-general") {
+    } else if (form === "llm-general") {
       setEditLlmGeneralSingleItemUuid(uuid);
       setEditLlmGeneralItemsOpen(true);
     } else {

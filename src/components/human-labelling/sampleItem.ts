@@ -16,8 +16,10 @@ const USER_TURN = "When is my baby's next vaccination due?";
 const AGENT_TURN =
   "Your baby's measles vaccine is due at 9 months. It is free at your nearest anganwadi or health centre.";
 
-/** Starting values for a new item, so the form can be saved as it opens.
- *  `n` keeps the name unique within the task. */
+/** Starting values for a new item, so most of the form is filled in when it
+ *  opens. A TTS sample still needs its audio picked, and an evaluator variable
+ *  with no default still needs a value. `n` is the task's item count plus one,
+ *  which can repeat a name after an item is deleted. */
 export function sampleItem<T extends SampleItemTaskType>(taskType: T, n: number): SampleItemFor<T> {
   const name = `Example item ${n}`;
   const byType: { [K in SampleItemTaskType]: SampleItemFor<K> } = {
