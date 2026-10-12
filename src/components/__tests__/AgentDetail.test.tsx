@@ -608,7 +608,7 @@ describe("AgentDetail", () => {
     render(<AgentDetail agentUuid={generalAgent.uuid} />);
 
     await waitFor(() =>
-      expect(screen.getByText("Single Agent Response")).toBeInTheDocument(),
+      expect(screen.getByText("Basic")).toBeInTheDocument(),
     );
   });
 

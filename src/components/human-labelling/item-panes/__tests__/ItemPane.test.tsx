@@ -12,7 +12,7 @@ const item = (payload: Record<string, unknown>) => ({
 });
 
 describe("ItemPane picks the pane by task type first", () => {
-  it("draws a single agent response tool-call item as input and output", () => {
+  it("draws a basic agent tool-call item as input and output", () => {
     render(
       <ItemPane
         item={item({

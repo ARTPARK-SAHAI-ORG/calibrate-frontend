@@ -63,7 +63,7 @@ async function goToStep2(user: ReturnType<typeof setupUser>) {
 const ANSWER_PATH: Record<string, string[]> = {
   "Agent reply": ["Text", "Conversation", "A single reply"],
   "Full conversation": ["Text", "Conversation", "The whole conversation"],
-  "Single Agent Response": ["Text", "Single Agent Response"],
+  "Basic": ["Text", "Basic"],
   "Speech to Text": ["Voice", "Speech to Text"],
   "Text to Speech": ["Voice", "Text to Speech"],
 };

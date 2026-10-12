@@ -7,7 +7,7 @@ export const INTERACTION_TYPES = {
     description: "Your agent has a conversation with a user",
   },
   general: {
-    label: "Single Agent Response",
+    label: "Basic",
     description: "The agent takes an input and generates an output",
   },
 } as const;

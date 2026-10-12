@@ -52,7 +52,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     ).toBe(false);
   });
 
-  it("treats a single agent response test and its tool-call test as eligible", () => {
+  it("treats a basic agent test and its tool-call test as eligible", () => {
     expect(
       isLabellingEligibleRaw({
         test_case: { evaluation: { type: "general" } },
@@ -65,7 +65,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     ).toBe(true);
   });
 
-  it("builds a single agent response run as input and output, with its tool-call test as a tool-call item", () => {
+  it("builds a basic agent run as input and output, with its tool-call test as a tool-call item", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "test_run",
       runUuid: "run-uuid-general01",
@@ -101,7 +101,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
       output: "Here is the summary.",
       evaluator_variables: { "ev-9": { tone: "brief" } },
     });
-    // The tool-call test belongs to the same single agent response agent, so
+    // The tool-call test belongs to the same basic agent, so
     // it keeps the input it was given instead of being written as a
     // conversation.
     expect(result.items[1].payload).toEqual({
@@ -114,7 +114,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.evaluatorUuids.has("ev-9")).toBe(true);
   });
 
-  it("reads a single agent response test's input from its one-turn history when the run does not echo input", () => {
+  it("reads a basic agent test's input from its one-turn history when the run does not echo input", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "test_run",
       runUuid: "run-uuid-general02",
@@ -135,7 +135,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.items[0].payload.chat_history).toBeUndefined();
   });
 
-  it("targets an Agent Response task for a single agent response benchmark", () => {
+  it("targets an Agent Response task for a basic agent benchmark", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "benchmark_run",
       benchmarkUuid: "bench-uuid-general1",
@@ -379,7 +379,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     });
   });
 
-  it("carries verdicts across for a single agent response test", () => {
+  it("carries verdicts across for a basic agent test", () => {
     const result = buildItemsFromSource({
       type: "test_run",
       runUuid: "run-uuid-12345678",
@@ -750,7 +750,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(result.skippedCount).toBe(0);
     const p = result.items[0].payload as Record<string, unknown>;
     expect(p.name).toBe("Books an appointment");
-    // A single agent response agent has no conversation, so the one input it
+    // A basic agent has no conversation, so the one input it
     // was given sits beside the call it made.
     expect(p.input).toBe("book me in");
     expect(p.chat_history).toBeUndefined();
@@ -1717,7 +1717,7 @@ describe("tool-call tests submitted for labelling", () => {
     ]);
   });
 
-  // A tool-call test written for a single agent response agent. Its evaluation
+  // A tool-call test written for a basic agent. Its evaluation
   // type is "tool_call" like any other, so the only thing marking it as that
   // agent's is the `input` it carries.
   const generalToolCallTest = {

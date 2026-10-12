@@ -1297,7 +1297,7 @@ export function ItemPane({
   const payload = (item.payload ?? {}) as Record<string, unknown>;
   if (taskType === "stt") return <SttItemPane payload={payload} />;
   if (taskType === "tts") return <TtsItemPane payload={payload} />;
-  // A single agent response item is input and output, never a conversation,
+  // A basic agent item is input and output, never a conversation,
   // so its own pane draws the tool call too. Only a next-reply item swaps to
   // the tool-call pane, which reads `chat_history` / `agent_response`.
   if (taskType === "llm-general")

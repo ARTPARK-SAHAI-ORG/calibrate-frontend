@@ -784,7 +784,7 @@ describe("TestDetailView", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("never shows a reasoning toggle for a single agent response either", () => {
+  it("never shows a reasoning toggle for a basic agent either", () => {
     render(
       <TestDetailView
         history={[{ role: "user", content: "What is 2+2?" }]}
@@ -888,7 +888,7 @@ describe("TestDetailView", () => {
     expect(screen.getByText("final")).toBeInTheDocument();
   });
 
-  describe('a Single Agent Response test (evaluation.type === "general")', () => {
+  describe('a basic agent test (evaluation.type === "general")', () => {
     it("renders the input and output as a box pair instead of chat bubbles", () => {
       const { container } = render(
         <TestDetailView

@@ -244,7 +244,7 @@ describe("AgentPicker", () => {
     // The two kinds are named with the same pills the agents list uses, so
     // the sentence is spread over several elements.
     expect(disabledOption.textContent).toContain(
-      "This agent was created as a Single Agent Response agent. Create your agent as a Conversation agent to run simulations.",
+      "This agent was created as a Basic agent. Create your agent as a Conversation agent to run simulations.",
     );
 
     // Clicking it does nothing.

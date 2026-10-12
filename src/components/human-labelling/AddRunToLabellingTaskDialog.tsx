@@ -148,7 +148,7 @@ export function targetTaskTypeForSource(
     case "traces":
       return source.agentNature === "general" ? "llm-general" : "llm";
     // A test run / benchmark says which kind of agent it ran through its own
-    // test cases, so nothing has to be passed in: a single agent response
+    // test cases, so nothing has to be passed in: a basic
     // agent's tests target an Agent Response task, a conversation agent's
     // target a Next Reply one.
     case "test_run":
@@ -338,7 +338,7 @@ type RawTestCaseLike = {
       tool_calls?: ExpectedToolCall[] | null;
     } | null;
     history?: TestCaseHistory[] | null;
-    /** The lone input a test written for a single agent response agent
+    /** The lone input a test written for a basic agent
      * carries instead of a conversation. */
     input?: string | null;
     evaluators?: Array<{
@@ -363,7 +363,7 @@ type RawTestCaseLike = {
   }> | null;
 };
 
-/** True for a test written for a single agent response agent — one input and
+/** True for a test written for a basic agent — one input and
  * one output, no conversation. An Agent Response test says so with
  * `evaluation.type`; a Tool Call test written for the same agent only by
  * carrying `input` (its type is always "tool_call"). Same rule as the test
@@ -375,7 +375,7 @@ function isGeneralTestCase(raw: RawTestCaseLike): boolean {
   );
 }
 
-/** The lone input a single agent response test was given. The run echoes it as
+/** The lone input a basic agent test was given. The run echoes it as
  * `test_case.input`; when it does not, the run widened it into a one-turn
  * history, so read it back from that user turn. */
 function generalInputOf(raw: RawTestCaseLike): string {
@@ -394,7 +394,7 @@ export function isToolCallTest(raw: RawTestCaseLike): boolean {
 }
 
 /** Tests that can be added to LLM labelling tasks: a conversation agent's
- * next-reply test (`response`) and a single agent response agent's test
+ * next-reply test (`response`) and a basic agent's test
  * (`general`) both become a response item scored by the evaluators; a
  * tool-call test becomes a tool-call item a person marks correct or wrong. */
 export function isLabellingEligibleRaw(raw: RawTestCaseLike): boolean {
@@ -438,7 +438,7 @@ function buildToolCallItem(
       ? { payload, evaluator_results }
       : { payload };
 
-  // A single agent response agent has no conversation, so its tool-call test
+  // A basic agent has no conversation, so its tool-call test
   // is labelled as the one input it was given and the output it produced —
   // the same shape its response tests use in an Agent Response task.
   if (isGeneralTestCase(raw)) {
@@ -557,7 +557,7 @@ function buildOneItem(
     }
   }
 
-  // A single agent response test is labelled as the one input it was given
+  // A basic agent test is labelled as the one input it was given
   // and the output it produced, which is what an Agent Response
   // ("llm-general") task holds. A conversation agent's test carries the
   // conversation so far plus the reply being judged.

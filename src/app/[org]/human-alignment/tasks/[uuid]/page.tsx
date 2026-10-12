@@ -3975,7 +3975,7 @@ function LabellingTaskPageInner() {
             const trimmedDescription = editLlmItemDescription.trim();
             const descriptionField = { description: trimmedDescription };
 
-            // Same rule as the single agent response edit: the save replaces
+            // Same rule as the basic agent item edit: the save replaces
             // the whole item, so keep what the form has no field for.
             const existingPayload = (editingItem?.payload ?? {}) as Record<
               string,
