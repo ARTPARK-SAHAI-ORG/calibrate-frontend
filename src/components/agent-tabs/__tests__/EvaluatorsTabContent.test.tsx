@@ -86,6 +86,8 @@ jest.mock("../../../lib/evaluatorApi", () => ({
   isDefaultEvaluator: (e: EvaluatorData) =>
     typeof e.is_default === "boolean" ? e.is_default : !e.owner_user_id,
   canDeleteEvaluator: (e: EvaluatorData) => !e.is_protected,
+  deleteEvaluatorWarning: jest.requireActual("../../../lib/evaluatorApi")
+    .deleteEvaluatorWarning,
   // EvaluatorPreviewModal -> EvaluatorPromptPreview reads this directly.
   fetchEvaluatorDetail: jest.fn(),
 }));

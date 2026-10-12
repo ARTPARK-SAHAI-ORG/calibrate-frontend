@@ -13,6 +13,7 @@ import {
   deleteEvaluatorVersion,
   supportsEvaluatorVariables,
   type EvaluatorData,
+  deleteEvaluatorWarning,
 } from "../evaluatorApi";
 import { clearAllRequestCaches } from "../requestCache";
 
@@ -399,3 +400,11 @@ describe("supportsEvaluatorVariables", () => {
   });
 });
 
+
+describe("deleteEvaluatorWarning", () => {
+  it("names the evaluator and says it leaves every agent that uses it", () => {
+    expect(deleteEvaluatorWarning("Tone check")).toBe(
+      'Permanently deleting "Tone check" will remove it from every agent that uses it and cannot be undone.',
+    );
+  });
+});

@@ -30,7 +30,7 @@ export default function AgentEvaluatorsPage() {
         <EvaluatorLibraryPanel
           title="Evaluators"
           evaluatorTypes={["llm", "llm-general", "tool-call"]}
-          description="LLM judges for evaluating an agent's responses"
+          description="LLM judges for evaluating an agent's outputs: free text responses or structured tool calls"
         />
       </div>
     </AppLayout>

@@ -328,3 +328,12 @@ export function supportsEvaluatorVariables(
 ): boolean {
   return type === "llm" || type === "llm-general";
 }
+
+/**
+ * The one warning shown before an evaluator is deleted for good, wherever the
+ * delete is started from, so no two screens describe the same delete
+ * differently.
+ */
+export function deleteEvaluatorWarning(name: string): string {
+  return `Permanently deleting "${name}" will remove it from every agent that uses it and cannot be undone.`;
+}

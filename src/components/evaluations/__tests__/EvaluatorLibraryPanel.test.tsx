@@ -14,7 +14,22 @@ jest.mock("../../../lib/evaluatorApi", () => ({
   ...jest.requireActual("../../../lib/evaluatorApi"),
   fetchAllEvaluators: jest.fn(),
   deleteEvaluator: jest.fn(),
+  // EvaluatorPreviewModal -> EvaluatorPromptPreview reads this directly.
+  fetchEvaluatorDetail: jest.fn(),
 }));
+
+// jsdom has no ResizeObserver; EvaluatorPreviewModal's prompt card measures
+// its own overflow.
+class MockResizeObserver {
+  observe() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  (
+    global as unknown as { ResizeObserver: typeof MockResizeObserver }
+  ).ResizeObserver = MockResizeObserver;
+});
 
 // The create flow is a whole multi-step sidebar of its own; here we only care
 // that the panel opens it and re-reads the list once something is created.
@@ -95,13 +110,9 @@ test("lists only the evaluators of this kind", async () => {
 
   expect(await screen.findByText("Word accuracy")).toBeInTheDocument();
   expect(screen.queryByText("Voice warmth")).not.toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "View" })).toHaveAttribute(
-    "href",
-    "/evaluators/ev-1",
-  );
   // View and Delete already say what they do, so neither repeats itself in a
   // hover popup.
-  expect(screen.getByRole("link", { name: "View" })).not.toHaveAttribute(
+  expect(screen.getByRole("button", { name: "View" })).not.toHaveAttribute(
     "title",
   );
   expect(screen.getByRole("button", { name: "Delete" })).not.toHaveAttribute(
@@ -271,17 +282,34 @@ test("draws the page header when it is the whole page", async () => {
   ).toBeInTheDocument();
 });
 
-test("opens the evaluator from anywhere on its card", async () => {
-  mockFetch.mockResolvedValue([evaluator("ev-1", "Word accuracy", "stt")]);
+// The same card the agent Evaluators tab draws: clicking it, or View, opens
+// how the evaluator judges over the list, with a link to its own page.
+test.each([["the card itself", "Open Word accuracy"], ["View", "View"]])(
+  "opens the evaluator preview from %s, linking to the evaluator page",
+  async (_where, buttonName) => {
+    mockFetch.mockResolvedValue([evaluator("ev-1", "Word accuracy", "stt")]);
+    const user = setupUser();
 
-  render(
-    <EvaluatorLibraryPanel
-      evaluatorTypes={["stt"]}
-      description="Score transcripts"
-    />,
-  );
+    render(
+      <EvaluatorLibraryPanel
+        evaluatorTypes={["stt"]}
+        description="Score transcripts"
+      />,
+    );
 
-  expect(
-    await screen.findByRole("link", { name: "Open Word accuracy" }),
-  ).toHaveAttribute("href", "/evaluators/ev-1");
-});
+    await user.click(await screen.findByRole("button", { name: buttonName }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Word accuracy", level: 2 }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View" })).toHaveAttribute(
+      "href",
+      "/evaluators/ev-1",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Close preview" }));
+    expect(
+      screen.queryByRole("heading", { name: "Word accuracy", level: 2 }),
+    ).not.toBeInTheDocument();
+  },
+);

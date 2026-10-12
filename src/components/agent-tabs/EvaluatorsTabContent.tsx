@@ -3,20 +3,19 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAccessToken } from "@/hooks";
 import { reportError } from "@/lib/reportError";
-import { PreBuiltPill } from "@/components/EvaluatorPills";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
-import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
+import { EvaluatorCard } from "@/components/evaluators/EvaluatorCard";
 import {
-  isDefaultEvaluator,
   type EvaluatorData,
   fetchAllEvaluators,
   fetchAgentEvaluators,
   addEvaluatorsToAgent,
   detachEvaluatorFromAgent,
   deleteEvaluator,
+  deleteEvaluatorWarning,
   canDeleteEvaluator,
 } from "@/lib/evaluatorApi";
 
@@ -71,13 +70,6 @@ export function EvaluatorsTabContent({
   const [deleteMode, setDeleteMode] = useState<DeleteMode>("remove");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // The evaluator whose prompt is on show, opened from a card's cover or its
-  // "View" button. Null until one is clicked.
-  const [previewEvaluator, setPreviewEvaluator] = useState<{
-    uuid: string;
-    name: string;
-  } | null>(null);
 
   const loadAttached = useCallback(async () => {
     if (!backendAccessToken) return;
@@ -226,7 +218,7 @@ export function EvaluatorsTabContent({
     deleteMode === "permanent" ? "Delete evaluator" : "Remove evaluator";
   const deleteDialogMessage =
     deleteMode === "permanent"
-      ? `Permanently deleting "${deleteTarget?.name ?? ""}" will remove it from every agent that uses it and cannot be undone.`
+      ? deleteEvaluatorWarning(deleteTarget?.name ?? "")
       : `Are you sure you want to remove "${deleteTarget?.name ?? ""}" from this agent? The evaluator will stay in your library and on any other agents that use it.`;
   // Org-scoped default forks are permanently deletable too. The exception is
   // an evaluator the product needs, which says so with `is_protected`;
@@ -344,69 +336,24 @@ export function EvaluatorsTabContent({
         </div>
       ) : (
         <div className="space-y-3">
-          {attachedEvaluators.map((evaluator) => {
-            return (
-              <div
-                key={evaluator.uuid}
-                data-tour="evaluator-card"
-                data-evaluator-name={evaluator.name}
-                className="relative border border-border rounded-xl bg-background dark:bg-muted px-4 py-3 md:px-5 md:py-3 transition-colors cursor-pointer hover:bg-muted/20 dark:hover:bg-accent"
-              >
-                {/* Covers the whole card so clicking anywhere opens the preview,
-                    and the buttons still sit above it. */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPreviewEvaluator({
-                      uuid: evaluator.uuid,
-                      name: evaluator.name,
-                    })
-                  }
-                  aria-label={`Open ${evaluator.name}`}
-                  className="absolute inset-0 rounded-xl z-0 cursor-pointer"
-                />
-                <div className="relative z-10 pointer-events-none flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-base font-semibold text-foreground">
-                        {evaluator.name}
-                      </h3>
-                      {/* Only "where did this come from". What it judges and
-                          how it scores are in the evaluator itself. */}
-                      {isDefaultEvaluator(evaluator) && <PreBuiltPill />}
-                    </div>
-                    {evaluator.description && (
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        {evaluator.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0 pointer-events-auto">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPreviewEvaluator({
-                          uuid: evaluator.uuid,
-                          name: evaluator.name,
-                        })
-                      }
-                      className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
-                    >
-                      View
-                    </button>
-                    <Tooltip content="Remove from agent" position="top">
-                      <button
-                        onClick={() => openRemoveDialog(evaluator)}
-                        className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
-                      >
-                        Remove
-                      </button>
-                    </Tooltip>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {attachedEvaluators.map((evaluator) => (
+            <EvaluatorCard
+              key={evaluator.uuid}
+              evaluator={evaluator}
+              data-tour="evaluator-card"
+              data-evaluator-name={evaluator.name}
+              actions={
+                <Tooltip content="Remove from agent" position="top">
+                  <button
+                    onClick={() => openRemoveDialog(evaluator)}
+                    className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </Tooltip>
+              }
+            />
+          ))}
         </div>
       )}
 
@@ -475,12 +422,6 @@ export function EvaluatorsTabContent({
             )}
           </div>
         }
-      />
-
-      <EvaluatorPreviewModal
-        evaluatorUuid={previewEvaluator?.uuid ?? null}
-        evaluatorName={previewEvaluator?.name}
-        onClose={() => setPreviewEvaluator(null)}
       />
     </div>
   );
