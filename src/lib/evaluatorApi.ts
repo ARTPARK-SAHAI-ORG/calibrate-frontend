@@ -335,5 +335,5 @@ export function supportsEvaluatorVariables(
  * differently.
  */
 export function deleteEvaluatorWarning(name: string): string {
-  return `Permanently deleting "${name}" will remove it from every agent that uses it and cannot be undone.`;
+  return `Permanently deleting "${name}" will remove it from everywhere it is used and cannot be undone.`;
 }

@@ -402,9 +402,9 @@ describe("supportsEvaluatorVariables", () => {
 
 
 describe("deleteEvaluatorWarning", () => {
-  it("names the evaluator and says it leaves every agent that uses it", () => {
+  it("names the evaluator and says it leaves everywhere it is used", () => {
     expect(deleteEvaluatorWarning("Tone check")).toBe(
-      'Permanently deleting "Tone check" will remove it from every agent that uses it and cannot be undone.',
+      'Permanently deleting "Tone check" will remove it from everywhere it is used and cannot be undone.',
     );
   });
 });
