@@ -302,7 +302,7 @@ test.each([["the card itself", "Open Word accuracy"], ["View", "View"]])(
     expect(
       await screen.findByRole("heading", { name: "Word accuracy", level: 2 }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Open" })).toHaveAttribute(
       "href",
       "/evaluators/ev-1",
     );

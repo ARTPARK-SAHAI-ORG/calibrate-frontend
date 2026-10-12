@@ -39,7 +39,7 @@ export function EvaluatorPreviewModal({
           </h2>
           <div className="flex items-center gap-2 shrink-0">
             {/* Both open a new tab, so the test being written stays open
-                behind them. View is the evaluator page as it is; Edit adds
+                behind them. Open is the evaluator page as it is; Edit adds
                 `?edit=1`, which opens that page with its Edit form already up,
                 the same edit as the button on the page itself. */}
             <Link
@@ -66,7 +66,7 @@ export function EvaluatorPreviewModal({
                   d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                 />
               </svg>
-              View
+              Open
             </Link>
             <Link
               href={`/evaluators/${evaluatorUuid}?edit=1`}

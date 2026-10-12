@@ -85,7 +85,7 @@ describe("EvaluatorPreviewModal", () => {
         onClose={jest.fn()}
       />,
     );
-    const view = screen.getByRole("link", { name: "View" });
+    const view = screen.getByRole("link", { name: "Open" });
     expect(view).toHaveAttribute("href", "/evaluators/e1");
     expect(view).toHaveAttribute("target", "_blank");
     expect(view).toHaveAttribute("rel", "noopener noreferrer");
