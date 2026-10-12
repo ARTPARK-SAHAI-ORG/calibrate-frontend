@@ -725,6 +725,7 @@ export function ItemDetailDialog({
             </div>
           ) : (
             <ItemDetailPane
+              itemDetailsInOwnColumn
               item={item}
               taskType={task.type}
               evaluators={adapted.evaluators}

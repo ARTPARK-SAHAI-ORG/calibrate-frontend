@@ -2855,9 +2855,11 @@ describe("ItemDetailPane about column", () => {
   const renderPane = (
     payload: Record<string, unknown>,
     metadata?: { key: string; value: string }[],
+    itemDetailsInOwnColumn = true,
   ) =>
     render(
       <ItemDetailPane
+        itemDetailsInOwnColumn={itemDetailsInOwnColumn}
         item={{
           id: 0,
           uuid: "item-1",
@@ -2920,5 +2922,22 @@ describe("ItemDetailPane about column", () => {
     expect(
       snapshotToItem({ uuid: "u1", payload: {}, metadata }, "task-1").metadata,
     ).toEqual(metadata);
+  });
+
+  it("draws them above the evaluator results when not given a column, as the labelling form does", () => {
+    renderPane({ description: "Desc here" }, [{ key: "source", value: "crm" }], false);
+    expect(screen.queryByTestId("item-detail-about-pane")).not.toBeInTheDocument();
+    const pane = screen.getByTestId("item-detail-left-pane").nextElementSibling as HTMLElement;
+    expect(within(pane).getByText("Description")).toBeInTheDocument();
+    expect(within(pane).getByText("Desc here")).toBeInTheDocument();
+    expect(within(pane).getByText("Metadata")).toBeInTheDocument();
+    expect(within(pane).getByText("crm")).toBeInTheDocument();
+    expect(screen.getAllByText("Desc here")).toHaveLength(1);
+  });
+
+  it("draws them only once when given a column", () => {
+    renderPane({ description: "Desc here" }, [{ key: "source", value: "crm" }]);
+    expect(screen.getAllByText("Desc here")).toHaveLength(1);
+    expect(screen.getAllByText("Metadata")).toHaveLength(1);
   });
 });

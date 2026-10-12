@@ -45,7 +45,8 @@ import {
   writeUrlParam,
 } from "@/components/human-labelling/valueFilterUrl";
 import { ExpectedToolCalls } from "@/components/human-labelling/item-panes/ExpectedToolCalls";
-import { MetadataTable, type MetadataEntry } from "@/components/ui";
+import { type MetadataEntry } from "@/components/ui";
+import { hasItemDetails, ItemDetailsBlock } from "./ItemDetailsBlock";
 import type { ReviewItem } from "./SendForReviewFlow";
 
 // ---------------------------------------------------------------------------
@@ -684,6 +685,7 @@ function SourcePill({
 }
 
 export function EvaluatorResultsPane({
+  itemDetails,
   evaluators,
   evaluatorNamesById,
   getJobEvaluator,
@@ -730,6 +732,8 @@ export function EvaluatorResultsPane({
   evaluatorVariablesByEvaluatorId: Record<string, Record<string, string>>;
   filterDisagreements: boolean;
   linkEvaluators: boolean;
+  /** The item's description and metadata, drawn above the comments. */
+  itemDetails?: React.ReactNode;
   /** Suppress the per-evaluator agreement tick/cross next to the source pills. */
   hideAgreementGlyph?: boolean;
   /** Always render the source-pill row even when no human annotations exist. */
@@ -772,6 +776,7 @@ export function EvaluatorResultsPane({
   if (evaluators.length === 0) {
     return (
       <div className="space-y-3">
+        {itemDetails}
         {commentsBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
           No evaluators in this run.
@@ -812,6 +817,7 @@ export function EvaluatorResultsPane({
   if (visibleEvaluators.length === 0) {
     return (
       <div className="space-y-3">
+        {itemDetails}
         {commentsBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
           {filterDisagreements
@@ -1088,6 +1094,7 @@ export function EvaluatorResultsPane({
     }
     return (
       <div className="space-y-4">
+        {itemDetails}
         {commentsBlock}
         {order.map((id) => (
           <GroupedEvaluatorCard
@@ -1110,6 +1117,7 @@ export function EvaluatorResultsPane({
 
   return (
     <div className="space-y-4">
+      {itemDetails}
       {commentsBlock}
       {visibleEvaluators.map((ev) => renderEvaluatorCard(ev))}
     </div>
@@ -1402,6 +1410,7 @@ function GroupedEvaluatorCard({
  * and pre-shaped evaluator / annotation data.
  */
 export function ItemDetailPane({
+  itemDetailsInOwnColumn = false,
   item,
   taskType,
   evaluators,
@@ -1422,6 +1431,9 @@ export function ItemDetailPane({
   singleAnnotatorFiltered = false,
   itemComments = [],
 }: {
+  /** Draw the description and metadata in a column of their own on the
+   *  left, instead of above the evaluator results. */
+  itemDetailsInOwnColumn?: boolean;
   item: Item;
   taskType: LabellingTaskFull["type"];
   evaluators: {
@@ -1467,11 +1479,6 @@ export function ItemDetailPane({
     item.payload && typeof item.payload === "object"
       ? (item.payload as Record<string, unknown>)
       : null;
-  const itemDescription =
-    itemPayload && typeof itemPayload.description === "string"
-      ? itemPayload.description.trim()
-      : "";
-  const hasMetadata = Boolean(item.metadata && item.metadata.length > 0);
 
   // The llm / conversation panes render `TestDetailView`, which brings its own
   // padding and a `sticky top-0` UI/JSON toggle. Adding top padding here would
@@ -1481,20 +1488,12 @@ export function ItemDetailPane({
 
   return (
     <div className="flex flex-col md:flex-row min-h-0 flex-1 md:overflow-hidden">
-      {(itemDescription || hasMetadata) && (
+      {itemDetailsInOwnColumn && hasItemDetails(item.payload, item.metadata) && (
         <div
           data-testid="item-detail-about-pane"
           className="order-last md:order-none md:w-80 border-t md:border-t-0 md:border-r border-border md:min-h-0 md:overflow-y-auto shrink-0 p-4 md:p-6 space-y-4"
         >
-          {itemDescription && (
-            <div className="space-y-1.5">
-              <h3 className="text-sm font-semibold text-foreground">Description</h3>
-              <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-                {itemDescription}
-              </p>
-            </div>
-          )}
-          <MetadataTable entries={item.metadata} />
+          <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
         </div>
       )}
       <div
@@ -1518,6 +1517,11 @@ export function ItemDetailPane({
           evaluatorVariablesByEvaluatorId={evaluatorVariablesByEvaluatorId}
           filterDisagreements={filterDisagreements}
           linkEvaluators={linkEvaluators}
+          itemDetails={
+            itemDetailsInOwnColumn ? null : (
+              <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
+            )
+          }
           hideAgreementGlyph={hideAgreementGlyph}
           alwaysShowSourcePills={alwaysShowSourcePills}
           showVersionInSourcePill={showVersionInSourcePill}
