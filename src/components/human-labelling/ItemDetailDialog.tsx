@@ -134,9 +134,12 @@ export function ItemDetailDialog({
   hasPrev = false,
   hasNext = false,
   position,
+  onEdit,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  /** Opens the item's edit form. No button when left out. */
+  onEdit?: () => void;
   task: ItemDetailDialogTask | null;
   item: Item | null;
   accessToken: string | null;
@@ -661,6 +664,15 @@ export function ItemDetailDialog({
                 </button>
               </Tooltip>
             )}
+            {onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="h-11 px-4 inline-flex items-center rounded-xl text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+              >
+                Edit
+              </button>
+            )}
             <button
               onClick={onClose}
               aria-label="Close"
@@ -713,6 +725,7 @@ export function ItemDetailDialog({
             </div>
           ) : (
             <ItemDetailPane
+              itemDetailsInOwnColumn
               item={item}
               taskType={task.type}
               evaluators={adapted.evaluators}

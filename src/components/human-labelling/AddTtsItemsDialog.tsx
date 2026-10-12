@@ -4,9 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
+import type { MetadataEntry } from "@/components/ui";
 import { FieldError } from "@/components/ui/FieldError";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
 import { humaniseDetailObject } from "./bulk-upload-shared";
+import {
+  MetadataFieldsEditor,
+  type MetadataRow,
+  metadataRowErrors,
+  metadataToRows,
+  rowsToMetadata,
+} from "./MetadataFieldsEditor";
 import {
   parseItemNameConflictFromError,
   rowNameErrorsFromConflict,
@@ -31,6 +39,7 @@ type TtsRowDraft = {
   existingAudio: string | null;
   /** s3 path from a successful upload, so a retry doesn't re-upload the file. */
   uploadedPath: string | null;
+  metadata: MetadataRow[];
 };
 
 export type TtsItemRowSubmission = {
@@ -38,6 +47,7 @@ export type TtsItemRowSubmission = {
   name: string;
   text: string;
   audio_path: string;
+  metadata?: MetadataEntry[];
 };
 
 type AddTtsItemsDialogProps = {
@@ -50,6 +60,7 @@ type AddTtsItemsDialogProps = {
     text: string;
     /** Existing stored audio (s3 path / signed URL). */
     audio: string;
+    metadata?: MetadataEntry[] | null;
   }[];
   onClose: () => void;
   onSubmit: (rows: TtsItemRowSubmission[]) => Promise<void> | void;
@@ -86,6 +97,7 @@ const newRow = (): TtsRowDraft => ({
   previewUrl: null,
   existingAudio: null,
   uploadedPath: null,
+  metadata: [],
 });
 
 const rowsFromInitial = (
@@ -101,6 +113,7 @@ const rowsFromInitial = (
         previewUrl: null,
         existingAudio: r.audio || null,
         uploadedPath: null,
+        metadata: metadataToRows(r.metadata),
       }))
     : [newRow()];
 
@@ -209,16 +222,16 @@ export function AddTtsItemsDialog({
     return scheduleScrollToFirstFieldError(scrollContainerRef.current);
   }, [errorScrollTick]);
 
-  const isDirty = isEdit
-    ? rows.some((r, i) => {
-        const init = initialRows?.[i];
-        return (
-          r.name.trim() !== (init?.name ?? "").trim() ||
-          r.text.trim() !== (init?.text ?? "").trim() ||
-          !!r.audioFile // any replacement audio counts as an edit
-        );
-      })
-    : rows.some((r) => r.name.trim() || r.text.trim() || r.audioFile);
+  const isDirty = rows.some((r, i) => {
+    const init = initialRows?.[i];
+    return (
+      r.name.trim() !== (init?.name ?? "").trim() ||
+      r.text.trim() !== (init?.text ?? "").trim() ||
+      !!r.audioFile ||
+      JSON.stringify(rowsToMetadata(r.metadata)) !==
+        JSON.stringify(rowsToMetadata(metadataToRows(init?.metadata)))
+    );
+  });
 
   const { discardConfirmOpen, closeDiscardConfirm, doClose, attemptClose } =
     useUnsavedCloseGuard({
@@ -289,6 +302,9 @@ export function AddTtsItemsDialog({
 
   const validRows = rows.filter(isRowValid);
   const allComplete = rows.every(isRowValid);
+  const metadataInvalid = rows.some(
+    (r) => Object.keys(metadataRowErrors(r.metadata)).length > 0,
+  );
 
   const addRow = () => {
     // Don't append a fresh blank card until the existing ones are complete.
@@ -312,6 +328,7 @@ export function AddTtsItemsDialog({
       setErrorScrollTick((n) => n + 1);
       return;
     }
+    if (metadataInvalid) return;
     setSubmitting(true);
     setError(null);
     setNameErrors({});
@@ -350,6 +367,7 @@ export function AddTtsItemsDialog({
         name: r.name.trim(),
         text: r.text.trim(),
         audio_path: uploaded[r.id] ?? r.existingAudio ?? "",
+        metadata: rowsToMetadata(r.metadata),
       }));
       await onSubmit(resolved);
     } catch (err) {
@@ -423,7 +441,7 @@ export function AddTtsItemsDialog({
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
               {isEdit
-                ? "Update the name, reference text, and audio for each item"
+                ? "Update the name, reference text, audio, and metadata for each item"
                 : "Annotators will listen to the audio and judge its quality"}
             </p>
           </div>
@@ -596,6 +614,11 @@ export function AddTtsItemsDialog({
                     Audio is required
                   </FieldError>
                 </div>
+                <MetadataFieldsEditor
+                  rows={row.metadata}
+                  onRowsChange={(metadata) => updateRow(row.id, { metadata })}
+                  disabled={submitting}
+                />
               </div>
             );
           })}
@@ -628,7 +651,7 @@ export function AddTtsItemsDialog({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || metadataInvalid}
             className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitLabel}

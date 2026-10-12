@@ -3,8 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
+import type { MetadataEntry } from "@/components/ui";
 import { FieldError } from "@/components/ui/FieldError";
 import { humaniseDetailObject } from "./bulk-upload-shared";
+import {
+  MetadataFieldsEditor,
+  type MetadataRow,
+  metadataRowErrors,
+  metadataToRows,
+  rowsToMetadata,
+} from "./MetadataFieldsEditor";
 import {
   parseItemNameConflictFromError,
   rowNameErrorsFromConflict,
@@ -21,6 +29,7 @@ type SttRowDraft = {
   name: string;
   actual: string;
   predicted: string;
+  metadata: MetadataRow[];
 };
 
 export type SttItemRowSubmission = {
@@ -28,6 +37,7 @@ export type SttItemRowSubmission = {
   name: string;
   actual_transcript: string;
   predicted_transcript: string;
+  metadata?: MetadataEntry[];
 };
 
 type AddSttItemsDialogProps = {
@@ -38,6 +48,7 @@ type AddSttItemsDialogProps = {
     name: string;
     actual: string;
     predicted: string;
+    metadata?: MetadataEntry[] | null;
   }[];
   onClose: () => void;
   onSubmit: (rows: SttItemRowSubmission[]) => Promise<void> | void;
@@ -69,7 +80,22 @@ const newRow = (): SttRowDraft => ({
   name: "",
   actual: "",
   predicted: "",
+  metadata: [],
 });
+
+const rowsFromInitial = (
+  initialRows: AddSttItemsDialogProps["initialRows"],
+): SttRowDraft[] =>
+  initialRows && initialRows.length > 0
+    ? initialRows.map((r) => ({
+        id: r.uuid,
+        uuid: r.uuid,
+        name: r.name,
+        actual: r.actual,
+        predicted: r.predicted,
+        metadata: metadataToRows(r.metadata),
+      }))
+    : [newRow()];
 
 export function AddSttItemsDialog({
   isOpen,
@@ -83,15 +109,7 @@ export function AddSttItemsDialog({
   const isEdit = mode === "edit";
 
   const [rows, setRows] = useState<SttRowDraft[]>(() =>
-    initialRows && initialRows.length > 0
-      ? initialRows.map((r) => ({
-          id: r.uuid,
-          uuid: r.uuid,
-          name: r.name,
-          actual: r.actual,
-          predicted: r.predicted,
-        }))
-      : [newRow()],
+    rowsFromInitial(initialRows),
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,17 +129,7 @@ export function AddSttItemsDialog({
   // latest selected items, and a reopened add starts blank).
   useEffect(() => {
     if (isOpen) {
-      setRows(
-        initialRows && initialRows.length > 0
-          ? initialRows.map((r) => ({
-              id: r.uuid,
-              uuid: r.uuid,
-              name: r.name,
-              actual: r.actual,
-              predicted: r.predicted,
-            }))
-          : [newRow()],
-      );
+      setRows(rowsFromInitial(initialRows));
       setError(null);
       setNameErrors({});
       setValidationAttempted(false);
@@ -150,16 +158,16 @@ export function AddSttItemsDialog({
   // Unsaved-changes check. Add mode: any field has content. Edit mode: any
   // field differs from the item it was seeded with (rows align 1:1 with
   // initialRows since edit mode can't add/remove rows).
-  const isDirty = isEdit
-    ? rows.some((r, i) => {
-        const init = initialRows?.[i];
-        return (
-          r.name.trim() !== (init?.name ?? "").trim() ||
-          r.actual.trim() !== (init?.actual ?? "").trim() ||
-          r.predicted.trim() !== (init?.predicted ?? "").trim()
-        );
-      })
-    : rows.some((r) => r.name.trim() || r.actual.trim() || r.predicted.trim());
+  const isDirty = rows.some((r, i) => {
+    const init = initialRows?.[i];
+    return (
+      r.name.trim() !== (init?.name ?? "").trim() ||
+      r.actual.trim() !== (init?.actual ?? "").trim() ||
+      r.predicted.trim() !== (init?.predicted ?? "").trim() ||
+      JSON.stringify(rowsToMetadata(r.metadata)) !==
+        JSON.stringify(rowsToMetadata(metadataToRows(init?.metadata)))
+    );
+  });
 
   // Note: this dialog intentionally has no backdrop-click close, so
   // `handleBackdropClick` is not used here.
@@ -198,6 +206,9 @@ export function AddSttItemsDialog({
   const isRowComplete = (r: SttRowDraft) =>
     !!r.name.trim() && !!r.actual.trim() && !!r.predicted.trim();
   const allComplete = rows.every(isRowComplete);
+  const metadataInvalid = rows.some(
+    (r) => Object.keys(metadataRowErrors(r.metadata)).length > 0,
+  );
 
   const addRow = () => {
     // Don't append a fresh blank card until the existing ones are complete.
@@ -219,6 +230,7 @@ export function AddSttItemsDialog({
       name: r.name.trim(),
       actual_transcript: r.actual.trim(),
       predicted_transcript: r.predicted.trim(),
+      metadata: rowsToMetadata(r.metadata),
     }))
     .filter((r) => r.name && r.actual_transcript && r.predicted_transcript);
 
@@ -230,6 +242,7 @@ export function AddSttItemsDialog({
       setErrorScrollTick((n) => n + 1);
       return;
     }
+    if (metadataInvalid) return;
     setSubmitting(true);
     setError(null);
     setNameErrors({});
@@ -294,7 +307,7 @@ export function AddSttItemsDialog({
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
               {isEdit
-                ? "Update the name, reference, and predicted transcripts for each row"
+                ? "Update the name, reference and predicted transcripts, and metadata for each row"
                 : "Annotators will compare the predicted transcript against the reference"}
             </p>
           </div>
@@ -424,6 +437,11 @@ export function AddSttItemsDialog({
                     Predicted transcript is required
                   </FieldError>
                 </div>
+                <MetadataFieldsEditor
+                  rows={row.metadata}
+                  onRowsChange={(metadata) => updateRow(row.id, { metadata })}
+                  disabled={submitting}
+                />
               </div>
             );
           })}
@@ -457,7 +475,7 @@ export function AddSttItemsDialog({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || metadataInvalid}
               className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting

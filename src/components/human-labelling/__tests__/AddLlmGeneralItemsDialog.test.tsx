@@ -1,4 +1,4 @@
-import { render, screen, setupUser, waitFor } from "@/test-utils";
+import { render, screen, setupUser, waitFor, within } from "@/test-utils";
 import {
   AddLlmGeneralItemsDialog,
   LlmGeneralEvaluatorDef,
@@ -69,10 +69,15 @@ jest.mock("../../ToolPicker", () => ({
 
 // CreateToolFlow is separately tested. Stubbed to a button that reports the
 // tool it "created" and the full list, the same shape the real flow reports.
-let createToolFlowProps: any = null;
+type CreateToolFlowStubProps = {
+  isOpen: boolean;
+  knownTools: unknown[];
+  onCreated: (tool: unknown, allTools: unknown[]) => void;
+};
+let createToolFlowProps = {} as CreateToolFlowStubProps;
 jest.mock("../../tools/CreateToolFlow", () => ({
   __esModule: true,
-  CreateToolFlow: (props: any) => {
+  CreateToolFlow: (props: CreateToolFlowStubProps) => {
     createToolFlowProps = props;
     return props.isOpen ? (
       <button
@@ -505,7 +510,7 @@ describe("AddLlmGeneralItemsDialog", () => {
     );
     await user.type(
       screen.getByPlaceholderText(
-        "(Optional) What is this item about? Shown to annotators alongside the evaluators.",
+        "Mother asks when her baby's next vaccine is due",
       ),
       "  desc  ",
     );
@@ -531,8 +536,46 @@ describe("AddLlmGeneralItemsDialog", () => {
         output: "out",
         toolCalls: [],
         evaluator_variables: { "ev-1": { topic: "sports", tone: "neutral" } },
+        metadata: [],
       },
     ]);
+  });
+
+  it("puts the evaluators in their own right column", () => {
+    renderDialog({ evaluators: [evaluatorWithVars] });
+    const column = screen.getByTestId("label-item-evaluators-column");
+    expect(within(column).getByText("Evaluators")).toBeInTheDocument();
+    expect(within(column).getByText("Relevance")).toBeInTheDocument();
+  });
+
+  it("does not add the item while two metadata fields share a name", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog();
+    await user.type(screen.getByPlaceholderText("Your item name"), "Item 1");
+    await user.type(
+      screen.getByPlaceholderText("The prompt or input given to the LLM"),
+      "in",
+    );
+    await user.type(
+      screen.getByPlaceholderText("The output the LLM produced"),
+      "out",
+    );
+    const addButton = screen.getByRole("button", { name: "Add item" });
+    expect(addButton).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Add field" }));
+    await user.click(screen.getByRole("button", { name: "Add field" }));
+    await user.type(screen.getByLabelText("Metadata field name 1"), "source");
+    await user.type(screen.getByLabelText("Metadata field name 2"), "source");
+    expect(screen.getByText(/is already used by another field/)).toBeInTheDocument();
+    expect(addButton).toBeDisabled();
+    await user.click(addButton);
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove metadata field 2" }),
+    );
+    expect(addButton).toBeEnabled();
   });
 
   it("shows a name-conflict error under the Name field", async () => {
@@ -694,8 +737,30 @@ describe("AddLlmGeneralItemsDialog", () => {
         input: "in",
         output: "out",
         varValues: { "ev-1": { topic: "sports", tone: "excited" } },
+        metadata: [{ key: "source", value: "call 12" }],
       },
     ];
+
+    it("shows the seeded metadata and saves the edited list", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({ mode: "edit", initialRows, onSubmit });
+      expect(screen.getByDisplayValue("source")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("call 12")).toBeInTheDocument();
+
+      await user.clear(screen.getByLabelText("Metadata value 1"));
+      await user.type(screen.getByLabelText("Metadata value 1"), "call 13");
+      await user.click(screen.getByRole("button", { name: "Add field" }));
+      await user.type(screen.getByLabelText("Metadata field name 2"), "lang");
+      await user.type(screen.getByLabelText("Metadata value 2"), "hi");
+      await user.click(screen.getByRole("button", { name: "Save item" }));
+
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit.mock.calls[0][0][0].metadata).toEqual([
+        { key: "source", value: "call 13" },
+        { key: "lang", value: "hi" },
+      ]);
+    });
 
     it("seeds fields from initialRows and shows edit-mode labels", () => {
       renderDialog({

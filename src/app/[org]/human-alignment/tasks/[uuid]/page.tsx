@@ -34,6 +34,12 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { AddSttItemsDialog } from "@/components/human-labelling/AddSttItemsDialog";
 import { AddTtsItemsDialog } from "@/components/human-labelling/AddTtsItemsDialog";
 import { AddLlmGeneralItemsDialog } from "@/components/human-labelling/AddLlmGeneralItemsDialog";
+import {
+  type MetadataRow,
+  metadataToRows,
+  rowsToMetadata,
+} from "@/components/human-labelling/MetadataFieldsEditor";
+import { sampleItem } from "@/components/human-labelling/sampleItem";
 import { BulkUploadSttItemsDialog } from "@/components/human-labelling/BulkUploadSttItemsDialog";
 import { BulkUploadTtsItemsDialog } from "@/components/human-labelling/BulkUploadTtsItemsDialog";
 import { BulkUploadConversationItemsDialog } from "@/components/human-labelling/BulkUploadConversationItemsDialog";
@@ -71,7 +77,12 @@ import { NotFoundPage } from "@/components/NotFoundPage";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
 import { ServerPaginatedListBar } from "@/components/ui/ServerPaginatedListBar";
-import { Breadcrumbs, CopyLinkButton, type Crumb } from "@/components/ui";
+import {
+  Breadcrumbs,
+  CopyLinkButton,
+  type Crumb,
+  type MetadataEntry,
+} from "@/components/ui";
 import {
   useAccessToken,
   useItemPager,
@@ -82,6 +93,7 @@ import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import {
   evaluatorsThatCanBeRun,
+  itemEditForm,
   runEvaluatorsDecision,
   toItemDetailItem,
   toolCallNotEvaluatedMessage,
@@ -164,6 +176,7 @@ type SummaryAnnotation = {
 type SummaryRow = {
   item_id: string;
   payload: Record<string, unknown> | null;
+  metadata?: MetadataEntry[] | null;
   evaluator_id: string;
   evaluator_version_id?: string | null;
   evaluator_value: boolean | number | null;
@@ -261,6 +274,7 @@ type LabellingItem = {
   /** True when this row's answer was a tool call rather than a written
    * reply. Set by the backend, the same field the labelling job sends. */
   is_tool_call?: boolean;
+  metadata?: MetadataEntry[] | null;
   created_at: string;
   updated_at?: string;
   deleted_at: string | null;
@@ -1230,6 +1244,9 @@ function LabellingTaskPageInner() {
   const [editLlmItemUuid, setEditLlmItemUuid] = useState<string | null>(null);
   const [editLlmItemName, setEditLlmItemName] = useState("");
   const [editLlmItemDescription, setEditLlmItemDescription] = useState("");
+  const [editLlmItemMetadata, setEditLlmItemMetadata] = useState<
+    MetadataRow[]
+  >([]);
   const [savingLlmItem, setSavingLlmItem] = useState(false);
   const [editLlmError, setEditLlmError] = useState<string | null>(null);
   // When duplicating an item, the create dialog opens pre-filled from this
@@ -1240,11 +1257,25 @@ function LabellingTaskPageInner() {
   > | null>(null);
   // STT items use a separate dialog; this holds the row to seed it with.
   const [duplicateSttRows, setDuplicateSttRows] = useState<
-    { uuid: string; name: string; actual: string; predicted: string }[] | null
+    | {
+        uuid: string;
+        name: string;
+        actual: string;
+        predicted: string;
+        metadata?: MetadataEntry[] | null;
+      }[]
+    | null
   >(null);
   // TTS items use their own text/audio dialog; this seeds a duplicate.
   const [duplicateTtsRows, setDuplicateTtsRows] = useState<
-    { uuid: string; name: string; text: string; audio: string }[] | null
+    | {
+        uuid: string;
+        name: string;
+        text: string;
+        audio: string;
+        metadata?: MetadataEntry[] | null;
+      }[]
+    | null
   >(null);
   // llm-general items use their own input/output dialog (non-conversational).
   const [editLlmGeneralItemsOpen, setEditLlmGeneralItemsOpen] = useState(false);
@@ -1258,6 +1289,7 @@ function LabellingTaskPageInner() {
       input: string;
       output: string;
       varValues?: Record<string, Record<string, string>>;
+      metadata?: MetadataEntry[] | null;
     }[]
     | null
   >(null);
@@ -1710,6 +1742,7 @@ function LabellingTaskPageInner() {
               uuid: row.item_id,
               task_id: taskSummary.task_id,
               payload: row.payload,
+              metadata: row.metadata,
               created_at: "",
               updated_at: undefined,
               deleted_at: null,
@@ -2357,6 +2390,22 @@ function LabellingTaskPageInner() {
     };
   };
 
+  const openItemEdit = (uuid: string) => {
+    const form = itemEditForm(taskType);
+    if (form === "tts") {
+      setEditTtsSingleItemUuid(uuid);
+      setEditTtsItemsOpen(true);
+    } else if (form === "stt") {
+      setEditSttSingleItemUuid(uuid);
+      setEditSttItemsOpen(true);
+    } else if (form === "llm-general") {
+      setEditLlmGeneralSingleItemUuid(uuid);
+      setEditLlmGeneralItemsOpen(true);
+    } else {
+      setEditLlmItemUuid(uuid);
+    }
+  };
+
   const editingInitialConfig = buildInitialConfig(editingPayload);
   const addItemInitialConfig = buildInitialConfig(duplicateSourcePayload);
 
@@ -2373,6 +2422,7 @@ function LabellingTaskPageInner() {
           ? (editingPayload.description as string)
           : "";
       setEditLlmItemDescription(d);
+      setEditLlmItemMetadata(metadataToRows(editingItem.metadata));
       setEditLlmError(null);
     }
   }, [editingItem?.uuid, editingPayload]);
@@ -2444,6 +2494,7 @@ function LabellingTaskPageInner() {
     useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newItemDescription, setNewItemDescription] = useState("");
+  const [newItemMetadata, setNewItemMetadata] = useState<MetadataRow[]>([]);
   const [creatingItem, setCreatingItem] = useState(false);
   const [createItemError, setCreateItemError] = useState<string | null>(null);
   const [validationAttempted, setValidationAttempted] = useState(false);
@@ -2640,21 +2691,24 @@ function LabellingTaskPageInner() {
                 const addItemButton = (
                   <button
                     onClick={() => {
+                      const uuid = crypto.randomUUID();
                       if (taskType === "llm" || taskType === "conversation") {
-                        setNewItemName("");
+                        const sample = sampleItem(taskType, itemsTotal + 1);
+                        setNewItemName(sample.name);
                         setNewItemDescription("");
+                        setNewItemMetadata([]);
                         setCreateItemError(null);
                         setValidationAttempted(false);
-                        setDuplicateSourcePayload(null);
+                        setDuplicateSourcePayload(sample.payload);
                         setAddItemOpen(true);
                       } else if (taskType === "stt") {
-                        setDuplicateSttRows(null);
+                        setDuplicateSttRows([{ uuid, ...sampleItem("stt", itemsTotal + 1) }]);
                         setAddSttItemsOpen(true);
                       } else if (taskType === "tts") {
-                        setDuplicateTtsRows(null);
+                        setDuplicateTtsRows([{ uuid, audio: "", ...sampleItem("tts", itemsTotal + 1) }]);
                         setAddTtsItemsOpen(true);
                       } else if (taskType === "llm-general") {
-                        setDuplicateLlmGeneralRows(null);
+                        setDuplicateLlmGeneralRows([{ uuid, ...sampleItem("llm-general", itemsTotal + 1) }]);
                         setAddLlmGeneralItemsOpen(true);
                       }
                     }}
@@ -3141,6 +3195,7 @@ function LabellingTaskPageInner() {
                                   uuid: row.item_id,
                                   task_id: batch.task_id,
                                   payload: row.payload,
+                                  metadata: row.metadata,
                                   created_at: "",
                                   updated_at: undefined,
                                   deleted_at: null,
@@ -3420,15 +3475,7 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
-                            onEdit={(uuid) => {
-                              if (taskType === "tts") {
-                                setEditTtsSingleItemUuid(uuid);
-                                setEditTtsItemsOpen(true);
-                              } else {
-                                setEditSttSingleItemUuid(uuid);
-                                setEditSttItemsOpen(true);
-                              }
-                            }}
+                            onEdit={openItemEdit}
                             onDuplicate={(uuid) => {
                               const item = items.find((i) => i.uuid === uuid);
                               if (!item) return;
@@ -3453,6 +3500,7 @@ function LabellingTaskPageInner() {
                                       typeof p.audio_path === "string"
                                         ? (p.audio_path as string)
                                         : "",
+                                    metadata: item.metadata,
                                   },
                                 ]);
                                 setAddTtsItemsOpen(true);
@@ -3469,6 +3517,7 @@ function LabellingTaskPageInner() {
                                       typeof p.predicted_transcript === "string"
                                         ? (p.predicted_transcript as string)
                                         : "",
+                                    metadata: item.metadata,
                                   },
                                 ]);
                                 setAddSttItemsOpen(true);
@@ -3595,14 +3644,7 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
-                            onEdit={(uuid) => {
-                              if (taskType === "llm-general") {
-                                setEditLlmGeneralSingleItemUuid(uuid);
-                                setEditLlmGeneralItemsOpen(true);
-                              } else {
-                                setEditLlmItemUuid(uuid);
-                              }
-                            }}
+                            onEdit={openItemEdit}
                             onDuplicate={(uuid) => {
                               const item = items.find((i) => i.uuid === uuid);
                               if (!item) return;
@@ -3632,6 +3674,7 @@ function LabellingTaskPageInner() {
                                         ? (p.output as string)
                                         : "",
                                     varValues: readEvaluatorVariables(p),
+                                    metadata: item.metadata,
                                   },
                                 ]);
                                 setAddLlmGeneralItemsOpen(true);
@@ -3643,6 +3686,7 @@ function LabellingTaskPageInner() {
                                   : "";
                               setNewItemName(`Copy of ${name}`);
                               setNewItemDescription(desc);
+                              setNewItemMetadata(metadataToRows(item.metadata));
                               setDuplicateSourcePayload(p);
                               setCreateItemError(null);
                               setValidationAttempted(false);
@@ -3811,6 +3855,8 @@ function LabellingTaskPageInner() {
           setTestName={setNewItemName}
           itemDescription={newItemDescription}
           setItemDescription={setNewItemDescription}
+          itemMetadata={newItemMetadata}
+          setItemMetadata={setNewItemMetadata}
           validationAttempted={validationAttempted}
           mode="labelItem"
           allowAgentLastMessage={taskType === "conversation"}
@@ -3903,7 +3949,11 @@ function LabellingTaskPageInner() {
             try {
               await apiClient(`/annotation-tasks/${uuid}/items`, accessToken, {
                 method: "POST",
-                body: { items: [{ payload }] },
+                body: {
+                  items: [
+                    { payload, metadata: rowsToMetadata(newItemMetadata) },
+                  ],
+                },
               });
               setAddItemOpen(false);
               setDuplicateSourcePayload(null);
@@ -3935,6 +3985,8 @@ function LabellingTaskPageInner() {
           setTestName={setEditLlmItemName}
           itemDescription={editLlmItemDescription}
           setItemDescription={setEditLlmItemDescription}
+          itemMetadata={editLlmItemMetadata}
+          setItemMetadata={setEditLlmItemMetadata}
           validationAttempted={false}
           mode="labelItem"
           allowAgentLastMessage={taskType === "conversation"}
@@ -4023,7 +4075,13 @@ function LabellingTaskPageInner() {
                 {
                   method: "PUT",
                   body: {
-                    updates: [{ uuid: editLlmItemUuid, payload }],
+                    updates: [
+                      {
+                        uuid: editLlmItemUuid,
+                        payload,
+                        metadata: rowsToMetadata(editLlmItemMetadata),
+                      },
+                    ],
                   },
                 },
               );
@@ -4166,6 +4224,7 @@ function LabellingTaskPageInner() {
                   reference_transcript: r.actual_transcript,
                   predicted_transcript: r.predicted_transcript,
                 },
+                metadata: r.metadata,
               })),
             },
           });
@@ -4198,6 +4257,7 @@ function LabellingTaskPageInner() {
                 typeof p.predicted_transcript === "string"
                   ? p.predicted_transcript
                   : "",
+              metadata: it.metadata,
             };
           })}
         onClose={() => {
@@ -4221,6 +4281,7 @@ function LabellingTaskPageInner() {
                       reference_transcript: r.actual_transcript,
                       predicted_transcript: r.predicted_transcript,
                     },
+                    metadata: r.metadata,
                   })),
               },
             },
@@ -4252,6 +4313,7 @@ function LabellingTaskPageInner() {
                   text: r.text,
                   audio_path: r.audio_path,
                 },
+                metadata: r.metadata,
               })),
             },
           });
@@ -4279,6 +4341,7 @@ function LabellingTaskPageInner() {
               name: typeof p.name === "string" ? p.name : "",
               text: typeof p.text === "string" ? p.text : "",
               audio: typeof p.audio_path === "string" ? p.audio_path : "",
+              metadata: it.metadata,
             };
           })}
         onClose={() => {
@@ -4302,6 +4365,7 @@ function LabellingTaskPageInner() {
                       text: r.text,
                       audio_path: r.audio_path,
                     },
+                    metadata: r.metadata,
                   })),
               },
             },
@@ -4340,6 +4404,7 @@ function LabellingTaskPageInner() {
                     ? { evaluator_variables: r.evaluator_variables }
                     : {}),
                 },
+                metadata: r.metadata,
               })),
             },
           });
@@ -4373,6 +4438,7 @@ function LabellingTaskPageInner() {
                 ? p.actual_tool_calls
                 : [],
               varValues: readEvaluatorVariables(p),
+              metadata: it.metadata,
             };
           })}
         onClose={() => {
@@ -4410,6 +4476,7 @@ function LabellingTaskPageInner() {
                         : { actual_tool_calls: undefined }),
                       evaluator_variables: r.evaluator_variables,
                     },
+                    metadata: r.metadata,
                   })),
               },
             },
@@ -4607,6 +4674,13 @@ function LabellingTaskPageInner() {
         onPrev={itemPager.prev}
         onNext={itemPager.next}
         position={itemPager.position}
+        onEdit={() => {
+          if (!itemDetailUuid) return;
+          const uuid = itemDetailUuid;
+          setItemDetailUuid(null);
+          itemPager.cancel();
+          openItemEdit(uuid);
+        }}
       />
     </AppLayout>
   );

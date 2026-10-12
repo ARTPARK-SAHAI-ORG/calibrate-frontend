@@ -227,6 +227,38 @@ describe("ItemDetailDialog", () => {
     jest.clearAllMocks();
   });
 
+  it("shows an Edit button that opens the edit form when given one", async () => {
+    apiClientMock.mockResolvedValue(baseSummary());
+    const user = setupUser();
+    const onEdit = jest.fn();
+    render(
+      <ItemDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        task={task}
+        item={item}
+        accessToken="tok"
+        onEdit={onEdit}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows no Edit button without a way to edit", () => {
+    apiClientMock.mockResolvedValue(baseSummary());
+    render(
+      <ItemDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        task={task}
+        item={item}
+        accessToken="tok"
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+  });
+
   it("renders nothing when closed", () => {
     render(
       <ItemDetailDialog

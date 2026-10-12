@@ -2,7 +2,13 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { Button, DialogNavHeader, LoadingState } from "@/components/ui";
+import {
+  Button,
+  DialogNavHeader,
+  LoadingState,
+  MetadataTable,
+  type MetadataEntry,
+} from "@/components/ui";
 import { useDialogNavKeys, useResizableWidth } from "@/hooks";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
@@ -20,7 +26,6 @@ import {
   fetchTraceScores,
   traceInputTurns,
   TraceDetail,
-  TraceMetadataEntry,
   TraceOutput,
   TraceScoringRun,
   TraceTurn,
@@ -221,9 +226,8 @@ function TraceMetaPanel({
   conversationId: string | null;
   createdAt: string;
   labels: string[] | null;
-  metadata: TraceMetadataEntry[] | null;
+  metadata: MetadataEntry[] | null;
 }) {
-  const entries = metadata ?? [];
   const tags = labels ?? [];
 
   return (
@@ -248,28 +252,7 @@ function TraceMetaPanel({
           </div>
         </div>
       )}
-      {entries.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-foreground">Metadata</h3>
-          <div className="border border-border rounded-lg overflow-hidden text-xs">
-            <div className="grid grid-cols-2 gap-3 px-3 py-2 border-b border-border bg-muted/30 font-medium text-muted-foreground">
-              <div>Field</div>
-              <div>Value</div>
-            </div>
-            {entries.map((entry, index) => (
-              <div
-                key={`${entry.key}-${index}`}
-                className="grid grid-cols-2 gap-3 px-3 py-2 border-b border-border last:border-b-0"
-              >
-                <div className="font-medium text-foreground break-all">
-                  {entry.key}
-                </div>
-                <div className="text-foreground break-all">{entry.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <MetadataTable entries={metadata} />
     </div>
   );
 }

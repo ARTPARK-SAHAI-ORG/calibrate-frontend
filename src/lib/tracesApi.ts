@@ -1,3 +1,4 @@
+import type { MetadataEntry } from "@/components/ui";
 import { apiGet, apiPost, apiPut, getBackendUrl, Paginated } from "./api";
 
 /** One turn of stored conversation history, OpenAI chat format. Extra keys
@@ -24,10 +25,6 @@ export type TraceOutput = {
   tool_calls?: TraceToolCall[] | null;
 };
 
-export type TraceMetadataEntry = {
-  key: string;
-  value: string;
-};
 
 /** Slim list row from `GET /traces` — previews and counts only; the full
  *  bodies live on the detail endpoint. */
@@ -112,7 +109,7 @@ export type TraceDetail = {
    * answers one input at a time, so it stores that input as plain text. */
   input: TraceTurn[] | string;
   output: TraceOutput;
-  metadata: TraceMetadataEntry[] | null;
+  metadata: MetadataEntry[] | null;
   labels?: string[] | null;
   created_at: string;
   updated_at: string;

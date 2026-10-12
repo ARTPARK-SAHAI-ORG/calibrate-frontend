@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 import { FieldError } from "@/components/ui/FieldError";
+import type { MetadataEntry } from "@/components/ui";
 import { ToolPicker, getToolParams } from "@/components/ToolPicker";
 import type { AvailableTool } from "@/components/ToolPicker";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
@@ -12,6 +13,13 @@ import { useAccessToken } from "@/hooks/useAccessToken";
 import { reportError } from "@/lib/reportError";
 import { normalizeToolCall } from "@/components/test-results/shared";
 import { humaniseDetailObject } from "./bulk-upload-shared";
+import {
+  MetadataFieldsEditor,
+  metadataRowErrors,
+  metadataToRows,
+  rowsToMetadata,
+  type MetadataRow,
+} from "./MetadataFieldsEditor";
 import { parseItemNameConflictFromError } from "./itemNameConflict";
 import {
   DiscardChangesDialog,
@@ -37,6 +45,7 @@ export type LlmGeneralItemRowSubmission = {
   /** The tool calls the agent made. Empty means the answer was text. */
   toolCalls: { tool: string; arguments: Record<string, unknown> }[];
   evaluator_variables: VarValues;
+  metadata: MetadataEntry[];
 };
 
 /** One tool call while it is being edited: values are held as the text in
@@ -110,6 +119,7 @@ type AddLlmGeneralItemsDialogProps = {
      * than text. Editable under Output. */
     toolCalls?: unknown[];
     varValues?: VarValues;
+    metadata?: MetadataEntry[] | null;
   }[];
   onClose: () => void;
   // Receives the single edited/added item wrapped in an array so existing
@@ -168,6 +178,9 @@ export function AddLlmGeneralItemsDialog({
   const [uuid, setUuid] = useState<string | undefined>(seed?.uuid);
   const [name, setName] = useState(seed?.name ?? "");
   const [description, setDescription] = useState(seed?.description ?? "");
+  const [metadataRows, setMetadataRows] = useState<MetadataRow[]>(() =>
+    metadataToRows(seed?.metadata),
+  );
   const [input, setInput] = useState(seed?.input ?? "");
   const [output, setOutput] = useState(seed?.output ?? "");
   const [toolCalls, setToolCalls] = useState<DraftToolCall[]>(() =>
@@ -192,6 +205,7 @@ export function AddLlmGeneralItemsDialog({
       setUuid(s?.uuid);
       setName(s?.name ?? "");
       setDescription(s?.description ?? "");
+      setMetadataRows(metadataToRows(s?.metadata));
       setInput(s?.input ?? "");
       setOutput(s?.output ?? "");
       setToolCalls(seedToolCalls(s?.toolCalls));
@@ -249,6 +263,8 @@ export function AddLlmGeneralItemsDialog({
   const isDirty =
     name.trim() !== (seed?.name ?? "").trim() ||
     description.trim() !== (seed?.description ?? "").trim() ||
+    JSON.stringify(rowsToMetadata(metadataRows)) !==
+      JSON.stringify(rowsToMetadata(metadataToRows(seed?.metadata))) ||
     input.trim() !== (seed?.input ?? "").trim() ||
     output.trim() !== (seed?.output ?? "").trim() ||
     JSON.stringify(toolCalls.map(({ tool, params }) => ({ tool, params }))) !==
@@ -335,7 +351,8 @@ export function AddLlmGeneralItemsDialog({
     !!name.trim() &&
     !!input.trim() &&
     (!!output.trim() || toolCalls.length > 0) &&
-    varsComplete;
+    varsComplete &&
+    Object.keys(metadataRowErrors(metadataRows)).length === 0;
 
   const handleSubmit = async () => {
     if (!valid || submitting) return;
@@ -365,6 +382,7 @@ export function AddLlmGeneralItemsDialog({
             ),
           })),
           evaluator_variables,
+          metadata: rowsToMetadata(metadataRows),
         },
       ]);
     } catch (err) {
@@ -424,10 +442,10 @@ export function AddLlmGeneralItemsDialog({
           </button>
         </div>
 
-        {/* Body — two panes: form on the left, input/output on the right. */}
+        {/* Body: name, description and metadata on the left, input and
+            output in the middle, evaluators on the right. */}
         <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
-          {/* Left: name + evaluators (with variable inputs) — mirrors the
-              AddTestDialog left column. */}
+          {/* Left column mirrors the AddTestDialog left column. */}
           <div className="w-full md:w-[30%] flex flex-col border-b md:border-b-0 md:border-r border-border overflow-y-auto p-4 md:p-6 space-y-6">
             <div>
               <label className="block text-base font-medium text-foreground mb-2">
@@ -452,77 +470,30 @@ export function AddLlmGeneralItemsDialog({
             </div>
 
             <div>
-              <label className="block text-base font-medium text-foreground mb-2">
+              <label className="block text-base font-medium text-foreground">
                 Description
               </label>
+              <p className="text-xs text-muted-foreground mt-1 mb-2">
+                Any details about this item to help annotators while labelling
+              </p>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="(Optional) What is this item about? Shown to annotators alongside the evaluators."
+                placeholder="Mother asks when her baby's next vaccine is due"
                 disabled={submitting}
                 rows={3}
                 className="w-full px-4 py-2.5 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-y disabled:opacity-50"
               />
             </div>
 
-            {evaluators.length > 0 && (
-              <div>
-                <label className="block text-base font-medium text-foreground mb-2">
-                  Evaluators
-                </label>
-                <div className="space-y-4">
-                  {evaluators.map((e) => (
-                    <div
-                      key={e.uuid}
-                      className="border border-border rounded-lg p-4 bg-background"
-                    >
-                      <div className="min-w-0 mb-3">
-                        <div className="text-sm font-semibold text-foreground">
-                          {e.name}
-                        </div>
-                        {e.description && (
-                          <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                            {e.description}
-                          </div>
-                        )}
-                      </div>
-                      {e.variables.length > 0 && (
-                        <div className="space-y-3">
-                          {e.variables.map((v) => {
-                            const placeholder =
-                              v.description && v.description.length > 0
-                                ? v.description
-                                : v.default && v.default.length > 0
-                                  ? v.default
-                                  : `Enter value for {{${v.name}}}`;
-                            return (
-                              <div key={v.name}>
-                                <div className="text-xs text-muted-foreground mb-1.5">
-                                  <code className="font-mono">{`{{${v.name}}}`}</code>
-                                </div>
-                                <textarea
-                                  value={varValues[e.uuid]?.[v.name] ?? ""}
-                                  onChange={(ev) =>
-                                    updateVar(e.uuid, v.name, ev.target.value)
-                                  }
-                                  placeholder={placeholder}
-                                  disabled={submitting}
-                                  rows={4}
-                                  className="w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <MetadataFieldsEditor
+              rows={metadataRows}
+              onRowsChange={setMetadataRows}
+              disabled={submitting}
+            />
           </div>
 
-          {/* Right: input + output boxes shown side by side, each filling
+          {/* Middle: input + output boxes shown side by side, each filling
               the full dialog height. */}
           <div className="w-full md:flex-1 flex flex-col md:flex-row bg-muted/30 min-h-0">
             <div className="flex-1 flex flex-col min-h-0 p-4 md:p-6 border-b md:border-b-0 md:border-r border-border">
@@ -696,6 +667,65 @@ export function AddLlmGeneralItemsDialog({
               </div>
             </div>
           </div>
+
+          {evaluators.length > 0 && (
+            <div
+              data-testid="label-item-evaluators-column"
+              className="w-full md:w-[25%] flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 md:border-l border-border p-4 md:p-6"
+            >
+              <label className="block text-base font-medium text-foreground mb-2">
+                Evaluators
+              </label>
+              <div className="space-y-4">
+                {evaluators.map((e) => (
+                  <div
+                    key={e.uuid}
+                    className="border border-border rounded-lg p-4 bg-background"
+                  >
+                    <div className="min-w-0 mb-3">
+                      <div className="text-sm font-semibold text-foreground">
+                        {e.name}
+                      </div>
+                      {e.description && (
+                        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                          {e.description}
+                        </div>
+                      )}
+                    </div>
+                    {e.variables.length > 0 && (
+                      <div className="space-y-3">
+                        {e.variables.map((v) => {
+                          const placeholder =
+                            v.description && v.description.length > 0
+                              ? v.description
+                              : v.default && v.default.length > 0
+                                ? v.default
+                                : `Enter value for {{${v.name}}}`;
+                          return (
+                            <div key={v.name}>
+                              <div className="text-xs text-muted-foreground mb-1.5">
+                                <code className="font-mono">{`{{${v.name}}}`}</code>
+                              </div>
+                              <textarea
+                                value={varValues[e.uuid]?.[v.name] ?? ""}
+                                onChange={(ev) =>
+                                  updateVar(e.uuid, v.name, ev.target.value)
+                                }
+                                placeholder={placeholder}
+                                disabled={submitting}
+                                rows={4}
+                                className="w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

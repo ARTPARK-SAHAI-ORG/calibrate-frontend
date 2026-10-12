@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, render, screen, setupUser } from "@/test-utils";
+import { cleanup, render, screen, setupUser, within } from "@/test-utils";
 
 // AnnotationJobView pulls in canvas-confetti and backend API helpers that
 // are irrelevant to this presentational view; stub ItemPane with a simple
@@ -105,6 +105,7 @@ describe("snapshotToItem", () => {
       payload: { a: 1 },
       created_at: "",
       deleted_at: null,
+      metadata: undefined,
     });
   });
 });
@@ -2080,18 +2081,6 @@ describe("EvaluatorResultsPane", () => {
     expect(screen.getByText("No evaluators in this run.")).toBeInTheDocument();
   });
 
-  it("renders the item description when provided", () => {
-    render(
-      <EvaluatorResultsPane
-        {...baseProps}
-        evaluators={[]}
-        runs={[]}
-        itemDescription="  Some description  "
-      />,
-    );
-    expect(screen.getByText("Some description")).toBeInTheDocument();
-  });
-
   it("renders a comments block with pills that switch the active comment", async () => {
     const user = setupUser();
     render(
@@ -2859,5 +2848,96 @@ describe("ItemDetailPane expected tool calls", () => {
   it("shows no heading for an item without expected tool calls", () => {
     renderPane({ description: "Desc here" });
     expect(screen.queryByText("Expected tool calls")).not.toBeInTheDocument();
+  });
+});
+
+describe("ItemDetailPane about column", () => {
+  const renderPane = (
+    payload: Record<string, unknown>,
+    metadata?: { key: string; value: string }[],
+    itemDetailsInOwnColumn = true,
+  ) =>
+    render(
+      <ItemDetailPane
+        itemDetailsInOwnColumn={itemDetailsInOwnColumn}
+        item={{
+          id: 0,
+          uuid: "item-1",
+          task_id: "task-1",
+          payload,
+          created_at: "",
+          deleted_at: null,
+          metadata,
+        }}
+        taskType="llm"
+        evaluators={[
+          { evaluator_id: "ev-bin", evaluator_version_id: "v-bin-1" },
+        ]}
+        evaluatorNamesById={{ "ev-bin": "Binary Evaluator" }}
+        getJobEvaluator={() => evaluatorBinary}
+        runs={[makeRun()]}
+        versionLabels={{}}
+        jobStatus="completed"
+        humanAgreementForItem={null}
+        evaluatorVariablesByEvaluatorId={{}}
+      />,
+    );
+
+  it("draws the description and the metadata in a column of their own", () => {
+    renderPane({ description: "  Desc here  " }, [{ key: "source", value: "crm" }]);
+    const pane = screen.getByTestId("item-detail-about-pane");
+    expect(within(pane).getByText("Description")).toBeInTheDocument();
+    expect(within(pane).getByText("Desc here")).toBeInTheDocument();
+    expect(within(pane).getByText("Metadata")).toBeInTheDocument();
+    expect(within(pane).getByText("source")).toBeInTheDocument();
+    expect(within(pane).getByText("crm")).toBeInTheDocument();
+  });
+
+  it("keeps the column for a description alone", () => {
+    renderPane({ description: "Desc here" });
+    const pane = screen.getByTestId("item-detail-about-pane");
+    expect(within(pane).getByText("Desc here")).toBeInTheDocument();
+    expect(screen.queryByText("Metadata")).not.toBeInTheDocument();
+  });
+
+  it("keeps the column for metadata alone", () => {
+    renderPane({}, [{ key: "source", value: "crm" }]);
+    const pane = screen.getByTestId("item-detail-about-pane");
+    expect(within(pane).getByText("crm")).toBeInTheDocument();
+    expect(screen.queryByText("Description")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["nothing", {}, undefined],
+    ["a blank description and an empty metadata list", { description: "   " }, []],
+  ])("draws no column for an item with %s", (_label, payload, metadata) => {
+    renderPane(payload, metadata);
+    expect(screen.queryByTestId("item-detail-about-pane")).not.toBeInTheDocument();
+    expect(screen.queryByText("Description")).not.toBeInTheDocument();
+    expect(screen.queryByText("Metadata")).not.toBeInTheDocument();
+  });
+
+  it("carries a snapshot's metadata onto the item", () => {
+    const metadata = [{ key: "source", value: "crm" }];
+    expect(
+      snapshotToItem({ uuid: "u1", payload: {}, metadata }, "task-1").metadata,
+    ).toEqual(metadata);
+  });
+
+  it("draws them above the evaluator results when not given a column, as the labelling form does", () => {
+    renderPane({ description: "Desc here" }, [{ key: "source", value: "crm" }], false);
+    expect(screen.queryByTestId("item-detail-about-pane")).not.toBeInTheDocument();
+    const pane = screen.getByTestId("item-detail-left-pane").nextElementSibling as HTMLElement;
+    expect(within(pane).getByText("Description")).toBeInTheDocument();
+    expect(within(pane).getByText("Desc here")).toBeInTheDocument();
+    expect(within(pane).getByText("Metadata")).toBeInTheDocument();
+    expect(within(pane).getByText("crm")).toBeInTheDocument();
+    expect(screen.getAllByText("Desc here")).toHaveLength(1);
+  });
+
+  it("draws them only once when given a column", () => {
+    renderPane({ description: "Desc here" }, [{ key: "source", value: "crm" }]);
+    expect(screen.getAllByText("Desc here")).toHaveLength(1);
+    expect(screen.getAllByText("Metadata")).toHaveLength(1);
   });
 });

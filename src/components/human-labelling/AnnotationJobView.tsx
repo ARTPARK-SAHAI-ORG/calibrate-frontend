@@ -5,6 +5,8 @@ import confetti from "canvas-confetti";
 import { getBackendUrl } from "@/lib/api";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
+import { type MetadataEntry } from "@/components/ui";
+import { ItemDetailsBlock } from "./ItemDetailsBlock";
 import {
   getBinaryDescription,
   getBinaryLabel,
@@ -118,6 +120,7 @@ export type Item = {
   /** True when this row's answer was a tool call rather than a written
    * reply. Set by the backend; absent on an older response. */
   is_tool_call?: boolean;
+  metadata?: MetadataEntry[] | null;
 };
 
 type Annotation = {
@@ -1350,18 +1353,6 @@ function EvaluatorsPane({
   // each card so annotators (and admins reviewing) can see the criteria
   // / variable values they're judging against.
   const itemPayload = (item.payload ?? {}) as Record<string, unknown>;
-  const itemDescription =
-    typeof itemPayload.description === "string"
-      ? (itemPayload.description as string).trim()
-      : "";
-  const descriptionBlock = itemDescription ? (
-    <div className="space-y-1.5">
-      <h3 className="text-sm font-semibold">Description</h3>
-      <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-        {itemDescription}
-      </p>
-    </div>
-  ) : null;
 
   const trimmedComment = itemComment.trim();
   // Read-only views show a comment only when one was written, so a job with
@@ -1394,7 +1385,7 @@ function EvaluatorsPane({
     return (
       <div className="space-y-3">
         <ExpectedToolCalls payload={itemPayload} />
-        {descriptionBlock}
+        <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
         {commentBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
           No evaluators are attached to this task.
@@ -1423,7 +1414,7 @@ function EvaluatorsPane({
   return (
     <div className="space-y-3 pb-4 md:pb-6">
       <ExpectedToolCalls payload={itemPayload} />
-      {descriptionBlock}
+      <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
       {commentBlock}
       {evaluatorsForItem(evaluators, item).map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);

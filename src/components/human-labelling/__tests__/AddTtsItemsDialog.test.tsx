@@ -108,6 +108,27 @@ function renderDialog(
 }
 
 describe("AddTtsItemsDialog", () => {
+  it("closes without asking when the form still holds what it opened with", async () => {
+    const user = setupUser();
+    const { onClose } = renderDialog({
+      initialRows: [{ uuid: "u1", name: "Example item 1", text: "hello", audio: "" }],
+    });
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
+  });
+
+  it("asks before discarding a change to a pre-filled add form", async () => {
+    const user = setupUser();
+    const { onClose } = renderDialog({
+      initialRows: [{ uuid: "u1", name: "Example item 1", text: "hello", audio: "" }],
+    });
+    await user.type(screen.getByDisplayValue("hello"), "!");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+  });
+
   it("renders nothing when closed", () => {
     render(
       <AddTtsItemsDialog
@@ -319,7 +340,34 @@ describe("AddTtsItemsDialog", () => {
         name: "Clip 1",
         text: "hello",
         audio_path: "tts/media/clip.wav",
+        metadata: [],
       },
+    ]);
+    expect(screen.getByText("Metadata")).toBeInTheDocument();
+  });
+
+  it("keeps the metadata of a duplicated item when adding it", async () => {
+    const onSubmit = jest.fn().mockResolvedValue(undefined);
+    renderDialog({
+      onSubmit,
+      initialRows: [
+        {
+          uuid: "u1",
+          name: "Clip 1 copy",
+          text: "hello",
+          audio: "https://x/a.wav",
+          metadata: [{ key: "speaker", value: "A" }],
+        },
+      ],
+    });
+    expect(screen.getByDisplayValue("speaker")).toBeInTheDocument();
+    await act(async () => {
+      screen.getByRole("button", { name: "Add item" }).click();
+      for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+    });
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0][0].metadata).toEqual([
+      { key: "speaker", value: "A" },
     ]);
   });
 
@@ -521,8 +569,71 @@ describe("AddTtsItemsDialog", () => {
           name: "Clip 1",
           text: "hello",
           audio_path: "https://x/a.wav",
+          metadata: [],
         },
       ]);
+    });
+
+    it("shows each row's metadata and submits the edited fields", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({
+        mode: "edit",
+        onSubmit,
+        initialRows: [
+          { ...initialRows[0], metadata: [{ key: "speaker", value: "A" }] },
+          { uuid: "u2", name: "Clip 2", text: "bye", audio: "https://x/b.wav" },
+        ],
+      });
+
+      expect(screen.getAllByText("Metadata")).toHaveLength(2);
+      expect(screen.getByDisplayValue("speaker")).toBeInTheDocument();
+      const value = screen.getByDisplayValue("A");
+      await user.clear(value);
+      await user.type(value, "B");
+
+      await act(async () => {
+        screen.getByRole("button", { name: "Save 2 items" }).click();
+        for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+      });
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit.mock.calls[0][0].map((r: { metadata: unknown }) => r.metadata)).toEqual([
+        [{ key: "speaker", value: "B" }],
+        [],
+      ]);
+    });
+
+    it("does not save while two metadata fields share a name", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn().mockResolvedValue(undefined);
+      renderDialog({
+        mode: "edit",
+        onSubmit,
+        initialRows: [
+          { ...initialRows[0], metadata: [{ key: "speaker", value: "A" }] },
+        ],
+      });
+
+      await user.click(screen.getByRole("button", { name: "Add field" }));
+      await user.type(screen.getByLabelText("Metadata field name 2"), "speaker");
+      expect(screen.getByText(/is already used by another field/)).toBeInTheDocument();
+
+      const save = screen.getByRole("button", { name: "Save item" });
+      expect(save).toBeDisabled();
+      await act(async () => {
+        save.click();
+        for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+      });
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("does not count an empty added metadata field as a change", async () => {
+      const user = setupUser();
+      const { onClose } = renderDialog({ mode: "edit", initialRows });
+      await user.click(screen.getByRole("button", { name: "Add field" }));
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
     });
   });
 });
