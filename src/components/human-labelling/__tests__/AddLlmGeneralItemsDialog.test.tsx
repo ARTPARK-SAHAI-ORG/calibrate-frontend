@@ -567,7 +567,7 @@ describe("AddLlmGeneralItemsDialog", () => {
     await user.click(screen.getByRole("button", { name: "Add field" }));
     await user.type(screen.getByLabelText("Metadata field name 1"), "source");
     await user.type(screen.getByLabelText("Metadata field name 2"), "source");
-    expect(screen.getByText("Field names must be unique")).toBeInTheDocument();
+    expect(screen.getByText(/is already used by another field/)).toBeInTheDocument();
     expect(addButton).toBeDisabled();
     await user.click(addButton);
     expect(onSubmit).not.toHaveBeenCalled();

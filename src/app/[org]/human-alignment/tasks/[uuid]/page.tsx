@@ -2691,7 +2691,7 @@ function LabellingTaskPageInner() {
                     onClick={() => {
                       const uuid = crypto.randomUUID();
                       if (taskType === "llm" || taskType === "conversation") {
-                        const sample = sampleItem(taskType, items.length + 1);
+                        const sample = sampleItem(taskType, itemsTotal + 1);
                         setNewItemName(sample.name);
                         setNewItemDescription("");
                         setNewItemMetadata([]);
@@ -2700,13 +2700,13 @@ function LabellingTaskPageInner() {
                         setDuplicateSourcePayload(sample.payload);
                         setAddItemOpen(true);
                       } else if (taskType === "stt") {
-                        setDuplicateSttRows([{ uuid, ...sampleItem("stt", items.length + 1) }]);
+                        setDuplicateSttRows([{ uuid, ...sampleItem("stt", itemsTotal + 1) }]);
                         setAddSttItemsOpen(true);
                       } else if (taskType === "tts") {
-                        setDuplicateTtsRows([{ uuid, audio: "", ...sampleItem("tts", items.length + 1) }]);
+                        setDuplicateTtsRows([{ uuid, audio: "", ...sampleItem("tts", itemsTotal + 1) }]);
                         setAddTtsItemsOpen(true);
                       } else if (taskType === "llm-general") {
-                        setDuplicateLlmGeneralRows([{ uuid, ...sampleItem("llm-general", items.length + 1) }]);
+                        setDuplicateLlmGeneralRows([{ uuid, ...sampleItem("llm-general", itemsTotal + 1) }]);
                         setAddLlmGeneralItemsOpen(true);
                       }
                     }}

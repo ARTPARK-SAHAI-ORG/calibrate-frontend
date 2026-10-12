@@ -22,7 +22,10 @@ describe("metadataRowErrors", () => {
         { key: "source", value: "a" },
         { key: " source ", value: "b" },
       ]),
-    ).toEqual({ 0: "Enter a field name", 2: "Field names must be unique" });
+    ).toEqual({
+      0: "Add a field name for this value",
+      2: '"source" is already used by another field. Use a different name.',
+    });
   });
 
   it("ignores a row with nothing typed in it", () => {
@@ -56,14 +59,17 @@ describe("MetadataFieldsEditor", () => {
     expect(screen.getAllByLabelText(/Metadata field name/)).toHaveLength(2);
 
     await user.type(screen.getByLabelText("Metadata value 2"), "x");
-    expect(screen.getByText("Enter a field name")).toBeInTheDocument();
+    expect(screen.getByText("Add a field name for this value")).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Metadata field name 2"), "source");
-    expect(screen.getByText("Field names must be unique")).toBeInTheDocument();
+    expect(screen.getByText('"source" is already used by another field. Use a different name.')).toBeInTheDocument();
+    expect(screen.getByLabelText("Metadata field name 2")).toHaveClass("border-red-500");
+    expect(screen.getByLabelText("Metadata field name 1")).not.toHaveClass("border-red-500");
 
     await user.click(screen.getByRole("button", { name: "Remove metadata field 2" }));
     expect(screen.getAllByLabelText(/Metadata field name/)).toHaveLength(1);
-    expect(screen.queryByText("Field names must be unique")).not.toBeInTheDocument();
+    expect(screen.queryByText(/is already used by another field/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Metadata value 1")).toHaveValue("crm");
   });
 
   it("caps field name and value length and stops adding rows at the limit", () => {

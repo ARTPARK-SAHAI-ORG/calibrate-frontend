@@ -158,18 +158,16 @@ export function AddSttItemsDialog({
   // Unsaved-changes check. Add mode: any field has content. Edit mode: any
   // field differs from the item it was seeded with (rows align 1:1 with
   // initialRows since edit mode can't add/remove rows).
-  const isDirty = isEdit
-    ? rows.some((r, i) => {
-        const init = initialRows?.[i];
-        return (
-          r.name.trim() !== (init?.name ?? "").trim() ||
-          r.actual.trim() !== (init?.actual ?? "").trim() ||
-          r.predicted.trim() !== (init?.predicted ?? "").trim() ||
-          JSON.stringify(rowsToMetadata(r.metadata)) !==
-            JSON.stringify(rowsToMetadata(metadataToRows(init?.metadata)))
-        );
-      })
-    : rows.some((r) => r.name.trim() || r.actual.trim() || r.predicted.trim());
+  const isDirty = rows.some((r, i) => {
+    const init = initialRows?.[i];
+    return (
+      r.name.trim() !== (init?.name ?? "").trim() ||
+      r.actual.trim() !== (init?.actual ?? "").trim() ||
+      r.predicted.trim() !== (init?.predicted ?? "").trim() ||
+      JSON.stringify(rowsToMetadata(r.metadata)) !==
+        JSON.stringify(rowsToMetadata(metadataToRows(init?.metadata)))
+    );
+  });
 
   // Note: this dialog intentionally has no backdrop-click close, so
   // `handleBackdropClick` is not used here.

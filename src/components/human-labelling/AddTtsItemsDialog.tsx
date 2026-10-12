@@ -222,18 +222,16 @@ export function AddTtsItemsDialog({
     return scheduleScrollToFirstFieldError(scrollContainerRef.current);
   }, [errorScrollTick]);
 
-  const isDirty = isEdit
-    ? rows.some((r, i) => {
-        const init = initialRows?.[i];
-        return (
-          r.name.trim() !== (init?.name ?? "").trim() ||
-          r.text.trim() !== (init?.text ?? "").trim() ||
-          !!r.audioFile || // any replacement audio counts as an edit
-          JSON.stringify(rowsToMetadata(r.metadata)) !==
-            JSON.stringify(rowsToMetadata(metadataToRows(init?.metadata)))
-        );
-      })
-    : rows.some((r) => r.name.trim() || r.text.trim() || r.audioFile);
+  const isDirty = rows.some((r, i) => {
+    const init = initialRows?.[i];
+    return (
+      r.name.trim() !== (init?.name ?? "").trim() ||
+      r.text.trim() !== (init?.text ?? "").trim() ||
+      !!r.audioFile ||
+      JSON.stringify(rowsToMetadata(r.metadata)) !==
+        JSON.stringify(rowsToMetadata(metadataToRows(init?.metadata)))
+    );
+  });
 
   const { discardConfirmOpen, closeDiscardConfirm, doClose, attemptClose } =
     useUnsavedCloseGuard({

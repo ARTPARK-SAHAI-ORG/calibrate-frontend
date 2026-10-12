@@ -32,9 +32,9 @@ export function metadataRowErrors(rows: MetadataRow[]): Record<number, string> {
     if (isBlankRow(row)) return;
     const key = row.key.trim();
     if (!key) {
-      errors[index] = "Enter a field name";
+      errors[index] = "Add a field name for this value";
     } else if (seen.has(key)) {
-      errors[index] = "Field names must be unique";
+      errors[index] = `"${key}" is already used by another field. Use a different name.`;
     }
     seen.add(key);
   });
@@ -52,7 +52,7 @@ export function metadataToRows(entries?: MetadataEntry[] | null): MetadataRow[] 
 }
 
 const inputClass =
-  "flex-1 min-w-0 h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent";
+  "flex-1 min-w-0 h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent";
 const removeClass =
   "w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0";
 
@@ -85,11 +85,13 @@ export function MetadataFieldsEditor({
                 type="text"
                 value={row.key}
                 maxLength={MAX_KEY_LENGTH}
+                aria-invalid={Boolean(errors[index])}
+                data-metadata-error={errors[index] ? "" : undefined}
                 onChange={(e) => update(index, "key", e.target.value)}
                 placeholder="Field name"
                 aria-label={`Metadata field name ${index + 1}`}
                 disabled={disabled}
-                className={inputClass}
+                className={`${inputClass} ${errors[index] ? "border-red-500" : "border-border"}`}
               />
               <input
                 type="text"
@@ -99,7 +101,7 @@ export function MetadataFieldsEditor({
                 placeholder="Value"
                 aria-label={`Metadata value ${index + 1}`}
                 disabled={disabled}
-                className={inputClass}
+                className={`${inputClass} border-border`}
               />
               <button
                 type="button"

@@ -1528,6 +1528,53 @@ describe("AddTestDialog", () => {
       expect(screen.getByRole("button", { name: "Create" })).toBeEnabled();
     });
 
+    function MetadataDialog(props: any) {
+      const [rows, setRows] = require("react").useState([]);
+      return (
+        <ControlledDialog
+          {...props}
+          itemMetadata={rows}
+          setItemMetadata={setRows}
+        />
+      );
+    }
+
+    const backdropOf = (container: HTMLElement) =>
+      container.querySelector(".absolute.inset-0.bg-black\\/50") as HTMLElement;
+
+    it("closes without asking when nothing was changed", async () => {
+      const user = setupUser();
+      const onClose = jest.fn();
+      const { container } = render(
+        <MetadataDialog
+          {...baseProps({ mode: "labelItem", onClose, setItemDescription: jest.fn() })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+      await user.click(backdropOf(container));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks before discarding a change to metadata alone", async () => {
+      const user = setupUser();
+      const onClose = jest.fn();
+      const { container } = render(
+        <MetadataDialog
+          {...baseProps({ mode: "labelItem", onClose, setItemDescription: jest.fn() })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: "Add field" }));
+      await user.type(screen.getByLabelText("Metadata field name 1"), "source");
+      await user.click(backdropOf(container));
+      expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
     it("updates the description field", async () => {
       const user = setupUser();
       render(
@@ -1645,7 +1692,12 @@ describe("AddTestDialog", () => {
       );
       await fillLabelItem(user);
       expect(onSubmit).not.toHaveBeenCalled();
-      expect(screen.getByText("Field names must be unique")).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          '"source" is already used by another field. Use a different name.',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Metadata field name 2")).toHaveFocus();
     });
 
     it("saves when every metadata row has its own field name", async () => {

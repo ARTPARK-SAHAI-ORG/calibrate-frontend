@@ -25,6 +25,7 @@ import {
   MetadataFieldsEditor,
   metadataRowErrors,
   type MetadataRow,
+  rowsToMetadata,
 } from "@/components/human-labelling/MetadataFieldsEditor";
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
@@ -3108,6 +3109,7 @@ export function AddTestDialog({
     return JSON.stringify({
       name: testName,
       description: itemDescription ?? "",
+      metadata: rowsToMetadata(itemMetadata ?? []),
       history,
       input: config.input ?? "",
       evaluation: config.evaluation,
@@ -3197,6 +3199,9 @@ export function AddTestDialog({
         isLabelItem &&
         Object.keys(metadataRowErrors(itemMetadata ?? [])).length > 0
       ) {
+        const bad = document.querySelector<HTMLInputElement>("[data-metadata-error]");
+        bad?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+        bad?.focus();
         return;
       }
       // At least one evaluator and every variable on every attached evaluator
