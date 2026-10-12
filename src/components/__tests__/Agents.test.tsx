@@ -106,7 +106,7 @@ describe("Agents", () => {
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
     expect(screen.getAllByText("Conversation").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Single Agent Response").length).toBeGreaterThan(
+    expect(screen.getAllByText("Basic").length).toBeGreaterThan(
       0,
     );
   });
@@ -121,7 +121,7 @@ describe("Agents", () => {
       expect(screen.getAllByText("Support Bot")[0]).toBeInTheDocument(),
     );
     expect(screen.getAllByText("Conversation").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Single Agent Response")).not.toBeInTheDocument();
+    expect(screen.queryByText("Basic")).not.toBeInTheDocument();
   });
 
   it("does not fetch when there is no access token", () => {
@@ -380,7 +380,7 @@ describe("Agents", () => {
     await typeAgentName(user, "Conn Agent");
     await user.click(screen.getByText("Connect your existing agent"));
     await user.click(screen.getByText("Next"));
-    await user.click(screen.getByText("Single Agent Response"));
+    await user.click(screen.getByText("Basic"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "conn-uuid" }),
@@ -552,7 +552,7 @@ describe("Agents", () => {
     await user.type(screen.getByPlaceholderText("Enter agent name"), "{Enter}");
 
     expect(screen.getByText("What does your agent do?")).toBeInTheDocument();
-    await user.click(screen.getByText("Single Agent Response"));
+    await user.click(screen.getByText("Basic"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "enter-uuid" }),
@@ -838,7 +838,7 @@ describe("Agents", () => {
     expect(screen.getByDisplayValue("Copy of Support Bot")).toBeInTheDocument();
 
     // The original holds a conversation; the copy is asked to answer once.
-    await user.click(screen.getByText("Single Agent Response"));
+    await user.click(screen.getByText("Basic"));
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(
       jsonResponse({ uuid: "dup-uuid" }),
@@ -856,7 +856,7 @@ describe("Agents", () => {
     const copyRow = screen.getAllByText("Copy of Support Bot")[0].closest("a")!
       .parentElement!;
     expect(
-      within(copyRow).getByText("Single Agent Response"),
+      within(copyRow).getByText("Basic"),
     ).toBeInTheDocument();
     expect(within(copyRow).queryByText("Conversation")).not.toBeInTheDocument();
 
@@ -1012,10 +1012,10 @@ describe("Agents", () => {
     const user = setupUser();
     render(<Agents onNavigateToAgent={onNavigateToAgent} />);
     await waitFor(() =>
-      expect(screen.getAllByText("Single Agent Response")[0]).toBeInTheDocument(),
+      expect(screen.getAllByText("Basic")[0]).toBeInTheDocument(),
     );
 
-    await user.click(screen.getAllByText("Single Agent Response")[0]);
+    await user.click(screen.getAllByText("Basic")[0]);
     expect(onNavigateToAgent).toHaveBeenCalledWith("a1");
   });
 

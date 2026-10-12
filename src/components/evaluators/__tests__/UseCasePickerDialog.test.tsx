@@ -52,7 +52,7 @@ describe("UseCasePickerDialog", () => {
     );
     expect(screen.queryByText("Voice")).not.toBeInTheDocument();
     expect(screen.getByText("Conversation")).toBeInTheDocument();
-    expect(screen.getByText("Single Agent Response")).toBeInTheDocument();
+    expect(screen.getByText("Basic")).toBeInTheDocument();
 
     // And with one kind left under a conversation, that question is skipped
     // too: choosing a conversation is already the whole answer.

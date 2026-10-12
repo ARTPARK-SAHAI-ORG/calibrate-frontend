@@ -125,7 +125,7 @@ describe("DuplicateAgentDialog", () => {
     expect(conversationCard()).toHaveClass("border-foreground");
   });
 
-  it("opens with Single Agent Response chosen for a general agent", () => {
+  it("opens with Basic chosen for a general agent", () => {
     renderDialog({ interactionType: "general" });
     expect(generalCard()).toHaveClass("border-foreground");
     expect(conversationCard()).not.toHaveClass("border-foreground");

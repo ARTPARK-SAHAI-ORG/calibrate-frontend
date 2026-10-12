@@ -12,9 +12,9 @@ describe("InteractionTypePill", () => {
     expect(screen.getByText("Conversation")).toBeInTheDocument();
   });
 
-  it("reads Single Agent Response for a general agent", () => {
+  it("reads Basic for a general agent", () => {
     render(<InteractionTypePill interactionType="general" />);
-    expect(screen.getByText("Single Agent Response")).toHaveClass(
+    expect(screen.getByText("Basic")).toHaveClass(
       "bg-teal-500/10"
     );
   });
@@ -23,7 +23,7 @@ describe("InteractionTypePill", () => {
     const user = setupUser();
     render(<InteractionTypePill interactionType="general" />);
 
-    await user.hover(screen.getByText("Single Agent Response"));
+    await user.hover(screen.getByText("Basic"));
     expect(
       await screen.findByText("The agent takes an input and generates an output")
     ).toBeInTheDocument();

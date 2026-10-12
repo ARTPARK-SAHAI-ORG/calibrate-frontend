@@ -129,7 +129,7 @@ export type TestCaseEvaluatorRef = {
 export type TestCaseData = {
   name?: string;
   history?: TestCaseHistory[];
-  /** The single input a test written for a single agent response agent
+  /** The single input a test written for a basic agent
    * carries instead of a conversation. Present on both its Agent Response
    * (`evaluation.type: "general"`) and its Tool Call tests — for the latter
    * the backend also widens it into a one-turn `history` for the run, so
@@ -972,7 +972,7 @@ export function TestDetailView({
       ? "border-l-4 border-l-green-500 pl-2 md:pl-3"
       : "border-l-4 border-l-red-500 pl-2 md:pl-3"
     : "border-l-4 border-l-foreground pl-2 md:pl-3";
-  // A Single Agent Response test has no conversation — its "history" is
+  // A basic agent test has no conversation — its "history" is
   // just one user turn standing in for the input. Rendered through the
   // chat-bubble view below it reads as a two-message conversation, so it
   // gets the same plain Input/Output box layout used for these agents
@@ -999,7 +999,7 @@ export function TestDetailView({
   }, [history, output]);
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      {/* Single Agent Response tests: one Input/Output box pair, no chat
+      {/* Basic agent tests: one Input/Output box pair, no chat
           bubbles — this agent never had a conversation to show. */}
       {isGeneralType && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
