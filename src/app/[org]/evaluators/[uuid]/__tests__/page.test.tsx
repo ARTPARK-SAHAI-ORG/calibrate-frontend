@@ -56,6 +56,23 @@ jest.mock("../../../../../lib/evaluatorApi", () => ({
     deleteEvaluatorVersion(...args),
 }));
 
+jest.mock(
+  "../../../../../components/evaluators/DuplicateEvaluatorButton",
+  () => ({
+    DuplicateEvaluatorButton: ({
+      evaluator,
+      onCreated,
+    }: {
+      evaluator: { name: string };
+      onCreated?: (e: { uuid: string; name: string }) => void;
+    }) => (
+      <button onClick={() => onCreated?.({ uuid: "ev-copy", name: "Copy" })}>
+        Duplicate {evaluator.name}
+      </button>
+    ),
+  }),
+);
+
 import EvaluatorDetailPage from "../page";
 
 const EVALUATOR = {
@@ -238,6 +255,17 @@ describe("evaluator page header actions", () => {
     expect(screen.getByText("Judge prompt")).toBeInTheDocument();
     // Seeded from the live version rather than starting blank.
     expect(screen.getByDisplayValue("Grade the reply")).toBeInTheDocument();
+  });
+
+  it("offers Duplicate and opens the copy once it is created", async () => {
+    const user = setupUser();
+    render(<EvaluatorDetailPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Duplicate Refund policy" }),
+    );
+
+    expect(push).toHaveBeenCalledWith("/evaluators/ev-copy");
   });
 
   it("opens the judge prompt form straight away when the address asks for it", async () => {

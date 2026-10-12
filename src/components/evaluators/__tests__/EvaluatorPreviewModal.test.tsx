@@ -14,6 +14,20 @@ jest.mock("../../../lib/evaluatorApi", () => ({
 
 jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
 
+jest.mock("../DuplicateEvaluatorButton", () => ({
+  DuplicateEvaluatorButton: ({
+    evaluator,
+    onCreated,
+  }: {
+    evaluator: { name: string };
+    onCreated?: (e: { uuid: string; name: string }) => void;
+  }) => (
+    <button onClick={() => onCreated?.({ uuid: "ev-copy", name: "Copy" })}>
+      Duplicate {evaluator.name}
+    </button>
+  ),
+}));
+
 // jsdom has no ResizeObserver; the prompt card measures its own overflow.
 class MockResizeObserver {
   observe() {}
@@ -94,6 +108,19 @@ describe("EvaluatorPreviewModal", () => {
     expect(edit).toHaveAttribute("href", "/evaluators/e1?edit=1");
     expect(edit).toHaveAttribute("target", "_blank");
     expect(edit).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("offers Duplicate for the open evaluator", () => {
+    render(
+      <EvaluatorPreviewModal
+        evaluatorUuid="e1"
+        evaluatorName="Conciseness"
+        onClose={jest.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Duplicate Conciseness" }),
+    ).toBeInTheDocument();
   });
 
   it("closes via the close button and via the backdrop, not via the panel", async () => {

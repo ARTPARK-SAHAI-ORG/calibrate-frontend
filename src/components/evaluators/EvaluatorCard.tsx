@@ -4,10 +4,12 @@ import { useState, type HTMLAttributes, type ReactNode } from "react";
 import { PreBuiltPill } from "@/components/EvaluatorPills";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
+import { EyeIcon } from "@/components/icons";
+import { EVALUATOR_CARD_BUTTON_CLASS } from "./DuplicateEvaluatorButton";
 
 type Props = {
   evaluator: EvaluatorData;
-  /** Drawn after View: Remove on an agent, Delete in the library. */
+  /** Drawn after View: Duplicate, then Remove on an agent or Delete in the library. */
   actions?: ReactNode;
 } & HTMLAttributes<HTMLDivElement>;
 
@@ -54,8 +56,9 @@ export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
           <button
             type="button"
             onClick={() => setPreviewOpen(true)}
-            className="h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer inline-flex items-center"
+            className={EVALUATOR_CARD_BUTTON_CLASS}
           >
+            <EyeIcon className="w-4 h-4" />
             View
           </button>
           {actions}

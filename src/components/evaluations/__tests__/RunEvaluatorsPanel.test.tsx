@@ -23,6 +23,21 @@ jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
     open ? <div data-testid="create-flow" /> : null,
 }));
 
+jest.mock("../../evaluators/DuplicateEvaluatorButton", () => ({
+  EVALUATOR_CARD_BUTTON_CLASS: "card-button",
+  DuplicateEvaluatorButton: ({
+    evaluator,
+    onCreated,
+  }: {
+    evaluator: { name: string };
+    onCreated?: (created: { uuid: string; name: string }) => void;
+  }) => (
+    <button onClick={() => onCreated?.({ uuid: "ev-copy", name: "Copy" })}>
+      Duplicate {evaluator.name}
+    </button>
+  ),
+}));
+
 jest.mock("../../../hooks", () => ({
   ...jest.requireActual("../../../hooks"),
   useAccessToken: () => "tok",
@@ -181,6 +196,24 @@ describe("RunEvaluatorsPanel", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Add evaluators" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("lets a chosen evaluator be duplicated, choosing the copy for the run", async () => {
+    const user = setupUser();
+    const onRefresh = jest.fn();
+    const { onSelectedChange } = renderPanel({ onRefresh });
+    await user.click(
+      screen.getByRole("button", { name: "Duplicate Semantic match" }),
+    );
+    expect(onSelectedChange).toHaveBeenCalledWith(["ev-1", "ev-copy"]);
+    expect(onRefresh).toHaveBeenCalled();
+  });
+
+  it("offers no Duplicate when read only, since a copy joins the run", () => {
+    renderPanel({ readOnly: true });
+    expect(
+      screen.queryByRole("button", { name: "Duplicate Semantic match" }),
     ).not.toBeInTheDocument();
   });
 

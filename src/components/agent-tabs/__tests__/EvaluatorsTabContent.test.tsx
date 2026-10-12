@@ -68,6 +68,25 @@ jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
     ) : null,
 }));
 
+jest.mock("../../evaluators/DuplicateEvaluatorButton", () => ({
+  DuplicateEvaluatorButton: ({
+    evaluator,
+    onCreated,
+  }: {
+    evaluator: { name: string };
+    onCreated?: (e: EvaluatorData) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onCreated?.({ uuid: "ev-copy", name: "Copy" } as EvaluatorData)
+      }
+    >
+      Duplicate {evaluator.name}
+    </button>
+  ),
+}));
+
 const mockFetchAgentEvaluators = jest.fn();
 const mockFetchAllEvaluators = jest.fn();
 const mockDetach = jest.fn();
@@ -413,6 +432,39 @@ describe("EvaluatorsTabContent", () => {
         ["ev-2"],
         "test-token",
       ),
+    );
+  });
+
+  it("shows Duplicate on each attached card and attaches the copy once made", async () => {
+    mockFetchAgentEvaluators.mockResolvedValue([
+      evaluator({ uuid: "ev-1" }),
+      evaluator({ uuid: "ev-2", name: "Tone check" }),
+    ]);
+    mockFetchAllEvaluators.mockResolvedValue([]);
+    mockAttach.mockResolvedValue({ linked: ["ev-copy"], already_linked: [] });
+
+    const user = setupUser();
+    render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+    await screen.findByText("Tone check");
+    expect(
+      screen.getByRole("button", { name: "Duplicate Follows Refund Policy" }),
+    ).toBeInTheDocument();
+    expect(mockFetchAgentEvaluators).toHaveBeenCalledTimes(1);
+
+    await user.click(
+      screen.getByRole("button", { name: "Duplicate Tone check" }),
+    );
+
+    await waitFor(() =>
+      expect(mockAttach).toHaveBeenCalledWith(
+        "agent-1",
+        ["ev-copy"],
+        "test-token",
+      ),
+    );
+    await waitFor(() =>
+      expect(mockFetchAgentEvaluators).toHaveBeenCalledTimes(2),
     );
   });
 
