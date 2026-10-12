@@ -1,5 +1,6 @@
 ## October 2026
 
+- The agent kind that takes one input and gives one output is now called Basic everywhere it appears, including the agent list, the new-agent and copy-agent choices, the evaluator kinds and the labelling task choices ([#681](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/681))
 - The Evaluators page is back in the sidebar under Agents, and clicking an evaluator there now opens the same preview window as the agent Evaluators tab ([#678](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/678))
 
 ## September 2026
