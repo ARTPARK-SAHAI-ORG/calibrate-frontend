@@ -87,4 +87,56 @@ describe("LlmGeneralItemPane", () => {
     );
     expect(screen.getByText("Item payload")).toBeInTheDocument();
   });
+
+  const versioned = {
+    input: {
+      content: "Summarise this",
+      label: "English prompt",
+      versions: { Hindi: "इसका सार दो" },
+    },
+    output: {
+      content: "A short summary",
+      label: "English reply",
+      versions: { Hindi: "एक छोटा सार" },
+    },
+  };
+
+  it("renders object input and output with their labels under the titles and their versions", () => {
+    render(<LlmGeneralItemPane payload={versioned} />);
+    expect(screen.getByText("English prompt")).toBeInTheDocument();
+    expect(screen.getByText("Summarise this")).toBeInTheDocument();
+    expect(screen.getByText("इसका सार दो")).toBeInTheDocument();
+    expect(screen.getByText("English reply")).toBeInTheDocument();
+    expect(screen.getByText("A short summary")).toBeInTheDocument();
+    expect(screen.getByText("एक छोटा सार")).toBeInTheDocument();
+    expect(screen.getAllByText("Hindi")).toHaveLength(2);
+    expect(screen.getByText("Input")).toBeInTheDocument();
+    expect(screen.getByText("Output")).toBeInTheDocument();
+  });
+
+  it("hides versions when showVersions is false", () => {
+    render(<LlmGeneralItemPane payload={versioned} showVersions={false} />);
+    expect(screen.getByText("Summarise this")).toBeInTheDocument();
+    expect(screen.queryByText("Hindi")).not.toBeInTheDocument();
+    expect(screen.queryByText("इसका सार दो")).not.toBeInTheDocument();
+  });
+
+  it("falls back to Input and Output titles for object fields without a label", () => {
+    render(
+      <LlmGeneralItemPane
+        payload={{ input: { content: "Q" }, output: { content: "A" } }}
+      />,
+    );
+    expect(screen.getByText("Input")).toBeInTheDocument();
+    expect(screen.getByText("Output")).toBeInTheDocument();
+    expect(screen.getByText("Q")).toBeInTheDocument();
+    expect(screen.getByText("A")).toBeInTheDocument();
+  });
+
+  it("treats an object without content as missing", () => {
+    render(
+      <LlmGeneralItemPane payload={{ input: { label: "x" }, output: {} }} />,
+    );
+    expect(screen.getByText("Item payload")).toBeInTheDocument();
+  });
 });

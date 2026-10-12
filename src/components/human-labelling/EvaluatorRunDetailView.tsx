@@ -23,6 +23,7 @@ import {
   type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
 import { summariseValues } from "@/lib/evaluatorResultStat";
+import { payloadHasVersions, textOf } from "@/lib/messageVersions";
 import {
   isSkippedRunResult,
   toolCallNotEvaluatedMessage,
@@ -486,9 +487,7 @@ export function extractPayloadInputValues(
     const history = Array.isArray(p.chat_history)
       ? serializeMessages(p.chat_history)
       : "";
-    const response =
-      typeof p.agent_response === "string" ? p.agent_response : "";
-    return [history, response];
+    return [history, textOf(p.agent_response)];
   }
   return [Array.isArray(p.transcript) ? serializeMessages(p.transcript) : ""];
 }
@@ -1430,10 +1429,13 @@ export function ItemDetailPane({
   annotatorFilterActive = false,
   singleAnnotatorFiltered = false,
   itemComments = [],
+  showJudgeNote = false,
 }: {
   /** Draw the description and metadata in a column of their own on the
    *  left, instead of above the evaluator results. */
   itemDetailsInOwnColumn?: boolean;
+  /** Say that the evaluator read only the default text. Only on an evaluator run. */
+  showJudgeNote?: boolean;
   item: Item;
   taskType: LabellingTaskFull["type"];
   evaluators: {
@@ -1502,6 +1504,16 @@ export function ItemDetailPane({
           paneHasOwnPadding ? "pb-4 md:pb-6" : "py-4 md:py-6"
         }`}
       >
+        {showJudgeNote && payloadHasVersions(item.payload) && (
+          <div
+            className={`mb-3 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground ${
+              paneHasOwnPadding ? "mt-4 md:mt-6" : ""
+            }`}
+          >
+            The evaluator read the default text of each message. Other
+            versions are shown for comparison and were not sent to it
+          </div>
+        )}
         <ItemPane item={item} taskType={taskType} />
       </div>
       <div className="md:flex-[3] md:min-h-0 md:overflow-y-auto p-4 md:p-6 space-y-3">
@@ -2196,6 +2208,7 @@ export function EvaluatorRunDetailView({
                 </div>
               ) : (
                 <ItemDetailPane
+                  showJudgeNote
                   item={currentItem}
                   taskType={task.type}
                   evaluators={detailsEvaluators}

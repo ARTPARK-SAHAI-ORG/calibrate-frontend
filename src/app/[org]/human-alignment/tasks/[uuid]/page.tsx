@@ -40,6 +40,12 @@ import {
   rowsToMetadata,
 } from "@/components/human-labelling/MetadataFieldsEditor";
 import { sampleItem } from "@/components/human-labelling/sampleItem";
+import {
+  historyToPayloadFields,
+  payloadToHistory,
+  replaceText,
+} from "@/components/human-labelling/itemConversation";
+import { textOf } from "@/lib/messageVersions";
 import { BulkUploadSttItemsDialog } from "@/components/human-labelling/BulkUploadSttItemsDialog";
 import { BulkUploadTtsItemsDialog } from "@/components/human-labelling/BulkUploadTtsItemsDialog";
 import { BulkUploadConversationItemsDialog } from "@/components/human-labelling/BulkUploadConversationItemsDialog";
@@ -354,9 +360,8 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
     if (typeof p.text === "string" && p.text) return p.text;
   }
   if (kind === "llm") {
-    if (typeof p.agent_response === "string" && p.agent_response) {
-      return p.agent_response;
-    }
+    const reply = textOf(p.agent_response);
+    if (reply) return reply;
     if (Array.isArray(p.chat_history) && p.chat_history.length > 0) {
       const last = p.chat_history[p.chat_history.length - 1] as {
         content?: unknown;
@@ -371,8 +376,10 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
     }
   }
   if (kind === "llm-general") {
-    if (typeof p.output === "string" && p.output) return p.output;
-    if (typeof p.input === "string" && p.input) return p.input;
+    const output = textOf(p.output);
+    if (output) return output;
+    const input = textOf(p.input);
+    if (input) return input;
   }
   try {
     return JSON.stringify(payload);
@@ -535,11 +542,10 @@ function buildItemsCsv(
       out.conversation_history = Array.isArray(p.chat_history)
         ? JSON.stringify(p.chat_history)
         : "";
-      out.agent_response =
-        typeof p.agent_response === "string" ? p.agent_response : "";
+      out.agent_response = textOf(p.agent_response);
     } else if (taskType === "llm-general") {
-      out.input = typeof p.input === "string" ? p.input : "";
-      out.output = typeof p.output === "string" ? p.output : "";
+      out.input = textOf(p.input);
+      out.output = textOf(p.output);
     }
 
     for (const ev of evaluators) {
@@ -1281,6 +1287,8 @@ function LabellingTaskPageInner() {
   const [editLlmGeneralItemsOpen, setEditLlmGeneralItemsOpen] = useState(false);
   const [editLlmGeneralSingleItemUuid, setEditLlmGeneralSingleItemUuid] =
     useState<string | null>(null);
+  const [duplicateLlmGeneralSource, setDuplicateLlmGeneralSource] =
+    useState<Record<string, unknown> | null>(null);
   const [duplicateLlmGeneralRows, setDuplicateLlmGeneralRows] = useState<
     {
       uuid: string;
@@ -2330,62 +2338,11 @@ function LabellingTaskPageInner() {
     payload: Record<string, unknown> | null,
   ): TestConfig | undefined => {
     if (!payload) return undefined;
-    type HistoryItem = NonNullable<TestConfig["history"]>[number];
-    const parseHistory = (raw: unknown): HistoryItem[] => {
-      if (!Array.isArray(raw)) return [];
-      const out: HistoryItem[] = [];
-      for (const m of raw) {
-        if (!m || typeof m !== "object") continue;
-        const obj = m as Record<string, unknown>;
-        const role = obj.role;
-        const content =
-          typeof obj.content === "string" ? obj.content : undefined;
-        const toolCalls = obj.tool_calls;
-        const toolCallId =
-          typeof obj.tool_call_id === "string" ? obj.tool_call_id : undefined;
-        const createdAt =
-          typeof obj.created_at === "string" ? obj.created_at : undefined;
-        const tsField = createdAt ? { created_at: createdAt } : {};
-        if (role === "assistant") {
-          if (Array.isArray(toolCalls) && toolCalls.length > 0) {
-            out.push({
-              role: "assistant",
-              ...(content != null ? { content } : {}),
-              tool_calls: toolCalls as HistoryItem["tool_calls"],
-              ...tsField,
-            });
-          } else if (content != null) {
-            out.push({ role: "assistant", content, ...tsField });
-          }
-        } else if (role === "user" && content != null) {
-          out.push({ role: "user", content, ...tsField });
-        } else if (role === "tool" && content != null) {
-          out.push({
-            role: "tool",
-            content,
-            ...(toolCallId ? { tool_call_id: toolCallId } : {}),
-            ...tsField,
-          });
-        }
-      }
-      return out;
-    };
-
-    let history: HistoryItem[];
-    if (taskType === "conversation") {
-      history = parseHistory(payload.transcript);
-    } else {
-      // LLM: chat_history (may include tool calls + tool responses) +
-      // optional trailing agent_response (the regular text reply being
-      // graded).
-      history = parseHistory(payload.chat_history);
-      const ar = payload.agent_response;
-      if (typeof ar === "string" && ar.length > 0) {
-        history.push({ role: "assistant", content: ar });
-      }
-    }
     return {
-      history,
+      history: payloadToHistory(
+        payload,
+        taskType === "conversation" ? "conversation" : "llm",
+      ),
       evaluation: { type: "response" as const, criteria: "" },
     };
   };
@@ -3657,6 +3614,7 @@ function LabellingTaskPageInner() {
                                   ? (p.name as string)
                                   : `Item ${item.id}`;
                               if (taskType === "llm-general") {
+                                setDuplicateLlmGeneralSource(p ?? null);
                                 setDuplicateLlmGeneralRows([
                                   {
                                     uuid: item.uuid,
@@ -3665,14 +3623,8 @@ function LabellingTaskPageInner() {
                                       typeof p?.description === "string"
                                         ? (p.description as string)
                                         : "",
-                                    input:
-                                      typeof p?.input === "string"
-                                        ? (p.input as string)
-                                        : "",
-                                    output:
-                                      typeof p?.output === "string"
-                                        ? (p.output as string)
-                                        : "",
+                                    input: textOf(p?.input),
+                                    output: textOf(p?.output),
                                     varValues: readEvaluatorVariables(p),
                                     metadata: item.metadata,
                                   },
@@ -3909,40 +3861,15 @@ function LabellingTaskPageInner() {
               ? { description: trimmedDescription }
               : {};
 
-            let payload: Record<string, unknown>;
-            if (taskType === "conversation") {
-              payload = {
-                name: newItemName.trim(),
-                ...descriptionField,
-                transcript: history,
-                evaluator_variables,
-              };
-            } else {
-              // LLM: split the trailing plain agent reply (no tool_calls)
-              // out as `agent_response`. Tool-call assistant messages stay
-              // in `chat_history` since they aren't a graded reply.
-              let chat_history = history;
-              let agent_response = "";
-              const last = history[history.length - 1];
-              if (
-                last &&
-                last.role === "assistant" &&
-                !(
-                  Array.isArray(last.tool_calls) && last.tool_calls.length > 0
-                ) &&
-                typeof last.content === "string"
-              ) {
-                chat_history = history.slice(0, -1);
-                agent_response = last.content;
-              }
-              payload = {
-                name: newItemName.trim(),
-                ...descriptionField,
-                chat_history,
-                agent_response,
-                evaluator_variables,
-              };
-            }
+            const payload: Record<string, unknown> = {
+              name: newItemName.trim(),
+              ...descriptionField,
+              ...historyToPayloadFields(
+                history,
+                taskType === "conversation" ? "conversation" : "llm",
+              ),
+              evaluator_variables,
+            };
 
             setCreatingItem(true);
             setCreateItemError(null);
@@ -4033,39 +3960,16 @@ function LabellingTaskPageInner() {
               string,
               unknown
             >;
-            let payload: Record<string, unknown>;
-            if (taskType === "conversation") {
-              payload = {
-                ...existingPayload,
-                name: editLlmItemName.trim(),
-                ...descriptionField,
-                transcript: history,
-                evaluator_variables,
-              };
-            } else {
-              let chat_history = history;
-              let agent_response = "";
-              const last = history[history.length - 1];
-              if (
-                last &&
-                last.role === "assistant" &&
-                !(
-                  Array.isArray(last.tool_calls) && last.tool_calls.length > 0
-                ) &&
-                typeof last.content === "string"
-              ) {
-                chat_history = history.slice(0, -1);
-                agent_response = last.content;
-              }
-              payload = {
-                ...existingPayload,
-                name: editLlmItemName.trim(),
-                ...descriptionField,
-                chat_history,
-                agent_response,
-                evaluator_variables,
-              };
-            }
+            const payload: Record<string, unknown> = {
+              ...existingPayload,
+              name: editLlmItemName.trim(),
+              ...descriptionField,
+              ...historyToPayloadFields(
+                history,
+                taskType === "conversation" ? "conversation" : "llm",
+              ),
+              evaluator_variables,
+            };
             setSavingLlmItem(true);
             setEditLlmError(null);
             try {
@@ -4385,6 +4289,7 @@ function LabellingTaskPageInner() {
         onClose={() => {
           setAddLlmGeneralItemsOpen(false);
           setDuplicateLlmGeneralRows(null);
+          setDuplicateLlmGeneralSource(null);
         }}
         onSubmit={async (rows) => {
           if (!accessToken) return;
@@ -4395,8 +4300,8 @@ function LabellingTaskPageInner() {
                 payload: {
                   ...(r.name ? { name: r.name } : {}),
                   ...(r.description ? { description: r.description } : {}),
-                  input: r.input,
-                  output: r.output,
+                  input: replaceText(duplicateLlmGeneralSource?.input, r.input),
+                  output: replaceText(duplicateLlmGeneralSource?.output, r.output),
                   ...(r.toolCalls.length > 0
                     ? { actual_tool_calls: r.toolCalls }
                     : {}),
@@ -4412,6 +4317,7 @@ function LabellingTaskPageInner() {
           await Promise.all([fetchTask(), fetchTaskSummary()]);
           setAddLlmGeneralItemsOpen(false);
           setDuplicateLlmGeneralRows(null);
+          setDuplicateLlmGeneralSource(null);
         }}
       />
 
@@ -4432,8 +4338,8 @@ function LabellingTaskPageInner() {
               name: typeof p.name === "string" ? p.name : "",
               description:
                 typeof p.description === "string" ? p.description : "",
-              input: typeof p.input === "string" ? p.input : "",
-              output: typeof p.output === "string" ? p.output : "",
+              input: textOf(p.input),
+              output: textOf(p.output),
               toolCalls: Array.isArray(p.actual_tool_calls)
                 ? p.actual_tool_calls
                 : [],
@@ -4455,29 +4361,32 @@ function LabellingTaskPageInner() {
               body: {
                 updates: rows
                   .filter((r) => !!r.uuid)
-                  .map((r) => ({
-                    uuid: r.uuid,
+                  .map((r) => {
                     // The save replaces the whole item, so start from what
                     // the item already holds. Without this, editing an item
                     // whose answer was a tool call deletes the call: the
                     // form has no field for it.
-                    payload: {
-                      ...(((items.find((it) => it.uuid === r.uuid)?.payload ??
-                        {}) as Record<string, unknown>) || {}),
-                      name: r.name,
-                      description: r.description,
-                      input: r.input,
-                      output: r.output,
-                      // Only a real call goes on the item. An empty list
-                      // would make every screen read a plain text answer as
-                      // a tool call, so the key is dropped instead.
-                      ...(r.toolCalls.length > 0
-                        ? { actual_tool_calls: r.toolCalls }
-                        : { actual_tool_calls: undefined }),
-                      evaluator_variables: r.evaluator_variables,
-                    },
-                    metadata: r.metadata,
-                  })),
+                    const existing = (items.find((it) => it.uuid === r.uuid)
+                      ?.payload ?? {}) as Record<string, unknown>;
+                    return {
+                      uuid: r.uuid,
+                      payload: {
+                        ...existing,
+                        name: r.name,
+                        description: r.description,
+                        input: replaceText(existing.input, r.input),
+                        output: replaceText(existing.output, r.output),
+                        // Only a real call goes on the item. An empty list
+                        // would make every screen read a plain text answer as
+                        // a tool call, so the key is dropped instead.
+                        ...(r.toolCalls.length > 0
+                          ? { actual_tool_calls: r.toolCalls }
+                          : { actual_tool_calls: undefined }),
+                        evaluator_variables: r.evaluator_variables,
+                      },
+                      metadata: r.metadata,
+                    };
+                  }),
               },
             },
           );

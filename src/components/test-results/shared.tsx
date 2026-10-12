@@ -24,6 +24,7 @@ import {
   toRatingScale,
 } from "@/lib/binaryLabels";
 import { copyToClipboard } from "@/lib/clipboard";
+import { readTurnExtras } from "@/lib/messageVersions";
 
 // Re-export icons for backwards compatibility
 export { CheckIcon, XIcon, SpinnerIcon, ToolIcon, CloseIcon, DocumentIcon };
@@ -65,6 +66,10 @@ export type TestCaseHistory = {
    * conversation with `created_at` on each turn; rendered next to the role
    * label so annotators see when each message happened. */
   created_at?: string;
+  /** Display name for this turn's text, shown in place of the role name. */
+  label?: string;
+  /** Other forms of the same text, keyed by the name shown above each. */
+  versions?: Record<string, string>;
 };
 
 export type TestCaseEvaluation = {
@@ -879,6 +884,41 @@ function CopyJsonButton({ value }: { value: string }) {
   );
 }
 
+const TURN_BUBBLE_CLASS =
+  "px-3 md:px-4 py-2.5 md:py-3 rounded-xl border border-border";
+
+export function TurnVersionBubbles({
+  versions,
+  side,
+}: {
+  versions?: Record<string, string>;
+  side: "user" | "assistant";
+}) {
+  const { versions: safe } = readTurnExtras({ versions });
+  if (!safe) return null;
+  return (
+    <>
+      {Object.entries(safe).map(([name, text]) => (
+        <div
+          key={name}
+          className={`max-w-[88%] md:max-w-3/4 w-fit flex flex-col mt-2 ${
+            side === "user" ? "items-end" : ""
+          }`}
+        >
+          <span className="text-[11px] font-medium text-muted-foreground mb-1">
+            {name}
+          </span>
+          <div className={`${TURN_BUBBLE_CLASS} border-dashed bg-muted/30`}>
+            <p className="text-sm text-foreground whitespace-pre-wrap">
+              {text}
+            </p>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export function TestDetailView({
   history,
   input,
@@ -892,6 +932,7 @@ export function TestDetailView({
   enableEvaluatorLinks = true,
   highlightEvalTarget = false,
   showVerdict = true,
+  showVersions = true,
 }: {
   history: TestCaseHistory[];
   /** `test_case.input` — set only for a test written as one input rather
@@ -922,6 +963,9 @@ export function TestDetailView({
    * turn (left border) but pass/fail chrome is omitted. Used by traces,
    * which are not scored. */
   showVerdict?: boolean;
+  /** When false, a turn's other forms (`versions`) are not drawn under its
+   * bubble. Labels still show. */
+  showVersions?: boolean;
 }) {
   // Precompute tool_call_id → response content map so the inline tool-call
   // card lookup is O(1) instead of scanning the entire history once per
@@ -1065,6 +1109,7 @@ export function TestDetailView({
             <div className="space-y-4">
               {history.map((message, index) => {
                 const isEvalTarget = index === evalTargetIndex;
+                const turnLabel = readTurnExtras(message).label;
                 const timestamp = formatTurnTimestamp(message.created_at);
                 // Tool-response entries are surfaced inline on their parent
                 // tool_call card via the `output` prop — skip them here so
@@ -1083,18 +1128,31 @@ export function TestDetailView({
                   >
                     {/* User Message */}
                     {message.role === "user" && (
-                      <div className="max-w-[88%] md:max-w-3/4 w-fit flex flex-col">
-                        <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-muted border border-border">
-                          <p className="text-sm text-foreground whitespace-pre-wrap">
-                            {message.content}
-                          </p>
-                        </div>
-                        {timestamp && (
-                          <span className="self-start text-[11px] text-muted-foreground tabular-nums mt-1">
-                            {timestamp}
+                      <>
+                        {turnLabel && (
+                          <span className="text-sm font-medium text-foreground">
+                            {turnLabel}
                           </span>
                         )}
-                      </div>
+                        <div className="max-w-[88%] md:max-w-3/4 w-fit flex flex-col">
+                          <div className={`${TURN_BUBBLE_CLASS} bg-muted`}>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">
+                              {message.content}
+                            </p>
+                          </div>
+                          {timestamp && (
+                            <span className="self-start text-[11px] text-muted-foreground tabular-nums mt-1">
+                              {timestamp}
+                            </span>
+                          )}
+                        </div>
+                        {showVersions && (
+                          <TurnVersionBubbles
+                            versions={message.versions}
+                            side="user"
+                          />
+                        )}
+                      </>
                     )}
 
                     {/* Agent Message (text response) */}
@@ -1102,7 +1160,7 @@ export function TestDetailView({
                       <>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium text-foreground">
-                            Agent
+                            {turnLabel || "Agent"}
                           </span>
                           {isEvalTarget && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -1111,7 +1169,7 @@ export function TestDetailView({
                           )}
                         </div>
                         <div className="max-w-[88%] md:max-w-3/4 w-fit flex flex-col">
-                          <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-background border border-border">
+                          <div className={`${TURN_BUBBLE_CLASS} bg-background`}>
                             <p className="text-sm text-foreground whitespace-pre-wrap">
                               {message.content}
                             </p>
@@ -1122,6 +1180,12 @@ export function TestDetailView({
                             </span>
                           )}
                         </div>
+                        {showVersions && (
+                          <TurnVersionBubbles
+                            versions={message.versions}
+                            side="assistant"
+                          />
+                        )}
                       </>
                     )}
 

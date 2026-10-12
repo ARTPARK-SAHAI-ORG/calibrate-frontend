@@ -4,9 +4,16 @@ import {
   type TestCaseHistory,
   type ToolCallOutput,
 } from "@/components/test-results/shared";
+import { readTextField } from "@/lib/messageVersions";
 import { normaliseHistoryItem } from "./shared";
 
-export function LlmItemPane({ payload }: { payload: Record<string, unknown> }) {
+export function LlmItemPane({
+  payload,
+  showVersions = true,
+}: {
+  payload: Record<string, unknown>;
+  showVersions?: boolean;
+}) {
   // Reuse the read-only conversation renderer from the test runner /
   // benchmark dialogs so labelling stays visually in sync with how the
   // same conversation is displayed elsewhere in the product.
@@ -18,12 +25,9 @@ export function LlmItemPane({ payload }: { payload: Record<string, unknown> }) {
     }
   }
 
-  const agentResponse =
-    typeof payload.agent_response === "string"
-      ? (payload.agent_response as string)
-      : "";
-  if (agentResponse.length > 0) {
-    history.push({ role: "assistant", content: agentResponse });
+  const agentResponse = readTextField(payload.agent_response);
+  if (agentResponse && agentResponse.content.length > 0) {
+    history.push({ role: "assistant", ...agentResponse });
   }
 
   // A tool-call test's saved item carries the calls the agent made. Append
@@ -48,5 +52,12 @@ export function LlmItemPane({ payload }: { payload: Record<string, unknown> }) {
     );
   }
 
-  return <TestDetailView history={history} passed={true} highlightEvalTarget />;
+  return (
+    <TestDetailView
+      history={history}
+      passed={true}
+      highlightEvalTarget
+      showVersions={showVersions}
+    />
+  );
 }

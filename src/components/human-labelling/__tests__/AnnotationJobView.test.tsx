@@ -28,6 +28,19 @@ jest.mock("../../../lib/api", () => ({
   getBackendUrl: () => "https://backend.example.com",
 }));
 
+const mockLlmPaneProps = jest.fn();
+jest.mock("../item-panes/LlmItemPane", () => {
+  const React = jest.requireActual("react");
+  const actual = jest.requireActual("../item-panes/LlmItemPane");
+  return {
+    ...actual,
+    LlmItemPane: (props: Record<string, unknown>) => {
+      mockLlmPaneProps(props);
+      return React.createElement(actual.LlmItemPane, props);
+    },
+  };
+});
+
 function jsonResponse(body: unknown, status = 200) {
   return {
     ok: status >= 200 && status < 300,
@@ -1812,5 +1825,87 @@ describe("AnnotationJobView picks the evaluators per row", () => {
     );
     expect(screen.getByText("Quality")).toBeInTheDocument();
     expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
+  });
+});
+
+describe("AnnotationJobView message versions", () => {
+  let fetchMock: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  const withVersions = {
+    ...items[0],
+    payload: {
+      name: "Item One",
+      chat_history: [
+        {
+          role: "user",
+          content: "hello",
+          label: "English",
+          versions: { Hindi: "namaste" },
+        },
+      ],
+      agent_response: "hi",
+    },
+  };
+
+  it("draws no version toggle for an item whose turns carry no versions", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item One")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("All versions")).not.toBeInTheDocument();
+    expect(screen.queryByText("Default only")).not.toBeInTheDocument();
+  });
+
+  it("shows every version by default and hides the others on Default only", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValue(
+      jsonResponse(jobResponse({ items: [withVersions] })),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("All versions")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("All versions")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(mockLlmPaneProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ showVersions: true }),
+    );
+
+    await user.click(screen.getByText("Default only"));
+    expect(screen.getByText("Default only")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByText("All versions")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(mockLlmPaneProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ showVersions: false }),
+    );
+
+    await user.click(screen.getByText("All versions"));
+    expect(mockLlmPaneProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ showVersions: true }),
+    );
+  });
+
+  it("keeps the version toggle in the admin read-only view", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(jobResponse({ items: [withVersions], read_only: true })),
+    );
+    render(<AnnotationJobView token="tok" mode="admin" />);
+    await waitFor(() =>
+      expect(screen.getByText("Default only")).toBeInTheDocument(),
+    );
   });
 });

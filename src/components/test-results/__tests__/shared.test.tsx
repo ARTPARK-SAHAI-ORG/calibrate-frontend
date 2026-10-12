@@ -661,6 +661,102 @@ describe("TestDetailView", () => {
     expect(screen.getByText("Hello! How can I help?")).toBeInTheDocument();
   });
 
+  it("renders a turn without label or versions as before: an Agent header and no extra bubbles", () => {
+    const { container } = render(
+      <TestDetailView history={baseHistory} passed={true} />,
+    );
+    expect(screen.getByText("Agent")).toBeInTheDocument();
+    expect(container.querySelectorAll(".border-dashed")).toHaveLength(0);
+    expect(container.querySelectorAll(".rounded-xl")).toHaveLength(2);
+  });
+
+  it("shows a turn's label in place of Agent and keeps the evaluation target pill", () => {
+    render(
+      <TestDetailView
+        history={[
+          { role: "user", content: "Hi" },
+          { role: "assistant", content: "Hello", label: "Nurse reply" },
+        ]}
+        passed={true}
+        highlightEvalTarget
+      />,
+    );
+    expect(screen.getByText("Nurse reply")).toBeInTheDocument();
+    expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+    expect(screen.getByText("Evaluation target")).toBeInTheDocument();
+  });
+
+  it("draws a label above a user turn when present", () => {
+    render(
+      <TestDetailView
+        history={[{ role: "user", content: "Hi", label: "Patient (Hindi)" }]}
+        passed={true}
+      />,
+    );
+    expect(screen.getByText("Patient (Hindi)")).toHaveClass(
+      "text-sm",
+      "font-medium",
+      "text-foreground",
+    );
+  });
+
+  it("draws each version with its name under user and assistant turns", () => {
+    const { container } = render(
+      <TestDetailView
+        history={[
+          {
+            role: "user",
+            content: "Namaste",
+            versions: { English: "Hello", Hinglish: "Namaste ji" },
+          },
+          {
+            role: "assistant",
+            content: "Kaise ho",
+            versions: { English: "How are you" },
+          },
+        ]}
+        passed={true}
+      />,
+    );
+    expect(screen.getAllByText("English")).toHaveLength(2);
+    expect(screen.getByText("Hinglish")).toBeInTheDocument();
+    expect(screen.getByText("Hello")).toBeInTheDocument();
+    expect(screen.getByText("Namaste ji")).toBeInTheDocument();
+    expect(screen.getByText("How are you")).toBeInTheDocument();
+    const dashed = container.querySelectorAll(".border-dashed");
+    expect(dashed).toHaveLength(3);
+    dashed.forEach((el) => expect(el).toHaveClass("bg-muted/30", "rounded-xl"));
+    expect(screen.getByText("Hello").closest(".border-dashed")).toBeTruthy();
+  });
+
+  it("hides version bubbles but keeps labels when showVersions is false", () => {
+    const { container } = render(
+      <TestDetailView
+        history={[
+          {
+            role: "user",
+            content: "Namaste",
+            label: "Patient",
+            versions: { English: "Hello" },
+          },
+          {
+            role: "assistant",
+            content: "Kaise ho",
+            label: "Nurse",
+            versions: { English: "How are you" },
+          },
+        ]}
+        passed={true}
+        showVersions={false}
+      />,
+    );
+    expect(screen.getByText("Patient")).toBeInTheDocument();
+    expect(screen.getByText("Nurse")).toBeInTheDocument();
+    expect(screen.queryByText("English")).not.toBeInTheDocument();
+    expect(screen.queryByText("Hello")).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".border-dashed")).toHaveLength(0);
+  });
+
   it("renders an assistant tool-call turn with its inline tool response", () => {
     const history: TestCaseHistory[] = [
       {
@@ -1200,5 +1296,36 @@ describe("TestCouldNotRunNotice", () => {
       screen.getByText("This test could not be run"),
     ).toBeInTheDocument();
     expect(screen.queryByText("View details")).not.toBeInTheDocument();
+  });
+});
+
+describe("TestDetailView with a malformed label or versions from the API", () => {
+  it("draws the turn as unlabelled instead of breaking", () => {
+    render(
+      <TestDetailView
+        history={[
+          {
+            role: "user",
+            content: "hi",
+            label: { x: 1 } as unknown as string,
+            versions: "abc" as unknown as Record<string, string>,
+          },
+          {
+            role: "assistant",
+            content: "hello",
+            versions: { ok: "fine", bad: 3 } as unknown as Record<
+              string,
+              string
+            >,
+          },
+        ]}
+        passed={true}
+      />,
+    );
+    expect(screen.getByText("hi")).toBeInTheDocument();
+    expect(screen.getByText("Agent")).toBeInTheDocument();
+    expect(screen.getByText("fine")).toBeInTheDocument();
+    expect(screen.queryByText("bad")).not.toBeInTheDocument();
+    expect(document.querySelectorAll(".border-dashed")).toHaveLength(1);
   });
 });

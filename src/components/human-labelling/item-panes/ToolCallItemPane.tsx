@@ -2,6 +2,7 @@ import {
   TestDetailView,
   type TestCaseHistory,
 } from "@/components/test-results/shared";
+import { readTextField } from "@/lib/messageVersions";
 import { normaliseHistoryItem } from "./shared";
 
 /**
@@ -21,8 +22,10 @@ import { normaliseHistoryItem } from "./shared";
  */
 export function ToolCallItemPane({
   payload,
+  showVersions = true,
 }: {
   payload: Record<string, unknown>;
+  showVersions?: boolean;
 }) {
   const history: TestCaseHistory[] = [];
   if (Array.isArray(payload.chat_history)) {
@@ -41,10 +44,9 @@ export function ToolCallItemPane({
     // A failed tool-call test: the agent replied with text instead of
     // calling a tool. Show that reply so the annotator sees what the agent
     // actually did.
-    const agentResponse =
-      typeof payload.agent_response === "string" ? payload.agent_response : "";
-    if (agentResponse.length > 0) {
-      history.push({ role: "assistant", content: agentResponse });
+    const agentResponse = readTextField(payload.agent_response);
+    if (agentResponse && agentResponse.content.length > 0) {
+      history.push({ role: "assistant", ...agentResponse });
     }
   }
 
@@ -56,5 +58,12 @@ export function ToolCallItemPane({
     );
   }
 
-  return <TestDetailView history={history} passed={true} highlightEvalTarget />;
+  return (
+    <TestDetailView
+      history={history}
+      passed={true}
+      highlightEvalTarget
+      showVersions={showVersions}
+    />
+  );
 }

@@ -38,6 +38,7 @@ import { readToolParameters, NormalizedToolParam } from "@/lib/toolParams";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { formatTurnTimestamp } from "@/components/test-results/shared";
+import { readTurnExtras } from "@/lib/messageVersions";
 import {
   CustomFieldsEditor,
   deriveInputs,
@@ -45,7 +46,7 @@ import {
   type InputRow,
   type InputFieldType,
 } from "@/components/CustomFieldsEditor";
-import { RobotIcon, ToolIcon } from "@/components/icons";
+import { RobotIcon, ToolIcon, TrashIcon } from "@/components/icons";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { sampleTest } from "@/lib/testSamples";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
@@ -624,6 +625,10 @@ export type TestConfig = {
      * dialog so bulk-uploaded labelling items don't lose timestamps when
      * edited. The dialog never asks the user to set this. */
     created_at?: string;
+    /** Display name for this turn's text, shown in place of the role name. */
+    label?: string;
+    /** Other forms of the same text, keyed by the name shown above each. */
+    versions?: Record<string, string>;
   }>;
   /** A general test has no conversation history — just this plain input string. */
   input?: string;
@@ -1035,6 +1040,8 @@ export function AddTestDialog({
           isInbuilt?: boolean;
           linkedToolCallId?: string;
           createdAt?: string;
+          label?: string;
+          versions?: Record<string, string>;
         }> = [];
 
         // Helper to format value - stringify objects/arrays for display
@@ -1139,6 +1146,7 @@ export function AddTestDialog({
                 role: "agent",
                 content: historyItem.content || "",
                 ...(createdAt ? { createdAt } : {}),
+                ...readTurnExtras(historyItem),
               });
             }
           } else if (historyItem.role === "user") {
@@ -1147,6 +1155,7 @@ export function AddTestDialog({
               role: "user",
               content: historyItem.content || "",
               ...(createdAt ? { createdAt } : {}),
+              ...readTurnExtras(historyItem),
             });
           } else if (historyItem.role === "tool" && historyItem.content) {
             // Tool response message - link to the tool call
@@ -1367,6 +1376,8 @@ export function AddTestDialog({
       isInbuilt?: boolean;
       linkedToolCallId?: string; // For tool_response to link back to tool_call
       createdAt?: string;
+      label?: string;
+      versions?: Record<string, string>;
     }>
   >(() => {
     const u = (id: string) => ({
@@ -1545,6 +1556,71 @@ export function AddTestDialog({
     setChatMessages(
       chatMessages.map((msg) => (msg.id === id ? { ...msg, content } : msg)),
     );
+  };
+
+  type ChatMessage = (typeof chatMessages)[number];
+
+  const patchChatMessage = (
+    id: string,
+    patch: (msg: ChatMessage) => ChatMessage,
+  ) => setChatMessages(chatMessages.map((m) => (m.id === id ? patch(m) : m)));
+
+  const setMessageLabel = (id: string, label: string) =>
+    patchChatMessage(id, (m) => ({ ...m, label: label || undefined }));
+
+  const setLabelForRole = (role: "agent" | "user", label: string) =>
+    setChatMessages(
+      chatMessages.map((m) =>
+        m.role === role ? { ...m, label: label || undefined } : m,
+      ),
+    );
+
+  const setMessageVersions = (
+    id: string,
+    next: (versions: Record<string, string>) => Record<string, string>,
+  ) =>
+    patchChatMessage(id, (m) => {
+      const versions = next(m.versions ?? {});
+      return Object.keys(versions).length > 0
+        ? { ...m, versions }
+        : { ...m, versions: undefined };
+    });
+
+  const renameVersion = (id: string, from: string, to: string) =>
+    setMessageVersions(id, (v) =>
+      to !== from && Object.hasOwn(v, to)
+        ? v
+        : Object.fromEntries(
+            Object.entries(v).map(([k, text]) => [k === from ? to : k, text]),
+          ),
+    );
+
+  // Which message's heading just changed, when other messages of the same
+  // role carry a different one and the user may want them to match.
+  const [headingPrompt, setHeadingPrompt] = useState<{
+    id: string;
+    role: "agent" | "user";
+    label: string;
+  } | null>(null);
+  const headingFocusValueRef = useRef("");
+  const [versionToRemove, setVersionToRemove] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const onHeadingBlur = (message: ChatMessage) => {
+    const label = message.label ?? "";
+    if (!label || label === headingFocusValueRef.current) return;
+    if (message.role !== "agent" && message.role !== "user") return;
+    const othersDiffer = chatMessages.some(
+      (m) =>
+        m.role === message.role &&
+        m.id !== message.id &&
+        (m.label ?? "") !== label,
+    );
+    if (othersDiffer) {
+      setHeadingPrompt({ id: message.id, role: message.role, label });
+    }
   };
 
   const updateToolCallParam = (
@@ -2936,17 +3012,29 @@ export function AddTestDialog({
     // Convert chat messages to the API format
     for (const message of chatMessages) {
       const ts = message.createdAt ? { created_at: message.createdAt } : {};
+      const label = message.label?.trim();
+      const versions = Object.fromEntries(
+        Object.entries(message.versions ?? {})
+          .map(([name, text]) => [name.trim(), text])
+          .filter(([name]) => name),
+      );
+      const extras = {
+        ...(label ? { label } : {}),
+        ...(Object.keys(versions).length > 0 ? { versions } : {}),
+      };
       if (message.role === "agent") {
         history.push({
           role: "assistant",
           content: message.content,
           ...ts,
+          ...extras,
         });
       } else if (message.role === "user") {
         history.push({
           role: "user",
           content: message.content,
           ...ts,
+          ...extras,
         });
       } else if (message.role === "tool_call") {
         // Generate a unique ID for this tool call
@@ -3344,6 +3432,105 @@ export function AddTestDialog({
     hasNext,
     onNext: showRunUnsavedConfirm ? undefined : navNext,
   });
+
+  const renderHeadingInput = (
+    message: ChatMessage,
+    placeholder: "Agent" | "User",
+  ) => (
+    <input
+      type="text"
+      value={message.label ?? ""}
+      placeholder={placeholder}
+      aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
+      onFocus={() => {
+        headingFocusValueRef.current = message.label ?? "";
+      }}
+      onChange={(e) => setMessageLabel(message.id, e.target.value)}
+      onBlur={() => onHeadingBlur(message)}
+      className={`h-7 px-2 -ml-2 rounded-md text-sm font-medium text-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
+        message.role === "user" ? "self-end" : ""
+      }`}
+    />
+  );
+
+  const renderHeadingPrompt = (message: ChatMessage) =>
+    headingPrompt?.id === message.id ? (
+      <div className="mt-2 w-[22rem] max-w-full rounded-xl border border-border bg-background shadow-2xl p-3 space-y-2 text-sm">
+        <p className="text-foreground">
+          {`Use "${headingPrompt.label}" for the other ${headingPrompt.role} messages too?`}
+        </p>
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setHeadingPrompt(null)}
+            className="h-9 px-3 rounded-lg text-sm font-medium border border-border bg-background hover:bg-muted transition-colors cursor-pointer"
+          >
+            Only this message
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLabelForRole(headingPrompt.role, headingPrompt.label);
+              setHeadingPrompt(null);
+            }}
+            className="h-9 px-3 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+          >
+            Update all
+          </button>
+        </div>
+      </div>
+    ) : null;
+
+  const renderVersions = (message: ChatMessage) =>
+    isLabelItem && message.versions
+      ? Object.entries(message.versions).map(([name, text], i) => (
+          <div key={i} className="mt-2 flex flex-col w-full">
+            <input
+              type="text"
+              value={name}
+              aria-label="Heading for this version"
+              onChange={(e) => renameVersion(message.id, name, e.target.value)}
+              className={`h-7 px-2 -ml-2 rounded-md text-xs text-muted-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
+                message.role === "user" ? "self-end" : ""
+              }`}
+            />
+            <div
+              className={`flex items-start gap-2 ${
+                message.role === "user" ? "flex-row-reverse" : ""
+              }`}
+            >
+              <textarea
+                value={text}
+                aria-label="Version text"
+                rows={1}
+                ref={autoSizeOnMount}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = "auto";
+                  target.style.height = `${target.scrollHeight}px`;
+                }}
+                onChange={(e) =>
+                  setMessageVersions(message.id, (v) => ({
+                    ...v,
+                    [name]: e.target.value,
+                  }))
+                }
+                className="[field-sizing:content] min-w-[180px] max-w-full px-4 py-2 rounded-xl text-sm text-foreground border focus:outline-none focus:ring-1 resize-none overflow-hidden placeholder:text-muted-foreground focus:ring-accent border-border border-dashed bg-muted/30"
+              />
+              <Tooltip content="Remove version" position="top">
+                <button
+                  type="button"
+                  aria-label="Remove version"
+                  onClick={() => setVersionToRemove({ id: message.id, name })}
+                  className="w-8 h-8 flex-shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              </Tooltip>
+            </div>
+          </div>
+        ))
+      : null;
 
   // Shown in its own right-hand column for a labelling item, in the left
   // column otherwise.
@@ -3766,6 +3953,45 @@ export function AddTestDialog({
                 className="h-10 px-4 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors cursor-pointer"
               >
                 Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {versionToRemove && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setVersionToRemove(null)}
+          />
+          <div className="relative bg-background rounded-xl shadow-2xl border border-border p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Remove this version?
+            </h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              {versionToRemove.name} will no longer be shown to annotators
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setVersionToRemove(null)}
+                className="h-10 px-4 rounded-lg text-sm font-medium bg-background text-foreground hover:bg-muted transition-colors cursor-pointer border border-border"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const { id, name } = versionToRemove;
+                  setMessageVersions(id, (v) =>
+                    Object.fromEntries(
+                      Object.entries(v).filter(([k]) => k !== name),
+                    ),
+                  );
+                  setVersionToRemove(null);
+                }}
+                className="h-10 px-4 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors cursor-pointer"
+              >
+                Remove
               </button>
             </div>
           </div>
@@ -4522,11 +4748,15 @@ export function AddTestDialog({
                           {(message.role === "agent" ||
                             message.role === "tool_call") && (
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-medium text-foreground">
-                                {message.role === "tool_call"
-                                  ? "Agent Tool Call"
-                                  : "Agent"}
-                              </span>
+                              {message.role === "agent" && isLabelItem ? (
+                                renderHeadingInput(message, "Agent")
+                              ) : (
+                                <span className="text-sm font-medium text-foreground">
+                                  {message.role === "tool_call"
+                                    ? "Agent Tool Call"
+                                    : "Agent"}
+                                </span>
+                              )}
                               {isEvalTarget && (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
                                   Evaluation target
@@ -4534,6 +4764,8 @@ export function AddTestDialog({
                               )}
                             </div>
                           )}
+                          {message.role === "agent" &&
+                            renderHeadingPrompt(message)}
 
                           {/* Message Bubble - for agent and user messages */}
                           {(message.role === "agent" ||
@@ -4580,6 +4812,13 @@ export function AddTestDialog({
                                 >
                                   {inlineDeleteBtn}
                                   <div className="w-fit max-w-[50%] min-w-[180px] flex flex-col">
+                                    {message.role === "user" &&
+                                      isLabelItem && (
+                                        <>
+                                          {renderHeadingInput(message, "User")}
+                                          {renderHeadingPrompt(message)}
+                                        </>
+                                      )}
                                     <textarea
                                       value={message.content}
                                       placeholder={
@@ -4631,6 +4870,7 @@ export function AddTestDialog({
                                         {turnTimestamp}
                                       </span>
                                     )}
+                                    {renderVersions(message)}
                                   </div>
                                 </div>
                               );
