@@ -1,3 +1,7 @@
+## October 2026
+
+- The Evaluators page is back in the sidebar under Agents, and clicking an evaluator there now opens the same preview window as the agent Evaluators tab ([#678](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/678))
+
 ## September 2026
 
 - The landing page now lists Raising The Village among the partners, in a row of cards that scrolls sideways instead of wrapping ([#659](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/659))
