@@ -1451,7 +1451,22 @@ export function AddTestDialog({
 
   const addChatMessage = (role: "agent" | "user") => {
     const id = Date.now().toString();
-    setChatMessages([...chatMessages, { id, role, content: "" }]);
+    const like = isLabelItem
+      ? chatMessages.find((m) => m.role === role && (m.label || m.versions))
+      : undefined;
+    const versions = like?.versions
+      ? Object.fromEntries(Object.keys(like.versions).map((name) => [name, ""]))
+      : undefined;
+    setChatMessages([
+      ...chatMessages,
+      {
+        id,
+        role,
+        content: "",
+        ...(like?.label ? { label: like.label } : {}),
+        ...(versions ? { versions } : {}),
+      },
+    ]);
     setPendingFocusId(id);
   };
 
@@ -1747,6 +1762,22 @@ export function AddTestDialog({
   // scrollable chat container's clipping (otherwise it hides beneath the
   // dialog's sticky header). Track the trigger's viewport rect to place it.
   const toolCallAnchorRef = useRef<HTMLDivElement>(null);
+  const menuPosition = (
+    r: { left: number; right: number; top: number; bottom: number } | null,
+    estHeight: number,
+    alignRight: boolean,
+  ): React.CSSProperties => {
+    if (!r) return { left: -9999, top: 0 };
+    const margin = 8;
+    const spaceBelow = window.innerHeight - r.bottom - margin;
+    const openAbove = spaceBelow < estHeight && r.top > spaceBelow;
+    return {
+      ...(openAbove
+        ? { bottom: window.innerHeight - r.top + margin }
+        : { top: r.bottom + margin }),
+      ...(alignRight ? { right: window.innerWidth - r.right } : { left: r.left }),
+    };
+  };
   const [toolCallAnchorRect, setToolCallAnchorRect] = useState<{
     left: number;
     right: number;
@@ -1755,7 +1786,7 @@ export function AddTestDialog({
   } | null>(null);
 
   useLayoutEffect(() => {
-    if (!toolCallDropdownOpen) return;
+    if (!toolCallDropdownOpen && !addMessageDropdownOpen) return;
     const update = () => {
       const el = toolCallAnchorRef.current;
       if (!el) return;
@@ -1774,7 +1805,7 @@ export function AddTestDialog({
       window.removeEventListener("scroll", update, true);
       window.removeEventListener("resize", update);
     };
-  }, [toolCallDropdownOpen]);
+  }, [toolCallDropdownOpen, addMessageDropdownOpen]);
 
   // Scroll to bottom when new messages are added
   useEffect(() => {
@@ -3318,6 +3349,12 @@ export function AddTestDialog({
       if (hasEmptyChatMessage) {
         return;
       }
+      const hasEmptyVersion = chatMessages.some((m) =>
+        Object.values(m.versions ?? {}).some((text) => !text.trim()),
+      );
+      if (hasEmptyVersion) {
+        return;
+      }
 
       // Webhook tool responses are required — the asterisk on the label means
       // it. Structured-output responses are optional and may stay blank.
@@ -3531,6 +3568,7 @@ export function AddTestDialog({
                 message.role === "user" ? "flex-row-reverse" : ""
               }`}
             >
+              <div className="flex flex-col">
               <textarea
                 value={text}
                 aria-label="Version text"
@@ -3547,8 +3585,19 @@ export function AddTestDialog({
                     [name]: e.target.value,
                   }))
                 }
-                className="[field-sizing:content] min-w-[180px] max-w-full px-4 py-2 rounded-xl text-sm text-foreground border focus:outline-none focus:ring-1 resize-none overflow-hidden placeholder:text-muted-foreground focus:ring-accent border-border border-dashed bg-muted/30"
+                placeholder={`Enter the ${name} version`}
+                className={`[field-sizing:content] min-w-[180px] max-w-full px-4 py-2 rounded-xl text-sm text-foreground border focus:outline-none focus:ring-1 resize-none overflow-hidden placeholder:text-muted-foreground border-dashed bg-muted/30 ${
+                  localValidationAttempted && !text.trim()
+                    ? "border-red-500 focus:ring-red-500"
+                    : "border-border focus:ring-accent"
+                }`}
               />
+              {localValidationAttempted && !text.trim() && (
+                <p className="text-xs text-red-500 mt-1">
+                  Version cannot be empty
+                </p>
+              )}
+              </div>
               <Tooltip content="Remove version" position="top">
                 <button
                   type="button"
@@ -4108,7 +4157,7 @@ export function AddTestDialog({
               space above a 32px button), and the type header / info banner
               otherwise. */}
           <button
-            onClick={onClose}
+            onClick={() => confirmDiscard(onClose)}
             disabled={isCreating || isLoading}
             className={`absolute ${
               stepsBetweenTests ? "top-2.5 md:top-2" : "top-2.5 md:top-3"
@@ -5289,25 +5338,24 @@ export function AddTestDialog({
                                     </Tooltip>
 
                                     {/* Dropdown Menu */}
-                                    {addMessageDropdownOpen && (
-                                      <>
-                                        <div
-                                          className="fixed inset-0 z-[150]"
-                                          onClick={() =>
-                                            setAddMessageDropdownOpen(false)
-                                          }
-                                        />
-                                        <div
-                                          className={`absolute bg-background border border-border rounded-lg shadow-xl z-[200] overflow-hidden whitespace-nowrap ${
-                                            message.role === "user"
-                                              ? chatMessages.length <= 2
-                                                ? "right-0 top-10"
-                                                : "right-0 bottom-full mb-2"
-                                              : chatMessages.length <= 2
-                                                ? "left-0 top-10"
-                                                : "left-0 bottom-full mb-2"
-                                          }`}
-                                        >
+                                    {addMessageDropdownOpen &&
+                                      typeof window !== "undefined" &&
+                                      createPortal(
+                                        <>
+                                          <div
+                                            className="fixed inset-0 z-[150]"
+                                            onClick={() =>
+                                              setAddMessageDropdownOpen(false)
+                                            }
+                                          />
+                                          <div
+                                            style={menuPosition(
+                                              toolCallAnchorRect,
+                                              160,
+                                              message.role === "user",
+                                            )}
+                                            className="fixed bg-background border border-border rounded-lg shadow-xl z-[200] overflow-hidden whitespace-nowrap"
+                                          >
                                           {/* Neutral rows (no bright fills) —
                                           the three options stay visually
                                           distinct via their icons (person /
@@ -5412,7 +5460,8 @@ export function AddTestDialog({
                                             </span>
                                           </button>
                                         </div>
-                                      </>
+                                      </>,
+                                      document.body,
                                     )}
 
                                     {/* Tool Call Selection Dropdown — rendered in a portal with

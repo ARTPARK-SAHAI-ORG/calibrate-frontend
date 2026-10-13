@@ -451,4 +451,58 @@ describe("AddTestDialog labelling item headings and versions", () => {
       screen.queryByText("Rename this version on every agent message?"),
     ).not.toBeInTheDocument();
   });
+
+  it("gives a new message the role's heading and version names, and needs every version filled", async () => {
+    const user = setupUser();
+    const onSubmit = renderDialog(jest.fn(), { initialConfig: SHARED });
+    await waitForHistory();
+
+    await user.click(screen.getAllByLabelText("Add message")[0]);
+    const menu = screen.getByRole("button", { name: /Agent message/ });
+    expect(menu.closest(".fixed")).not.toBeNull();
+    expect(document.body.contains(menu)).toBe(true);
+    await user.click(menu);
+
+    expect(versionNames()).toEqual([
+      "English",
+      "Hinglish",
+      "English",
+      "Hinglish",
+      "English",
+      "Hinglish",
+    ]);
+    const texts = screen.getAllByLabelText("Version text") as HTMLTextAreaElement[];
+    expect(texts[4].value).toBe("");
+    expect(texts[4].placeholder).toBe("Enter the English version");
+
+    const bubbles = screen.getAllByPlaceholderText("Enter agent message");
+    await user.type(bubbles[bubbles.length - 1], "Theek hai");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getAllByText("Version cannot be empty")).toHaveLength(2);
+
+    await user.type(texts[4], "Fine");
+    await user.type(texts[5], "Theek hai");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    const [config] = onSubmit.mock.calls[0];
+    expect(config.history[4]).toEqual({
+      role: "assistant",
+      content: "Theek hai",
+      versions: { English: "Fine", Hinglish: "Theek hai" },
+    });
+  });
+
+  it("asks before closing when a message was added, even an empty one", async () => {
+    const user = setupUser();
+    const onClose = jest.fn();
+    renderDialog(jest.fn(), { onClose });
+    await waitForHistory();
+
+    await user.click(screen.getAllByLabelText("Add message")[0]);
+    await user.click(screen.getByRole("button", { name: /User message/ }));
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
