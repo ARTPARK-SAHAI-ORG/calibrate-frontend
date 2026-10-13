@@ -505,4 +505,17 @@ describe("AddTestDialog labelling item headings and versions", () => {
     expect(screen.getByText("Discard changes?")).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("closes the add-message menu when the backdrop is clicked", async () => {
+    const user = setupUser();
+    renderDialog();
+    await waitForHistory();
+
+    await user.click(screen.getAllByLabelText("Add message")[0]);
+    expect(screen.getByRole("button", { name: /User message/ })).toBeInTheDocument();
+    await user.click(
+      document.querySelector("body > div .fixed.inset-0.z-\\[150\\], body > .fixed.inset-0.z-\\[150\\]") as HTMLElement,
+    );
+    expect(screen.queryByRole("button", { name: /User message/ })).not.toBeInTheDocument();
+  });
 });
