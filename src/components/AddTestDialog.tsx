@@ -1595,32 +1595,88 @@ export function AddTestDialog({
           ),
     );
 
-  // Which message's heading just changed, when other messages of the same
-  // role carry a different one and the user may want them to match.
-  const [headingPrompt, setHeadingPrompt] = useState<{
-    id: string;
-    role: "agent" | "user";
-    label: string;
-  } | null>(null);
-  const headingFocusValueRef = useRef("");
-  const [versionToRemove, setVersionToRemove] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
+  type MessageRole = "agent" | "user";
+  const isTextRole = (m: ChatMessage): m is ChatMessage & { role: MessageRole } =>
+    m.role === "agent" || m.role === "user";
+  const patchRole = (role: MessageRole, patch: (msg: ChatMessage) => ChatMessage) =>
+    setChatMessages(chatMessages.map((m) => (m.role === role ? patch(m) : m)));
+  const renamedVersions = (v: Record<string, string>, from: string, to: string) =>
+    Object.hasOwn(v, from) && !Object.hasOwn(v, to)
+      ? Object.fromEntries(
+          Object.entries(v).map(([k, text]) => [k === from ? to : k, text]),
+        )
+      : v;
+  const withoutVersion = (v: Record<string, string>, name: string) =>
+    Object.fromEntries(Object.entries(v).filter(([k]) => k !== name));
+  const versionsOf = (m: ChatMessage, next: Record<string, string>) =>
+    Object.keys(next).length > 0
+      ? { ...m, versions: next }
+      : { ...m, versions: undefined };
+
+  // Headings and version names are the same on every message of a role, so
+  // a change is applied to all of them or put back. The value at focus is
+  // what Cancel restores.
+  const [roleChange, setRoleChange] = useState<
+    | { kind: "heading"; id: string; role: MessageRole; from: string; to: string }
+    | { kind: "rename"; id: string; role: MessageRole; from: string; to: string }
+    | { kind: "remove"; id: string; role: MessageRole; name: string }
+    | null
+  >(null);
+  const focusValueRef = useRef("");
 
   const onHeadingBlur = (message: ChatMessage) => {
-    const label = message.label ?? "";
-    if (!label || label === headingFocusValueRef.current) return;
-    if (message.role !== "agent" && message.role !== "user") return;
+    if (!isTextRole(message)) return;
+    const to = message.label ?? "";
+    const from = focusValueRef.current;
+    if (to === from) return;
     const othersDiffer = chatMessages.some(
+      (m) => m.role === message.role && m.id !== message.id && (m.label ?? "") !== to,
+    );
+    if (othersDiffer) {
+      setRoleChange({ kind: "heading", id: message.id, role: message.role, from, to });
+    }
+  };
+
+  const onVersionNameBlur = (message: ChatMessage, to: string) => {
+    if (!isTextRole(message)) return;
+    const from = focusValueRef.current;
+    if (to === from) return;
+    if (!to.trim()) {
+      renameVersion(message.id, to, from);
+      return;
+    }
+    const othersHaveIt = chatMessages.some(
       (m) =>
         m.role === message.role &&
         m.id !== message.id &&
-        (m.label ?? "") !== label,
+        Object.hasOwn(m.versions ?? {}, from),
     );
-    if (othersDiffer) {
-      setHeadingPrompt({ id: message.id, role: message.role, label });
+    if (othersHaveIt) {
+      setRoleChange({ kind: "rename", id: message.id, role: message.role, from, to });
     }
+  };
+
+  const cancelRoleChange = () => {
+    if (!roleChange) return;
+    if (roleChange.kind === "heading") setMessageLabel(roleChange.id, roleChange.from);
+    if (roleChange.kind === "rename")
+      renameVersion(roleChange.id, roleChange.to, roleChange.from);
+    setRoleChange(null);
+  };
+
+  const applyRoleChange = () => {
+    if (!roleChange) return;
+    const { role } = roleChange;
+    if (roleChange.kind === "heading") setLabelForRole(role, roleChange.to);
+    if (roleChange.kind === "rename") {
+      const { from, to } = roleChange;
+      patchRole(role, (m) => versionsOf(m, renamedVersions(m.versions ?? {}, from, to)));
+    }
+    if (roleChange.kind === "remove") {
+      const { name } = roleChange;
+      patchRole(role, (m) => versionsOf(m, withoutVersion(m.versions ?? {}, name)));
+    }
+    setRoleChange(null);
   };
 
   const updateToolCallParam = (
@@ -3443,7 +3499,7 @@ export function AddTestDialog({
       placeholder={placeholder}
       aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
       onFocus={() => {
-        headingFocusValueRef.current = message.label ?? "";
+        focusValueRef.current = message.label ?? "";
       }}
       onChange={(e) => setMessageLabel(message.id, e.target.value)}
       onBlur={() => onHeadingBlur(message)}
@@ -3453,34 +3509,6 @@ export function AddTestDialog({
     />
   );
 
-  const renderHeadingPrompt = (message: ChatMessage) =>
-    headingPrompt?.id === message.id ? (
-      <div className="mt-2 w-[22rem] max-w-full rounded-xl border border-border bg-background shadow-2xl p-3 space-y-2 text-sm">
-        <p className="text-foreground">
-          {`Use "${headingPrompt.label}" for the other ${headingPrompt.role} messages too?`}
-        </p>
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setHeadingPrompt(null)}
-            className="h-9 px-3 rounded-lg text-sm font-medium border border-border bg-background hover:bg-muted transition-colors cursor-pointer"
-          >
-            Only this message
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setLabelForRole(headingPrompt.role, headingPrompt.label);
-              setHeadingPrompt(null);
-            }}
-            className="h-9 px-3 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-          >
-            Update all
-          </button>
-        </div>
-      </div>
-    ) : null;
-
   const renderVersions = (message: ChatMessage) =>
     isLabelItem && message.versions
       ? Object.entries(message.versions).map(([name, text], i) => (
@@ -3489,7 +3517,11 @@ export function AddTestDialog({
               type="text"
               value={name}
               aria-label="Heading for this version"
+              onFocus={() => {
+                focusValueRef.current = name;
+              }}
               onChange={(e) => renameVersion(message.id, name, e.target.value)}
+              onBlur={() => onVersionNameBlur(message, name)}
               className={`h-7 px-2 -ml-2 rounded-md text-xs text-muted-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
                 message.role === "user" ? "self-end" : ""
               }`}
@@ -3521,7 +3553,10 @@ export function AddTestDialog({
                 <button
                   type="button"
                   aria-label="Remove version"
-                  onClick={() => setVersionToRemove({ id: message.id, name })}
+                  onClick={() =>
+                    isTextRole(message) &&
+                    setRoleChange({ kind: "remove", id: message.id, role: message.role, name })
+                  }
                   className="w-8 h-8 flex-shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
                 >
                   <TrashIcon className="w-4 h-4" />
@@ -3959,39 +3994,48 @@ export function AddTestDialog({
         </div>
       )}
 
-      {versionToRemove && (
+      {roleChange && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/30"
-            onClick={() => setVersionToRemove(null)}
-          />
+          <div className="absolute inset-0 bg-black/30" onClick={cancelRoleChange} />
           <div className="relative bg-background rounded-xl shadow-2xl border border-border p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-semibold text-foreground mb-2">
-              Remove this version?
+              {roleChange.kind === "heading"
+                ? `Use this heading on every ${roleChange.role} message?`
+                : roleChange.kind === "rename"
+                  ? `Rename this version on every ${roleChange.role} message?`
+                  : "Remove this version?"}
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
-              {versionToRemove.name} will no longer be shown to annotators
+              {roleChange.kind === "heading"
+                ? `Headings are the same on every ${roleChange.role} message. ${
+                    roleChange.to ? `"${roleChange.to}" goes on all of them` : "The heading is cleared on all of them"
+                  }, or the old one is put back`
+                : roleChange.kind === "rename"
+                  ? `Version names are the same on every ${roleChange.role} message. "${roleChange.from}" becomes "${roleChange.to}" on all of them, or the old name is put back`
+                  : `"${roleChange.name}" is removed from every ${roleChange.role} message`}
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
-                onClick={() => setVersionToRemove(null)}
+                type="button"
+                onClick={cancelRoleChange}
                 className="h-10 px-4 rounded-lg text-sm font-medium bg-background text-foreground hover:bg-muted transition-colors cursor-pointer border border-border"
               >
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  const { id, name } = versionToRemove;
-                  setMessageVersions(id, (v) =>
-                    Object.fromEntries(
-                      Object.entries(v).filter(([k]) => k !== name),
-                    ),
-                  );
-                  setVersionToRemove(null);
-                }}
-                className="h-10 px-4 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors cursor-pointer"
+                type="button"
+                onClick={applyRoleChange}
+                className={`h-10 px-4 rounded-lg text-sm font-medium cursor-pointer ${
+                  roleChange.kind === "remove"
+                    ? "bg-red-500 text-white hover:bg-red-600 transition-colors"
+                    : "bg-foreground text-background hover:opacity-90 transition-opacity"
+                }`}
               >
-                Remove
+                {roleChange.kind === "heading"
+                  ? "Update all"
+                  : roleChange.kind === "rename"
+                    ? "Rename all"
+                    : "Remove"}
               </button>
             </div>
           </div>
@@ -4764,8 +4808,6 @@ export function AddTestDialog({
                               )}
                             </div>
                           )}
-                          {message.role === "agent" &&
-                            renderHeadingPrompt(message)}
 
                           {/* Message Bubble - for agent and user messages */}
                           {(message.role === "agent" ||
@@ -4814,10 +4856,7 @@ export function AddTestDialog({
                                   <div className="w-fit max-w-[50%] min-w-[180px] flex flex-col">
                                     {message.role === "user" &&
                                       isLabelItem && (
-                                        <>
-                                          {renderHeadingInput(message, "User")}
-                                          {renderHeadingPrompt(message)}
-                                        </>
+                                        renderHeadingInput(message, "User")
                                       )}
                                     <textarea
                                       value={message.content}

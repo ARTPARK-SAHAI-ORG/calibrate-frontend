@@ -186,7 +186,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     expect(config.history[0]).toEqual({ role: "user", content: "Namaste" });
   });
 
-  it("asks to relabel the other agent messages after a heading changes, and 'Update all' does so", async () => {
+  it("asks to use a changed heading on every agent message, and 'Update all' does so", async () => {
     const user = setupUser();
     const onSubmit = renderDialog();
     await waitForHistory();
@@ -195,16 +195,16 @@ describe("AddTestDialog labelling item headings and versions", () => {
     await user.clear(first);
     await user.type(first, "Doctor");
     expect(
-      screen.queryByText('Use "Doctor" for the other agent messages too?'),
+      screen.queryByText("Use this heading on every agent message?"),
     ).not.toBeInTheDocument();
     await user.tab();
     expect(
-      screen.getByText('Use "Doctor" for the other agent messages too?'),
+      screen.getByText("Use this heading on every agent message?"),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Update all" }));
     expect(
-      screen.queryByText('Use "Doctor" for the other agent messages too?'),
+      screen.queryByText("Use this heading on every agent message?"),
     ).not.toBeInTheDocument();
     expect(second.value).toBe("Doctor");
     expect(userHeadings().map((i) => i.value)).toEqual(["Mother", ""]);
@@ -214,7 +214,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     expect(config.history[3]).toMatchObject({ label: "Doctor" });
   });
 
-  it("'Only this message' leaves the other headings alone", async () => {
+  it("Cancel puts the old heading back on the message that was changed", async () => {
     const user = setupUser();
     renderDialog();
     await waitForHistory();
@@ -223,14 +223,14 @@ describe("AddTestDialog labelling item headings and versions", () => {
     await user.type(second, "Father");
     await user.tab();
     expect(
-      screen.getByText('Use "Father" for the other user messages too?'),
+      screen.getByText("Use this heading on every user message?"),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Only this message" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(
-      screen.queryByText('Use "Father" for the other user messages too?'),
+      screen.queryByText("Use this heading on every user message?"),
     ).not.toBeInTheDocument();
     expect(first.value).toBe("Mother");
-    expect(second.value).toBe("Father");
+    expect(second.value).toBe("");
   });
 
   it("does not ask when the heading was not changed or every other message already matches", async () => {
@@ -240,11 +240,11 @@ describe("AddTestDialog labelling item headings and versions", () => {
 
     await user.click(agentHeadings()[0]);
     await user.tab();
-    expect(screen.queryByText(/messages too\?/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/on every (agent|user) message\?/)).not.toBeInTheDocument();
 
     await user.type(agentHeadings()[1], "Nurse");
     await user.tab();
-    expect(screen.queryByText(/messages too\?/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/on every (agent|user) message\?/)).not.toBeInTheDocument();
   });
 
   it("renames a version and edits its text, keeping the order", async () => {
@@ -288,7 +288,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     await user.click(screen.getAllByLabelText("Remove version")[2]);
     expect(screen.getByText("Remove this version?")).toBeInTheDocument();
     expect(
-      screen.getByText("Hinglish will no longer be shown to annotators"),
+      screen.getByText('"Hinglish" is removed from every agent message'),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByText("Remove this version?")).not.toBeInTheDocument();
@@ -352,23 +352,103 @@ describe("AddTestDialog labelling item headings and versions", () => {
     ]);
   });
 
-  it("trims headings and drops a version whose name was blanked when saving", async () => {
+  it("trims a heading when saving", async () => {
     const user = setupUser();
     const onSubmit = renderDialog();
     await waitForHistory();
 
     await user.clear(agentHeadings()[0]);
     await user.type(agentHeadings()[0], "  Nurse draft  ");
-    const hinglish = screen.getAllByLabelText("Heading for this version")[2];
-    await user.clear(hinglish);
+    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Update all" }));
 
     await user.click(screen.getByRole("button", { name: "Save" }));
     const [config] = onSubmit.mock.calls[0];
-    expect(config.history[1]).toEqual({
-      role: "assistant",
-      content: "Kaise ho?",
-      label: "Nurse draft",
-      versions: { English: "How are you?" },
-    });
+    expect(config.history[1]).toMatchObject({ label: "Nurse draft" });
+    expect(config.history[3]).toMatchObject({ label: "Nurse draft" });
+  });
+
+  const SHARED: TestConfig = {
+    history: [
+      { role: "user", content: "Namaste" },
+      {
+        role: "assistant",
+        content: "Kaise ho?",
+        versions: { English: "How are you?", Hinglish: "Kaise ho" },
+      },
+      { role: "user", content: "Theek hoon" },
+      {
+        role: "assistant",
+        content: "Accha",
+        versions: { English: "Good", Hinglish: "Accha" },
+      },
+    ],
+    evaluation: { type: "response" },
+  };
+
+  const versionNames = () =>
+    screen
+      .getAllByLabelText("Heading for this version")
+      .map((i) => (i as HTMLInputElement).value);
+
+  it("renames a version on every agent message or puts the old name back", async () => {
+    const user = setupUser();
+    const onSubmit = renderDialog(jest.fn(), { initialConfig: SHARED });
+    await waitForHistory();
+
+    const first = screen.getAllByLabelText("Heading for this version")[0];
+    await user.clear(first);
+    await user.type(first, "Translation");
+    await user.tab();
+    expect(
+      screen.getByText("Rename this version on every agent message?"),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(versionNames()).toEqual(["English", "Hinglish", "English", "Hinglish"]);
+
+    await user.clear(first);
+    await user.type(first, "Translation");
+    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Rename all" }));
+    expect(versionNames()).toEqual([
+      "Translation",
+      "Hinglish",
+      "Translation",
+      "Hinglish",
+    ]);
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    const [config] = onSubmit.mock.calls[0];
+    expect(Object.keys(config.history[1].versions)).toEqual(["Translation", "Hinglish"]);
+    expect(Object.keys(config.history[3].versions)).toEqual(["Translation", "Hinglish"]);
+  });
+
+  it("removes a version from every agent message", async () => {
+    const user = setupUser();
+    const onSubmit = renderDialog(jest.fn(), { initialConfig: SHARED });
+    await waitForHistory();
+
+    await user.click(screen.getAllByLabelText("Remove version")[1]);
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    expect(versionNames()).toEqual(["English", "English"]);
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    const [config] = onSubmit.mock.calls[0];
+    expect(config.history[1].versions).toEqual({ English: "How are you?" });
+    expect(config.history[3].versions).toEqual({ English: "Good" });
+  });
+
+  it("puts a version name back when it is left blank", async () => {
+    const user = setupUser();
+    renderDialog(jest.fn(), { initialConfig: SHARED });
+    await waitForHistory();
+
+    const first = screen.getAllByLabelText("Heading for this version")[0];
+    await user.clear(first);
+    await user.tab();
+    expect(versionNames()[0]).toBe("English");
+    expect(
+      screen.queryByText("Rename this version on every agent message?"),
+    ).not.toBeInTheDocument();
   });
 });
