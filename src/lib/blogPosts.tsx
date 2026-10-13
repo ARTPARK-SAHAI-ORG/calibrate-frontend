@@ -20,10 +20,9 @@ export type BlogPost = {
   seoTitle?: string;
   /** The day it went up, as year-month-day. */
   date: string;
-  author: string;
-  /** Where the author's name goes when clicked. Left out for an author with
-   * nowhere to point at. */
-  authorUrl?: string;
+  /** Who wrote it, in the order they are credited. `url` is where the name
+   * goes when clicked, left out for an author with nowhere to point at. */
+  authors: { name: string; url?: string }[];
   /** What kind of post this is, shown as a pill on the list of posts. Left out
    * for an ordinary post. */
   kind?: string;
@@ -56,11 +55,11 @@ export function articleJsonLd(post: BlogPost) {
     datePublished: post.date,
     image: `${SITE_URL}${post.image ?? SHARE_IMAGE}`,
     mainEntityOfPage: `${SITE_URL}/blog/${post.slug}`,
-    author: {
+    author: post.authors.map(({ name, url }) => ({
       "@type": "Person",
-      name: post.author,
-      ...(post.authorUrl ? { url: post.authorUrl } : {}),
-    },
+      name,
+      ...(url ? { url } : {}),
+    })),
     publisher: {
       "@type": "Organization",
       name: "Calibrate",
@@ -114,18 +113,23 @@ export function PostByline({
     <p className={`text-sm text-gray-600 ${className}`}>
       <time dateTime={post.date}>{formatPostDate(post.date)}</time>
       <span className="mx-2">·</span>
-      {post.authorUrl ? (
-        <a
-          href={post.authorUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 decoration-gray-300 hover:text-gray-900 hover:decoration-gray-600 transition-colors"
-        >
-          {post.author}
-        </a>
-      ) : (
-        post.author
-      )}
+      {post.authors.map(({ name, url }, i) => (
+        <span key={name}>
+          {i > 0 && ", "}
+          {url ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 decoration-gray-300 hover:text-gray-900 hover:decoration-gray-600 transition-colors"
+            >
+              {name}
+            </a>
+          ) : (
+            name
+          )}
+        </span>
+      ))}
     </p>
   );
 }
@@ -184,14 +188,18 @@ function Figure({
   width,
   height,
   caption,
+  narrow = false,
 }: {
   src: string;
   width: number;
   height: number;
   caption?: ReactNode;
+  /** Holds the picture to the width the original post showed it at, rather
+   * than stretching it across the whole column. */
+  narrow?: boolean;
 }) {
   return (
-    <figure>
+    <figure className={narrow ? "mx-auto max-w-[728px]" : undefined}>
       <img
         src={src}
         alt=""
@@ -253,7 +261,17 @@ export const POSTS: BlogPost[] = [
       "Building a reliable AI coaching assistant for last-mile communities in rural Uganda",
     kind: "Case study",
     date: "2026-10-13",
-    author: "Aman Dalmia, Cosmas Wamozo, Oscar Katahweire",
+    authors: [
+      { name: "Aman Dalmia", url: "https://www.linkedin.com/in/aman-dalmia/" },
+      {
+        name: "Cosmas Wamozo",
+        url: "https://www.linkedin.com/in/wamozo-cosmas-a5551b138/",
+      },
+      {
+        name: "Oscar Katahweire",
+        url: "https://www.linkedin.com/in/oscar-katahweire-74901152/",
+      },
+    ],
     summary:
       "A look at how Raising The Village and The Agency Fund used LLM judges and human experts to improve an AI coaching assistant, with lessons for the social sector at large",
     image: "/blog/building-a-reliable-ai-coaching-assistant.png",
@@ -272,9 +290,10 @@ export const POSTS: BlogPost[] = [
           </em>
         </p>
         <Figure
+          narrow
           src="/blog/building-a-reliable-ai-coaching-assistant/figure-1.jpeg"
-          width={1456}
-          height={970}
+          width={2048}
+          height={1365}
           caption="Image credit: Raising the Village (RTV)"
         />
         <Aside>
@@ -323,9 +342,10 @@ export const POSTS: BlogPost[] = [
           tailored advice &ndash; focusing on questions like:
         </p>
         <Figure
+          narrow
           src="/blog/building-a-reliable-ai-coaching-assistant/figure-2.png"
-          width={1456}
-          height={920}
+          width={2048}
+          height={1294}
         />
         <p>
           As RTV expands across more geographies and grows its team of FAs,
@@ -336,9 +356,10 @@ export const POSTS: BlogPost[] = [
           helping even new FAs deliver more consistent guidance. For example:
         </p>
         <Figure
+          narrow
           src="/blog/building-a-reliable-ai-coaching-assistant/figure-3.png"
-          width={1456}
-          height={934}
+          width={1747}
+          height={1121}
         />
         <p>
           Before deploying at scale, the tool needed to be evaluated &ndash; a
@@ -416,9 +437,10 @@ export const POSTS: BlogPost[] = [
           flagged others as incorrect with an explanation:
         </p>
         <Figure
+          narrow
           src="/blog/building-a-reliable-ai-coaching-assistant/figure-4.png"
-          width={1456}
-          height={475}
+          width={2048}
+          height={669}
         />
         <p>
           Only 48% of messages passed the accuracy test. Human review later
@@ -441,6 +463,7 @@ export const POSTS: BlogPost[] = [
           generate messages for the human expert labeling workshop:
         </p>
         <Figure
+          narrow
           src="/blog/building-a-reliable-ai-coaching-assistant/figure-5.png"
           width={1326}
           height={708}
@@ -477,11 +500,13 @@ export const POSTS: BlogPost[] = [
           issues, revise messages, and recalibrate.
         </p>
         <Figure
+          narrow
           src="/blog/building-a-reliable-ai-coaching-assistant/figure-6.png"
           width={1238}
           height={174}
         />
         <Figure
+          narrow
           src="/blog/building-a-reliable-ai-coaching-assistant/figure-7.png"
           width={1238}
           height={300}
@@ -569,25 +594,19 @@ export const POSTS: BlogPost[] = [
           If you are struggling to evaluate your AI tool systematically and want
           your entire team, including domain experts, to be involved, check out{" "}
           <PostLink href="https://calibrate.artpark.ai/">Calibrate</PostLink>,
-          the open-source AI evaluation tool mentioned in this blog.
+          the open-source AI evaluation tool mentioned in this post.
         </p>
         <hr className="border-gray-200" />
         <p>
           <em>
-            <PostLink href="https://linkedin.com/in/aman-dalmia">
-              Aman Dalmia
-            </PostLink>{" "}
-            is Lead AI Engineer at{" "}
+            Aman Dalmia is Lead AI Engineer at{" "}
             <PostLink href="https://www.agency.fund/">The Agency Fund</PostLink>
             .
           </em>
         </p>
         <p>
           <em>
-            <PostLink href="https://www.linkedin.com/in/wamozo-cosmas-a5551b138/">
-              Cosmas Wamozo
-            </PostLink>{" "}
-            is a Senior Data Scientist at{" "}
+            Cosmas Wamozo is a Senior Data Scientist at{" "}
             <PostLink href="https://raisingthevillage.org/">
               Raising The Village
             </PostLink>
@@ -596,10 +615,8 @@ export const POSTS: BlogPost[] = [
         </p>
         <p>
           <em>
-            <PostLink href="https://www.linkedin.com/in/oscar-katahweire-74901152/">
-              Oscar Katahweire
-            </PostLink>{" "}
-            is a Learning and Knowledge Management Coordinator at{" "}
+            Oscar Katahweire is a Learning and Knowledge Management Coordinator
+            at{" "}
             <PostLink href="https://raisingthevillage.org/">
               Raising The Village
             </PostLink>
@@ -616,8 +633,9 @@ export const POSTS: BlogPost[] = [
     kind: "Case study",
     seoTitle: "How we evaluated a form-filling voice agent",
     date: "2026-09-02",
-    author: "Aman Dalmia",
-    authorUrl: "https://www.linkedin.com/in/aman-dalmia/",
+    authors: [
+      { name: "Aman Dalmia", url: "https://www.linkedin.com/in/aman-dalmia/" },
+    ],
     summary:
       "Our evaluation design for a voice agent that fills a form over a phone call, built on simulated calls, and what the first results say about the models we can deploy.",
     image: "/blog/evaluating-a-form-filling-voice-agent.png",
@@ -1856,8 +1874,9 @@ export const POSTS: BlogPost[] = [
     title: "Calibrate will be at IndiaFOSS",
     seoTitle: "Calibrate at IndiaFOSS",
     date: "2026-08-18",
-    author: "Aman Dalmia",
-    authorUrl: "https://www.linkedin.com/in/aman-dalmia/",
+    authors: [
+      { name: "Aman Dalmia", url: "https://www.linkedin.com/in/aman-dalmia/" },
+    ],
     summary:
       "Our proposal to present Calibrate at IndiaFOSS, the biggest gathering of the open-source community in India, has been accepted.",
     body: (
@@ -1921,8 +1940,9 @@ export const POSTS: BlogPost[] = [
     title: "Evaluation is all you need",
     seoTitle: "How to evaluate your AI agents",
     date: "2026-08-17",
-    author: "Aman Dalmia",
-    authorUrl: "https://www.linkedin.com/in/aman-dalmia/",
+    authors: [
+      { name: "Aman Dalmia", url: "https://www.linkedin.com/in/aman-dalmia/" },
+    ],
     summary:
       "Evaluation is the missing piece that translates model capability to real impact.",
     image: "/blog/evaluation-is-all-you-need.png",

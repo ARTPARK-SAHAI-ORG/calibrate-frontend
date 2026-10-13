@@ -24,8 +24,7 @@ describe("Blog", () => {
   });
 
   it("opens a post at its own address", async () => {
-    // A post with a link on its author's name, which not every post has.
-    const post = POSTS.find((entry) => entry.authorUrl)!;
+    const post = POSTS[0];
     render(
       await BlogPostPage({ params: Promise.resolve({ slug: post.slug }) }),
     );
@@ -33,10 +32,13 @@ describe("Blog", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: post.title }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: post.author })).toHaveAttribute(
-      "href",
-      post.authorUrl,
-    );
+    // Every author is credited, each name linking to their own page.
+    for (const author of post.authors) {
+      expect(screen.getByRole("link", { name: author.name })).toHaveAttribute(
+        "href",
+        author.url,
+      );
+    }
     expect(screen.getByRole("link", { name: "← All posts" })).toHaveAttribute(
       "href",
       "/blog",
