@@ -37,6 +37,19 @@ describe("Customer cards", () => {
     expect(link).not.toHaveAttribute("target");
   });
 
+  it("sends the Raising The Village card to its case study on this site", () => {
+    render(<HomePage />);
+
+    expect(
+      within(card("Raising The Village")).getByRole("link", {
+        name: "Read the story",
+      }),
+    ).toHaveAttribute(
+      "href",
+      "/blog/building-a-reliable-ai-coaching-assistant",
+    );
+  });
+
   it("opens a story written elsewhere in a new tab", () => {
     render(<HomePage />);
 
