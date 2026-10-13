@@ -46,7 +46,7 @@ import {
   type InputRow,
   type InputFieldType,
 } from "@/components/CustomFieldsEditor";
-import { RobotIcon, ToolIcon, TrashIcon } from "@/components/icons";
+import { CheckIcon, CloseIcon, RobotIcon, ToolIcon, TrashIcon } from "@/components/icons";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { sampleTest } from "@/lib/testSamples";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
@@ -1639,11 +1639,15 @@ export function AddTestDialog({
   >(null);
   const focusValueRef = useRef("");
 
-  const onHeadingBlur = (message: ChatMessage) => {
+  const onHeadingBlur = (message: ChatMessage, placeholder: string) => {
     if (!isTextRole(message)) return;
     const to = message.label ?? "";
     const from = focusValueRef.current;
     if (to === from) return;
+    if (from === "" && to === placeholder) {
+      setMessageLabel(message.id, "");
+      return;
+    }
     const othersDiffer = chatMessages.some(
       (m) => m.role === message.role && m.id !== message.id && (m.label ?? "") !== to,
     );
@@ -1652,14 +1656,20 @@ export function AddTestDialog({
     }
   };
 
-  const onVersionNameBlur = (message: ChatMessage, to: string) => {
-    if (!isTextRole(message)) return;
-    const from = focusValueRef.current;
-    if (to === from) return;
-    if (!to.trim()) {
-      renameVersion(message.id, to, from);
-      return;
-    }
+  // A version name is typed into a draft and applied with its tick, never
+  // by clicking away.
+  const [versionDraft, setVersionDraft] = useState<{
+    id: string;
+    from: string;
+    to: string;
+  } | null>(null);
+
+  const confirmVersionDraft = (message: ChatMessage) => {
+    if (!versionDraft || versionDraft.id !== message.id || !isTextRole(message)) return;
+    const { from } = versionDraft;
+    const to = versionDraft.to.trim();
+    setVersionDraft(null);
+    if (!to || to === from) return;
     const othersHaveIt = chatMessages.some(
       (m) =>
         m.role === message.role &&
@@ -1668,14 +1678,14 @@ export function AddTestDialog({
     );
     if (othersHaveIt) {
       setRoleChange({ kind: "rename", id: message.id, role: message.role, from, to });
+    } else {
+      renameVersion(message.id, from, to);
     }
   };
 
   const cancelRoleChange = () => {
     if (!roleChange) return;
     if (roleChange.kind === "heading") setMessageLabel(roleChange.id, roleChange.from);
-    if (roleChange.kind === "rename")
-      renameVersion(roleChange.id, roleChange.to, roleChange.from);
     setRoleChange(null);
   };
 
@@ -3537,10 +3547,11 @@ export function AddTestDialog({
       aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
       onFocus={() => {
         focusValueRef.current = message.label ?? "";
+        if (!message.label) setMessageLabel(message.id, placeholder);
       }}
       onChange={(e) => setMessageLabel(message.id, e.target.value)}
-      onBlur={() => onHeadingBlur(message)}
-      className={`h-7 px-2 -ml-2 rounded-md text-sm font-medium text-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
+      onBlur={() => onHeadingBlur(message, placeholder)}
+      className={`h-7 px-2 rounded-md text-sm font-medium text-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
         message.role === "user" ? "self-end" : ""
       }`}
     />
@@ -3548,72 +3559,100 @@ export function AddTestDialog({
 
   const renderVersions = (message: ChatMessage) =>
     isLabelItem && message.versions
-      ? Object.entries(message.versions).map(([name, text], i) => (
-          <div key={i} className="mt-2 flex flex-col w-full">
-            <input
-              type="text"
-              value={name}
-              aria-label="Heading for this version"
-              onFocus={() => {
-                focusValueRef.current = name;
-              }}
-              onChange={(e) => renameVersion(message.id, name, e.target.value)}
-              onBlur={() => onVersionNameBlur(message, name)}
-              className={`h-7 px-2 -ml-2 rounded-md text-xs text-muted-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
-                message.role === "user" ? "self-end" : ""
-              }`}
-            />
-            <div
-              className={`flex items-start gap-2 ${
-                message.role === "user" ? "flex-row-reverse" : ""
-              }`}
-            >
-              <div className="flex flex-col">
-              <textarea
-                value={text}
-                aria-label="Version text"
-                rows={1}
-                ref={autoSizeOnMount}
-                onInput={(e) => {
-                  const target = e.target as HTMLTextAreaElement;
-                  target.style.height = "auto";
-                  target.style.height = `${target.scrollHeight}px`;
-                }}
-                onChange={(e) =>
-                  setMessageVersions(message.id, (v) => ({
-                    ...v,
-                    [name]: e.target.value,
-                  }))
-                }
-                placeholder={`Enter the ${name} version`}
-                className={`[field-sizing:content] min-w-[180px] max-w-full px-4 py-2 rounded-xl text-sm text-foreground border focus:outline-none focus:ring-1 resize-none overflow-hidden placeholder:text-muted-foreground border-dashed bg-muted/30 ${
-                  localValidationAttempted && !text.trim()
-                    ? "border-red-500 focus:ring-red-500"
-                    : "border-border focus:ring-accent"
+      ? Object.entries(message.versions).map(([name, text], i) => {
+          const draft =
+            versionDraft?.id === message.id && versionDraft.from === name
+              ? versionDraft
+              : null;
+          return (
+            <div key={i} className="mt-2 mb-3 flex flex-col w-full">
+              <div
+                className={`flex items-center gap-1 ${
+                  message.role === "user" ? "self-end" : ""
                 }`}
-              />
-              {localValidationAttempted && !text.trim() && (
-                <p className="text-xs text-red-500 mt-1">
-                  Version cannot be empty
-                </p>
-              )}
-              </div>
-              <Tooltip content="Remove version" position="top">
-                <button
-                  type="button"
-                  aria-label="Remove version"
-                  onClick={() =>
-                    isTextRole(message) &&
-                    setRoleChange({ kind: "remove", id: message.id, role: message.role, name })
+              >
+                <input
+                  type="text"
+                  value={draft ? draft.to : name}
+                  aria-label="Heading for this version"
+                  onChange={(e) =>
+                    setVersionDraft({ id: message.id, from: name, to: e.target.value })
                   }
-                  className="w-8 h-8 flex-shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              </Tooltip>
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") confirmVersionDraft(message);
+                    if (e.key === "Escape") setVersionDraft(null);
+                  }}
+                  className="h-7 px-2 rounded-md text-xs text-muted-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground"
+                />
+                {draft && draft.to !== name && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Confirm version name"
+                      onClick={() => confirmVersionDraft(message)}
+                      className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 transition-colors"
+                    >
+                      <CheckIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Cancel version name"
+                      onClick={() => setVersionDraft(null)}
+                      className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-muted-foreground hover:bg-muted transition-colors"
+                    >
+                      <CloseIcon className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="flex flex-col flex-1 min-w-0">
+                  <textarea
+                    value={text}
+                    aria-label="Version text"
+                    rows={1}
+                    ref={autoSizeOnMount}
+                    onInput={(e) => {
+                      const target = e.target as HTMLTextAreaElement;
+                      target.style.height = "auto";
+                      target.style.height = `${target.scrollHeight}px`;
+                    }}
+                    onChange={(e) =>
+                      setMessageVersions(message.id, (v) => ({
+                        ...v,
+                        [name]: e.target.value,
+                      }))
+                    }
+                    placeholder="Enter this version"
+                    className={`[field-sizing:content] w-full px-4 py-2 rounded-xl text-sm text-foreground border focus:outline-none focus:ring-1 resize-none overflow-hidden placeholder:text-muted-foreground border-dashed bg-muted/30 ${
+                      localValidationAttempted && !text.trim()
+                        ? "border-red-500 focus:ring-red-500"
+                        : "border-border focus:ring-accent"
+                    }`}
+                  />
+                  {localValidationAttempted && !text.trim() && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Version cannot be empty
+                    </p>
+                  )}
+                </div>
+                <Tooltip content="Remove version" position="top">
+                  <button
+                    type="button"
+                    aria-label="Remove version"
+                    onClick={() =>
+                      isTextRole(message) &&
+                      setRoleChange({ kind: "remove", id: message.id, role: message.role, name })
+                    }
+                    className="w-7 h-7 mt-1 flex-shrink-0 rounded-md flex items-center justify-center cursor-pointer text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                  >
+                    <CloseIcon className="w-4 h-4" />
+                  </button>
+                </Tooltip>
+              </div>
             </div>
-          </div>
-        ))
+          );
+        })
       : null;
 
   // Shown in its own right-hand column for a labelling item, in the left
@@ -4049,19 +4088,15 @@ export function AddTestDialog({
           <div className="relative bg-background rounded-xl shadow-2xl border border-border p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-semibold text-foreground mb-2">
               {roleChange.kind === "heading"
-                ? `Use this heading on every ${roleChange.role} message?`
+                ? roleChange.to
+                  ? `Use "${roleChange.to}" on all ${roleChange.role} messages?`
+                  : `Clear the heading on all ${roleChange.role} messages?`
                 : roleChange.kind === "rename"
-                  ? `Rename this version on every ${roleChange.role} message?`
-                  : "Remove this version?"}
+                  ? `Rename "${roleChange.from}" to "${roleChange.to}" on all ${roleChange.role} messages?`
+                  : `Remove "${roleChange.name}" from all ${roleChange.role} messages?`}
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
-              {roleChange.kind === "heading"
-                ? `Headings are the same on every ${roleChange.role} message. ${
-                    roleChange.to ? `"${roleChange.to}" goes on all of them` : "The heading is cleared on all of them"
-                  }, or the old one is put back`
-                : roleChange.kind === "rename"
-                  ? `Version names are the same on every ${roleChange.role} message. "${roleChange.from}" becomes "${roleChange.to}" on all of them, or the old name is put back`
-                  : `"${roleChange.name}" is removed from every ${roleChange.role} message`}
+              {`This applies to every ${roleChange.role} message`}
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
