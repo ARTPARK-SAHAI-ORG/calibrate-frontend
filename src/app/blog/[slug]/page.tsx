@@ -34,7 +34,7 @@ export async function generateMetadata({
       description: post.summary,
       url: `/blog/${post.slug}`,
       publishedTime: post.date,
-      authors: [post.author],
+      authors: post.authors.map(({ name }) => name),
       // A post with its own picture describes it with its own headline,
       // since that is what the picture says. The rest fall back to the
       // site-wide picture and the words that go with it.

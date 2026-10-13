@@ -20,10 +20,9 @@ export type BlogPost = {
   seoTitle?: string;
   /** The day it went up, as year-month-day. */
   date: string;
-  author: string;
-  /** Where the author's name goes when clicked. Left out for an author with
-   * nowhere to point at. */
-  authorUrl?: string;
+  /** Who wrote it, in the order they are credited. `url` is where the name
+   * goes when clicked, left out for an author with nowhere to point at. */
+  authors: { name: string; url?: string }[];
   /** What kind of post this is, shown as a pill on the list of posts. Left out
    * for an ordinary post. */
   kind?: string;
@@ -56,11 +55,11 @@ export function articleJsonLd(post: BlogPost) {
     datePublished: post.date,
     image: `${SITE_URL}${post.image ?? SHARE_IMAGE}`,
     mainEntityOfPage: `${SITE_URL}/blog/${post.slug}`,
-    author: {
+    author: post.authors.map(({ name, url }) => ({
       "@type": "Person",
-      name: post.author,
-      ...(post.authorUrl ? { url: post.authorUrl } : {}),
-    },
+      name,
+      ...(url ? { url } : {}),
+    })),
     publisher: {
       "@type": "Organization",
       name: "Calibrate",
@@ -114,18 +113,23 @@ export function PostByline({
     <p className={`text-sm text-gray-600 ${className}`}>
       <time dateTime={post.date}>{formatPostDate(post.date)}</time>
       <span className="mx-2">·</span>
-      {post.authorUrl ? (
-        <a
-          href={post.authorUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2 decoration-gray-300 hover:text-gray-900 hover:decoration-gray-600 transition-colors"
-        >
-          {post.author}
-        </a>
-      ) : (
-        post.author
-      )}
+      {post.authors.map(({ name, url }, i) => (
+        <span key={name}>
+          {i > 0 && ", "}
+          {url ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 decoration-gray-300 hover:text-gray-900 hover:decoration-gray-600 transition-colors"
+            >
+              {name}
+            </a>
+          ) : (
+            name
+          )}
+        </span>
+      ))}
     </p>
   );
 }
@@ -174,7 +178,7 @@ function H4({ children }: { children: ReactNode }) {
 }
 
 /**
- * A picture in a post, with the line that explains it. The width and height
+ * A picture in a post, with the line that explains it when it has one. The width and height
  * are the real ones, so the page does not jump as the pictures arrive. The
  * picture itself carries no words of its own because the line underneath it
  * already says what it shows.
@@ -184,14 +188,18 @@ function Figure({
   width,
   height,
   caption,
+  narrow = false,
 }: {
   src: string;
   width: number;
   height: number;
-  caption: ReactNode;
+  caption?: ReactNode;
+  /** Holds the picture to the width the original post showed it at, rather
+   * than stretching it across the whole column. */
+  narrow?: boolean;
 }) {
   return (
-    <figure>
+    <figure className={narrow ? "mx-auto max-w-[728px]" : undefined}>
       <img
         src={src}
         alt=""
@@ -200,9 +208,11 @@ function Figure({
         loading="lazy"
         className="w-full rounded-xl border border-gray-200"
       />
-      <figcaption className="mt-3 text-sm md:text-base text-gray-500 leading-relaxed">
-        {caption}
-      </figcaption>
+      {caption && (
+        <figcaption className="mt-3 text-sm md:text-base text-gray-500 leading-relaxed">
+          {caption}
+        </figcaption>
+      )}
     </figure>
   );
 }
@@ -246,14 +256,386 @@ export function findPost(slug: string): BlogPost | undefined {
 
 export const POSTS: BlogPost[] = [
   {
+    slug: "building-a-reliable-ai-coaching-assistant",
+    title:
+      "Building a reliable AI coaching assistant for last-mile communities in rural Uganda",
+    kind: "Case study",
+    date: "2026-10-13",
+    authors: [
+      { name: "Aman Dalmia", url: "https://www.linkedin.com/in/aman-dalmia/" },
+      {
+        name: "Cosmas Wamozo",
+        url: "https://www.linkedin.com/in/wamozo-cosmas-a5551b138/",
+      },
+      {
+        name: "Oscar Katahweire",
+        url: "https://www.linkedin.com/in/oscar-katahweire-74901152/",
+      },
+    ],
+    summary:
+      "A look at how Raising The Village and The Agency Fund used LLM judges and human experts to improve an AI coaching assistant, with lessons for the social sector at large",
+    image: "/blog/building-a-reliable-ai-coaching-assistant.png",
+    // The picture is a crop of the photo at the top of the post, so it is the
+    // thumbnail a shared link shows and the full photo is shown in the post.
+    showImageOnPage: false,
+    body: (
+      <>
+        <p>
+          <em>
+            This post was first published on{" "}
+            <PostLink href="https://theagencyfund.substack.com/p/building-a-reliable-ai-coaching-assistant">
+              The Agency Fund&rsquo;s Substack
+            </PostLink>
+            .
+          </em>
+        </p>
+        <Figure
+          narrow
+          src="/blog/building-a-reliable-ai-coaching-assistant/figure-1.jpeg"
+          width={2048}
+          height={1365}
+          caption="Image credit: Raising the Village (RTV)"
+        />
+        <Aside>
+          <p className="font-semibold text-gray-900">At a glance:</p>
+          <ul className="mt-3 list-disc space-y-3 pl-6">
+            <li>
+              <strong>Evaluating a new AI tool: </strong>Raising The Village
+              (RTV) built an AI coaching assistant to help field staff deliver
+              consistent, tailored coaching to rural households, but they needed
+              to evaluate message quality before deployment.
+            </li>
+            <li>
+              <strong>Combining automated and human review:</strong> Automated
+              AI evaluations using LLM judges, supplemented by multiple rounds
+              of expert review, helped identify errors and improve coaching
+              messages.
+            </li>
+            <li>
+              <strong>Lessons for the social sector</strong>: LLM judges
+              struggle with evaluating subjective criteria, making expert human
+              feedback essential. Organizations should choose human reviewers
+              carefully, learn from their disagreements, and iteratively test
+              the evaluation workflow on a small scale to manage costs.
+            </li>
+          </ul>
+        </Aside>
+
+        <H2>Using AI to support human coaches</H2>
+        <p>
+          <PostLink href="https://raisingthevillage.org/">
+            Raising The Village (RTV)
+          </PostLink>{" "}
+          delivers a 24-month, village-wide ultra-poverty graduation program
+          that has reached more than 2.4 million people across Sub-Saharan
+          Africa. It supports last-mile rural communities with the tools,
+          skills, and systems to help them increase incomes, build assets, and
+          sustain pathways out of ultra-poverty.
+        </p>
+        <p>
+          Coaching is core to the program. Group trainings introduce households
+          to improved agricultural techniques, livelihood practices, and water,
+          sanitation and hygiene (WASH) measures. Follow-up 1:1 coaching
+          reinforces sustained adoption, supporting long-term economic and
+          health outcomes. During each visit, a field agent (FA) works directly
+          with households to understand barriers to adoption and provide
+          tailored advice &ndash; focusing on questions like:
+        </p>
+        <Figure
+          narrow
+          src="/blog/building-a-reliable-ai-coaching-assistant/figure-2.png"
+          width={2048}
+          height={1294}
+        />
+        <p>
+          As RTV expands across more geographies and grows its team of FAs,
+          maintaining consistent coaching quality becomes harder. To address
+          this challenge, RTV built an AI coaching assistant to support FAs in
+          real time &ndash; using information about each household to generate
+          customized coaching messages based on RTV&rsquo;s program guidelines,
+          helping even new FAs deliver more consistent guidance. For example:
+        </p>
+        <Figure
+          narrow
+          src="/blog/building-a-reliable-ai-coaching-assistant/figure-3.png"
+          width={1747}
+          height={1121}
+        />
+        <p>
+          Before deploying at scale, the tool needed to be evaluated &ndash; a
+          process that yielded valuable lessons for both RTV and the social
+          sector at large.
+        </p>
+
+        <H2>The evaluation challenge</H2>
+        <p>
+          Building an AI coaching assistant for the remote communities where RTV
+          works was challenging. FAs cover large territories quickly (since
+          coaching for practices like composting or planting must be timed to
+          the growing season) and the AI tool must work offline in areas with
+          little or no internet connectivity. So, the team planned to generate
+          130,000 coaching messages in advance, covering a wide range of
+          scenarios, at a cost of nearly $1,000 (depending on the model used).
+          Because the messages were bundled into an app, any corrections after
+          launch require a new version that FAs would need to download and
+          install.
+        </p>
+        <p>
+          To ensure message quality before deployment, RTV and The Agency Fund
+          partnered to develop automated AI evaluations supplemented by human
+          expert review.
+        </p>
+        <p>We decided to assess each message on four dimensions:</p>
+        <ul className="list-disc space-y-3 pl-6">
+          <li>
+            <strong>Accuracy</strong>: Technically correct, practical in the
+            household context, and consistent with program guidelines
+          </li>
+          <li>
+            <strong>Encouragement</strong>: Motivates households to practice
+            rather than simply instructing them
+          </li>
+          <li>
+            <strong>Respectfulness</strong>: Engages households with deep
+            consideration for their social-cultural norms and behaviors,
+            maintaining objective and non-judgmental tone
+          </li>
+          <li>
+            <strong>Clarity</strong>: Gives households clear, easy-to-follow
+            instructions they can immediately act on
+          </li>
+        </ul>
+        <p>
+          When FAs rated sample messages, their reviews were unsurprisingly
+          inconsistent; the AI tool is meant to address that variation. To
+          obtain expert feedback, RTV recruited five experienced, top-performing
+          former FAs for a four-day evaluation workshop in Mbarara, Uganda.
+        </p>
+
+        <H2>Automated evaluations using LLM judges</H2>
+        <p>
+          Before the next human expert workshop, we used{" "}
+          <PostLink href="https://calibrate.artpark.ai/">
+            Calibrate &ndash;
+          </PostLink>{" "}
+          an open-source AI agent evaluation tool for non-profits &ndash; to
+          check message accuracy, the only objective evaluation dimension. An
+          LLM judge checked:{" "}
+          <em>
+            Is the message fully grounded in RTV guidelines, or does any part of
+            it go beyond them?
+          </em>{" "}
+          (The prompt is available{" "}
+          <PostLink href="https://github.com/agency-fund/sbcc-coach-learnings/blob/main/LLM_Judge.txt">
+            here
+          </PostLink>
+          .)
+        </p>
+        <p>
+          We generated a sample of 350 coaching messages. The LLM judged
+          messages grounded in RTV&rsquo;s knowledge base as correct, and it
+          flagged others as incorrect with an explanation:
+        </p>
+        <Figure
+          narrow
+          src="/blog/building-a-reliable-ai-coaching-assistant/figure-4.png"
+          width={2048}
+          height={669}
+        />
+        <p>
+          Only 48% of messages passed the accuracy test. Human review later
+          found that some failed messages were in fact accurate, but nearly 150
+          had genuine mistakes that could have been deployed to real users
+          without this evaluation step.
+        </p>
+        <p>
+          We then classified the errors by type. One common error was applying
+          guidance for one farm animal to others. For example, the knowledge
+          base warns against spreading fresh pig manure in kitchen gardens, but
+          an AI-generated message applied the guideline to <em>guinea-pig</em>{" "}
+          droppings. This reinforced the need to ground every part of each
+          message in RTV&rsquo;s knowledge base, reducing the risk of
+          unsupported or inappropriate guidance.
+        </p>
+        <p>
+          We also compared different OpenAI models. After finding that accuracy
+          increased significantly with newer models, we used GPT 5.6 sol to
+          generate messages for the human expert labeling workshop:
+        </p>
+        <Figure
+          narrow
+          src="/blog/building-a-reliable-ai-coaching-assistant/figure-5.png"
+          width={1326}
+          height={708}
+        />
+
+        <H2>Refining the AI assistant with human experts</H2>
+        <p>
+          Five experienced, high-performing former FAs reviewed, rated, and
+          helped refine the 350 generated messages across all four dimensions in
+          the evaluation rubric.
+        </p>
+        <p>
+          In an earlier workshop, the same group had rated each message on a 1-5
+          scale. They gave messages an average score of 4.75 out of 5, but often
+          disagreed; the 1&ndash;5 scale required fine distinctions on
+          subjective dimensions like clarity and respectfulness, where ratings
+          may reflect individual preferences rather than objective correctness.
+          For the new workshop, we simplified the review task and asked a single
+          binary question:{" "}
+          <em>
+            Do you believe this message is helpful for household coaching?
+          </em>
+        </p>
+        <p>
+          We held a couple of dry runs to train the group on the{" "}
+          <PostLink href="https://calibrate.artpark.ai/">rating tool</PostLink>{" "}
+          and calibrate their ratings to reduce disagreements. On Day 1, the
+          reviewers found the messages generally sound and agreement was 96.3%,
+          but they found the binary choice of &ldquo;Yes&rdquo; and
+          &ldquo;No&rdquo; too restrictive. They wanted a way to indicate when
+          they were unsure. So, we added a &ldquo;Not sure&rdquo; option (see
+          below), and agreement fell to 64% on Day 2, revealing differences the
+          binary option had obscured. This gave the team a chance to identify
+          issues, revise messages, and recalibrate.
+        </p>
+        <Figure
+          narrow
+          src="/blog/building-a-reliable-ai-coaching-assistant/figure-6.png"
+          width={1238}
+          height={174}
+        />
+        <Figure
+          narrow
+          src="/blog/building-a-reliable-ai-coaching-assistant/figure-7.png"
+          width={1238}
+          height={300}
+          caption="Definitions for each label and their score for the labelling exercise"
+        />
+        <p>
+          In the final round, all five reviewers rated the same 50 messages. The
+          average quality score was 2.82 out of 3 and agreement rose to 75%. The
+          LLM judge agreed with reviewers on accuracy 68% of the time, close to
+          their agreement with one another.
+        </p>
+        <p>
+          One consistent finding was that a message can satisfy all four
+          dimensions of the evaluation rubric, yet still fail to address a
+          household&rsquo;s specific barrier. For example, reviewers rejected a
+          soil-management message that simply restated the practice&rsquo;s
+          benefits instead of addressing the household&rsquo;s land-access
+          barrier. They also rejected messages that were technically correct but
+          not practical. For example, an organic-pesticide message recommended
+          neem, which is scarce in RTV&rsquo;s operating districts.
+        </p>
+        <p>
+          Most messages required only one revision. Reviewers&rsquo; suggestions
+          also gave the team useful feedback for the next cycle of message
+          generation.
+        </p>
+
+        <H2>Broader lessons</H2>
+        <p>
+          Our experience evaluating RTV&rsquo;s AI assistant highlights several
+          lessons for teams building and testing AI tools in the social sector:
+        </p>
+        <ul className="list-disc space-y-3 pl-6">
+          <li>
+            <strong>
+              Expert feedback can be slow and costly, but it&rsquo;s
+              irreplaceable
+            </strong>
+            . Experienced reviewers identified nuances that were otherwise hard
+            for the team to catch, providing a clearer picture of where the
+            model worked and where it needed improvement.
+          </li>
+          <li>
+            <strong>
+              Choose evaluators wisely and learn from their disagreements.
+            </strong>{" "}
+            Feedback from the staff who will use the tool was inconsistent
+            initially and unhelpful for assessing message quality. Having each
+            expert reviewer assess a unique set of messages would have produced
+            a larger dataset, but having multiple experts review the same
+            messages revealed where they disagreed. The process of resolving
+            those disagreements brought greater clarity.
+          </li>
+          <li>
+            <strong>LLM judges struggle with subjective criteria.</strong> LLM
+            judges can help scale AI evals when faced with limited human review
+            capacity, and surface critical issues to inform decisions. But they
+            perform poorly on subjective criteria. We used them only to evaluate
+            accuracy, our most objective dimension &ndash; this is a &ldquo;
+            <PostLink href="https://eval.playbook.org.ai/model-behaviour/level-1-module-evaluation/what-is-the-minimum-viable-evaluation-for-level-1">
+              minimum viable evaluation
+            </PostLink>
+            &rdquo; approach that resolves easy to identify issues before human
+            review.
+          </li>
+          <li>
+            <strong>Account for evaluation costs.</strong> To manage costs, we
+            evaluated a small sample of messages instead of the entire set. Once
+            confident in the system, we generated all 130,000 messages using GPT
+            5.6 sol for nearly $900.
+          </li>
+        </ul>
+        <p>
+          The refined messages are now in the app for the upcoming planting
+          season, when RTV will A/B test whether AI-assisted coaching improves
+          household practices and knowledge. If your organization is tackling
+          similar challenges, we&rsquo;d love to hear from you &ndash; contact
+          us at{" "}
+          <a href="mailto:tech@agency.fund" className={POST_LINK_CLASS}>
+            tech@agency.fund
+          </a>
+          .
+        </p>
+        <p>
+          If you are struggling to evaluate your AI tool systematically and want
+          your entire team, including domain experts, to be involved, check out{" "}
+          <PostLink href="https://calibrate.artpark.ai/">Calibrate</PostLink>,
+          the open-source AI evaluation tool mentioned in this post.
+        </p>
+        <hr className="border-gray-200" />
+        <p>
+          <em>
+            Aman Dalmia is Lead AI Engineer at{" "}
+            <PostLink href="https://www.agency.fund/">The Agency Fund</PostLink>
+            .
+          </em>
+        </p>
+        <p>
+          <em>
+            Cosmas Wamozo is a Senior Data Scientist at{" "}
+            <PostLink href="https://raisingthevillage.org/">
+              Raising The Village
+            </PostLink>
+            .
+          </em>
+        </p>
+        <p>
+          <em>
+            Oscar Katahweire is a Learning and Knowledge Management Coordinator
+            at{" "}
+            <PostLink href="https://raisingthevillage.org/">
+              Raising The Village
+            </PostLink>
+            .
+          </em>
+        </p>
+      </>
+    ),
+  },
+  {
     slug: "evaluating-a-form-filling-voice-agent",
     title:
       "Evaluating a form-filling voice agent that enrols mothers over a phone call",
     kind: "Case study",
     seoTitle: "How we evaluated a form-filling voice agent",
     date: "2026-09-02",
-    author: "Aman Dalmia",
-    authorUrl: "https://www.linkedin.com/in/aman-dalmia/",
+    authors: [
+      { name: "Aman Dalmia", url: "https://www.linkedin.com/in/aman-dalmia/" },
+    ],
     summary:
       "Our evaluation design for a voice agent that fills a form over a phone call, built on simulated calls, and what the first results say about the models we can deploy.",
     image: "/blog/evaluating-a-form-filling-voice-agent.png",
@@ -1492,8 +1874,9 @@ export const POSTS: BlogPost[] = [
     title: "Calibrate will be at IndiaFOSS",
     seoTitle: "Calibrate at IndiaFOSS",
     date: "2026-08-18",
-    author: "Aman Dalmia",
-    authorUrl: "https://www.linkedin.com/in/aman-dalmia/",
+    authors: [
+      { name: "Aman Dalmia", url: "https://www.linkedin.com/in/aman-dalmia/" },
+    ],
     summary:
       "Our proposal to present Calibrate at IndiaFOSS, the biggest gathering of the open-source community in India, has been accepted.",
     body: (
@@ -1557,8 +1940,9 @@ export const POSTS: BlogPost[] = [
     title: "Evaluation is all you need",
     seoTitle: "How to evaluate your AI agents",
     date: "2026-08-17",
-    author: "Aman Dalmia",
-    authorUrl: "https://www.linkedin.com/in/aman-dalmia/",
+    authors: [
+      { name: "Aman Dalmia", url: "https://www.linkedin.com/in/aman-dalmia/" },
+    ],
     summary:
       "Evaluation is the missing piece that translates model capability to real impact.",
     image: "/blog/evaluation-is-all-you-need.png",

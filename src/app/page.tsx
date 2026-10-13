@@ -103,6 +103,7 @@ const USE_CASES: {
       "Benchmarking different LLMs on coaching message quality to find the best tradeoff across accuracy and cost",
       "Collecting feedback from expert field agents, identifying and resolving disagreements, and aligning LLM judges to the experts",
     ],
+    storyHref: "/blog/building-a-reliable-ai-coaching-assistant",
   },
 ];
 

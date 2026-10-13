@@ -359,15 +359,20 @@ describe("article facts", () => {
     datePublished: string;
     image: string;
     mainEntityOfPage: string;
-    author: { name: string; url?: string };
+    author: { name: string; url?: string }[];
     publisher: { logo: { url: string } };
   };
 
   it("carries the headline, the date and the author", () => {
     expect(article.headline).toBe(POSTS[0].title);
     expect(article.datePublished).toBe(POSTS[0].date);
-    expect(article.author.name).toBe(POSTS[0].author);
-    expect(article.author.url).toBe(POSTS[0].authorUrl);
+    expect(article.author).toEqual(
+      POSTS[0].authors.map(({ name, url }) => ({
+        "@type": "Person",
+        name,
+        url,
+      })),
+    );
   });
 
   it("writes every address out in full", () => {

@@ -32,10 +32,13 @@ describe("Blog", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: post.title }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: post.author })).toHaveAttribute(
-      "href",
-      post.authorUrl,
-    );
+    // Every author is credited, each name linking to their own page.
+    for (const author of post.authors) {
+      expect(screen.getByRole("link", { name: author.name })).toHaveAttribute(
+        "href",
+        author.url,
+      );
+    }
     expect(screen.getByRole("link", { name: "← All posts" })).toHaveAttribute(
       "href",
       "/blog",
@@ -73,8 +76,10 @@ describe("Blog", () => {
   // test all land in the same document and would find each other's pills.
   it("marks the case study with a pill on the list, not on the post", async () => {
     const list = within(render(<BlogPage />).container);
-    // One pill, on the one post that says what kind it is.
-    expect(list.getAllByText("Case study")).toHaveLength(1);
+    // One pill on each post that says what kind it is.
+    expect(list.getAllByText("Case study")).toHaveLength(
+      POSTS.filter((post) => post.kind === "Case study").length,
+    );
     // The words are no longer in the title, which is what the pill replaced.
     expect(
       list.getByRole("link", {
