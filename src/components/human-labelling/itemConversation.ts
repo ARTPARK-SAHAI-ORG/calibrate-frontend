@@ -1,9 +1,9 @@
 import type { TestConfig } from "@/components/AddTestDialog";
 import {
   readTextField,
-  readTurnExtras,
   writeTextField,
   type TextField,
+  type TurnExtras,
 } from "@/lib/messageVersions";
 import { normaliseHistoryItem } from "./item-panes/shared";
 
@@ -61,11 +61,15 @@ export function historyToPayloadFields(
   return { chat_history: history, agent_response: "" };
 }
 
-/** A reply field with new default text and the label and versions the stored
- * field already carried. */
-export function replaceText(
-  existing: unknown,
-  text: string,
-): string | TextField {
-  return writeTextField(text, readTurnExtras(existing));
+/** The dialog's input and output back as payload fields. */
+export function textFieldsToPayload(fields: {
+  input: string;
+  output: string;
+  inputExtras?: TurnExtras;
+  outputExtras?: TurnExtras;
+}) {
+  return {
+    input: writeTextField(fields.input, fields.inputExtras),
+    output: writeTextField(fields.output, fields.outputExtras),
+  };
 }

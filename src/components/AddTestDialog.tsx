@@ -48,7 +48,11 @@ import {
   type InputFieldType,
 } from "@/components/CustomFieldsEditor";
 import { RobotIcon, ToolIcon } from "@/components/icons";
-import { CheckIcon, CloseIcon } from "@/components/icons";
+import { CloseIcon } from "@/components/icons";
+import {
+  ConfirmCancel,
+  TAKEN_MESSAGE,
+} from "@/components/human-labelling/TextVersionsEditor";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { sampleTest } from "@/lib/testSamples";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
@@ -1637,6 +1641,14 @@ export function AddTestDialog({
   const versionNameTaken = (message: ChatMessage, from: string, to: string) =>
     to !== from &&
     chatMessages.some(
+      (m) =>
+        m.role === message.role &&
+        (Object.hasOwn(m.versions ?? {}, to) || (!!to && m.label === to)),
+    );
+
+  const headingTaken = (message: ChatMessage, to: string) =>
+    !!to &&
+    chatMessages.some(
       (m) => m.role === message.role && Object.hasOwn(m.versions ?? {}, to),
     );
 
@@ -1674,8 +1686,9 @@ export function AddTestDialog({
     const key = headingKey(message.id);
     const draft = drafts[key];
     if (draft === undefined || !isTextRole(message)) return;
-    dropDrafts((k) => k !== key);
     const to = draft.trim();
+    if (headingTaken(message, to)) return;
+    dropDrafts((k) => k !== key);
     if (headingUnchanged(message, to, placeholder)) return;
     const othersDiffer = chatMessages.some(
       (m) =>
@@ -3540,49 +3553,23 @@ export function AddTestDialog({
   // The left and right arrow keys step too, the same as the buttons. No
   // Escape: this window holds edits that have not been saved, and a stray
   // press would throw them away.
-  // The save-or-discard prompt for running a test is the other thing that can
-  // be on top of this window. Its own question is not the discard question, so
-  // `confirmDiscard` does not know about it, and a key press behind it would
-  // raise a second prompt underneath the one on screen.
+  // The save-or-discard prompt for running a test, and the question about
+  // changing every message of a role, can also be on top of this window.
+  // Neither is the discard question, so `confirmDiscard` does not know about
+  // them, and a key press behind one would step away or raise a second
+  // prompt underneath it.
   useDialogNavKeys({
     isOpen,
     hasPrev,
-    onPrev: showRunUnsavedConfirm ? undefined : navPrev,
+    onPrev: showRunUnsavedConfirm || roleChange ? undefined : navPrev,
     hasNext,
-    onNext: showRunUnsavedConfirm ? undefined : navNext,
+    onNext: showRunUnsavedConfirm || roleChange ? undefined : navNext,
   });
 
   const evalTargetPill = (
     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
       Evaluation target
     </span>
-  );
-
-  const confirmCancelButtons = (
-    what: string,
-    onConfirm: () => void,
-    onCancel: () => void,
-    canConfirm = true,
-  ) => (
-    <>
-      <button
-        type="button"
-        aria-label={`Confirm ${what}`}
-        onClick={onConfirm}
-        disabled={!canConfirm}
-        className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <CheckIcon className="w-4 h-4" />
-      </button>
-      <button
-        type="button"
-        aria-label={`Cancel ${what}`}
-        onClick={onCancel}
-        className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-muted-foreground hover:bg-muted transition-colors"
-      >
-        <CloseIcon className="w-4 h-4" />
-      </button>
-    </>
   );
 
   const renderHeadingInput = (
@@ -3595,51 +3582,64 @@ export function AddTestDialog({
     const shown = draft ?? current;
     const dirty =
       draft !== undefined && !headingUnchanged(message, draft, placeholder);
+    const taken = dirty && headingTaken(message, draft.trim());
     const isUser = message.role === "user";
     return (
-      <div
-        className={`flex items-center gap-1 ${
-          isUser ? "w-full flex-row-reverse" : ""
-        }`}
-      >
-        <div className={`grid ${isUser ? "flex-1 min-w-0" : "max-w-64"}`}>
-          <input
-            type="text"
-            size={1}
-            value={shown}
-            placeholder={placeholder}
-            aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
-            onFocus={() => {
-              if (draft === undefined) setDraft(key, current || placeholder);
-            }}
-            onChange={(e) => setDraft(key, e.target.value)}
-            onBlur={() => {
-              if (draft !== undefined && !dirty) dropDrafts((k) => k !== key);
-            }}
-            onKeyDown={(e) => {
-              if (e.nativeEvent.isComposing) return;
-              if (e.key === "Enter") confirmHeading(message, placeholder);
-              if (e.key === "Escape") dropDrafts((k) => k !== key);
-            }}
-            className={`[grid-area:1/1/2/2] w-full min-w-0 h-7 rounded-md text-sm font-medium text-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
-              isUser ? "pl-2 pr-4 text-right" : "pl-4 pr-2"
-            }`}
-          />
-          <span
-            aria-hidden="true"
-            className={`[grid-area:1/1/2/2] invisible h-7 border whitespace-pre text-sm font-medium overflow-hidden ${
-              isUser ? "pl-2 pr-4" : "pl-4 pr-2"
+      <div className={`flex flex-col ${isUser ? "w-full" : ""}`}>
+        <div
+          className={`flex items-center gap-1 ${
+            isUser ? "w-full flex-row-reverse" : ""
+          }`}
+        >
+          <div className={`grid ${isUser ? "flex-1 min-w-0" : "max-w-64"}`}>
+            <input
+              type="text"
+              size={1}
+              value={shown}
+              placeholder={placeholder}
+              aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
+              onFocus={() => {
+                if (draft === undefined) setDraft(key, current || placeholder);
+              }}
+              onChange={(e) => setDraft(key, e.target.value)}
+              onBlur={() => {
+                if (draft !== undefined && !dirty) dropDrafts((k) => k !== key);
+              }}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) return;
+                if (e.key === "Enter") confirmHeading(message, placeholder);
+                if (e.key === "Escape") dropDrafts((k) => k !== key);
+              }}
+              className={`[grid-area:1/1/2/2] w-full min-w-0 h-7 rounded-md text-sm font-medium text-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
+                isUser ? "pl-2 pr-4 text-right" : "pl-4 pr-2"
+              }`}
+            />
+            <span
+              aria-hidden="true"
+              className={`[grid-area:1/1/2/2] invisible h-7 border whitespace-pre text-sm font-medium overflow-hidden ${
+                isUser ? "pl-2 pr-4" : "pl-4 pr-2"
+              }`}
+            >
+              {shown || placeholder}
+            </span>
+          </div>
+          {dirty &&
+            <ConfirmCancel
+              what="heading"
+              onConfirm={() => confirmHeading(message, placeholder)}
+              onCancel={() => dropDrafts((k) => k !== key)}
+              canConfirm={!taken}
+            />}
+        </div>
+        {taken && (
+          <p
+            className={`text-xs text-red-500 px-4 mt-1 ${
+              isUser ? "text-right" : ""
             }`}
           >
-            {shown || placeholder}
-          </span>
-        </div>
-        {dirty &&
-          confirmCancelButtons(
-            "heading",
-            () => confirmHeading(message, placeholder),
-            () => dropDrafts((k) => k !== key),
-          )}
+            {TAKEN_MESSAGE}
+          </p>
+        )}
       </div>
     );
   };
@@ -3675,12 +3675,12 @@ export function AddTestDialog({
                   }`}
                 />
                 {dirty &&
-                  confirmCancelButtons(
-                    "version name",
-                    () => confirmVersionName(message, name),
-                    () => dropDrafts((k) => k !== key),
-                    !taken,
-                  )}
+                  <ConfirmCancel
+                    what="version name"
+                    onConfirm={() => confirmVersionName(message, name)}
+                    onCancel={() => dropDrafts((k) => k !== key)}
+                    canConfirm={!taken}
+                  />}
               </div>
               {taken && (
                 <p
@@ -3688,7 +3688,7 @@ export function AddTestDialog({
                     isUser ? "text-right" : ""
                   }`}
                 >
-                  Another version already has this name
+                  {TAKEN_MESSAGE}
                 </p>
               )}
               <div

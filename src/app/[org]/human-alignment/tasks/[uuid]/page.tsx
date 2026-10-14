@@ -46,7 +46,7 @@ import { sampleItem } from "@/components/human-labelling/sampleItem";
 import {
   historyToPayloadFields,
   payloadToHistory,
-  replaceText,
+  textFieldsToPayload,
 } from "@/components/human-labelling/itemConversation";
 import { textOf } from "@/lib/messageVersions";
 import { BulkUploadSttItemsDialog } from "@/components/human-labelling/BulkUploadSttItemsDialog";
@@ -4329,14 +4329,7 @@ function LabellingTaskPageInner() {
                 payload: {
                   ...(r.name ? { name: r.name } : {}),
                   ...(r.description ? { description: r.description } : {}),
-                  input: replaceText(
-                    (items.find((it) => it.uuid === r.uuid)?.payload as Record<string, unknown> | undefined)?.input,
-                    r.input,
-                  ),
-                  output: replaceText(
-                    (items.find((it) => it.uuid === r.uuid)?.payload as Record<string, unknown> | undefined)?.output,
-                    r.output,
-                  ),
+                  ...textFieldsToPayload(r),
                   ...(r.toolCalls.length > 0
                     ? { actual_tool_calls: r.toolCalls }
                     : {}),
@@ -4396,8 +4389,7 @@ function LabellingTaskPageInner() {
                         ...existing,
                         name: r.name,
                         description: r.description,
-                        input: replaceText(existing.input, r.input),
-                        output: replaceText(existing.output, r.output),
+                        ...textFieldsToPayload(r),
                         // Only a real call goes on the item. An empty list
                         // would make every screen read a plain text answer as
                         // a tool call, so the key is dropped instead.

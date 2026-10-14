@@ -140,3 +140,22 @@ describe("LlmGeneralItemPane", () => {
     expect(screen.getByText("Item payload")).toBeInTheDocument();
   });
 });
+
+describe("LlmGeneralItemPane name pills", () => {
+  it("draws every input name in one colour and every output name in another", () => {
+    render(
+      <LlmGeneralItemPane
+        payload={{
+          input: { content: "hi", label: "Caller", versions: { Hindi: "नमस्ते" } },
+          output: { content: "ok", label: "AI draft", versions: { Nurse: "fine" } },
+        }}
+      />,
+    );
+    for (const name of ["Caller", "Hindi"]) {
+      expect(screen.getByText(name).className).toContain("bg-blue-500/10");
+    }
+    for (const name of ["AI draft", "Nurse"]) {
+      expect(screen.getByText(name).className).toContain("bg-purple-500/10");
+    }
+  });
+});

@@ -1,3 +1,4 @@
+import { textFieldsToPayload } from "@/components/human-labelling/itemConversation";
 import { evaluatorsThatCanBeRun, isSkippedRunResult, runEvaluatorsDecision, toItemDetailItem, toolCallNotEvaluatedMessage, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables } from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
@@ -143,6 +144,21 @@ describe("itemEditForm", () => {
 // Duplicate once built this row inline and left the tool calls off, so a copy
 // of a tool-call item opened with no answer and Save stayed off.
 describe("llmGeneralDialogRow", () => {
+  it("carries the input's and output's headings and versions", () => {
+    const input = { content: "hi", label: "English", versions: { Hindi: "नमस्ते" } };
+    const row = llmGeneralDialogRow({
+      uuid: "i1",
+      payload: { input, output: "hello" },
+    });
+    expect(row).toMatchObject({
+      input: "hi",
+      output: "hello",
+      inputExtras: { label: "English", versions: { Hindi: "नमस्ते" } },
+      outputExtras: {},
+    });
+    expect(textFieldsToPayload(row)).toEqual({ input, output: "hello" });
+  });
+
   const calls = [{ tool: "lookup", arguments: { id: 7 } }];
 
   it("carries the item's tool calls", () => {
@@ -174,6 +190,8 @@ describe("llmGeneralDialogRow", () => {
       description: "d",
       input: "in",
       output: "out",
+      inputExtras: { label: "English" },
+      outputExtras: {},
       toolCalls: [],
       varValues: { ev: { x: "1" } },
       metadata,

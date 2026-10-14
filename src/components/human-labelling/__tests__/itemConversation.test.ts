@@ -1,7 +1,7 @@
 import {
   historyToPayloadFields,
   payloadToHistory,
-  replaceText,
+  textFieldsToPayload,
   type HistoryItem,
 } from "../itemConversation";
 
@@ -203,18 +203,18 @@ describe("historyToPayloadFields", () => {
   });
 });
 
-describe("replaceText", () => {
-  it("keeps the stored label and versions around the new text", () => {
+describe("textFieldsToPayload", () => {
+  it("writes a plain string unless a heading or version is set", () => {
     expect(
-      replaceText(
-        { content: "old", label: "English", versions: { Hindi: "x" } },
-        "new",
-      ),
-    ).toEqual({ content: "new", label: "English", versions: { Hindi: "x" } });
-  });
-
-  it("writes a plain string when the stored field was one or missing", () => {
-    expect(replaceText("old", "new")).toBe("new");
-    expect(replaceText(undefined, "new")).toBe("new");
+      textFieldsToPayload({
+        input: "Summarise",
+        output: "A summary",
+        inputExtras: { label: "English", versions: { Hindi: "सार" } },
+        outputExtras: {},
+      }),
+    ).toEqual({
+      input: { content: "Summarise", label: "English", versions: { Hindi: "सार" } },
+      output: "A summary",
+    });
   });
 });

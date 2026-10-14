@@ -606,7 +606,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     const first = screen.getAllByLabelText("Version name")[0];
     await user.clear(first);
     await user.type(first, "Hinglish");
-    expect(screen.getByText("Another version already has this name")).toBeInTheDocument();
+    expect(screen.getByText("The heading or another version already has this name")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirm version name" })).toBeDisabled();
     await user.keyboard("{Enter}");
     expect(screen.queryByText(/on all agent messages\?/)).not.toBeInTheDocument();
@@ -676,5 +676,43 @@ describe("AddTestDialog labelling item headings and versions", () => {
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByText("Discard changes?")).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("AddTestDialog arrow keys behind the role question", () => {
+  it("does not step to another item while the rename-all question is up", async () => {
+    const user = setupUser();
+    const onNext = jest.fn();
+    renderDialog(jest.fn(), { onNext, hasNext: true });
+    await waitForHistory();
+    const [first] = agentHeadings();
+    await user.clear(first);
+    await user.type(first, "Doctor");
+    await user.click(screen.getByRole("button", { name: "Confirm heading" }));
+    expect(
+      screen.getByText('Use "Doctor" on all agent messages?'),
+    ).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(onNext).not.toHaveBeenCalled();
+  });
+});
+
+describe("AddTestDialog heading and version names stay apart", () => {
+  it("refuses a heading that a version of that role already uses", async () => {
+    const user = setupUser();
+    renderDialog();
+    await waitForHistory();
+    const [first] = agentHeadings();
+    await user.clear(first);
+    await user.type(first, "Hinglish{Enter}");
+    expect(
+      screen.getByText("The heading or another version already has this name"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Confirm heading" }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByText('Use "Hinglish" on all agent messages?'),
+    ).not.toBeInTheDocument();
   });
 });

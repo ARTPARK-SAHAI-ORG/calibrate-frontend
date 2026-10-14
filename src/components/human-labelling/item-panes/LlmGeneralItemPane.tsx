@@ -1,4 +1,5 @@
 import {
+  TEXT_FIELD_COLOR_CLASS,
   ToolCallCard,
   TurnVersionBubbles,
   normalizeToolCall,
@@ -47,7 +48,11 @@ export function LlmGeneralItemPane({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Section title="Input" subtitle={inputField?.label}>
+      <Section
+        title="Input"
+        subtitle={inputField?.label}
+        subtitleColor={TEXT_FIELD_COLOR_CLASS.input}
+      >
         <p className="text-sm whitespace-pre-wrap break-words">
           {input || "—"}
         </p>
@@ -55,10 +60,15 @@ export function LlmGeneralItemPane({
           <TurnVersionBubbles
             versions={inputField?.versions}
             side="assistant"
+            pillColor={TEXT_FIELD_COLOR_CLASS.input}
           />
         )}
       </Section>
-      <Section title="Output" subtitle={outputField?.label}>
+      <Section
+        title="Output"
+        subtitle={outputField?.label}
+        subtitleColor={TEXT_FIELD_COLOR_CLASS.output}
+      >
         {output && (
           <p className="text-sm whitespace-pre-wrap break-words">{output}</p>
         )}
@@ -66,6 +76,7 @@ export function LlmGeneralItemPane({
           <TurnVersionBubbles
             versions={outputField?.versions}
             side="assistant"
+            pillColor={TEXT_FIELD_COLOR_CLASS.output}
           />
         )}
         {toolCalls.length > 0 && (

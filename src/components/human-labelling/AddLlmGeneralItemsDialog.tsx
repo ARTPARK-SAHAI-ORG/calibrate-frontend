@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  TextVersionsEditor,
+  sameExtras,
+  versionsComplete,
+} from "./TextVersionsEditor";
+import type { TurnExtras } from "@/lib/messageVersions";
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
@@ -44,6 +50,9 @@ export type LlmGeneralItemRowSubmission = {
   description: string;
   input: string;
   output: string;
+  /** The heading and other versions of the input and of the output. */
+  inputExtras: TurnExtras;
+  outputExtras: TurnExtras;
   /** The tool calls the agent made. Empty means the answer was text. */
   toolCalls: { tool: string; arguments: Record<string, unknown> }[];
   evaluator_variables: VarValues;
@@ -117,6 +126,8 @@ type AddLlmGeneralItemsDialogProps = {
     description?: string;
     input: string;
     output: string;
+    inputExtras?: TurnExtras;
+    outputExtras?: TurnExtras;
     /** The tool calls the agent made, when its answer was a tool call rather
      * than text. Editable under Output. */
     toolCalls?: unknown[];
@@ -191,6 +202,14 @@ export function AddLlmGeneralItemsDialog({
   );
   const [input, setInput] = useState(seed?.input ?? "");
   const [output, setOutput] = useState(seed?.output ?? "");
+  const [inputExtras, setInputExtras] = useState<TurnExtras>(
+    seed?.inputExtras ?? {},
+  );
+  const [outputExtras, setOutputExtras] = useState<TurnExtras>(
+    seed?.outputExtras ?? {},
+  );
+  const [inputPending, setInputPending] = useState(false);
+  const [outputPending, setOutputPending] = useState(false);
   const [toolCalls, setToolCalls] = useState<DraftToolCall[]>(() =>
     seedToolCalls(seed?.toolCalls),
   );
@@ -216,6 +235,8 @@ export function AddLlmGeneralItemsDialog({
       setMetadataRows(metadataToRows(s?.metadata));
       setInput(s?.input ?? "");
       setOutput(s?.output ?? "");
+      setInputExtras(s?.inputExtras ?? {});
+      setOutputExtras(s?.outputExtras ?? {});
       setToolCalls(seedToolCalls(s?.toolCalls));
       setPickerOpen(false);
       setVarValues(seedVarValues(s?.varValues));
@@ -275,6 +296,10 @@ export function AddLlmGeneralItemsDialog({
       JSON.stringify(rowsToMetadata(metadataToRows(seed?.metadata))) ||
     input.trim() !== (seed?.input ?? "").trim() ||
     output.trim() !== (seed?.output ?? "").trim() ||
+    !sameExtras(inputExtras, seed?.inputExtras ?? {}) ||
+    !sameExtras(outputExtras, seed?.outputExtras ?? {}) ||
+    inputPending ||
+    outputPending ||
     JSON.stringify(toolCalls.map(({ tool, params }) => ({ tool, params }))) !==
       JSON.stringify(
         seedToolCalls(seed?.toolCalls).map(({ tool, params }) => ({
@@ -368,6 +393,8 @@ export function AddLlmGeneralItemsDialog({
     !!input.trim() &&
     (!!output.trim() || toolCalls.length > 0) &&
     varsComplete &&
+    versionsComplete(inputExtras) &&
+    (toolCalls.length > 0 || versionsComplete(outputExtras)) &&
     Object.keys(metadataRowErrors(metadataRows)).length === 0;
 
   const handleSubmit = async () => {
@@ -391,6 +418,8 @@ export function AddLlmGeneralItemsDialog({
           description: description.trim(),
           input: input.trim(),
           output: output.trim(),
+          inputExtras,
+          outputExtras: toolCalls.length > 0 ? {} : outputExtras,
           toolCalls: toolCalls.map((tc) => ({
             tool: tc.tool,
             arguments: Object.fromEntries(
@@ -448,6 +477,7 @@ export function AddLlmGeneralItemsDialog({
               <ViewItemButton onClick={navView} disabled={submitting} />
             )}
             <button
+              aria-label="Close"
               onClick={attemptClose}
               disabled={submitting}
               className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -523,20 +553,32 @@ export function AddLlmGeneralItemsDialog({
           {/* Middle: input + output boxes shown side by side, each filling
               the full dialog height. */}
           <div className="w-full md:flex-1 flex flex-col md:flex-row bg-muted/30 min-h-0">
-            <div className="flex-1 flex flex-col min-h-0 p-4 md:p-6 border-b md:border-b-0 md:border-r border-border">
-              <label className="block text-base font-medium text-foreground mb-2">
-                Input
-              </label>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="The prompt or input given to the LLM"
+            <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-4 md:p-6 border-b md:border-b-0 md:border-r border-border">
+              {/* As tall as the Output row beside it, which holds the tool
+                  buttons, so both headings start on the same line. */}
+              <div className="flex items-center min-h-9 mb-3">
+                <label className="block text-base font-medium text-foreground">
+                  Input
+                </label>
+              </div>
+              <TextVersionsEditor
+                field="input"
+                extras={inputExtras}
+                onChange={setInputExtras}
+                onPendingChange={setInputPending}
                 disabled={submitting}
-                className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-              />
+              >
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="The prompt or input given to the LLM"
+                  disabled={submitting}
+                  className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                />
+              </TextVersionsEditor>
             </div>
             <div className="flex-1 flex flex-col min-h-0 p-4 md:p-6">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <label className="block text-base font-medium text-foreground">
                   Output
                 </label>
@@ -598,13 +640,21 @@ export function AddLlmGeneralItemsDialog({
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto space-y-3 flex flex-col">
                 {toolCalls.length === 0 && (
-                  <textarea
-                    value={output}
-                    onChange={(e) => setOutput(e.target.value)}
-                    placeholder="The output the LLM produced"
+                  <TextVersionsEditor
+                    field="output"
+                    extras={outputExtras}
+                    onChange={setOutputExtras}
+                    onPendingChange={setOutputPending}
                     disabled={submitting}
-                    className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-                  />
+                  >
+                    <textarea
+                      value={output}
+                      onChange={(e) => setOutput(e.target.value)}
+                      placeholder="The output the LLM produced"
+                      disabled={submitting}
+                      className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                    />
+                  </TextVersionsEditor>
                 )}
                 {toolCalls.map((tc) => (
                   // Same card the test dialog draws a tool call with, in the
