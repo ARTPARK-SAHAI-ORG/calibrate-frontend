@@ -300,15 +300,15 @@ type UseOrgMembersReturn = {
   removeMember: (userId: string) => Promise<void>;
 };
 
+const workspaceKey = (accessToken: string, orgUuid: string) =>
+  `${accessToken}:${orgUuid}`;
+
 // Module-level cache + in-flight dedup for a workspace's member list, keyed by
 // `${accessToken}:${orgUuid}`. Without it, every visit to workspace settings
 // refetches the list; mutations below keep the cache in sync.
 const membersCache = createRequestCache<OrganizationMember[]>({
   ttlMs: 30_000,
 });
-const membersKey = (accessToken: string, orgUuid: string) =>
-  `${accessToken}:${orgUuid}`;
-
 /**
  * List + invite + remove members of a single workspace.
  */
@@ -318,7 +318,7 @@ export function useOrgMembers(
 ): UseOrgMembersReturn {
   const cached =
     accessToken && orgUuid
-      ? membersCache.peek(membersKey(accessToken, orgUuid))
+      ? membersCache.peek(workspaceKey(accessToken, orgUuid))
       : undefined;
   const [members, setMembers] = useState<OrganizationMember[]>(cached ?? []);
   const [isLoading, setIsLoading] = useState(!cached);
@@ -334,7 +334,7 @@ export function useOrgMembers(
       setIsLoading(true);
       setError(null);
       const data = await membersCache.fetch(
-        membersKey(accessToken, orgUuid),
+        workspaceKey(accessToken, orgUuid),
         () =>
           apiGet<OrganizationMember[]>(
             `/organizations/${orgUuid}/members`,
@@ -352,7 +352,7 @@ export function useOrgMembers(
 
   useEffect(() => {
     if (accessToken && orgUuid) {
-      const hit = membersCache.peek(membersKey(accessToken, orgUuid));
+      const hit = membersCache.peek(workspaceKey(accessToken, orgUuid));
       if (hit) {
         setMembers(hit);
         setIsLoading(false);
@@ -377,7 +377,7 @@ export function useOrgMembers(
       );
       setMembers((prev) => {
         const next = [...prev, created];
-        membersCache.set(membersKey(accessToken, orgUuid), next);
+        membersCache.set(workspaceKey(accessToken, orgUuid), next);
         return next;
       });
       return created;
@@ -396,7 +396,7 @@ export function useOrgMembers(
       );
       setMembers((prev) => {
         const next = prev.filter((m) => m.user_id !== userId);
-        membersCache.set(membersKey(accessToken, orgUuid), next);
+        membersCache.set(workspaceKey(accessToken, orgUuid), next);
         return next;
       });
     },
@@ -422,9 +422,6 @@ type UseOrgInviteLinkReturn = {
 const inviteLinkCache = createRequestCache<InviteLink | null>({
   ttlMs: 30_000,
 });
-const inviteLinkKey = (accessToken: string, orgUuid: string) =>
-  `${accessToken}:${orgUuid}`;
-
 /**
  * The one invite link a workspace hands out: read it, make it, turn it off.
  *
@@ -440,7 +437,7 @@ export function useOrgInviteLink(
 ): UseOrgInviteLinkReturn {
   const cached =
     accessToken && orgUuid
-      ? inviteLinkCache.peek(inviteLinkKey(accessToken, orgUuid))
+      ? inviteLinkCache.peek(workspaceKey(accessToken, orgUuid))
       : undefined;
   const [inviteLink, setInviteLink] = useState<InviteLink | null>(
     cached ?? null,
@@ -458,7 +455,7 @@ export function useOrgInviteLink(
       setIsLoading(true);
       setError(null);
       const data = await inviteLinkCache.fetch(
-        inviteLinkKey(accessToken, orgUuid),
+        workspaceKey(accessToken, orgUuid),
         async () => {
           try {
             const answer = await apiGet<InviteLink>(
@@ -495,7 +492,7 @@ export function useOrgInviteLink(
 
   useEffect(() => {
     if (accessToken && orgUuid) {
-      const hit = inviteLinkCache.peek(inviteLinkKey(accessToken, orgUuid));
+      const hit = inviteLinkCache.peek(workspaceKey(accessToken, orgUuid));
       if (hit !== undefined) {
         setInviteLink(hit);
         setIsLoading(false);
@@ -514,7 +511,7 @@ export function useOrgInviteLink(
       accessToken,
       {},
     );
-    inviteLinkCache.set(inviteLinkKey(accessToken, orgUuid), created);
+    inviteLinkCache.set(workspaceKey(accessToken, orgUuid), created);
     setInviteLink(created);
     return created;
   }, [accessToken, orgUuid]);
@@ -537,9 +534,6 @@ type UseWorkspaceApiKeysReturn = {
   createApiKey: (name: string) => Promise<OrganizationApiKeyWithSecret>;
   revokeApiKey: (keyUuid: string) => Promise<void>;
 };
-
-const workspaceKey = (accessToken: string, orgUuid: string) =>
-  `${accessToken}:${orgUuid}`;
 
 /** Loads one workspace-scoped list through a 30-second cache. A mount reuses
  *  the stored copy; `refetch` always asks the backend again. */
