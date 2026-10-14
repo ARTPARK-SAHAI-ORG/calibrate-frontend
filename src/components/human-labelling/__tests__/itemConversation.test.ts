@@ -1,6 +1,7 @@
 import {
   historyToPayloadFields,
   payloadToHistory,
+  replaceText,
   type HistoryItem,
 } from "../itemConversation";
 
@@ -199,5 +200,21 @@ describe("historyToPayloadFields", () => {
     expect(historyToPayloadFields(history, "conversation")).toEqual({
       transcript: history,
     });
+  });
+});
+
+describe("replaceText", () => {
+  it("keeps the stored label and versions around the new text", () => {
+    expect(
+      replaceText(
+        { content: "old", label: "English", versions: { Hindi: "x" } },
+        "new",
+      ),
+    ).toEqual({ content: "new", label: "English", versions: { Hindi: "x" } });
+  });
+
+  it("writes a plain string when the stored field was one or missing", () => {
+    expect(replaceText("old", "new")).toBe("new");
+    expect(replaceText(undefined, "new")).toBe("new");
   });
 });
