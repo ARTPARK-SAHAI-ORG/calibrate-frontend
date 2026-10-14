@@ -22,6 +22,16 @@ const WEATHER_TOOL = {
   updated_at: "2024-01-01T00:00:00Z",
 };
 const RENAMED = { ...WEATHER_TOOL, name: "get_city_weather" };
+// The same tool after an input was added and none removed.
+const WITH_DATE = {
+  ...WEATHER_TOOL,
+  config: {
+    parameters: {
+      properties: { city: { type: "string" }, date: { type: "string" } },
+      required: ["date"],
+    },
+  },
+};
 
 // The tool side panel has its own tests. Here it only has to hand back the
 // workspace list after a save, with the tool renamed.
@@ -34,15 +44,26 @@ jest.mock("../AddToolDialog", () => ({
     onToolsUpdated: (tools: unknown[]) => void;
     onClose: () => void;
   }) => (
-    <button
-      type="button"
-      onClick={() => {
-        onToolsUpdated([RENAMED]);
-        onClose();
-      }}
-    >
-      Save renamed tool
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          onToolsUpdated([RENAMED]);
+          onClose();
+        }}
+      >
+        Save renamed tool
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          onToolsUpdated([WITH_DATE]);
+          onClose();
+        }}
+      >
+        Save with a new input
+      </button>
+    </>
   ),
 }));
 
@@ -197,5 +218,44 @@ it("shows no Open button on a card whose tool is not in the workspace", async ()
   );
   expect(
     screen.queryByRole("button", { name: "Open deleted_tool" }),
+  ).not.toBeInTheDocument();
+});
+
+it("gives a tool call card the tool's new inputs, keeping typed values", async () => {
+  const user = setupUser();
+  render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
+
+  await user.click(screen.getByLabelText("Add message"));
+  await user.click(screen.getByText("Agent tool call"));
+  await user.click(await screen.findByText("get_weather"));
+  await user.type(screen.getByPlaceholderText("Enter city"), "Delhi");
+
+  await user.click(screen.getByRole("button", { name: "Open get_weather" }));
+  await user.click(
+    screen.getByRole("button", { name: "Save with a new input" }),
+  );
+
+  expect(screen.getByPlaceholderText("Enter city")).toHaveValue("Delhi");
+  expect(screen.getByPlaceholderText("Enter date")).toHaveValue("");
+});
+
+it("adds a tool's new required input to its Tools to test card", async () => {
+  const user = setupUser();
+  render(<AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />);
+
+  await user.click(screen.getByRole("button", { name: "Add tool" }));
+  await user.click(await screen.findByText("get_weather"));
+  expect(screen.queryByText("date")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Open get_weather" }));
+  await user.click(
+    screen.getByRole("button", { name: "Save with a new input" }),
+  );
+
+  // A required input shows as a row on the card, not as a button offering to
+  // add it back.
+  expect(await screen.findByText("date")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /date/ }),
   ).not.toBeInTheDocument();
 });

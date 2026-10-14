@@ -9,6 +9,7 @@ import { ToolPicker, getToolParams } from "@/components/ToolPicker";
 import type { AvailableTool } from "@/components/ToolPicker";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
 import { OpenToolButton } from "@/components/tools/OpenToolButton";
+import { mergeFlatParams } from "@/lib/toolEditsInForm";
 import { getDefaultHeaders } from "@/lib/api";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { reportError } from "@/lib/reportError";
@@ -324,17 +325,26 @@ export function AddLlmGeneralItemsDialog({
   if (!isOpen) return null;
 
   // A tool opened from the list or from a tool call card was saved. Tool calls
-  // hold the tool by name, so a rename has to reach the ones on this item.
+  // hold the tool by name, so the ones carrying its old name get the new name
+  // and its current inputs, keeping what was typed into inputs that remain.
   const handleToolSaved = (
     tool: AvailableTool,
     previousName: string,
     allTools: AvailableTool[],
   ) => {
     setAvailableTools(allTools);
-    if (tool.name === previousName) return;
+    // This form does not read a webhook tool's inputs (they live in its
+    // request), so its tool calls keep the inputs they have.
+    const fresh = tool.config?.type === "webhook" ? null : getToolParams(tool);
     setToolCalls((prev) =>
       prev.map((tc) =>
-        tc.tool === previousName ? { ...tc, tool: tool.name } : tc,
+        tc.tool === previousName
+          ? {
+              ...tc,
+              tool: tool.name,
+              params: fresh ? mergeFlatParams(tc.params, fresh) : tc.params,
+            }
+          : tc,
       ),
     );
   };

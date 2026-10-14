@@ -33,9 +33,10 @@ import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
 import { OpenToolButton } from "@/components/tools/OpenToolButton";
 import {
-  renameSelectedTool,
-  renameToolInMessages,
-} from "@/lib/renameToolInForm";
+  applyToolEditToMessages,
+  applyToolEditToSelectedTools,
+  mergeExpectedParams,
+} from "@/lib/toolEditsInForm";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
 import { attachToolsToAgent } from "@/lib/agentTools";
 import { toast } from "sonner";
@@ -2402,17 +2403,33 @@ export function AddTestDialog({
     availableTools.find((t) => t.uuid === id || t.name === name);
 
   // A tool opened from a picker or a tool call card was saved: refresh the
-  // list, and carry a new name onto the copies of it this form already holds.
+  // list, and carry its new name and inputs onto the copies of it this form
+  // already holds, keeping what was typed into inputs that still exist.
   const handleToolSaved = (
     tool: AvailableTool,
     previousName: string,
     allTools: AvailableTool[],
   ) => {
     setAvailableTools(allTools);
-    if (tool.name === previousName) return;
-    const renamed = { uuid: tool.uuid, previousName, name: tool.name };
-    setSelectedTools((prev) => renameSelectedTool(prev, renamed));
-    setChatMessages((prev) => renameToolInMessages(prev, renamed));
+    const edit = { uuid: tool.uuid, previousName, name: tool.name };
+    const schema = buildExpectedParamsFromToolConfig(tool.config);
+    setSelectedTools((prev) =>
+      applyToolEditToSelectedTools(prev, edit, (t) => ({
+        ...t,
+        allowCustomParameters: schema.allowCustom,
+        // A tool that accepts any values has no expected inputs to update.
+        expectedParameters: t.acceptAnyParameterValues
+          ? t.expectedParameters
+          : mergeExpectedParams(
+              t.expectedParameters,
+              schema.params,
+              (param) => defaultSelectedParams([param])[0],
+            ),
+      })),
+    );
+    setChatMessages((prev) =>
+      applyToolEditToMessages(prev, edit, computeToolCallParams(tool)),
+    );
   };
 
   const selectInbuiltTool = (toolId: string, toolName: string) => {

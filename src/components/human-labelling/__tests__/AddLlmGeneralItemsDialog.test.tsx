@@ -39,7 +39,14 @@ jest.mock("../../../hooks/useAccessToken", () => ({
 jest.mock("../../ToolPicker", () => ({
   __esModule: true,
   getToolParams: (tool: { name: string }) =>
-    tool.name === "book_flight" ? [{ name: "city", value: "" }] : [],
+    tool.name === "book_flight"
+      ? [{ name: "city", value: "" }]
+      : tool.name === "renamed_tool"
+        ? [
+            { name: "success", value: "" },
+            { name: "reason", value: "" },
+          ]
+        : [],
   ToolPicker: ({
     onSelectCustomTool,
     onSelectInbuiltTool,
@@ -66,6 +73,22 @@ jest.mock("../../ToolPicker", () => ({
         }
       >
         Save dummy as renamed_tool
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onToolSaved?.(
+            {
+              uuid: "t-dummy",
+              name: "renamed_tool",
+              config: { type: "webhook" },
+            } as { uuid: string; name: string },
+            "dummy",
+            [{ uuid: "t-dummy", name: "renamed_tool" }],
+          )
+        }
+      >
+        Save dummy as a webhook named renamed_tool
       </button>
       <div data-tool-side-panel>
         <input aria-label="Tool side panel field" />
@@ -487,8 +510,10 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     ]);
     await user.click(screen.getByRole("button", { name: "Save item" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    // The tool's current inputs: the typed value is kept and the new input
+    // is added empty.
     expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
-      { tool: "renamed_tool", arguments: { success: true } },
+      { tool: "renamed_tool", arguments: { success: true, reason: "" } },
       { tool: "other", arguments: {} },
     ]);
   });
@@ -536,6 +561,33 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     expect(screen.getByText("renamed_tool")).toBeInTheDocument();
     expect(screen.queryByText("dummy")).not.toBeInTheDocument();
     accessTokenMock.mockReturnValue(null);
+  });
+
+  it("keeps a webhook tool call's inputs when the tool is saved", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "Save dummy as a webhook named renamed_tool",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "renamed_tool", arguments: { success: true } },
+    ]);
   });
 
   it("keeps the text box when the answer was text", () => {
