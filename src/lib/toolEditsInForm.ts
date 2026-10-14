@@ -17,7 +17,11 @@ export function mergeFlatParams<T extends FlatParam>(
   fresh: T[],
 ): T[] {
   return fresh.map((f) => {
-    const kept = current.find((c) => c.name === f.name && c.group === f.group);
+    // An input saved without its part of the request (a webhook call written
+    // through the API without the query/body split) still matches by name.
+    const kept =
+      current.find((c) => c.name === f.name && c.group === f.group) ??
+      current.find((c) => c.name === f.name && !c.group);
     return kept ? { ...f, value: kept.value } : f;
   });
 }
@@ -28,6 +32,7 @@ type TreeParam = {
   dataType: string;
   isObject: boolean;
   custom: boolean;
+  allowCustomKeys?: boolean;
   properties?: TreeParam[];
 };
 
@@ -52,6 +57,7 @@ export function mergeExpectedParams<T extends TreeParam>(
         ...c,
         required: s.required,
         dataType: s.dataType,
+        allowCustomKeys: s.allowCustomKeys,
         properties: c.isObject
           ? mergeExpectedParams(
               (c.properties ?? []) as T[],

@@ -102,6 +102,21 @@ it("keeps typed values only for inputs in the same group", () => {
   ]);
 });
 
+it("matches an input saved without its group by name", () => {
+  expect(
+    mergeFlatParams(
+      [{ name: "id", value: "7" }],
+      [
+        { name: "id", value: "", group: "query" },
+        { name: "note", value: "", group: "body" },
+      ],
+    ),
+  ).toEqual([
+    { name: "id", value: "7", group: "query" },
+    { name: "note", value: "", group: "body" },
+  ]);
+});
+
 describe("mergeExpectedParams", () => {
   type P = {
     name: string;
@@ -110,6 +125,7 @@ describe("mergeExpectedParams", () => {
     isObject: boolean;
     custom: boolean;
     value: string;
+    allowCustomKeys?: boolean;
     properties?: P[];
   };
   const p = (name: string, extra: Partial<P> = {}): P => ({
@@ -145,6 +161,7 @@ describe("mergeExpectedParams", () => {
     const current = [
       p("addr", {
         isObject: true,
+        allowCustomKeys: true,
         properties: [p("zip", { value: "1" }), p("old")],
       }),
       p("flag", { value: "z" }),
@@ -152,11 +169,13 @@ describe("mergeExpectedParams", () => {
     const schema = [
       p("addr", {
         isObject: true,
+        allowCustomKeys: false,
         properties: [p("zip"), p("street", { required: true })],
       }),
       p("flag", { isObject: true, required: true }),
     ];
     const result = mergeExpectedParams(current, schema, prepareNew);
+    expect(result[0].allowCustomKeys).toBe(false);
     expect(result[0].properties).toEqual([
       p("zip", { value: "1" }),
       p("street", { required: true, value: "fresh" }),

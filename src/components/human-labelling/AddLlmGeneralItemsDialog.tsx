@@ -83,6 +83,17 @@ function isGroupedArgs(args: Record<string, unknown>): boolean {
   );
 }
 
+/** Inputs read as a webhook's query and body only because of how their saved
+ * arguments looked, put back as the two inputs `query` and `body` they are
+ * on a tool that is not a webhook. */
+function ungroupParams(params: ToolCallParam[]): ToolCallParam[] {
+  if (!params.some((p) => p.group)) return params;
+  return Object.entries(paramsToArgs(params)).map(([name, value]) => ({
+    name,
+    value: argValueToText(value),
+  }));
+}
+
 /** The typed-in inputs, back to the arguments the tool call is saved with. */
 function paramsToArgs(params: ToolCallParam[]): Record<string, unknown> {
   if (!params.some((p) => p.group)) {
@@ -381,7 +392,12 @@ export function AddLlmGeneralItemsDialog({
           ? {
               ...tc,
               tool: tool.name,
-              params: mergeFlatParams(tc.params, fresh),
+              params: mergeFlatParams(
+                tool.config?.type === "webhook"
+                  ? tc.params
+                  : ungroupParams(tc.params),
+                fresh,
+              ),
             }
           : tc,
       ),

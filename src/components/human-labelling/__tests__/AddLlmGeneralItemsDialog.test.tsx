@@ -44,14 +44,16 @@ jest.mock("../../ToolPicker", () => ({
           { name: "id", value: "", group: "query" },
           { name: "extra", value: "", group: "body" },
         ]
-      : tool.name === "book_flight"
-        ? [{ name: "city", value: "" }]
-        : tool.name === "renamed_tool"
-          ? [
-              { name: "success", value: "" },
-              { name: "reason", value: "" },
-            ]
-          : [],
+      : tool.name === "send_email"
+        ? [{ name: "body", value: "" }]
+        : tool.name === "book_flight"
+          ? [{ name: "city", value: "" }]
+          : tool.name === "renamed_tool"
+            ? [
+                { name: "success", value: "" },
+                { name: "reason", value: "" },
+              ]
+            : [],
   ToolPicker: ({
     onSelectCustomTool,
     onSelectInbuiltTool,
@@ -94,6 +96,22 @@ jest.mock("../../ToolPicker", () => ({
         }
       >
         Save dummy as a webhook named renamed_tool
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onToolSaved?.(
+            {
+              uuid: "t-dummy",
+              name: "send_email",
+              config: {},
+            } as { uuid: string; name: string },
+            "dummy",
+            [{ uuid: "t-dummy", name: "send_email" }],
+          )
+        }
+      >
+        Save dummy as send_email
       </button>
       <div data-tool-side-panel>
         <input aria-label="Tool side panel field" />
@@ -637,6 +655,31 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
         tool: "renamed_tool",
         arguments: { query: { id: "7" }, body: { extra: "" } },
       },
+    ]);
+  });
+
+  it("keeps the values of a tool that only looked like a webhook when it is saved", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { body: { to: "a" } } }],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(
+      screen.getByRole("button", { name: "Save dummy as send_email" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "send_email", arguments: { body: '{"to":"a"}' } },
     ]);
   });
 

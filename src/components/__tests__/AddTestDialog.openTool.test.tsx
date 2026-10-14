@@ -259,3 +259,22 @@ it("adds a tool's new required input to its Tools to test card", async () => {
     screen.queryByRole("button", { name: /date/ }),
   ).not.toBeInTheDocument();
 });
+
+it("rewrites a Tools to test card's JSON view after the tool is saved", async () => {
+  const user = setupUser();
+  render(<AddTestDialog {...baseProps({ initialTab: "tool-invocation" })} />);
+
+  await user.click(screen.getByRole("button", { name: "Add tool" }));
+  await user.click(await screen.findByText("get_weather"));
+  await user.click(screen.getByRole("button", { name: "JSON" }));
+  const jsonBox = () =>
+    document.querySelector("textarea") as HTMLTextAreaElement;
+  expect(jsonBox().value).not.toContain("date");
+
+  await user.click(screen.getByRole("button", { name: "Open get_weather" }));
+  await user.click(
+    screen.getByRole("button", { name: "Save with a new input" }),
+  );
+
+  expect(jsonBox().value).toContain("date");
+});

@@ -2366,20 +2366,39 @@ export function AddTestDialog({
     setAvailableTools(allTools);
     const edit = { uuid: tool.uuid, previousName, name: tool.name };
     const schema = buildExpectedParamsFromToolConfig(tool.config);
-    setSelectedTools((prev) =>
-      applyToolEditToSelectedTools(prev, edit, (t) => ({
-        ...t,
-        allowCustomParameters: schema.allowCustom,
-        // A tool that accepts any values has no expected inputs to update.
-        expectedParameters: t.acceptAnyParameterValues
-          ? t.expectedParameters
-          : mergeExpectedParams(
-              t.expectedParameters,
-              schema.params,
-              (param) => defaultSelectedParams([param])[0],
-            ),
-      })),
+    const nextTools = applyToolEditToSelectedTools(selectedTools, edit, (t) => ({
+      ...t,
+      allowCustomParameters: schema.allowCustom,
+      // A tool that accepts any values has no expected inputs to update.
+      expectedParameters: t.acceptAnyParameterValues
+        ? t.expectedParameters
+        : mergeExpectedParams(
+            t.expectedParameters,
+            schema.params,
+            (param) => defaultSelectedParams([param])[0],
+          ),
+    }));
+    setSelectedTools(nextTools);
+    // A card open in its JSON view shows text written when the view opened,
+    // so rewrite it for the cards that changed or it would show old inputs.
+    const changedInJson = nextTools.filter(
+      (t, i) => t !== selectedTools[i] && jsonModeToolIds.has(t.id),
     );
+    if (changedInJson.length > 0) {
+      setToolJsonText((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          changedInJson.map((t) => [
+            t.id,
+            JSON.stringify(
+              buildArgsFromExpectedParams(t.expectedParameters),
+              null,
+              2,
+            ),
+          ]),
+        ),
+      }));
+    }
     setChatMessages((prev) =>
       applyToolEditToMessages(prev, edit, getToolParams(tool)),
     );
