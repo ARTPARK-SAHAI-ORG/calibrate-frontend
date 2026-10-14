@@ -477,7 +477,7 @@ export function AddLlmGeneralItemsDialog({
             output in the middle, evaluators on the right. */}
         <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
           {/* Left column mirrors the AddTestDialog left column. */}
-          <div className="w-full md:w-[30%] flex flex-col border-b md:border-b-0 md:border-r border-border overflow-y-auto p-4 md:p-6 space-y-6">
+          <div className="w-full md:w-[20%] flex flex-col border-b md:border-b-0 md:border-r border-border overflow-y-auto p-4 md:p-6 space-y-6">
             <div>
               <label className="block text-base font-medium text-foreground mb-2">
                 Name
@@ -540,7 +540,7 @@ export function AddLlmGeneralItemsDialog({
               />
             </div>
             <div className="flex-1 flex flex-col min-h-0 p-4 md:p-6">
-              <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <label className="block text-base font-medium text-foreground">
                   Output
                 </label>
@@ -549,7 +549,7 @@ export function AddLlmGeneralItemsDialog({
                     type="button"
                     onClick={() => setCreateToolOpen(true)}
                     disabled={submitting}
-                    className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Create tool
                   </button>
@@ -558,7 +558,7 @@ export function AddLlmGeneralItemsDialog({
                       type="button"
                       onClick={() => setPickerOpen((open) => !open)}
                       disabled={submitting}
-                      className="h-9 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap bg-foreground text-background hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <svg
                         className="w-3.5 h-3.5"

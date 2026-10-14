@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type ComponentProps,
   Fragment,
   Suspense,
   useCallback,
@@ -103,6 +104,8 @@ import {
   runEvaluatorsDecision,
   toItemDetailItem,
   toolCallNotEvaluatedMessage,
+  llmGeneralDialogRow,
+  readEvaluatorVariables,
 } from "@/lib/labellingItem";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
@@ -1288,16 +1291,7 @@ function LabellingTaskPageInner() {
   const [editLlmGeneralSingleItemUuid, setEditLlmGeneralSingleItemUuid] =
     useState<string | null>(null);
   const [duplicateLlmGeneralRows, setDuplicateLlmGeneralRows] = useState<
-    {
-      uuid: string;
-      name: string;
-      description?: string;
-      input: string;
-      output: string;
-      varValues?: Record<string, Record<string, string>>;
-      metadata?: MetadataEntry[] | null;
-    }[]
-    | null
+    ComponentProps<typeof AddLlmGeneralItemsDialog>["initialRows"] | null
   >(null);
 
   // Sort direction for the items table's Updated at column. Always
@@ -2266,27 +2260,6 @@ function LabellingTaskPageInner() {
     string,
     unknown
   > | null;
-
-  // Read saved evaluator variable values from an item payload, indexed by
-  // evaluator uuid → { var: value }.
-  const readEvaluatorVariables = (
-    payload: Record<string, unknown> | null,
-  ): Record<string, Record<string, string>> => {
-    if (!payload) return {};
-    const ev = payload.evaluator_variables;
-    if (!ev || typeof ev !== "object" || Array.isArray(ev)) return {};
-    const out: Record<string, Record<string, string>> = {};
-    for (const [k, v] of Object.entries(ev as Record<string, unknown>)) {
-      if (v && typeof v === "object" && !Array.isArray(v)) {
-        const inner: Record<string, string> = {};
-        for (const [vk, vv] of Object.entries(v as Record<string, unknown>)) {
-          if (typeof vv === "string") inner[vk] = vv;
-        }
-        out[k] = inner;
-      }
-    }
-    return out;
-  };
 
   // Linked evaluators (with their variable defs) passed to the llm-general
   // add/edit dialog so it can render per-item variable inputs.
@@ -3652,16 +3625,8 @@ function LabellingTaskPageInner() {
                               if (taskType === "llm-general") {
                                 setDuplicateLlmGeneralRows([
                                   {
-                                    uuid: item.uuid,
+                                    ...llmGeneralDialogRow(item),
                                     name: `Copy of ${name}`,
-                                    description:
-                                      typeof p?.description === "string"
-                                        ? (p.description as string)
-                                        : "",
-                                    input: textOf(p?.input),
-                                    output: textOf(p?.output),
-                                    varValues: readEvaluatorVariables(p),
-                                    metadata: item.metadata,
                                   },
                                 ]);
                                 setAddLlmGeneralItemsOpen(true);
@@ -4400,22 +4365,7 @@ function LabellingTaskPageInner() {
               ? it.uuid === editLlmGeneralSingleItemUuid
               : selectedItemIds.has(it.uuid),
           )
-          .map((it) => {
-            const p = (it.payload ?? {}) as Record<string, unknown>;
-            return {
-              uuid: it.uuid,
-              name: typeof p.name === "string" ? p.name : "",
-              description:
-                typeof p.description === "string" ? p.description : "",
-              input: textOf(p.input),
-              output: textOf(p.output),
-              toolCalls: Array.isArray(p.actual_tool_calls)
-                ? p.actual_tool_calls
-                : [],
-              varValues: readEvaluatorVariables(p),
-              metadata: it.metadata,
-            };
-          })}
+          .map(llmGeneralDialogRow)}
         onClose={() => {
           editPager.cancel();
           setEditLlmGeneralItemsOpen(false);

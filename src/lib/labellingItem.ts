@@ -7,6 +7,7 @@
 // field silently here is exactly the bug that made the dialog draw every
 // evaluator on a tool-call item instead of just Tool call correctness.
 import type { MetadataEntry } from "@/components/ui";
+import { textOf } from "@/lib/messageVersions";
 
 export type ItemDetailSourceItem = {
   id: number;
@@ -98,4 +99,56 @@ export function itemEditForm(taskType: string | undefined): ItemEditForm {
     return taskType;
   }
   return "chat";
+}
+
+// Reads saved evaluator variable values from an item payload, indexed by
+// evaluator uuid → { var: value }.
+export function readEvaluatorVariables(
+  payload: Record<string, unknown> | null,
+): Record<string, Record<string, string>> {
+  if (!payload) return {};
+  const ev = payload.evaluator_variables;
+  if (!ev || typeof ev !== "object" || Array.isArray(ev)) return {};
+  const out: Record<string, Record<string, string>> = {};
+  for (const [k, v] of Object.entries(ev as Record<string, unknown>)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const inner: Record<string, string> = {};
+      for (const [vk, vv] of Object.entries(v as Record<string, unknown>)) {
+        if (typeof vv === "string") inner[vk] = vv;
+      }
+      out[k] = inner;
+    }
+  }
+  return out;
+}
+
+export type LlmGeneralDialogRow = {
+  uuid: string;
+  name: string;
+  description: string;
+  input: string;
+  output: string;
+  toolCalls: unknown[];
+  varValues: Record<string, Record<string, string>>;
+  metadata?: MetadataEntry[] | null;
+};
+
+// Seeds the llm-general add/edit dialog from a saved item. Edit and duplicate
+// both go through it, so a field one of them carries the other cannot drop.
+export function llmGeneralDialogRow(item: {
+  uuid: string;
+  payload: unknown;
+  metadata?: MetadataEntry[] | null;
+}): LlmGeneralDialogRow {
+  const p = (item.payload ?? {}) as Record<string, unknown>;
+  return {
+    uuid: item.uuid,
+    name: typeof p.name === "string" ? p.name : "",
+    description: typeof p.description === "string" ? p.description : "",
+    input: textOf(p.input),
+    output: textOf(p.output),
+    toolCalls: Array.isArray(p.actual_tool_calls) ? p.actual_tool_calls : [],
+    varValues: readEvaluatorVariables(p),
+    metadata: item.metadata,
+  };
 }

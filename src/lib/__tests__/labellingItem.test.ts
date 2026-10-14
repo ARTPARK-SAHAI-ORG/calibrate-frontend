@@ -1,4 +1,4 @@
-import { evaluatorsThatCanBeRun, isSkippedRunResult, runEvaluatorsDecision, toItemDetailItem, toolCallNotEvaluatedMessage, itemEditForm } from "../labellingItem";
+import { evaluatorsThatCanBeRun, isSkippedRunResult, runEvaluatorsDecision, toItemDetailItem, toolCallNotEvaluatedMessage, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables } from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
 // field by field, and is_tool_call was left off the list. The dialog then
@@ -137,5 +137,64 @@ describe("itemEditForm", () => {
     ["conversation", "chat"],
   ])("opens a %s item in the %s form", (taskType, form) => {
     expect(itemEditForm(taskType)).toBe(form);
+  });
+});
+
+// Duplicate once built this row inline and left the tool calls off, so a copy
+// of a tool-call item opened with no answer and Save stayed off.
+describe("llmGeneralDialogRow", () => {
+  const calls = [{ tool: "lookup", arguments: { id: 7 } }];
+
+  it("carries the item's tool calls", () => {
+    const row = llmGeneralDialogRow({
+      uuid: "i1",
+      payload: { name: "A", input: "hi", output: "", actual_tool_calls: calls },
+    });
+    expect(row.toolCalls).toEqual(calls);
+    expect(row.output).toBe("");
+  });
+
+  it("reads every other field off the payload", () => {
+    const metadata = [{ key: "k", value: "v" }];
+    expect(
+      llmGeneralDialogRow({
+        uuid: "i1",
+        payload: {
+          name: "A",
+          description: "d",
+          input: { content: "in", label: "English" },
+          output: "out",
+          evaluator_variables: { ev: { x: "1", n: 2 } },
+        },
+        metadata,
+      }),
+    ).toEqual({
+      uuid: "i1",
+      name: "A",
+      description: "d",
+      input: "in",
+      output: "out",
+      toolCalls: [],
+      varValues: { ev: { x: "1" } },
+      metadata,
+    });
+  });
+
+  it("falls back to empty values for a missing payload", () => {
+    expect(llmGeneralDialogRow({ uuid: "i1", payload: null })).toMatchObject({
+      name: "",
+      description: "",
+      input: "",
+      output: "",
+      toolCalls: [],
+      varValues: {},
+    });
+  });
+});
+
+describe("readEvaluatorVariables", () => {
+  it("returns nothing for a missing payload or a malformed value", () => {
+    expect(readEvaluatorVariables(null)).toEqual({});
+    expect(readEvaluatorVariables({ evaluator_variables: [] })).toEqual({});
   });
 });
