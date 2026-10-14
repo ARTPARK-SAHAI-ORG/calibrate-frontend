@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
-import { DialogNavRow, type MetadataEntry } from "@/components/ui";
+import { DialogNavHeader, type MetadataEntry } from "@/components/ui";
 import { FieldError } from "@/components/ui/FieldError";
 import { humaniseDetailObject } from "./bulk-upload-shared";
 import {
@@ -187,8 +187,7 @@ export function AddSttItemsDialog({
     navPrev,
     navNext,
     navView,
-  } =
-    useUnsavedCloseGuard({
+  } = useUnsavedCloseGuard({
     isOpen,
     isDirty,
     isEdit,
@@ -321,26 +320,20 @@ export function AddSttItemsDialog({
         className="bg-background border border-border rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Previous / next item: a thin row of its own across the top, the
-            same as the test window. Only when one item is open. */}
-        <DialogNavRow
-          noun="item"
-          onPrev={navPrev}
-          onNext={navNext}
-          hasPrev={hasPrev}
-          hasNext={hasNext}
-          position={position}
-        />
-        <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
+        <div className="relative flex items-center justify-between gap-3 px-5 md:px-6 py-3 border-b border-border">
+          {/* Previous / next item, centred in the header row. */}
+          <DialogNavHeader
+            noun="item"
+            onPrev={navPrev}
+            onNext={navNext}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            position={position}
+          />
           <div className="min-w-0">
             <h2 className="text-base md:text-lg font-semibold text-foreground">
               {isEdit ? "Edit items" : "Add items"}
             </h2>
-            <p className="text-xs md:text-sm text-muted-foreground mt-1">
-              {isEdit
-                ? "Update the name, reference and predicted transcripts, and metadata for each row"
-                : "Annotators will compare the predicted transcript against the reference"}
-            </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {navView && (
@@ -427,7 +420,9 @@ export function AddSttItemsDialog({
                   <input
                     type="text"
                     value={row.name}
-                    onChange={(e) => updateRow(row.id, { name: e.target.value })}
+                    onChange={(e) =>
+                      updateRow(row.id, { name: e.target.value })
+                    }
                     placeholder="e.g. Clip 1"
                     disabled={submitting}
                     className={`${inputBase} h-9 ${nameInvalid ? "border-red-500 ring-1 ring-red-500/30" : "border-border"}`}

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 import { FieldError } from "@/components/ui/FieldError";
-import { DialogNavRow, type MetadataEntry } from "@/components/ui";
+import { DialogNavHeader, type MetadataEntry } from "@/components/ui";
 import { ToolPicker, getToolParams } from "@/components/ToolPicker";
 import type { AvailableTool } from "@/components/ToolPicker";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
@@ -427,25 +427,21 @@ export function AddLlmGeneralItemsDialog({
         className="bg-background border border-border rounded-xl md:rounded-2xl w-full max-w-[90rem] h-[95vh] md:h-[85vh] mx-2 md:mx-4 shadow-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Previous / next item: a thin row of its own across the top, the
-            same as the test window. Only when one item is open. */}
-        <DialogNavRow
-          noun="item"
-          onPrev={navPrev}
-          onNext={navNext}
-          hasPrev={hasPrev}
-          hasNext={hasNext}
-          position={position}
-        />
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
+        <div className="relative flex items-center justify-between gap-3 px-5 md:px-6 py-3 border-b border-border">
+          {/* Previous / next item, centred in the header row. */}
+          <DialogNavHeader
+            noun="item"
+            onPrev={navPrev}
+            onNext={navNext}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            position={position}
+          />
           <div className="min-w-0">
             <h2 className="text-base md:text-lg font-semibold text-foreground">
               {isEdit ? "Edit item" : "Add item"}
             </h2>
-            <p className="text-xs md:text-sm text-muted-foreground mt-1">
-              Annotators will judge the output produced for the given input
-            </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {navView && (
