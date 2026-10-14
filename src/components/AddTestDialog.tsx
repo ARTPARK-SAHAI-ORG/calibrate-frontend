@@ -31,6 +31,7 @@ import {
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
+import { OpenToolButton } from "@/components/tools/OpenToolButton";
 import {
   renameSelectedTool,
   renameToolInMessages,
@@ -2395,8 +2396,13 @@ export function AddTestDialog({
     setToolDropdownOpen(false);
   };
 
-  // A tool opened from either picker was saved: refresh the list, and carry a
-  // new name onto the copies of it this form already holds.
+  // The workspace tool a tool call in this form refers to. A tool picked here
+  // carries its uuid; one loaded from a saved test carries only its name.
+  const findFormTool = (id?: string, name?: string) =>
+    availableTools.find((t) => t.uuid === id || t.name === name);
+
+  // A tool opened from a picker or a tool call card was saved: refresh the
+  // list, and carry a new name onto the copies of it this form already holds.
   const handleToolSaved = (
     tool: AvailableTool,
     previousName: string,
@@ -4582,6 +4588,21 @@ export function AddTestDialog({
                                   <div className="flex-1 h-10 px-4 rounded-lg text-base bg-background text-foreground border border-border flex items-center">
                                     {tool.name}
                                   </div>
+                                  {(() => {
+                                    const saved = tool.isInbuilt
+                                      ? undefined
+                                      : findFormTool(tool.id, tool.name);
+                                    return saved ? (
+                                      <OpenToolButton
+                                        tool={saved}
+                                        accessToken={
+                                          backendAccessToken ?? undefined
+                                        }
+                                        onToolSaved={handleToolSaved}
+                                        className="w-10 h-10"
+                                      />
+                                    ) : null;
+                                  })()}
                                   <button
                                     onClick={() => removeTool(tool.id)}
                                     className="w-10 h-10 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
@@ -5199,6 +5220,25 @@ export function AddTestDialog({
                                         Webhook
                                       </span>
                                     )}
+                                    {(() => {
+                                      const tool = message.isInbuilt
+                                        ? undefined
+                                        : findFormTool(
+                                            message.toolId,
+                                            message.toolName,
+                                          );
+                                      return tool ? (
+                                        <span className="ml-auto">
+                                          <OpenToolButton
+                                            tool={tool}
+                                            accessToken={
+                                              backendAccessToken ?? undefined
+                                            }
+                                            onToolSaved={handleToolSaved}
+                                          />
+                                        </span>
+                                      ) : null;
+                                    })()}
                                   </div>
                                   {message.toolParams &&
                                     message.toolParams.length > 0 && (

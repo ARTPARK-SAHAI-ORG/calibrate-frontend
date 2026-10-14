@@ -94,6 +94,33 @@ type CreateToolFlowStubProps = {
   onCreated: (tool: unknown, allTools: unknown[]) => void;
 };
 let createToolFlowProps = {} as CreateToolFlowStubProps;
+// The tool side panel has its own tests. Here it only hands back the
+// workspace list after a save, with the tool renamed.
+jest.mock("../../AddToolDialog", () => ({
+  __esModule: true,
+  AddToolDialog: ({
+    editingToolUuid,
+    onToolsUpdated,
+    onClose,
+  }: {
+    editingToolUuid: string;
+    onToolsUpdated: (tools: unknown[]) => void;
+    onClose: () => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => {
+        onToolsUpdated([
+          { uuid: editingToolUuid, name: "renamed_tool", config: {} },
+        ]);
+        onClose();
+      }}
+    >
+      Save the opened tool as renamed_tool
+    </button>
+  ),
+}));
+
 jest.mock("../../tools/CreateToolFlow", () => ({
   __esModule: true,
   CreateToolFlow: (props: CreateToolFlowStubProps) => {
@@ -464,6 +491,51 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
       { tool: "renamed_tool", arguments: { success: true } },
       { tool: "other", arguments: {} },
     ]);
+  });
+
+  it("opens a tool call's tool from its card and carries a rename", async () => {
+    const user = setupUser();
+    accessTokenMock.mockReturnValue("tok-123");
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          uuid: "t-dummy",
+          name: "dummy",
+          config: {},
+          created_at: "",
+          updated_at: "",
+        },
+      ],
+    }) as unknown as typeof fetch;
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [
+            { tool: "dummy", arguments: {} },
+            { tool: "other", arguments: {} },
+          ],
+        },
+      ],
+    });
+    await user.click(await screen.findByRole("button", { name: "Open dummy" }));
+    // A tool call whose tool is not in the workspace has nothing to open.
+    expect(
+      screen.queryByRole("button", { name: "Open other" }),
+    ).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Save the opened tool as renamed_tool",
+      }),
+    );
+    expect(screen.getByText("renamed_tool")).toBeInTheDocument();
+    expect(screen.queryByText("dummy")).not.toBeInTheDocument();
+    accessTokenMock.mockReturnValue(null);
   });
 
   it("keeps the text box when the answer was text", () => {

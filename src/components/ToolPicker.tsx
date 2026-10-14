@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createPortal } from "react-dom";
-import { AddToolDialog } from "@/components/AddToolDialog";
-import { Tooltip } from "@/components/Tooltip";
+import { OpenToolButton, OnToolSaved } from "@/components/tools/OpenToolButton";
 import { INBUILT_TOOLS, getInbuiltToolIcon } from "@/constants/inbuilt-tools";
 import { ToolTypePill } from "@/components/tools/ToolTypePill";
 
@@ -32,11 +30,7 @@ type ToolPickerProps = {
    * list after the save; `previousName` lets the caller rename tool calls in
    * its open form that still carry the old name.
    */
-  onToolSaved?: (
-    tool: AvailableTool,
-    previousName: string,
-    allTools: AvailableTool[],
-  ) => void;
+  onToolSaved?: OnToolSaved;
 };
 
 // Helper function to get tool parameters
@@ -72,7 +66,6 @@ export function ToolPicker({
   onToolSaved,
 }: ToolPickerProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [openTool, setOpenTool] = useState<AvailableTool | null>(null);
 
   // Filter tools based on search query and exclude already selected tools
   const filteredTools = availableTools.filter(
@@ -198,28 +191,12 @@ export function ToolPicker({
                       />
                     </div>
                   </button>
-                  <Tooltip content="Open the tool" position="left">
-                    <button
-                      type="button"
-                      onClick={() => setOpenTool(tool)}
-                      aria-label={`Open ${tool.name}`}
-                      className="mr-2 w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-background cursor-pointer"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                        />
-                      </svg>
-                    </button>
-                  </Tooltip>
+                  <OpenToolButton
+                    tool={tool}
+                    accessToken={accessToken}
+                    onToolSaved={onToolSaved}
+                    className="mr-2 w-8 h-8"
+                  />
                 </div>
               );
             })}
@@ -236,37 +213,6 @@ export function ToolPicker({
           </>
         )}
       </div>
-
-      {/* The side panel sits above every dialog and dropdown that holds this
-          picker, and its clicks and key presses stop here so the dialog
-          behind it does not read them as a click on its background. */}
-      {openTool &&
-        createPortal(
-          <div
-            data-tool-side-panel
-            className="relative z-[300]"
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            <AddToolDialog
-              isOpen
-              onClose={() => setOpenTool(null)}
-              toolType={
-                openTool.config?.type === "webhook"
-                  ? "webhook"
-                  : "structured_output"
-              }
-              editingToolUuid={openTool.uuid}
-              backendAccessToken={accessToken}
-              onToolsUpdated={(allTools) => {
-                const saved = allTools.find((t) => t.uuid === openTool.uuid);
-                if (saved) onToolSaved?.(saved, openTool.name, allTools);
-              }}
-            />
-          </div>,
-          document.body,
-        )}
     </>
   );
 }

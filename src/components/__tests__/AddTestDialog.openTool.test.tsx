@@ -103,15 +103,11 @@ it("renames a tool already picked into Tools to test", async () => {
   await user.click(await screen.findByText("get_weather"));
   expect(screen.getByText("get_weather")).toBeInTheDocument();
 
-  // The picked tool is hidden from the picker, so open it from the
-  // conversation's tool picker instead, which lists every tool.
-  await user.click(screen.getByLabelText("Add message"));
-  await user.click(screen.getByText("Agent tool call"));
+  // Opened from the Open button on the picked tool's card.
   await openAndRename(user);
 
-  // Once in the picker that is still open, once in the form.
   await waitFor(() =>
-    expect(screen.getAllByText("get_city_weather")).toHaveLength(2),
+    expect(screen.getByText("get_city_weather")).toBeInTheDocument(),
   );
   expect(screen.queryByText("get_weather")).not.toBeInTheDocument();
 });
@@ -125,13 +121,11 @@ it("renames a tool call already in the conversation", async () => {
   await user.click(await screen.findByText("get_weather"));
   expect(screen.getByText("get_weather")).toBeInTheDocument();
 
-  await user.click(screen.getByLabelText("Add message"));
-  await user.click(screen.getByText("Agent tool call"));
+  // Opened from the Open button on the tool call's card.
   await openAndRename(user);
 
-  // Once in the picker that is still open, once in the form.
   await waitFor(() =>
-    expect(screen.getAllByText("get_city_weather")).toHaveLength(2),
+    expect(screen.getByText("get_city_weather")).toBeInTheDocument(),
   );
   expect(screen.queryByText("get_weather")).not.toBeInTheDocument();
 });
@@ -159,13 +153,49 @@ it("renames a tool loaded from a saved test", async () => {
   await waitFor(() =>
     expect(screen.getByText("get_weather")).toBeInTheDocument(),
   );
+  // Opened from the Open button on the tool call's card.
+  await openAndRename(user);
+
+  await waitFor(() =>
+    expect(screen.getByText("get_city_weather")).toBeInTheDocument(),
+  );
+  expect(screen.queryByText("get_weather")).not.toBeInTheDocument();
+});
+
+it("opens a tool from the tool list as well as from a card", async () => {
+  const user = setupUser();
+  render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);
+
   await user.click(screen.getByLabelText("Add message"));
   await user.click(screen.getByText("Agent tool call"));
   await openAndRename(user);
-
-  // Once in the picker that is still open, once in the form.
   await waitFor(() =>
-    expect(screen.getAllByText("get_city_weather")).toHaveLength(2),
+    expect(screen.getByText("get_city_weather")).toBeInTheDocument(),
   );
-  expect(screen.queryByText("get_weather")).not.toBeInTheDocument();
+});
+
+it("shows no Open button on a card whose tool is not in the workspace", async () => {
+  const initialConfig: TestConfig = {
+    history: [{ role: "user", content: "Hi" }],
+    evaluation: {
+      type: "tool_call",
+      tool_calls: [{ tool: "deleted_tool", arguments: {}, is_called: true }],
+    },
+  };
+  render(
+    <AddTestDialog
+      {...baseProps({
+        isEditing: true,
+        initialTab: "tool-invocation",
+        initialConfig,
+        testName: "Existing",
+      })}
+    />,
+  );
+  await waitFor(() =>
+    expect(screen.getByText("deleted_tool")).toBeInTheDocument(),
+  );
+  expect(
+    screen.queryByRole("button", { name: "Open deleted_tool" }),
+  ).not.toBeInTheDocument();
 });
