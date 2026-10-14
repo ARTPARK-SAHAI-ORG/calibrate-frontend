@@ -4264,7 +4264,7 @@ function LabellingTaskPageInner() {
       />
 
       <AddSttItemsDialog
-        key={editSttSingleItemUuid ?? "several"}
+        key={`stt-${editSttSingleItemUuid ?? "several"}`}
         isOpen={editSttItemsOpen}
         mode="edit"
         {...(editSttSingleItemUuid ? editStepProps : {})}
@@ -4357,7 +4357,7 @@ function LabellingTaskPageInner() {
       />
 
       <AddTtsItemsDialog
-        key={editTtsSingleItemUuid ?? "several"}
+        key={`tts-${editTtsSingleItemUuid ?? "several"}`}
         isOpen={editTtsItemsOpen}
         mode="edit"
         {...(editTtsSingleItemUuid ? editStepProps : {})}
@@ -4452,7 +4452,7 @@ function LabellingTaskPageInner() {
       />
 
       <AddLlmGeneralItemsDialog
-        key={editLlmGeneralSingleItemUuid ?? "several"}
+        key={`llm-general-${editLlmGeneralSingleItemUuid ?? "several"}`}
         isOpen={editLlmGeneralItemsOpen}
         mode="edit"
         {...(editLlmGeneralSingleItemUuid ? editStepProps : {})}

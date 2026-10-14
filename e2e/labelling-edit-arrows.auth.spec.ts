@@ -161,12 +161,25 @@ async function stepsBothWays(
 
 test.describe("Labelling item edit window: previous / next (authenticated, real backend)", () => {
   let taskUuid: string | null = null;
+  // React's own warnings land in the browser console. Any of them on this
+  // page fails the test (two edit windows sharing a key slipped through once).
+  let consoleErrors: string[] = [];
+
+  test.beforeEach(async ({ page }) => {
+    consoleErrors = [];
+    page.on("console", (m) => {
+      if (m.type() === "error" && m.text().includes("same key")) {
+        consoleErrors.push(m.text());
+      }
+    });
+  });
 
   test.afterEach(async ({ request }) => {
     if (taskUuid) {
       await api(request, `/annotation-tasks/${taskUuid}`, { method: "DELETE" });
       taskUuid = null;
     }
+    expect(consoleErrors).toEqual([]);
   });
 
   test("a speech-to-text item steps to the next item, and asks first when edited", async ({
