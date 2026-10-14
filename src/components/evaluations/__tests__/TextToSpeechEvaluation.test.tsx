@@ -1,5 +1,12 @@
 import React from "react";
-import { render, screen, setupUser, waitFor, act } from "@/test-utils";
+import {
+  render,
+  screen,
+  setupUser,
+  waitFor,
+  act,
+  fireEvent,
+} from "@/test-utils";
 import { useRouter } from "next/navigation";
 import { TextToSpeechEvaluation } from "../TextToSpeechEvaluation";
 
@@ -8,10 +15,47 @@ let mockEnabledProviders: Set<string> | null = null;
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
   useMaxRowsPerEval: () => 20,
-  useUsesOwnProviderKeys: () => false,
   useEnabledProviders: () => mockEnabledProviders,
   isProviderEnabled: (enabled: Set<string> | null, value: string) =>
     !enabled || enabled.has(value.toLowerCase()),
+}));
+
+// ─── MissingProviderKeys ────────────────────────────────────────────────────
+let mockUsesOwnKeys = false;
+let mockMissingKeys = new Set<string>();
+const mockSaveMissingKeys = jest.fn();
+const mockSetValue = jest.fn();
+jest.mock("../../workspace/MissingProviderKeys", () => ({
+  useMissingProviderKeys: () => ({
+    usesOwnKeys: mockUsesOwnKeys,
+    isMissingKey: (p: string) => mockMissingKeys.has(p),
+    values: {},
+    errors: {},
+    setValue: mockSetValue,
+    saveMissingKeys: mockSaveMissingKeys,
+    isSaving: false,
+    isSavingKey: () => false,
+  }),
+  NoKeyBadge: () => <span>API key needed</span>,
+  ProviderKeyInput: ({
+    name,
+    onChange,
+    onSave,
+  }: {
+    name: string;
+    onChange: (v: string) => void;
+    onSave: () => void;
+  }) => (
+    <div>
+      <input
+        aria-label={`${name} API key`}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <button type="button" onClick={onSave}>
+        {`Save the ${name} key`}
+      </button>
+    </div>
+  ),
 }));
 
 // ─── reportError ────────────────────────────────────────────────────────────
@@ -153,6 +197,9 @@ const mockEvaluatorsResponse = (
 beforeEach(() => {
   jest.clearAllMocks();
   mockEnabledProviders = null;
+  mockUsesOwnKeys = false;
+  mockMissingKeys = new Set();
+  mockSaveMissingKeys.mockResolvedValue(true);
   mockListDatasets.mockResolvedValue([]);
   editorHandleMock = {
     getNewRows: jest.fn().mockReturnValue([]),
@@ -239,7 +286,9 @@ describe("TextToSpeechEvaluation", () => {
     const { signOut } = require("next-auth/react");
     render(<TextToSpeechEvaluation />);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
   });
 
@@ -274,21 +323,18 @@ describe("TextToSpeechEvaluation", () => {
     expect(links[0]).not.toHaveAttribute("title");
     await user.hover(links[0]);
     await waitFor(() =>
-      expect(screen.getAllByText("Visit OpenAI website").length).toBeGreaterThan(
-        0,
-      ),
+      expect(
+        screen.getAllByText("Visit OpenAI website").length,
+      ).toBeGreaterThan(0),
     );
   });
 
-  it("explains an empty provider list and does not show select all as ticked", async () => {
+  it("does not show select all as ticked when the provider list is empty", async () => {
     mockEnabledProviders = new Set(["openrouter"]);
     const user = setupUser();
     const { container } = render(<TextToSpeechEvaluation />);
     await user.click(screen.getByText("Evaluators"));
 
-    expect(
-      screen.getByText(/This workspace has no text-to-speech provider key/),
-    ).toBeInTheDocument();
     const headerBox = container.querySelector("thead th div")!;
     const mobileBox = screen.getByText("Select all").previousElementSibling!;
     for (const box of [headerBox, mobileBox]) {
@@ -304,19 +350,129 @@ describe("TextToSpeechEvaluation", () => {
     expect(screen.queryByText(/provider key/)).not.toBeInTheDocument();
   });
 
-  it("says no key supports the chosen language when the keys cover other languages", async () => {
-    mockEnabledProviders = new Set(["cartesia"]);
+  it("lists every provider on own keys and marks the ones with no key", async () => {
+    mockEnabledProviders = new Set(["openai"]);
+    mockUsesOwnKeys = true;
+    mockMissingKeys = new Set(["cartesia"]);
     const user = setupUser();
     render(<TextToSpeechEvaluation />);
     await user.click(screen.getByText("Evaluators"));
-    expect(screen.queryByText(/provider key/)).not.toBeInTheDocument();
 
-    await user.selectOptions(screen.getByRole("combobox"), "odia");
+    const cartesiaRow = screen.getAllByText("Cartesia")[0].closest("tr")!;
+    expect(cartesiaRow).toHaveTextContent("API key needed");
+    const openaiRow = screen.getAllByText("OpenAI")[0].closest("tr")!;
+    expect(openaiRow).not.toHaveTextContent("API key needed");
+    expect(screen.queryByLabelText("Cartesia API key")).not.toBeInTheDocument();
+
+    await user.click(cartesiaRow);
+    expect(screen.getAllByLabelText("Cartesia API key").length).toBeGreaterThan(
+      0,
+    );
+  });
+
+  it("saves the key from either copy of the field", async () => {
+    mockUsesOwnKeys = true;
+    mockMissingKeys = new Set(["cartesia"]);
+    mockSaveMissingKeys.mockResolvedValue(true);
+    const user = setupUser();
+    render(<TextToSpeechEvaluation />);
+    await user.click(screen.getByText("Evaluators"));
+    // Opening the provider's website does not select it.
+    for (const link of screen.getAllByRole("link", {
+      name: "Visit Cartesia website",
+    }))
+      fireEvent.click(link);
+    expect(screen.queryAllByLabelText("Cartesia API key")).toHaveLength(0);
+    await user.click(screen.getAllByText("Cartesia")[0].closest("tr")!);
+
+    const fields = screen.getAllByLabelText("Cartesia API key");
+    expect(fields).toHaveLength(2);
+    for (const field of fields) await user.type(field, "k");
+    expect(mockSetValue).toHaveBeenCalledWith("cartesia", "k");
+    expect(mockSetValue).toHaveBeenCalledTimes(2);
+    for (const save of screen.getAllByRole("button", {
+      name: "Save the Cartesia key",
+    }))
+      await user.click(save);
+
+    expect(mockSaveMissingKeys).toHaveBeenCalledTimes(2);
+    expect(mockSaveMissingKeys).toHaveBeenCalledWith(["cartesia"]);
+    expect(screen.getAllByLabelText("Cartesia API key")).toHaveLength(2);
+  });
+
+  it("does not start the run when a missing key fails to save", async () => {
+    mockUsesOwnKeys = true;
+    mockMissingKeys = new Set(["cartesia"]);
+    mockSaveMissingKeys.mockResolvedValue(false);
+    const user = setupUser();
+    const onEvaluatingChange = jest.fn();
+    const evaluateRef = { current: null as (() => void) | null };
+    render(
+      <TextToSpeechEvaluation
+        evaluateRef={evaluateRef}
+        onEvaluatingChange={onEvaluatingChange}
+      />,
+    );
+    await user.click(screen.getByText("Evaluators"));
+    await waitFor(() => screen.getByTestId("evaluator-e1"));
+    await user.click(screen.getAllByText("Cartesia")[0].closest("tr")!);
+    await user.click(screen.getByText("Dataset"));
+    await user.type(screen.getByLabelText("dataset-name-input"), "My dataset");
+    editorHandleMock.getNewRows.mockReturnValue([{ text: "hello" }]);
+
+    await act(async () => {
+      evaluateRef.current?.();
+    });
+
+    expect(mockSaveMissingKeys).toHaveBeenCalledWith(["cartesia"]);
+    expect(onEvaluatingChange).toHaveBeenLastCalledWith(false);
+    const calledUrls = (global.fetch as jest.Mock).mock.calls.map((c) => c[0]);
+    expect(calledUrls.some((u: string) => u.includes("/tts/evaluate"))).toBe(
+      false,
+    );
+    // The Models tab is the one shown again, so the key error is in view.
     expect(
-      screen.getByText(
-        "None of this workspace's text-to-speech provider keys support Odia. Add a key for a provider that does in Workspace settings, under Bring your own keys (BYOK).",
-      ),
-    ).toBeInTheDocument();
+      screen.getByText("Language").closest('[class="space-y-8"]'),
+    ).not.toBeNull();
+  });
+
+  it("starts the run once the missing keys save", async () => {
+    mockUsesOwnKeys = true;
+    mockMissingKeys = new Set(["cartesia"]);
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(
+        mockEvaluatorsResponse([
+          {
+            uuid: "e1",
+            name: "Default Eval",
+            evaluator_type: "tts",
+            is_default: true,
+          },
+        ]),
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ task_id: "task-789", status: "queued" }),
+      });
+    const user = setupUser();
+    const evaluateRef = { current: null as (() => void) | null };
+    render(<TextToSpeechEvaluation evaluateRef={evaluateRef} />);
+    await user.click(screen.getByText("Evaluators"));
+    await waitFor(() => screen.getByTestId("evaluator-e1"));
+    await user.click(screen.getAllByText("Cartesia")[0].closest("tr")!);
+    await user.type(screen.getByLabelText("dataset-name-input"), "My dataset");
+    editorHandleMock.getNewRows.mockReturnValue([{ text: "hello" }]);
+
+    await act(async () => {
+      evaluateRef.current?.();
+    });
+
+    expect(mockSaveMissingKeys).toHaveBeenCalledWith(["cartesia"]);
+    await waitFor(() => {
+      const router = useRouter();
+      expect(router.push).toHaveBeenCalledWith("/tts/task-789");
+    });
   });
 
   it("selects and clears every provider from the table header and the mobile row", async () => {
@@ -668,7 +824,9 @@ describe("TextToSpeechEvaluation", () => {
     });
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
   });
 

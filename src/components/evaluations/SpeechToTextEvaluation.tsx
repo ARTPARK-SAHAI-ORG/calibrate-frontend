@@ -2,7 +2,7 @@
 import { reportError } from "@/lib/reportError";
 import { unwrapList } from "@/lib/api";
 
-import { useState, useRef, useEffect } from "react";
+import { Fragment, useState, useRef, useEffect } from "react";
 import { useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
@@ -25,6 +25,11 @@ import { STTDatasetEditor, STTDatasetEditorHandle } from "./STTDatasetEditor";
 import { RunEvaluatorsPanel } from "./RunEvaluatorsPanel";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 import { Tooltip } from "../Tooltip";
+import {
+  NoKeyBadge,
+  ProviderKeyInput,
+  useMissingProviderKeys,
+} from "@/components/workspace/MissingProviderKeys";
 import { pruneSelectionToAllowed } from "./providerSelection";
 import { SARVAM_ASR_BLOG_URL } from "@/constants/links";
 
@@ -111,17 +116,30 @@ export function SpeechToTextEvaluation({
   // LLM-WER/CER (+ intent/entity) on top of the always-present WER/CER. It's a
   // single on/off for the whole bundle; enabling it adds an LLM call per row.
   const [sarvamJudges, setSarvamJudges] = useState(true);
+  const {
+    usesOwnKeys,
+    isMissingKey,
+    values: keyValues,
+    errors: keyErrors,
+    setValue: setKeyValue,
+    saveMissingKeys,
+    isSaving: isSavingKeys,
+    isSavingKey,
+  } = useMissingProviderKeys();
   const enabledProviders = useEnabledProviders();
+  // A workspace on its own keys sees every provider, and adds a missing key
+  // in place.
+  const providerFilter = usesOwnKeys ? null : enabledProviders;
 
   // Get filtered providers based on selected language + enabled API keys
-  const filteredProviders = getFilteredProviders(language, enabledProviders);
+  const filteredProviders = getFilteredProviders(language, providerFilter);
   const providerLabels = filteredProviders.map((p) => p.label);
   const allProvidersSelected =
     providerLabels.length > 0 &&
     selectedProviders.size === providerLabels.length;
 
   useEffect(() => {
-    const only = getFilteredProviders(language, enabledProviders);
+    const only = getFilteredProviders(language, providerFilter);
     if (only.length === 1) {
       const onlyLabel = only[0].label;
       setSelectedProviders((prev) =>
@@ -132,14 +150,14 @@ export function SpeechToTextEvaluation({
     // Drop any selection that became invalid once the enabled set resolved.
     const allowed = new Set(only.map((p) => p.label));
     setSelectedProviders((prev) => pruneSelectionToAllowed(prev, allowed));
-  }, [language, enabledProviders]);
+  }, [language, providerFilter]);
 
   // Handle language change - clear providers that don't support the new language
   const handleLanguageChange = (newLanguage: LanguageOption) => {
     setLanguage(newLanguage);
     const newFilteredProviders = getFilteredProviders(
       newLanguage,
-      enabledProviders,
+      providerFilter,
     );
     const supportedLabels = new Set(newFilteredProviders.map((p) => p.label));
     setSelectedProviders((prev) => {
@@ -313,6 +331,15 @@ export function SpeechToTextEvaluation({
 
     setProvidersInvalid(false);
     setIsEvaluating(true);
+
+    const selectedValues = sttProviders
+      .filter((p) => selectedProviders.has(p.label))
+      .map((p) => p.value);
+    if (!(await saveMissingKeys(selectedValues))) {
+      setIsEvaluating(false);
+      setActiveTab("models");
+      return;
+    }
 
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -585,15 +612,6 @@ export function SpeechToTextEvaluation({
               ({selectedProviders.size} selected)
             </span>
           </div>
-          {enabledProviders && providerLabels.length === 0 && (
-            <p className="text-[13px] text-muted-foreground">
-              {sttProviders.some((p) =>
-                isProviderEnabled(enabledProviders, p.value),
-              )
-                ? `None of this workspace's speech-to-text provider keys support ${languageDisplayName[language]}. Add a key for a provider that does in Workspace settings, under Bring your own keys (BYOK).`
-                : "This workspace has no speech-to-text provider key. Add one in Workspace settings, under Bring your own keys (BYOK)."}
-            </p>
-          )}
           {/* Desktop: Table layout */}
           <div className="hidden md:block border border-border rounded-lg overflow-hidden">
             <table className="w-full">
@@ -684,84 +702,105 @@ export function SpeechToTextEvaluation({
               <tbody>
                 {filteredProviders.map((provider) => {
                   const isSelected = selectedProviders.has(provider.label);
+                  const missingKey = isMissingKey(provider.value);
                   return (
-                    <tr
-                      key={provider.label}
-                      className="border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                      onClick={() => toggleProvider(provider.label)}
-                    >
-                      <td className="w-12 px-4 py-2">
-                        <div
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                            isSelected
-                              ? "bg-foreground border-foreground"
-                              : "border-border"
-                          }`}
-                        >
-                          {isSelected && (
-                            <svg
-                              className="w-3 h-3 text-background"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={3}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M4.5 12.75l6 6 9-13.5"
-                              />
-                            </svg>
-                          )}
-                        </div>
-                      </td>
-                      <td
-                        className={`px-4 py-2 text-[13px] ${isSelected ? "text-foreground font-medium" : "text-muted-foreground"}`}
+                    <Fragment key={provider.label}>
+                      <tr
+                        className={`${missingKey && isSelected ? "" : "border-b border-border last:border-b-0"} hover:bg-muted/30 cursor-pointer transition-colors`}
+                        onClick={() => toggleProvider(provider.label)}
                       >
-                        {provider.label}
-                      </td>
-                      <td className="px-4 py-2 text-[13px] text-muted-foreground font-mono">
-                        {provider.modelOverrides?.[
-                          languageDisplayName[language]
-                        ] || provider.model}
-                      </td>
-                      <td className="px-4 py-2">
-                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize">
-                          {getSttApiType(provider.value)}
-                        </span>
-                      </td>
-                      <td className="w-12 px-4 py-2">
-                        {provider.website && (
-                          <Tooltip
-                            content={`Visit ${provider.label} website`}
-                            position="top"
+                        <td className="w-12 px-4 py-2">
+                          <div
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                              isSelected
+                                ? "bg-foreground border-foreground"
+                                : "border-border"
+                            }`}
                           >
-                            <a
-                              href={provider.website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              aria-label={`Visit ${provider.label} website`}
-                              className="text-muted-foreground hover:text-foreground transition-colors"
-                            >
+                            {isSelected && (
                               <svg
-                                className="w-4 h-4"
+                                className="w-3 h-3 text-background"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
-                                strokeWidth={2}
+                                strokeWidth={3}
                               >
                                 <path
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
-                                  d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                                  d="M4.5 12.75l6 6 9-13.5"
                                 />
                               </svg>
-                            </a>
-                          </Tooltip>
-                        )}
-                      </td>
-                    </tr>
+                            )}
+                          </div>
+                        </td>
+                        <td
+                          className={`px-4 py-2 text-[13px] ${isSelected ? "text-foreground font-medium" : "text-muted-foreground"}`}
+                        >
+                          {provider.label}
+                          {missingKey && <NoKeyBadge className="ml-2" />}
+                        </td>
+                        <td className="px-4 py-2 text-[13px] text-muted-foreground font-mono">
+                          {provider.modelOverrides?.[
+                            languageDisplayName[language]
+                          ] || provider.model}
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize">
+                            {getSttApiType(provider.value)}
+                          </span>
+                        </td>
+                        <td className="w-12 px-4 py-2">
+                          {provider.website && (
+                            <Tooltip
+                              content={`Visit ${provider.label} website`}
+                              position="top"
+                            >
+                              <a
+                                href={provider.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                aria-label={`Visit ${provider.label} website`}
+                                className="text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                                  />
+                                </svg>
+                              </a>
+                            </Tooltip>
+                          )}
+                        </td>
+                      </tr>
+                      {missingKey && isSelected && (
+                        <tr className="border-b border-border last:border-b-0">
+                          <td colSpan={5} className="px-4 pb-3">
+                            <ProviderKeyInput
+                              provider={provider.value}
+                              name={provider.label}
+                              value={keyValues[provider.value] ?? ""}
+                              error={keyErrors[provider.value]}
+                              onChange={(t) => setKeyValue(provider.value, t)}
+                              onSave={() =>
+                                void saveMissingKeys([provider.value])
+                              }
+                              saving={isSavingKey(provider.value)}
+                              disabled={isSavingKeys || isEvaluating}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -827,6 +866,7 @@ export function SpeechToTextEvaluation({
 
             {filteredProviders.map((provider) => {
               const isSelected = selectedProviders.has(provider.label);
+              const missingKey = isMissingKey(provider.value);
               return (
                 <div
                   key={provider.label}
@@ -868,6 +908,7 @@ export function SpeechToTextEvaluation({
                         >
                           {provider.label}
                         </span>
+                        {missingKey && <NoKeyBadge />}
                         {provider.website && (
                           <Tooltip
                             content={`Visit ${provider.label} website`}
@@ -899,6 +940,25 @@ export function SpeechToTextEvaluation({
                           </Tooltip>
                         )}
                       </div>
+                      {missingKey && isSelected && (
+                        <div
+                          className="mt-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ProviderKeyInput
+                            provider={provider.value}
+                            name={provider.label}
+                            value={keyValues[provider.value] ?? ""}
+                            error={keyErrors[provider.value]}
+                            onChange={(t) => setKeyValue(provider.value, t)}
+                            onSave={() =>
+                              void saveMissingKeys([provider.value])
+                            }
+                            saving={isSavingKey(provider.value)}
+                            disabled={isSavingKeys || isEvaluating}
+                          />
+                        </div>
+                      )}
                       <p className="text-[12px] text-muted-foreground font-mono truncate mt-0.5">
                         {provider.modelOverrides?.[
                           languageDisplayName[language]

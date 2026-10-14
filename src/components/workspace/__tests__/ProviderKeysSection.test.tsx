@@ -50,7 +50,6 @@ const WEBSITES: [string, string][] = [
   ["ElevenLabs", "https://elevenlabs.io"],
   ["Sarvam", "https://sarvam.ai"],
   ["Cartesia", "https://cartesia.ai"],
-  ["Groq", "https://groq.com"],
   ["Gemini", "https://ai.google.dev"],
   ["Google Cloud", "https://cloud.google.com/speech-to-text"],
   ["Smallest AI", "https://smallest.ai"],
