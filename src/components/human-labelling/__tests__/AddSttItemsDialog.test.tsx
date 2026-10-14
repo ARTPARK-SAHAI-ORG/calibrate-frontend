@@ -71,11 +71,6 @@ describe("AddSttItemsDialog", () => {
   it("renders the add-mode header and a single blank row", () => {
     renderDialog();
     expect(screen.getByText("Add items")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Annotators will compare the predicted transcript against the reference",
-      ),
-    ).toBeInTheDocument();
     expect(screen.getByPlaceholderText("e.g. Clip 1")).toBeInTheDocument();
   });
 
@@ -522,11 +517,6 @@ describe("AddSttItemsDialog", () => {
     it("seeds rows from initialRows, hides remove/add controls, and disables Save with no edits made... actually enables since row is complete", () => {
       renderDialog({ mode: "edit", initialRows });
       expect(screen.getByText("Edit items")).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          "Update the name, reference and predicted transcripts, and metadata for each row",
-        ),
-      ).toBeInTheDocument();
       expect(screen.getAllByDisplayValue(/Clip \d/)).toHaveLength(2);
       expect(
         screen.queryByRole("button", { name: "Add another item" }),

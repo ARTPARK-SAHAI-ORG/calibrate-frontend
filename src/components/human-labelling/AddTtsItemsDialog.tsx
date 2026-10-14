@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
-import { DialogNavRow, type MetadataEntry } from "@/components/ui";
+import { DialogNavHeader, type MetadataEntry } from "@/components/ui";
 import { FieldError } from "@/components/ui/FieldError";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
 import { humaniseDetailObject } from "./bulk-upload-shared";
@@ -249,23 +249,22 @@ export function AddTtsItemsDialog({
     navPrev,
     navNext,
     navView,
-  } =
-    useUnsavedCloseGuard({
-      isOpen,
-      isDirty,
-      isEdit,
-      submitting,
-      onClose,
-      onPrev,
-      onNext,
-      hasPrev,
-      hasNext,
-      onView,
-      onBeforeClose: () => {
-        setError(null);
-        setNameErrors({});
-      },
-    });
+  } = useUnsavedCloseGuard({
+    isOpen,
+    isDirty,
+    isEdit,
+    submitting,
+    onClose,
+    onPrev,
+    onNext,
+    hasPrev,
+    hasNext,
+    onView,
+    onBeforeClose: () => {
+      setError(null);
+      setNameErrors({});
+    },
+  });
 
   if (!isOpen) return null;
 
@@ -317,9 +316,7 @@ export function AddTtsItemsDialog({
   };
 
   const isRowValid = (r: TtsRowDraft) =>
-    !!r.name.trim() &&
-    !!r.text.trim() &&
-    (!!r.audioFile || !!r.existingAudio);
+    !!r.name.trim() && !!r.text.trim() && (!!r.audioFile || !!r.existingAudio);
 
   const validRows = rows.filter(isRowValid);
   const allComplete = rows.every(isRowValid);
@@ -455,26 +452,20 @@ export function AddTtsItemsDialog({
         className="bg-background border border-border rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Previous / next item: a thin row of its own across the top, the
-            same as the test window. Only when one item is open. */}
-        <DialogNavRow
-          noun="item"
-          onPrev={navPrev}
-          onNext={navNext}
-          hasPrev={hasPrev}
-          hasNext={hasNext}
-          position={position}
-        />
-        <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
+        <div className="relative flex items-center justify-between gap-3 px-5 md:px-6 py-3 border-b border-border">
+          {/* Previous / next item, centred in the header row. */}
+          <DialogNavHeader
+            noun="item"
+            onPrev={navPrev}
+            onNext={navNext}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+            position={position}
+          />
           <div className="min-w-0">
             <h2 className="text-base md:text-lg font-semibold text-foreground">
               {isEdit ? "Edit items" : "Add items"}
             </h2>
-            <p className="text-xs md:text-sm text-muted-foreground mt-1">
-              {isEdit
-                ? "Update the name, reference text, audio, and metadata for each item"
-                : "Annotators will listen to the audio and judge its quality"}
-            </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {navView && (
@@ -560,7 +551,9 @@ export function AddTtsItemsDialog({
                   <input
                     type="text"
                     value={row.name}
-                    onChange={(e) => updateRow(row.id, { name: e.target.value })}
+                    onChange={(e) =>
+                      updateRow(row.id, { name: e.target.value })
+                    }
                     placeholder="e.g. Clip 1"
                     disabled={submitting}
                     className={`w-full h-9 px-3 rounded-md text-sm border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 ${nameInvalid ? "border-red-500 ring-1 ring-red-500/30" : "border-border"}`}
@@ -578,7 +571,9 @@ export function AddTtsItemsDialog({
                   </label>
                   <textarea
                     value={row.text}
-                    onChange={(e) => updateRow(row.id, { text: e.target.value })}
+                    onChange={(e) =>
+                      updateRow(row.id, { text: e.target.value })
+                    }
                     placeholder="The reference text that was spoken"
                     disabled={submitting}
                     rows={2}
@@ -644,7 +639,9 @@ export function AddTtsItemsDialog({
                     </div>
                   )}
                   {audioErrors[row.id] && (
-                    <p className="text-xs text-red-500">{audioErrors[row.id]}</p>
+                    <p className="text-xs text-red-500">
+                      {audioErrors[row.id]}
+                    </p>
                   )}
                   <FieldError show={audioMissing && !audioErrors[row.id]}>
                     Audio is required
