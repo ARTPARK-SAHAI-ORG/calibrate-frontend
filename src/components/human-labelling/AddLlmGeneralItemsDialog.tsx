@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 import { FieldError } from "@/components/ui/FieldError";
-import type { MetadataEntry } from "@/components/ui";
+import { DialogNavRow, type MetadataEntry } from "@/components/ui";
 import { ToolPicker, getToolParams } from "@/components/ToolPicker";
 import type { AvailableTool } from "@/components/ToolPicker";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
@@ -24,6 +24,7 @@ import { parseItemNameConflictFromError } from "./itemNameConflict";
 import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
+  type ItemStepProps,
 } from "./unsavedCloseGuard";
 
 export type LlmGeneralEvaluatorDef = {
@@ -125,7 +126,7 @@ type AddLlmGeneralItemsDialogProps = {
   // Receives the single edited/added item wrapped in an array so existing
   // POST/PUT call sites that map over `rows` keep working unchanged.
   onSubmit: (rows: LlmGeneralItemRowSubmission[]) => Promise<void> | void;
-};
+} & ItemStepProps;
 
 function extractApiError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
@@ -152,6 +153,11 @@ export function AddLlmGeneralItemsDialog({
   initialRows,
   onClose,
   onSubmit,
+  onPrev,
+  onNext,
+  hasPrev,
+  hasNext,
+  position,
 }: AddLlmGeneralItemsDialogProps) {
   useHideFloatingButton(isOpen);
   const accessToken = useAccessToken();
@@ -288,12 +294,18 @@ export function AddLlmGeneralItemsDialog({
     doClose,
     attemptClose,
     handleBackdropClick,
+    navPrev,
+    navNext,
   } = useUnsavedCloseGuard({
     isOpen,
     isDirty,
     isEdit,
     submitting,
     onClose,
+    onPrev,
+    onNext,
+    hasPrev,
+    hasNext,
     onBeforeClose: () => {
       setError(null);
       setNameError(null);
@@ -411,6 +423,16 @@ export function AddLlmGeneralItemsDialog({
         className="bg-background border border-border rounded-xl md:rounded-2xl w-full max-w-[90rem] h-[95vh] md:h-[85vh] mx-2 md:mx-4 shadow-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Previous / next item: a thin row of its own across the top, the
+            same as the test window. Only when one item is open. */}
+        <DialogNavRow
+          noun="item"
+          onPrev={navPrev}
+          onNext={navNext}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+          position={position}
+        />
         {/* Header */}
         <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
           <div>

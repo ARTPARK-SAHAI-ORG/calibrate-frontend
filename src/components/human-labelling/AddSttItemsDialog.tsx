@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
-import type { MetadataEntry } from "@/components/ui";
+import { DialogNavRow, type MetadataEntry } from "@/components/ui";
 import { FieldError } from "@/components/ui/FieldError";
 import { humaniseDetailObject } from "./bulk-upload-shared";
 import {
@@ -21,6 +21,7 @@ import { scheduleScrollToFirstFieldError } from "./scrollToFieldError";
 import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
+  type ItemStepProps,
 } from "./unsavedCloseGuard";
 
 type SttRowDraft = {
@@ -52,7 +53,7 @@ type AddSttItemsDialogProps = {
   }[];
   onClose: () => void;
   onSubmit: (rows: SttItemRowSubmission[]) => Promise<void> | void;
-};
+} & ItemStepProps;
 
 function extractApiError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
@@ -103,6 +104,11 @@ export function AddSttItemsDialog({
   initialRows,
   onClose,
   onSubmit,
+  onPrev,
+  onNext,
+  hasPrev,
+  hasNext,
+  position,
 }: AddSttItemsDialogProps) {
   useHideFloatingButton(isOpen);
 
@@ -171,13 +177,24 @@ export function AddSttItemsDialog({
 
   // Note: this dialog intentionally has no backdrop-click close, so
   // `handleBackdropClick` is not used here.
-  const { discardConfirmOpen, closeDiscardConfirm, doClose, attemptClose } =
+  const {
+    discardConfirmOpen,
+    closeDiscardConfirm,
+    doClose,
+    attemptClose,
+    navPrev,
+    navNext,
+  } =
     useUnsavedCloseGuard({
     isOpen,
     isDirty,
     isEdit,
     submitting,
     onClose,
+    onPrev,
+    onNext,
+    hasPrev,
+    hasNext,
     onBeforeClose: () => {
       setError(null);
       setNameErrors({});
@@ -300,6 +317,16 @@ export function AddSttItemsDialog({
         className="bg-background border border-border rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Previous / next item: a thin row of its own across the top, the
+            same as the test window. Only when one item is open. */}
+        <DialogNavRow
+          noun="item"
+          onPrev={navPrev}
+          onNext={navNext}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+          position={position}
+        />
         <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
           <div>
             <h2 className="text-base md:text-lg font-semibold text-foreground">
