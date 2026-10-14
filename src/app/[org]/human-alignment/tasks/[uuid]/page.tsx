@@ -1581,8 +1581,13 @@ function LabellingTaskPageInner() {
    * populating). */
   const [summaryFetchCompleted, setSummaryFetchCompleted] = useState(false);
 
+  // Each read of the item list is numbered, and only the newest one is put
+  // on screen. Without this, a page asked for earlier and answered later
+  // replaces the page the reader moved to since.
+  const summaryRequestRef = useRef(0);
   const fetchTaskSummary = useCallback(async () => {
     if (!accessToken || !uuid) return;
+    const request = ++summaryRequestRef.current;
     setTaskSummaryError(null);
     setSummaryLoading(true);
     const params = new URLSearchParams({
@@ -1597,12 +1602,16 @@ function LabellingTaskPageInner() {
         `/annotation-tasks/${uuid}/summary?${params.toString()}`,
         accessToken,
       );
+      if (request !== summaryRequestRef.current) return;
       setTaskSummary(data);
     } catch (err) {
+      if (request !== summaryRequestRef.current) return;
       setTaskSummaryError(parseApiError(err, "Failed to load task summary"));
     } finally {
-      setSummaryLoading(false);
-      setSummaryFetchCompleted(true);
+      if (request === summaryRequestRef.current) {
+        setSummaryLoading(false);
+        setSummaryFetchCompleted(true);
+      }
     }
   }, [accessToken, uuid, itemsLimit, itemsOffset, itemsSort, itemsSearch]);
 
@@ -2427,6 +2436,9 @@ function LabellingTaskPageInner() {
   // and opens the item view window on the same item.
   const viewEditedItem = (uuid: string) => {
     editPager.cancel();
+    // A step to the next page may already be loading. Stay on the page that
+    // holds this item, or the view window loses it when that page lands.
+    setItemsOffset(loadedItemsOffset);
     setEditLlmItemUuid(null);
     setEditSttItemsOpen(false);
     setEditSttSingleItemUuid(null);
@@ -4659,6 +4671,8 @@ function LabellingTaskPageInner() {
           const uuid = itemDetailUuid;
           setItemDetailUuid(null);
           itemPager.cancel();
+          // Same as Preview the other way: stay on the page holding the item.
+          setItemsOffset(loadedItemsOffset);
           openItemEdit(uuid);
         }}
       />

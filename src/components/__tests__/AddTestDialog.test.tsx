@@ -2609,6 +2609,46 @@ describe("AddTestDialog — stepping to another test", () => {
 });
 
 describe("AddTestDialog — Preview", () => {
+  const labelItemProps = (overrides: Record<string, unknown> = {}) =>
+    baseProps({
+      mode: "labelItem",
+      isEditing: true,
+      testName: "Item one",
+      initialConfig: {
+        history: [
+          { role: "user", content: "Can you help me?" },
+          { role: "assistant", content: "Yes, happy to help." },
+        ],
+        evaluation: { type: "response", criteria: "" },
+      },
+      ...overrides,
+    } as Partial<Parameters<typeof AddTestDialog>[0]>);
+
+  it("on a labelling item, Preview gets a top row of its own and is greyed out while saving", async () => {
+    render(
+      <AddTestDialog {...labelItemProps({ onView: jest.fn(), isCreating: true })} />,
+    );
+    const preview = await screen.findByRole("button", { name: "Preview" });
+    expect(preview).toBeDisabled();
+    expect(screen.getByTestId("preview-row")).toBeInTheDocument();
+  });
+
+  it("on a labelling item with arrows, Preview shares their row", async () => {
+    render(
+      <AddTestDialog
+        {...labelItemProps({
+          onView: jest.fn(),
+          onNext: jest.fn(),
+          hasNext: true,
+          position: { index: 0, total: 3 },
+        })}
+      />,
+    );
+    await screen.findByRole("button", { name: "Preview" });
+    expect(screen.getByTestId("dialog-nav-row")).toBeInTheDocument();
+    expect(screen.queryByTestId("preview-row")).not.toBeInTheDocument();
+  });
+
   it("draws no Preview button when no handler is passed", async () => {
     render(<AddTestDialog {...baseProps({ isEditing: true, testName: "Saved" })} />);
     await screen.findByText("Test name");

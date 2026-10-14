@@ -943,7 +943,7 @@ describe("previous / next item in the edit window", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("Preview opens the view window, asking first when there are edits", async () => {
+  it("Preview opens the view window at once when nothing has been edited", async () => {
     const user = setupUser();
     const onView = jest.fn();
     renderDialog({ mode: "edit", initialRows: [{ uuid: "u1", name: "Item 1", input: "hi", output: "hello" }], onView });
