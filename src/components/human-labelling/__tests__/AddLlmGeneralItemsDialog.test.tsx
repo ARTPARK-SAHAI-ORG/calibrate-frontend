@@ -534,6 +534,8 @@ describe("AddLlmGeneralItemsDialog", () => {
         description: "desc",
         input: "in",
         output: "out",
+        inputExtras: {},
+        outputExtras: {},
         toolCalls: [],
         evaluator_variables: { "ev-1": { topic: "sports", tone: "neutral" } },
         metadata: [],
@@ -967,5 +969,77 @@ describe("previous / next item in the edit window", () => {
     renderDialog({ mode: "edit", initialRows: [{ uuid: "u1", name: "Item 1", input: "hi", output: "hello" }] });
     expect(screen.queryByRole("button", { name: "Next item" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Preview" })).not.toBeInTheDocument();
+  });
+});
+
+describe("AddLlmGeneralItemsDialog headings and versions", () => {
+  const versioned = {
+    uuid: "i1",
+    name: "Item one",
+    input: "Summarise this",
+    output: "A summary",
+    inputExtras: { label: "English", versions: { Hindi: "इसका सार दो" } },
+    outputExtras: { versions: { Hindi: "एक सार" } },
+  };
+
+  it("shows the stored headings and versions and sends back what was edited", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn().mockResolvedValue(undefined);
+    renderDialog({ mode: "edit", initialRows: [versioned], onSubmit });
+
+    expect(screen.getByLabelText("Heading for the input")).toHaveValue("English");
+    expect(screen.getByLabelText("Heading for the output")).toHaveValue("");
+    const texts = screen.getAllByLabelText("Version text");
+    expect(texts.map((t) => (t as HTMLTextAreaElement).value)).toEqual([
+      "इसका सार दो",
+      "एक सार",
+    ]);
+
+    await user.type(texts[1], " अच्छा");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    const [row] = onSubmit.mock.calls[0][0];
+    expect(row.inputExtras).toEqual(versioned.inputExtras);
+    expect(row.outputExtras).toEqual({ versions: { Hindi: "एक सार अच्छा" } });
+  });
+
+  it("keeps Save off while a version has no text", async () => {
+    const user = setupUser();
+    renderDialog({ mode: "edit", initialRows: [versioned] });
+    await user.clear(screen.getAllByLabelText("Version text")[0]);
+    expect(screen.getByText("Version cannot be empty")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save item" })).toBeDisabled();
+  });
+
+  it("sends no output versions when the answer is a tool call", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn().mockResolvedValue(undefined);
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          ...versioned,
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+      onSubmit,
+    });
+    expect(screen.queryByLabelText("Heading for the output")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].outputExtras).toEqual({});
+  });
+
+  it("asks before closing when a heading was typed but not confirmed", async () => {
+    const user = setupUser();
+    const { onClose, container } = renderDialog({
+      mode: "edit",
+      initialRows: [versioned],
+    });
+    await user.type(screen.getByLabelText("Heading for the output"), "Hindi");
+    await user.click(container.querySelector(".border-b button") as Element);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("Discard changes?")).toBeInTheDocument();
   });
 });
