@@ -178,6 +178,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     await waitForHistory();
 
     await user.clear(userHeadings()[0]);
+    await user.click(screen.getByRole("button", { name: "Confirm heading" }));
     await user.click(screen.getAllByLabelText("Remove version")[0]);
     await user.click(screen.getByRole("button", { name: "Remove" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
@@ -197,7 +198,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     expect(
       screen.queryByText('Use "Doctor" on all agent messages?'),
     ).not.toBeInTheDocument();
-    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Confirm heading" }));
     expect(
       screen.getByText('Use "Doctor" on all agent messages?'),
     ).toBeInTheDocument();
@@ -222,7 +223,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     const [first, second] = userHeadings();
     await user.clear(second);
     await user.type(second, "Father");
-    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Confirm heading" }));
     expect(
       screen.getByText('Use "Father" on all user messages?'),
     ).toBeInTheDocument();
@@ -245,7 +246,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
 
     await user.clear(agentHeadings()[1]);
     await user.type(agentHeadings()[1], "Nurse");
-    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Confirm heading" }));
     expect(screen.queryByText(/on all (agent|user) messages\?/)).not.toBeInTheDocument();
   });
 
@@ -367,7 +368,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
 
     await user.clear(agentHeadings()[0]);
     await user.type(agentHeadings()[0], "  Nurse draft  ");
-    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Confirm heading" }));
     await user.click(screen.getByRole("button", { name: "Update all" }));
 
     await user.click(screen.getByRole("button", { name: "Save" }));
@@ -560,5 +561,22 @@ describe("AddTestDialog labelling item headings and versions", () => {
 
     await user.type(first, "Y{Escape}");
     expect(versionNames()[0]).toBe("English");
+  });
+
+  it("drops a typed heading on its cross and applies it with Enter", async () => {
+    const user = setupUser();
+    renderDialog();
+    await waitForHistory();
+
+    const first = agentHeadings()[0];
+    await user.type(first, "X");
+    expect(first.value).toBe("NurseX");
+    await user.click(screen.getByRole("button", { name: "Cancel heading" }));
+    expect(first.value).toBe("Nurse");
+
+    await user.clear(first);
+    await user.type(first, "Nurse{Enter}");
+    expect(screen.queryByText(/on all agent messages\?/)).not.toBeInTheDocument();
+    expect(first.value).toBe("Nurse");
   });
 });

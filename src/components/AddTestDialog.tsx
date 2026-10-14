@@ -1637,22 +1637,34 @@ export function AddTestDialog({
     | { kind: "remove"; id: string; role: MessageRole; name: string }
     | null
   >(null);
-  const focusValueRef = useRef("");
+  // A heading is typed into a draft and applied with its tick, never by
+  // clicking away. Focusing an empty one shows its default as the draft.
+  const [headingDraft, setHeadingDraft] = useState<{
+    id: string;
+    to: string;
+  } | null>(null);
 
-  const onHeadingBlur = (message: ChatMessage, placeholder: string) => {
-    if (!isTextRole(message)) return;
-    const to = message.label ?? "";
-    const from = focusValueRef.current;
-    if (to === from) return;
-    if (from === "" && to === placeholder) {
-      setMessageLabel(message.id, "");
-      return;
+  const dropHeadingDraftIfUnchanged = (message: ChatMessage, placeholder: string) => {
+    if (!headingDraft || headingDraft.id !== message.id) return;
+    const current = message.label ?? "";
+    if (headingDraft.to === current || (!current && headingDraft.to === placeholder)) {
+      setHeadingDraft(null);
     }
+  };
+
+  const confirmHeadingDraft = (message: ChatMessage, placeholder: string) => {
+    if (!headingDraft || headingDraft.id !== message.id || !isTextRole(message)) return;
+    const from = message.label ?? "";
+    const to = headingDraft.to.trim();
+    setHeadingDraft(null);
+    if (to === from || (!from && to === placeholder)) return;
     const othersDiffer = chatMessages.some(
       (m) => m.role === message.role && m.id !== message.id && (m.label ?? "") !== to,
     );
     if (othersDiffer) {
       setRoleChange({ kind: "heading", id: message.id, role: message.role, from, to });
+    } else {
+      setMessageLabel(message.id, to);
     }
   };
 
@@ -1685,7 +1697,6 @@ export function AddTestDialog({
 
   const cancelRoleChange = () => {
     if (!roleChange) return;
-    if (roleChange.kind === "heading") setMessageLabel(roleChange.id, roleChange.from);
     setRoleChange(null);
   };
 
@@ -3539,36 +3550,76 @@ export function AddTestDialog({
   const renderHeadingInput = (
     message: ChatMessage,
     placeholder: "Agent" | "User",
-  ) => (
-    <input
-      type="text"
-      value={message.label ?? ""}
-      placeholder={placeholder}
-      aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
-      onFocus={() => {
-        focusValueRef.current = message.label ?? "";
-        if (!message.label) setMessageLabel(message.id, placeholder);
-      }}
-      onChange={(e) => setMessageLabel(message.id, e.target.value)}
-      onBlur={() => onHeadingBlur(message, placeholder)}
-      className={`h-7 px-2 rounded-md text-sm font-medium text-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
-        message.role === "user" ? "self-end" : ""
-      }`}
-    />
-  );
+  ) => {
+    const draft = headingDraft?.id === message.id ? headingDraft : null;
+    const current = message.label ?? "";
+    const dirty =
+      !!draft && draft.to !== current && !(!current && draft.to === placeholder);
+    const isUser = message.role === "user";
+    return (
+      <div
+        className={`flex items-center gap-1 ${
+          isUser ? "w-full flex-row-reverse" : ""
+        }`}
+      >
+        <input
+          type="text"
+          value={draft ? draft.to : current}
+          placeholder={placeholder}
+          aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
+          onFocus={() => {
+            if (!draft)
+              setHeadingDraft({ id: message.id, to: current || placeholder });
+          }}
+          onChange={(e) =>
+            setHeadingDraft({ id: message.id, to: e.target.value })
+          }
+          onBlur={() => dropHeadingDraftIfUnchanged(message, placeholder)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") confirmHeadingDraft(message, placeholder);
+            if (e.key === "Escape") setHeadingDraft(null);
+          }}
+          className={`h-7 px-4 rounded-md text-sm font-medium text-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
+            isUser ? "flex-1 min-w-0 text-right" : ""
+          }`}
+        />
+        {dirty && (
+          <>
+            <button
+              type="button"
+              aria-label="Confirm heading"
+              onClick={() => confirmHeadingDraft(message, placeholder)}
+              className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 transition-colors"
+            >
+              <CheckIcon className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Cancel heading"
+              onClick={() => setHeadingDraft(null)}
+              className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-muted-foreground hover:bg-muted transition-colors"
+            >
+              <CloseIcon className="w-4 h-4" />
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
 
   const renderVersions = (message: ChatMessage) =>
-    isLabelItem && message.versions
-      ? Object.entries(message.versions).map(([name, text], i) => {
+    isLabelItem && message.versions ? (
+      <div className="my-3 flex flex-col gap-3 w-full">
+        {Object.entries(message.versions).map(([name, text], i) => {
           const draft =
             versionDraft?.id === message.id && versionDraft.from === name
               ? versionDraft
               : null;
           return (
-            <div key={i} className="mt-2 mb-3 flex flex-col w-full">
+            <div key={i} className="flex flex-col w-full">
               <div
-                className={`flex items-center gap-1 ${
-                  message.role === "user" ? "self-end" : ""
+                className={`flex items-center gap-1 w-full ${
+                  message.role === "user" ? "flex-row-reverse" : ""
                 }`}
               >
                 <input
@@ -3582,7 +3633,9 @@ export function AddTestDialog({
                     if (e.key === "Enter") confirmVersionDraft(message);
                     if (e.key === "Escape") setVersionDraft(null);
                   }}
-                  className="h-7 px-2 rounded-md text-xs text-muted-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground"
+                  className={`h-7 px-4 rounded-md text-xs text-muted-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
+                    message.role === "user" ? "flex-1 min-w-0 text-right" : ""
+                  }`}
                 />
                 {draft && draft.to !== name && (
                   <>
@@ -3652,8 +3705,9 @@ export function AddTestDialog({
               </div>
             </div>
           );
-        })
-      : null;
+        })}
+      </div>
+    ) : null;
 
   // Shown in its own right-hand column for a labelling item, in the left
   // column otherwise.
