@@ -879,6 +879,32 @@ describe("AnnotationJobView", () => {
     }
     afterEach(() => setSearch(""));
 
+    it("stays on the item after Update and keeps it finished when an optional answer is removed", async () => {
+      const user = setupUser();
+      await renderJob({
+        evaluators: [evaluators[0], { ...evaluators[1], is_optional: true }],
+      });
+
+      await user.click(screen.getByRole("button", { name: "3" }));
+      // Not saved yet, so the item reads as started rather than finished.
+      expect(
+        screen.getAllByRole("button", { name: "Item 1 (in progress)" }).length,
+      ).toBeGreaterThan(0);
+
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: [], count: 1, status: "in_progress" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Update" }));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole("button", { name: "Item 1 (completed)" }).length,
+        ).toBeGreaterThan(0),
+      );
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+    });
+
     it("sends a null value for a removed saved answer and unmarks the item", async () => {
       const user = setupUser();
       await renderJob();
@@ -902,6 +928,28 @@ describe("AnnotationJobView", () => {
           screen.queryByRole("button", { name: "Item 1 (completed)" }),
         ).not.toBeInTheDocument(),
       );
+      // The rating is still answered, so the item reads as started.
+      expect(
+        screen.getAllByRole("button", { name: "Item 1 (in progress)" }).length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("marks an item in progress once one of its answers is picked", async () => {
+      const user = setupUser();
+      fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByRole("button", { name: "Item 1 (in progress)" }),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+
+      expect(
+        screen.getAllByRole("button", { name: "Item 1 (in progress)" }).length,
+      ).toBeGreaterThan(0);
     });
 
     it("saves a removed answer when the annotator presses Next", async () => {

@@ -723,6 +723,20 @@ function AnnotateView({
     requiredEvaluatorsFor(itemId).every(
       (ev) => evaluatorAnswered(itemId, ev) || isSaved(itemId, ev),
     );
+  // How an item reads in the item list: finished, started (some answer on
+  // screen, saved or not), or untouched.
+  const itemListStatus = (itemId: string) =>
+    itemCompleted(itemId)
+      ? "completed"
+      : evaluatorsFor(itemId).some((ev) => evaluatorAnswered(itemId, ev))
+        ? "in progress"
+        : null;
+  const ITEM_LIST_STATUS_CLASS = {
+    completed:
+      "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400",
+    "in progress":
+      "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400",
+  };
 
   // Labels the annotator touched in this sitting. A job that asks for
   // reasoning asks for it on these only: a label that arrived already
@@ -859,6 +873,12 @@ function AnnotateView({
       return true;
     }
 
+    // Saving an item for the first time moves on to the next one; updating
+    // an item that already had answers saved stays on it.
+    const firstSave = !evaluatorsFor(currentItem.uuid).some((ev) =>
+      isSaved(currentItem.uuid, ev),
+    );
+
     setSubmitting(true);
     try {
       const result = await publicFetch<{
@@ -900,7 +920,7 @@ function AnnotateView({
         onJobUpdate({ ...data.job, status: "in_progress", completed_at: null });
       }
 
-      if (advance) {
+      if (advance && firstSave) {
         // Asked of the row's own evaluators, so a tool-call row already
         // answered is not offered again as the next unfinished one.
         const isItemDone = (itemId: string) =>
@@ -1151,23 +1171,23 @@ function AnnotateView({
           <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
             <div className="p-2 grid grid-cols-8 gap-2">
               {items.map((it, i) => {
-                const done = itemCompleted(it.uuid);
+                const status = itemListStatus(it.uuid);
                 const isCurrent = i === currentIndex;
                 const position = originalIndexByUuid.get(it.uuid);
                 return (
                   <Tooltip
                     key={it.uuid}
-                    content={`Item ${position}${done ? " (completed)" : ""}`}
+                    content={`Item ${position}${status ? ` (${status})` : ""}`}
                     position="top"
                   >
                     <button
                       onClick={() => navigateTo(i)}
-                      aria-label={`Item ${position}${done ? " (completed)" : ""}`}
+                      aria-label={`Item ${position}${status ? ` (${status})` : ""}`}
                       className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                         isCurrent
                           ? "border-foreground bg-foreground text-background"
-                          : done
-                            ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
+                          : status
+                            ? ITEM_LIST_STATUS_CLASS[status]
                             : "border-border bg-background text-foreground hover:bg-muted/50"
                       }`}
                     >
@@ -1183,23 +1203,23 @@ function AnnotateView({
             <div className="absolute inset-0 overflow-y-auto">
               <div className="p-3 grid grid-cols-1 gap-2">
                 {items.map((it, i) => {
-                  const done = itemCompleted(it.uuid);
+                  const status = itemListStatus(it.uuid);
                   const isCurrent = i === currentIndex;
                   const position = originalIndexByUuid.get(it.uuid);
                   return (
                     <Tooltip
                       key={it.uuid}
-                      content={`Item ${position}${done ? " (completed)" : ""}`}
+                      content={`Item ${position}${status ? ` (${status})` : ""}`}
                       position="right"
                     >
                       <button
                         onClick={() => navigateTo(i)}
-                        aria-label={`Item ${position}${done ? " (completed)" : ""}`}
+                        aria-label={`Item ${position}${status ? ` (${status})` : ""}`}
                         className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                           isCurrent
                             ? "border-foreground bg-foreground text-background"
-                            : done
-                              ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
+                            : status
+                              ? ITEM_LIST_STATUS_CLASS[status]
                               : "border-border bg-background text-foreground hover:bg-muted/50"
                         }`}
                       >
