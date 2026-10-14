@@ -30,7 +30,11 @@ import {
 } from "@/components/human-labelling/MetadataFieldsEditor";
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
-import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
+import {
+  ToolPicker,
+  AvailableTool,
+  getToolParams,
+} from "@/components/ToolPicker";
 import { OpenToolButton } from "@/components/tools/OpenToolButton";
 import {
   applyToolEditToMessages,
@@ -1493,57 +1497,6 @@ export function AddTestDialog({
     setPendingFocusId(id);
   };
 
-  // The parameter list for a tool_call message, read off a tool's stored
-  // config the same way picking an existing tool does — shared by
-  // onSelectCustomTool below and CreateToolFlow's onCreated, so a freshly
-  // made tool behaves identically to one already in the library.
-  const computeToolCallParams = (
-    tool: AvailableTool,
-  ): Array<{ name: string; value: string; group?: string }> => {
-    const isWebhook = tool.config?.type === "webhook";
-    let allParams: Array<{ name: string; value: string; group?: string }> = [];
-
-    if (isWebhook && tool.config?.webhook) {
-      const webhook = tool.config.webhook;
-      if (webhook.queryParameters && Array.isArray(webhook.queryParameters)) {
-        webhook.queryParameters.forEach((p: any) => {
-          allParams.push({
-            name: p.id || p.name || "",
-            value: "",
-            group: "query",
-          });
-        });
-      }
-      if (webhook.body?.parameters && Array.isArray(webhook.body.parameters)) {
-        webhook.body.parameters.forEach((p: any) => {
-          allParams.push({
-            name: p.id || p.name || "",
-            value: "",
-            group: "body",
-          });
-        });
-      }
-      // Note: Headers are not shown in conversation history UI
-    } else {
-      const params = tool.config?.parameters;
-      if (Array.isArray(params)) {
-        allParams = params.map((p: any) => ({
-          name: p.id || p.name || "",
-          value: "",
-        }));
-      } else {
-        const propsObj =
-          tool.config?.parameters?.properties ||
-          tool.config?.function?.parameters?.properties ||
-          tool.config?.properties ||
-          tool.config?.parameters ||
-          {};
-        allParams = Object.keys(propsObj).map((name) => ({ name, value: "" }));
-      }
-    }
-    return allParams;
-  };
-
   const addToolCallMessage = (
     toolId: string,
     toolName: string,
@@ -2428,7 +2381,7 @@ export function AddTestDialog({
       })),
     );
     setChatMessages((prev) =>
-      applyToolEditToMessages(prev, edit, computeToolCallParams(tool)),
+      applyToolEditToMessages(prev, edit, getToolParams(tool)),
     );
   };
 
@@ -5739,7 +5692,7 @@ export function AddTestDialog({
                                                   addToolCallMessage(
                                                     tool.uuid,
                                                     tool.name,
-                                                    computeToolCallParams(tool),
+                                                    getToolParams(tool),
                                                     tool.config?.type ===
                                                       "webhook",
                                                   );
@@ -6071,7 +6024,7 @@ export function AddTestDialog({
           addToolCallMessage(
             tool.uuid,
             tool.name,
-            computeToolCallParams(tool),
+            getToolParams(tool),
             tool.config?.type === "webhook",
           );
           if (!agentUuid) return;

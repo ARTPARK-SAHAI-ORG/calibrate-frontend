@@ -61,6 +61,7 @@ jest.mock("../evaluators/CreateEvaluatorFlow", () => ({
 
 jest.mock("../ToolPicker", () => ({
   __esModule: true,
+  getToolParams: jest.requireActual("../ToolPicker").getToolParams,
   ToolPicker: ({
     onSelectInbuiltTool,
     onSelectCustomTool,

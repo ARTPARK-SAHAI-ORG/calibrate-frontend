@@ -18,10 +18,7 @@ type ToolPickerProps = {
   availableTools: AvailableTool[];
   isLoading: boolean;
   onSelectInbuiltTool: (toolId: string, toolName: string) => void;
-  onSelectCustomTool: (
-    tool: AvailableTool,
-    params: Array<{ name: string; value: string }>,
-  ) => void;
+  onSelectCustomTool: (tool: AvailableTool, params: ToolCallParam[]) => void;
   selectedToolIds?: string[];
   /** Token the tool side panel uses to load and save a tool opened from a row. */
   accessToken?: string;
@@ -33,10 +30,30 @@ type ToolPickerProps = {
   onToolSaved?: OnToolSaved;
 };
 
-// Helper function to get tool parameters
-export const getToolParams = (
-  tool: AvailableTool,
-): Array<{ name: string; value: string }> => {
+export type ToolCallParam = { name: string; value: string; group?: string };
+
+/**
+ * The inputs a call to this tool takes, each with an empty value. A webhook
+ * keeps its inputs in its request, so each one carries the part it belongs
+ * to as `group` ("query" or "body"); its headers are not inputs.
+ */
+export const getToolParams = (tool: AvailableTool): ToolCallParam[] => {
+  const webhook = tool.config?.type === "webhook" && tool.config?.webhook;
+  if (webhook) {
+    const grouped = (list: unknown, group: string): ToolCallParam[] =>
+      Array.isArray(list)
+        ? list.map((p: { id?: string; name?: string }) => ({
+            name: p.id || p.name || "",
+            value: "",
+            group,
+          }))
+        : [];
+    return [
+      ...grouped(webhook.queryParameters, "query"),
+      ...grouped(webhook.body?.parameters, "body"),
+    ];
+  }
+
   // Check for array format first (new format)
   const params = tool.config?.parameters;
   if (Array.isArray(params)) {

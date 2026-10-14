@@ -38,15 +38,20 @@ jest.mock("../../../hooks/useAccessToken", () => ({
 
 jest.mock("../../ToolPicker", () => ({
   __esModule: true,
-  getToolParams: (tool: { name: string }) =>
-    tool.name === "book_flight"
-      ? [{ name: "city", value: "" }]
-      : tool.name === "renamed_tool"
-        ? [
-            { name: "success", value: "" },
-            { name: "reason", value: "" },
-          ]
-        : [],
+  getToolParams: (tool: { name: string; config?: { type?: string } }) =>
+    tool.config?.type === "webhook"
+      ? [
+          { name: "id", value: "", group: "query" },
+          { name: "extra", value: "", group: "body" },
+        ]
+      : tool.name === "book_flight"
+        ? [{ name: "city", value: "" }]
+        : tool.name === "renamed_tool"
+          ? [
+              { name: "success", value: "" },
+              { name: "reason", value: "" },
+            ]
+          : [],
   ToolPicker: ({
     onSelectCustomTool,
     onSelectInbuiltTool,
@@ -563,7 +568,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     accessTokenMock.mockReturnValue(null);
   });
 
-  it("keeps a webhook tool call's inputs when the tool is saved", async () => {
+  it("shows a webhook tool call's inputs under Query and Body and saves them back in place", async () => {
     const user = setupUser();
     const { onSubmit } = renderDialog({
       mode: "edit",
@@ -573,7 +578,47 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
           name: "Item one",
           input: "Hi",
           output: "",
-          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+          toolCalls: [
+            {
+              tool: "dummy",
+              arguments: { query: { id: "7" }, body: { note: "hi" } },
+            },
+          ],
+        },
+      ],
+    });
+    expect(screen.getByText("Query")).toBeInTheDocument();
+    expect(screen.getByText("Body")).toBeInTheDocument();
+    expect(screen.getByLabelText("id")).toHaveValue("7");
+    await user.clear(screen.getByLabelText("note"));
+    await user.type(screen.getByLabelText("note"), "bye");
+
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      {
+        tool: "dummy",
+        arguments: { query: { id: "7" }, body: { note: "bye" } },
+      },
+    ]);
+  });
+
+  it("gives a webhook tool call the tool's new inputs when the tool is saved", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [
+            {
+              tool: "dummy",
+              arguments: { query: { id: "7" }, body: { note: "hi" } },
+            },
+          ],
         },
       ],
     });
@@ -585,8 +630,13 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     );
     await user.click(screen.getByRole("button", { name: "Save item" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    // The typed id is kept, the input the tool dropped is gone, and the one
+    // it gained is added empty.
     expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
-      { tool: "renamed_tool", arguments: { success: true } },
+      {
+        tool: "renamed_tool",
+        arguments: { query: { id: "7" }, body: { extra: "" } },
+      },
     ]);
   });
 

@@ -19,6 +19,7 @@ beforeAll(() => {
 // tool-invocation "Add tool" dropdown and the in-chat "Agent tool call" portal.
 jest.mock("../ToolPicker", () => ({
   __esModule: true,
+  getToolParams: jest.requireActual("../ToolPicker").getToolParams,
   ToolPicker: ({
     onSelectInbuiltTool,
     onSelectCustomTool,

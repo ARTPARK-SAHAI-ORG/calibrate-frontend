@@ -261,6 +261,31 @@ describe("getToolParams", () => {
     expect(getToolParams(tool)).toEqual([]);
   });
 
+  it("reads a webhook tool's inputs from its query and body", () => {
+    // How a saved webhook tool stores them: nothing at the top level.
+    const tool: AvailableTool = {
+      uuid: "w",
+      name: "get_presigned_url",
+      config: {
+        type: "webhook",
+        parameters: [],
+        webhook: {
+          method: "POST",
+          headers: [{ name: "x-key", value: "1" }],
+          queryParameters: [{ id: "test" }],
+          body: { parameters: [{ id: "task_type" }, { name: "note" }] },
+        },
+      },
+      created_at: "",
+      updated_at: "",
+    };
+    expect(getToolParams(tool)).toEqual([
+      { name: "test", value: "", group: "query" },
+      { name: "task_type", value: "", group: "body" },
+      { name: "note", value: "", group: "body" },
+    ]);
+  });
+
   describe("Open button", () => {
     it("opens the tool side panel in edit mode without picking the tool", async () => {
       const user = setupUser();

@@ -5,7 +5,11 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 import { FieldError } from "@/components/ui/FieldError";
 import { DialogNavHeader, type MetadataEntry } from "@/components/ui";
-import { ToolPicker, getToolParams } from "@/components/ToolPicker";
+import {
+  ToolPicker,
+  getToolParams,
+  type ToolCallParam,
+} from "@/components/ToolPicker";
 import type { AvailableTool } from "@/components/ToolPicker";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
 import { OpenToolButton } from "@/components/tools/OpenToolButton";
@@ -57,8 +61,42 @@ export type LlmGeneralItemRowSubmission = {
 type DraftToolCall = {
   id: string;
   tool: string;
-  params: { name: string; value: string }[];
+  params: ToolCallParam[];
 };
+
+/** A webhook's inputs are saved split by the part of its request they go in,
+ * `{ query: {...}, body: {...} }`, the same way the test editor saves them. */
+const WEBHOOK_GROUPS = ["query", "body"];
+
+/** True when saved arguments have that webhook shape. */
+function isGroupedArgs(args: Record<string, unknown>): boolean {
+  const keys = Object.keys(args);
+  return (
+    keys.length > 0 &&
+    keys.every(
+      (k) =>
+        WEBHOOK_GROUPS.includes(k) &&
+        !!args[k] &&
+        typeof args[k] === "object" &&
+        !Array.isArray(args[k]),
+    )
+  );
+}
+
+/** The typed-in inputs, back to the arguments the tool call is saved with. */
+function paramsToArgs(params: ToolCallParam[]): Record<string, unknown> {
+  if (!params.some((p) => p.group)) {
+    return Object.fromEntries(
+      params.map((p) => [p.name, parseArgValue(p.value)]),
+    );
+  }
+  const args: Record<string, Record<string, unknown>> = {};
+  for (const p of params) {
+    const group = p.group ?? "body";
+    args[group] = { ...args[group], [p.name]: parseArgValue(p.value) };
+  }
+  return args;
+}
 
 /** A typed-in argument, back to a real value. Only the three words that
  * cannot be anything else are converted: true, false and null. Digits stay
@@ -89,18 +127,21 @@ function seedToolCalls(raw: unknown): DraftToolCall[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((tc, i) => {
     const { toolName, args } = normalizeToolCall(tc);
-    const entries =
+    const record =
       args && typeof args === "object" && !Array.isArray(args)
-        ? Object.entries(args as Record<string, unknown>)
-        : [];
-    return {
-      id: `seed-${i}`,
-      tool: toolName,
-      params: entries.map(([name, value]) => ({
-        name,
-        value: argValueToText(value),
-      })),
-    };
+        ? (args as Record<string, unknown>)
+        : {};
+    const params: ToolCallParam[] = isGroupedArgs(record)
+      ? WEBHOOK_GROUPS.flatMap((group) =>
+          Object.entries((record[group] ?? {}) as Record<string, unknown>).map(
+            ([name, value]) => ({ name, value: argValueToText(value), group }),
+          ),
+        )
+      : Object.entries(record).map(([name, value]) => ({
+          name,
+          value: argValueToText(value),
+        }));
+    return { id: `seed-${i}`, tool: toolName, params };
   });
 }
 
@@ -333,26 +374,21 @@ export function AddLlmGeneralItemsDialog({
     allTools: AvailableTool[],
   ) => {
     setAvailableTools(allTools);
-    // This form does not read a webhook tool's inputs (they live in its
-    // request), so its tool calls keep the inputs they have.
-    const fresh = tool.config?.type === "webhook" ? null : getToolParams(tool);
+    const fresh = getToolParams(tool);
     setToolCalls((prev) =>
       prev.map((tc) =>
         tc.tool === previousName
           ? {
               ...tc,
               tool: tool.name,
-              params: fresh ? mergeFlatParams(tc.params, fresh) : tc.params,
+              params: mergeFlatParams(tc.params, fresh),
             }
           : tc,
       ),
     );
   };
 
-  const addToolCall = (
-    toolName: string,
-    params: { name: string; value: string }[],
-  ) => {
+  const addToolCall = (toolName: string, params: ToolCallParam[]) => {
     setToolCalls((prev) => [
       ...prev,
       {
@@ -367,14 +403,20 @@ export function AddLlmGeneralItemsDialog({
   const removeToolCall = (id: string) =>
     setToolCalls((prev) => prev.filter((tc) => tc.id !== id));
 
-  const updateToolCallParam = (id: string, paramName: string, value: string) =>
+  const updateToolCallParam = (
+    id: string,
+    param: ToolCallParam,
+    value: string,
+  ) =>
     setToolCalls((prev) =>
       prev.map((tc) =>
         tc.id === id
           ? {
               ...tc,
               params: tc.params.map((prm) =>
-                prm.name === paramName ? { ...prm, value } : prm,
+                prm.name === param.name && prm.group === param.group
+                  ? { ...prm, value }
+                  : prm,
               ),
             }
           : tc,
@@ -424,9 +466,7 @@ export function AddLlmGeneralItemsDialog({
           output: output.trim(),
           toolCalls: toolCalls.map((tc) => ({
             tool: tc.tool,
-            arguments: Object.fromEntries(
-              tc.params.map((prm) => [prm.name, parseArgValue(prm.value)]),
-            ),
+            arguments: paramsToArgs(tc.params),
           })),
           evaluator_variables,
           metadata: rowsToMetadata(metadataRows),
@@ -705,22 +745,31 @@ export function AddLlmGeneralItemsDialog({
                         </div>
                         {tc.params.length > 0 && (
                           <div className="space-y-3 mt-3">
-                            {tc.params.map((prm) => (
-                              <div key={prm.name}>
+                            {tc.params.map((prm, i) => (
+                              <div key={`${prm.group ?? ""}-${prm.name}`}>
+                                {/* A webhook's inputs sit under the part of
+                                    its request they go in, as in the test
+                                    editor. */}
+                                {prm.group &&
+                                  prm.group !== tc.params[i - 1]?.group && (
+                                    <h5 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                                      {prm.group === "query" ? "Query" : "Body"}
+                                    </h5>
+                                  )}
                                 <label
-                                  htmlFor={`${tc.id}-${prm.name}`}
+                                  htmlFor={`${tc.id}-${prm.group ?? ""}-${prm.name}`}
                                   className="block text-sm font-medium text-foreground mb-1.5"
                                 >
                                   {prm.name}
                                 </label>
                                 <input
-                                  id={`${tc.id}-${prm.name}`}
+                                  id={`${tc.id}-${prm.group ?? ""}-${prm.name}`}
                                   type="text"
                                   value={prm.value}
                                   onChange={(e) =>
                                     updateToolCallParam(
                                       tc.id,
-                                      prm.name,
+                                      prm,
                                       e.target.value,
                                     )
                                   }
