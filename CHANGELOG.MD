@@ -1,5 +1,6 @@
 ## October 2026
 
+- A workspace using its own provider keys can now see every speech provider that supports the language on the Speech-to-Text and Text-to-Speech pages and add a missing key right there before running an evaluation ([#717](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/717))
 - A workspace can now add its own AI provider keys in workspace settings, so its runs use those keys and are no longer held to the usual limits on rows, traces, personas, scenarios and text length ([#694](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/694))
 - You can now open a tool from the tool list when adding a tool call to a test or a labelling item, edit it in the side panel, and see the tool calls already in the form pick up the changes ([#712](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/712))
 - You can now edit the headings and other versions of the input and output on labelling items for basic agents, with a check before removing a version or discarding changes ([#693](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/693))
