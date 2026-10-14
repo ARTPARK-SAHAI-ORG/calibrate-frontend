@@ -1057,6 +1057,7 @@ export function TracesTabContent({
                 hasSelectableItems={deletion.hasSelectableItems}
                 onToggleSelectAll={deletion.toggleSelectAll}
                 onOpen={itemPager.open}
+                agentUuid={agentUuid}
                 onDelete={deletion.openDeleteDialog}
                 scoreColumns={scoreColumns}
                 sortByEvaluator={sortByEvaluator}

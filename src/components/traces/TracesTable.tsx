@@ -6,6 +6,8 @@ import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { DeleteIconButton } from "@/components/ui";
+import { Link } from "@/lib/nav";
+import { openInPlace } from "@/lib/openInPlace";
 import type {
   TraceSortOrder,
   TraceSummary,
@@ -34,6 +36,9 @@ type TracesTableProps = {
   onToggleSelectAll: () => void;
   /** Open the detail view for a trace. */
   onOpen: (traceUuid: string) => void;
+  /** The agent the traces belong to, so each row can link to its own trace
+   *  and open in a new tab. */
+  agentUuid: string;
   /** Ask to delete a single trace. */
   onDelete: (trace: TraceSummary) => void;
   /** One column per evaluator that scores this agent's traces. None hides
@@ -214,6 +219,7 @@ export function TracesTable({
   hasSelectableItems,
   onToggleSelectAll,
   onOpen,
+  agentUuid,
   onDelete,
   scoreColumns = [],
   sortByEvaluator = null,
@@ -234,6 +240,17 @@ export function TracesTable({
       evaluatorTracks ? ` ${evaluatorTracks}` : ""
     } 160px auto`,
   };
+  // Each row's text is a link, so a right-click, middle-click or Cmd-click opens
+  // the trace in a new tab, while a plain click opens the window in place. The
+  // row keeps its own click for the parts that are not links (the score cells,
+  // the gaps), and the links stop theirs from reaching it so nothing opens twice.
+  const linkProps = (traceUuid: string) => ({
+    href: `/agents/${agentUuid}?tab=monitoring&traceId=${traceUuid}`,
+    onClick: (e: React.MouseEvent) => {
+      e.stopPropagation();
+      openInPlace(e, () => onOpen(traceUuid));
+    },
+  });
   return (
     <>
       {/* Desktop table */}
@@ -274,30 +291,39 @@ export function TracesTable({
               key={trace.uuid}
               onClick={() => onOpen(trace.uuid)}
               style={ROW_STYLE}
-              className={`${ROW_CLASS} py-2.5 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
+              className={`${ROW_CLASS} border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
             >
               <div className="flex items-center">
                 <SelectCheckbox {...checkboxProps(trace)} />
               </div>
-              <div className="min-w-0 flex items-center gap-2">
+              <Link
+                {...linkProps(trace.uuid)}
+                className="min-w-0 self-stretch py-2.5 flex items-center gap-2"
+              >
                 <TraceScoreMark trace={trace} />
                 {trace.input_preview && (
                   <div className="text-sm font-medium text-foreground truncate">
                     {trace.input_preview}
                   </div>
                 )}
-              </div>
-              <div className="min-w-0">
+              </Link>
+              <Link
+                {...linkProps(trace.uuid)}
+                className="min-w-0 self-stretch py-2.5 flex flex-col justify-center"
+              >
                 <TraceOutputCell trace={trace} />
-              </div>
+              </Link>
               <TraceScoreCells
                 trace={trace}
                 columns={scoreColumns}
                 layout="row"
               />
-              <div className="text-sm text-muted-foreground whitespace-nowrap">
+              <Link
+                {...linkProps(trace.uuid)}
+                className="self-stretch py-2.5 flex items-center text-sm text-muted-foreground whitespace-nowrap"
+              >
                 {formatTraceDate(trace.created_at)}
-              </div>
+              </Link>
               <div className="flex items-center">
                 <DeleteIconButton
                   onClick={() => onDelete(trace)}
@@ -319,28 +345,34 @@ export function TracesTable({
               className="border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex items-start gap-2">
+                <Link
+                  {...linkProps(trace.uuid)}
+                  className="min-w-0 flex items-start gap-2"
+                >
                   <TraceScoreMark trace={trace} />
                   {trace.input_preview && (
                     <p className="text-sm font-medium text-foreground line-clamp-2">
                       {trace.input_preview}
                     </p>
                   )}
-                </div>
+                </Link>
                 <SelectCheckbox {...checkboxProps(trace)} />
               </div>
-              <div className="mt-2">
+              <Link {...linkProps(trace.uuid)} className="block mt-2">
                 <TraceOutputCell trace={trace} />
-              </div>
+              </Link>
               <TraceScoreCells
                 trace={trace}
                 columns={scoreColumns}
                 layout="card"
               />
               <div className="flex items-center gap-2 mt-2">
-                <span className="text-xs text-muted-foreground">
+                <Link
+                  {...linkProps(trace.uuid)}
+                  className="text-xs text-muted-foreground"
+                >
                   {formatTraceDate(trace.created_at)}
-                </span>
+                </Link>
                 <div className="ml-auto">
                   <DeleteIconButton
                     onClick={() => onDelete(trace)}

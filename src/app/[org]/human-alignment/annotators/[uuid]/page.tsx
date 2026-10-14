@@ -1,7 +1,19 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
-import { replaceUrl, useParams, useRouter, useSearchParams } from "@/lib/nav";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  Link,
+  replaceUrl,
+  useParams,
+  useRouter,
+  useSearchParams,
+} from "@/lib/nav";
 import {
   CartesianGrid,
   Line,
@@ -589,8 +601,6 @@ function JobTaskName({ name }: { name: string }) {
 }
 
 function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
-  const router = useRouter();
-
   return (
     <div className="border border-border rounded-xl overflow-hidden">
       <div className="grid grid-cols-[180px_minmax(0,1fr)_120px_120px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
@@ -606,42 +616,60 @@ function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
       {jobs.map((job) => {
         const isImported = job.public_token.startsWith("import:");
         const url = buildAnnotateUrl(job.public_token);
+        // An imported job has no page of its own, so its cells are plain.
+        const cell = (className: string, children: ReactNode) =>
+          isImported ? (
+            <div className={className}>{children}</div>
+          ) : (
+            <Link
+              href={`/human-alignment/jobs/${job.public_token}`}
+              className={`${className} cursor-pointer`}
+            >
+              {children}
+            </Link>
+          );
         return (
           <div
             key={job.uuid}
-            onClick={() => {
-              if (!isImported)
-                router.push(`/human-alignment/jobs/${job.public_token}`);
-            }}
-            className={`grid grid-cols-[180px_minmax(0,1fr)_120px_120px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 items-center hover:bg-muted/20 transition-colors ${
-              isImported ? "" : "cursor-pointer"
-            }`}
+            className="grid grid-cols-[180px_minmax(0,1fr)_120px_120px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 border-b border-border last:border-b-0 items-stretch hover:bg-muted/20 transition-colors"
           >
-            <JobTaskName name={job.task_name} />
-            <div className="flex items-center gap-2 min-w-0">
-              {isImported ? (
-                <span className="text-xs text-muted-foreground">Imported</span>
-              ) : (
-                <>
+            {/* A column, so the name is held to the cell's width and cut short. */}
+            {cell(
+              "flex flex-col justify-center py-3 min-w-0",
+              <JobTaskName name={job.task_name} />,
+            )}
+            {isImported ? (
+              cell(
+                "flex items-center py-3 min-w-0",
+                <span className="text-xs text-muted-foreground">Imported</span>,
+              )
+            ) : (
+              <div className="flex items-center gap-2 min-w-0">
+                {cell(
+                  "flex items-center py-3 min-w-0",
                   <span className="text-xs font-mono text-muted-foreground truncate">
                     {url}
-                  </span>
-                  <CopyLinkButton value={url} />
-                </>
-              )}
-            </div>
-            <div>
+                  </span>,
+                )}
+                <CopyLinkButton value={url} />
+              </div>
+            )}
+            {cell(
+              "flex items-center py-3",
               <span
                 className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium border ${statusPillClass(
                   job.status,
                 )}`}
               >
                 {statusLabel(job.status)}
-              </span>
-            </div>
-            <div className="text-sm text-muted-foreground tabular-nums">
-              {job.completed_item_count} / {job.item_count}
-            </div>
+              </span>,
+            )}
+            {cell(
+              "flex items-center py-3 text-sm text-muted-foreground tabular-nums",
+              <>
+                {job.completed_item_count} / {job.item_count}
+              </>,
+            )}
           </div>
         );
       })}

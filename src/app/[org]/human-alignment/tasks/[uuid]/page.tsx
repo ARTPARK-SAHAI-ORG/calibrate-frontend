@@ -8,8 +8,10 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import {
+  Link,
   replaceUrl,
   useParams,
   useRouter,
@@ -659,7 +661,7 @@ function EvaluatorRunsList({
   loading,
   error,
   onRequestDelete,
-  onOpen,
+  taskUuid,
 }: {
   runs: EvaluatorRunJob[];
   /** Top-level evaluators[] block from the runs-list response. Keyed
@@ -668,7 +670,7 @@ function EvaluatorRunsList({
   loading: boolean;
   error: string | null;
   onRequestDelete: (runUuid: string) => void;
-  onOpen: (runUuid: string) => void;
+  taskUuid: string;
 }) {
   // (evaluator_id, evaluator_version_id) -> top-level entry. Same
   // evaluator can appear under multiple versions, so we key on both.
@@ -766,15 +768,18 @@ function EvaluatorRunsList({
                 : null,
           };
         });
+        const href = `/human-alignment/tasks/${taskUuid}/evaluator-runs/${run.uuid}`;
         return (
           <div
             key={run.uuid}
-            onClick={() => onOpen(run.uuid)}
-            className="grid grid-cols-[minmax(0,1.5fr)_100px_140px_minmax(0,1fr)_60px] gap-4 px-4 py-3 border-b border-border last:border-b-0 items-center hover:bg-muted/20 transition-colors cursor-pointer"
+            className="grid grid-cols-[minmax(0,1.5fr)_100px_140px_minmax(0,1fr)_60px] gap-4 px-4 border-b border-border last:border-b-0 items-stretch hover:bg-muted/20 transition-colors"
           >
             {/* The pills wrap onto as many lines as they need, so every name
                 and version is already readable: nothing to put on hover. */}
-            <div className="flex flex-wrap gap-1.5 min-w-0">
+            <Link
+              href={href}
+              className="flex flex-wrap content-center items-center gap-1.5 py-3 min-w-0 cursor-pointer"
+            >
               {runEvaluators.length === 0 ? (
                 <span className="text-sm text-muted-foreground">—</span>
               ) : (
@@ -795,11 +800,14 @@ function EvaluatorRunsList({
                   );
                 })
               )}
-            </div>
-            <div className="text-sm text-muted-foreground tabular-nums">
+            </Link>
+            <Link
+              href={href}
+              className="flex items-center py-3 text-sm text-muted-foreground tabular-nums cursor-pointer"
+            >
               {itemCount}
-            </div>
-            <div>
+            </Link>
+            <Link href={href} className="flex items-center py-3 cursor-pointer">
               <span
                 className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium border ${runStatusPillClass(
                   run.status,
@@ -807,19 +815,19 @@ function EvaluatorRunsList({
               >
                 {runStatusLabel(run.status)}
               </span>
-            </div>
-            <div className="text-sm text-muted-foreground">
+            </Link>
+            <Link
+              href={href}
+              className="flex items-center py-3 text-sm text-muted-foreground cursor-pointer"
+            >
               {new Date(lastUpdated.replace(" ", "T") + "Z").toLocaleString()}
-            </div>
-            <div className="flex justify-end">
+            </Link>
+            <div className="flex items-center justify-end">
               {(run.status === "completed" || run.status === "failed") && (
                 <Tooltip content="Delete run" position="top">
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRequestDelete(run.uuid);
-                    }}
+                    onClick={() => onRequestDelete(run.uuid)}
                     aria-label="Delete run"
                     className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                   >
@@ -1049,8 +1057,6 @@ function JobsList({
   someSelected: boolean;
   onRequestDelete: (jobUuid: string) => void;
 }) {
-  const router = useRouter();
-
   return (
     <div className="border border-border rounded-xl overflow-hidden">
       <div className="grid grid-cols-[40px_180px_minmax(0,1fr)_120px_120px_60px] gap-4 [&>*:nth-child(4)]:pl-6 px-4 py-2 border-b border-border bg-muted/30 items-center">
@@ -1080,60 +1086,75 @@ function JobsList({
         const isImported = job.public_token.startsWith("import:");
         const url = buildAnnotateUrl(job.public_token);
         const isSelected = selectedJobUuids.has(job.uuid);
+        // An imported job has no page of its own, so its cells are plain.
+        const cell = (className: string, children: ReactNode) =>
+          isImported ? (
+            <div className={className}>{children}</div>
+          ) : (
+            <Link
+              href={`/human-alignment/jobs/${job.public_token}`}
+              className={`${className} cursor-pointer`}
+            >
+              {children}
+            </Link>
+          );
         return (
           <div
             key={job.uuid}
-            onClick={() => {
-              if (!isImported)
-                router.push(`/human-alignment/jobs/${job.public_token}`);
-            }}
-            className={`grid grid-cols-[40px_180px_minmax(0,1fr)_120px_120px_60px] gap-4 [&>*:nth-child(4)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 items-center transition-colors ${
+            className={`grid grid-cols-[40px_180px_minmax(0,1fr)_120px_120px_60px] gap-4 [&>*:nth-child(4)]:pl-6 px-4 border-b border-border last:border-b-0 items-stretch transition-colors ${
               isSelected ? "bg-muted/30" : "hover:bg-muted/20"
-            } ${isImported ? "" : "cursor-pointer"}`}
+            }`}
           >
             <input
               type="checkbox"
               checked={isSelected}
               onChange={() => onToggleJob(job.uuid)}
-              onClick={(e) => e.stopPropagation()}
               aria-label={`Select job ${job.annotator_name}`}
-              className="w-4 h-4 cursor-pointer accent-foreground"
+              className="w-4 h-4 self-center cursor-pointer accent-foreground"
             />
-            <div className="text-sm font-medium truncate">
-              {job.annotator_name}
-            </div>
-            <div className="flex items-center gap-2 min-w-0">
-              {isImported ? (
-                <span className="text-xs text-muted-foreground">Imported</span>
-              ) : (
-                <>
+            {cell(
+              "flex items-center py-3 min-w-0",
+              <div className="text-sm font-medium truncate">
+                {job.annotator_name}
+              </div>,
+            )}
+            {isImported ? (
+              cell(
+                "flex items-center py-3 min-w-0",
+                <span className="text-xs text-muted-foreground">Imported</span>,
+              )
+            ) : (
+              <div className="flex items-center gap-2 min-w-0">
+                {cell(
+                  "flex items-center py-3 min-w-0",
                   <span className="text-xs font-mono text-muted-foreground truncate">
                     {url}
-                  </span>
-                  <CopyLinkButton value={url} />
-                </>
-              )}
-            </div>
-            <div>
+                  </span>,
+                )}
+                <CopyLinkButton value={url} />
+              </div>
+            )}
+            {cell(
+              "flex items-center py-3",
               <span
                 className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium border ${statusPillClass(
                   job.status,
                 )}`}
               >
                 {statusLabel(job.status)}
-              </span>
-            </div>
-            <div className="text-sm text-muted-foreground tabular-nums">
-              {job.completed_item_count} / {job.item_count}
-            </div>
-            <div className="flex justify-center">
+              </span>,
+            )}
+            {cell(
+              "flex items-center py-3 text-sm text-muted-foreground tabular-nums",
+              <>
+                {job.completed_item_count} / {job.item_count}
+              </>,
+            )}
+            <div className="flex items-center justify-center">
               <Tooltip content="Delete job" position="top">
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRequestDelete(job.uuid);
-                  }}
+                  onClick={() => onRequestDelete(job.uuid)}
                   aria-label="Delete job"
                   className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors cursor-pointer"
                 >
@@ -3792,11 +3813,7 @@ function LabellingTaskPageInner() {
             loading={runsLoading || !runsFetchCompleted}
             error={runsError}
             onRequestDelete={(runUuid) => setDeletingRunUuid(runUuid)}
-            onOpen={(runUuid) =>
-              router.push(
-                `/human-alignment/tasks/${uuid}/evaluator-runs/${runUuid}`,
-              )
-            }
+            taskUuid={uuid}
           />
         )}
       </div>

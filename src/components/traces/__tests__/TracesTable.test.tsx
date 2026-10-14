@@ -43,6 +43,7 @@ function renderTable(
       hasSelectableItems
       onToggleSelectAll={onToggleSelectAll}
       onOpen={onOpen}
+      agentUuid="ag-1"
       onDelete={onDelete}
       {...props}
     />,
@@ -392,6 +393,47 @@ describe("TracesTable", () => {
     const { onOpen } = renderTable();
     // The desktop row shows the created date; click it.
     await user.click(screen.getAllByText("When is the next vaccination?")[0]);
+    expect(onOpen).toHaveBeenCalledWith("t1");
+  });
+
+  it("links every row to its own trace so it can open in a new tab", () => {
+    renderTable();
+    const href = "/agents/ag-1?tab=monitoring&traceId=t1";
+    for (const text of ["When is the next vaccination?", "At 14 weeks."]) {
+      for (const el of screen.getAllByText(text)) {
+        expect(el.closest("a")).toHaveAttribute("href", href);
+      }
+    }
+    for (const el of screen.getAllByText(formatTraceDate(trace().created_at))) {
+      expect(el.closest("a")).toHaveAttribute("href", href);
+    }
+  });
+
+  it("opens the window once on a plain click on a link", async () => {
+    const user = setupUser();
+    const { onOpen } = renderTable();
+    await user.click(screen.getAllByText("At 14 weeks.")[0]);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onOpen).toHaveBeenCalledWith("t1");
+  });
+
+  it("leaves a Cmd-click to the browser instead of opening the window", async () => {
+    const user = setupUser();
+    const { onOpen } = renderTable();
+    await user.keyboard("{Meta>}");
+    await user.click(screen.getAllByText("At 14 weeks.")[0]);
+    await user.keyboard("{/Meta}");
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("still opens a trace from a score cell, which is not a link", async () => {
+    const user = setupUser();
+    const { onOpen } = renderTable({
+      scoreColumns: [{ evaluator_uuid: "ev-1", name: "Accuracy" }],
+    });
+    const cell = screen.getAllByText("Not scored yet")[0];
+    expect(cell.closest("a")).toBeNull();
+    await user.click(cell);
     expect(onOpen).toHaveBeenCalledWith("t1");
   });
 
