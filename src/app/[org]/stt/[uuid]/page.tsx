@@ -53,7 +53,7 @@ import { useSidebarState } from "@/lib/sidebar";
 import { ShareButton } from "@/components/ShareButton";
 import type { ExportColumn } from "@/components/ExportResultsButton";
 import { ExportZipButton } from "@/components/ExportZipButton";
-import { audioFileExtension } from "@/lib/audioExport";
+import { audioFileExtension, fetchRunForExport } from "@/lib/audioExport";
 import { retryEvaluation } from "@/lib/retryEvaluation";
 import {
   deriveEvaluatorColumns,
@@ -836,7 +836,13 @@ export default function STTEvaluationDetailPage() {
                   ) && (
                     <ExportZipButton
                       filename={`stt-results-${evaluationResult.dataset_name ?? taskId}`}
-                      getContents={() => {
+                      getContents={async () => {
+                        // Read the run again: its clip links stop working an hour
+                        // after the page first loaded them.
+                        const run = await fetchRunForExport<EvaluationResult>(
+                          `/stt/evaluate/${taskId}`,
+                          backendAccessToken,
+                        );
                         const columns: ExportColumn[] = [
                           { key: "provider", header: "Provider" },
                           { key: "audio_name", header: "Audio name" },
@@ -864,7 +870,7 @@ export default function STTEvaluationDetailPage() {
                         // Every provider transcribed the same clip, so each clip
                         // goes in the zip once, named after its row id.
                         const files = new Map<string, string>();
-                        for (const pr of evaluationResult.provider_results ??
+                        for (const pr of run.provider_results ??
                           []) {
                           for (const r of pr.results ?? []) {
                             const audioName = r.audio_url

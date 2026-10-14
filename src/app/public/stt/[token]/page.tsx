@@ -30,7 +30,7 @@ import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell"
 import type { AudioCostBreakdown } from "@/lib/audioCost";
 import type { ExportColumn } from "@/components/ExportResultsButton";
 import { ExportZipButton } from "@/components/ExportZipButton";
-import { audioFileExtension } from "@/lib/audioExport";
+import { audioFileExtension, fetchRunForExport } from "@/lib/audioExport";
 import {
   getPublicDefaultEvaluator,
   type PublicDefaultEvaluator,
@@ -232,7 +232,12 @@ export default function PublicSTTPage() {
               <div className="flex items-center justify-end">
                 <ExportZipButton
                   filename={`stt-results-${data.task_id}`}
-                  getContents={() => {
+                  getContents={async () => {
+                    // Read the run again: its clip links stop working an hour
+                    // after the page first loaded them.
+                    const run = await fetchRunForExport<EvaluationResult>(
+                      `/public/stt/${token}`,
+                    );
                     const columns: ExportColumn[] = [
                       { key: "provider", header: "Provider" },
                       { key: "audio_name", header: "Audio name" },
@@ -249,7 +254,7 @@ export default function PublicSTTPage() {
                     // Every provider transcribed the same clip, so each clip
                     // goes in the zip once, named after its row id.
                     const files = new Map<string, string>();
-                    for (const pr of data.provider_results ?? []) {
+                    for (const pr of run.provider_results ?? []) {
                       for (const r of pr.results ?? []) {
                         const audioName = r.audio_url
                           ? `${r.id}.${audioFileExtension(r.audio_url)}`

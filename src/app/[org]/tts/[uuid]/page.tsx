@@ -52,7 +52,7 @@ import {
 } from "@/components/human-labelling/ttsLabellingSource";
 import { useSidebarState } from "@/lib/sidebar";
 import { ShareButton } from "@/components/ShareButton";
-import { audioFileExtension } from "@/lib/audioExport";
+import { audioFileExtension, fetchRunForExport } from "@/lib/audioExport";
 import { ExportZipButton } from "@/components/ExportZipButton";
 import type { ExportColumn } from "@/components/ExportResultsButton";
 import { retryEvaluation } from "@/lib/retryEvaluation";
@@ -765,7 +765,13 @@ export default function TTSEvaluationDetailPage() {
                   ) && (
                     <ExportZipButton
                       filename={`tts-results-${evaluationResult.dataset_name ?? taskId}`}
-                      getContents={() => {
+                      getContents={async () => {
+                        // Read the run again: its clip links stop working an hour
+                        // after the page first loaded them.
+                        const run = await fetchRunForExport<EvaluationResult>(
+                          `/tts/evaluate/${taskId}`,
+                          backendAccessToken,
+                        );
                         const columns: ExportColumn[] = [
                           { key: "provider", header: "Provider" },
                           { key: "audio_name", header: "Audio name" },
@@ -777,7 +783,7 @@ export default function TTSEvaluationDetailPage() {
                         ];
                         const rows: Record<string, unknown>[] = [];
                         const files: { path: string; url: string }[] = [];
-                        for (const pr of evaluationResult.provider_results ??
+                        for (const pr of run.provider_results ??
                           []) {
                           for (const r of pr.results ?? []) {
                             const ext = audioFileExtension(r.audio_path ?? "");

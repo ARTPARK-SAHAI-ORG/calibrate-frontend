@@ -26,6 +26,7 @@ import {
 } from "@/lib/evaluatorColumns";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import { ExportZipButton } from "@/components/ExportZipButton";
+import { audioFileExtension, fetchRunForExport } from "@/lib/audioExport";
 import type { ExportColumn } from "@/components/ExportResultsButton";
 import {
   getPublicDefaultEvaluator,
@@ -210,7 +211,12 @@ export default function PublicTTSPage() {
               <div className="flex items-center justify-end">
                 <ExportZipButton
                   filename={`tts-results-${data.dataset_name ?? data.task_id}`}
-                  getContents={() => {
+                  getContents={async () => {
+                    // Read the run again: its clip links stop working an hour
+                    // after the page first loaded them.
+                    const run = await fetchRunForExport<EvaluationResult>(
+                      `/public/tts/${token}`,
+                    );
                     const columns: ExportColumn[] = [
                       { key: "provider", header: "Provider" },
                       { key: "audio_name", header: "Audio name" },
@@ -222,23 +228,9 @@ export default function PublicTTSPage() {
                     ];
                     const rows: Record<string, unknown>[] = [];
                     const files: { path: string; url: string }[] = [];
-                    for (const pr of data.provider_results ?? []) {
+                    for (const pr of run.provider_results ?? []) {
                       for (const r of pr.results ?? []) {
-                        const ext = (() => {
-                          try {
-                            const u = new URL(
-                              r.audio_path,
-                              window.location.origin,
-                            );
-                            const m = u.pathname.match(/\.([a-z0-9]+)$/i);
-                            return m ? m[1].toLowerCase() : "wav";
-                          } catch {
-                            const m = r.audio_path.match(
-                              /\.([a-z0-9]+)(?:\?|$)/i,
-                            );
-                            return m ? m[1].toLowerCase() : "wav";
-                          }
-                        })();
+                        const ext = audioFileExtension(r.audio_path ?? "");
                         const audioName = r.audio_path
                           ? `${pr.provider}_${r.id}.${ext}`
                           : "";

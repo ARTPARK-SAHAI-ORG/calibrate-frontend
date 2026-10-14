@@ -5,7 +5,10 @@ jest.mock("../../lib/reportError", () => ({
   reportError: jest.fn(),
 }));
 
+jest.mock("sonner", () => ({ toast: { error: jest.fn() } }));
+
 import { reportError } from "../../lib/reportError";
+import { toast } from "sonner";
 
 function mockAnchor() {
   if (!URL.createObjectURL) (URL as any).createObjectURL = () => "";
@@ -83,6 +86,36 @@ describe("ExportZipButton", () => {
     await user.click(screen.getByRole("button"));
     expect(getContents).toHaveBeenCalledTimes(1);
     expect(createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("waits for contents read at click time before building the zip", async () => {
+    const user = setupUser();
+    const { createObjectURL } = mockAnchor();
+    const getContents = jest.fn().mockResolvedValue({
+      csv: { columns: [{ key: "a", header: "A" }], rows: [{ a: 1 }] },
+      files: [],
+    });
+    render(<ExportZipButton filename="f" getContents={getContents} />);
+
+    await user.click(screen.getByRole("button"));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledTimes(1));
+  });
+
+  it("says the export failed when the contents cannot be read", async () => {
+    const user = setupUser();
+    const { createObjectURL } = mockAnchor();
+    const getContents = jest.fn().mockRejectedValue(new Error("HTTP 500"));
+    render(<ExportZipButton filename="f" getContents={getContents} />);
+
+    await user.click(screen.getByRole("button"));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Could not export the results. Try again",
+      ),
+    );
+    expect(reportError).toHaveBeenCalled();
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Export results" })).toBeEnabled();
   });
 
   it("builds a zip with the csv and successfully fetched files, shows exporting state, then downloads", async () => {
