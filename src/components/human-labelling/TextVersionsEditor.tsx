@@ -4,9 +4,10 @@ import { useEffect, useState, type ReactNode } from "react";
 import { CheckIcon, CloseIcon } from "@/components/icons";
 import { Tooltip } from "@/components/Tooltip";
 import type { TurnExtras } from "@/lib/messageVersions";
+import { TEXT_FIELD_COLOR_CLASS } from "@/components/test-results/shared";
 
 const NAME_INPUT_CLASS =
-  "h-7 pl-4 pr-2 rounded-md bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground";
+  "h-7 pl-4 pr-2 rounded-md border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground";
 
 /** True when every version has text. */
 export function versionsComplete(extras: TurnExtras): boolean {
@@ -155,7 +156,7 @@ export function TextVersionsEditor({
 
   return (
     <>
-      <div className="flex items-center gap-1 mb-2">
+      <div className="flex items-center gap-1 mb-3">
         <input
           type="text"
           value={headingDraft ?? label}
@@ -167,7 +168,7 @@ export function TextVersionsEditor({
             if (headingDraft !== undefined && !headingDirty) dropDraft("heading");
           }}
           onKeyDown={onKey(confirmHeading, () => dropDraft("heading"))}
-          className={`${NAME_INPUT_CLASS} flex-1 min-w-0 text-sm font-medium text-foreground`}
+          className={`${NAME_INPUT_CLASS} ${TEXT_FIELD_COLOR_CLASS[field]} flex-1 min-w-0 text-sm font-medium`}
         />
         {headingDirty && (
           <ConfirmCancel
@@ -181,14 +182,14 @@ export function TextVersionsEditor({
       {children}
 
       {Object.keys(versions).length > 0 && (
-        <div className="mt-3 flex flex-col gap-3">
+        <div className="mt-4 flex flex-col gap-4">
           {Object.entries(versions).map(([name, text], i) => {
             const key = `version:${name}`;
             const draft = drafts[key];
             const dirty = draft !== undefined && draft.trim() !== name;
             const taken = dirty && nameTaken(name, draft.trim());
             return (
-              <div key={i} className="flex flex-col gap-1">
+              <div key={i} className="flex flex-col gap-3">
                 <div className="flex items-center gap-1">
                   <input
                     type="text"
@@ -203,7 +204,7 @@ export function TextVersionsEditor({
                       () => confirmName(name),
                       () => dropDraft(key),
                     )}
-                    className={`${NAME_INPUT_CLASS} flex-1 min-w-0 text-xs text-muted-foreground`}
+                    className={`${NAME_INPUT_CLASS} ${TEXT_FIELD_COLOR_CLASS[field]} flex-1 min-w-0 text-xs font-medium`}
                   />
                   {dirty && (
                     <ConfirmCancel

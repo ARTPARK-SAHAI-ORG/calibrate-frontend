@@ -884,15 +884,28 @@ function CopyJsonButton({ value }: { value: string }) {
   );
 }
 
+// A basic-agent item's input and output each draw every name in one colour,
+// heading and versions alike, in the item view and in the edit window.
+export const TEXT_FIELD_COLOR_CLASS = {
+  input: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  output:
+    "border-purple-500/30 bg-purple-500/10 text-purple-700 dark:text-purple-300",
+} as const;
+export const PILL_CLASS =
+  "inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-medium";
+
 const TURN_BUBBLE_CLASS =
   "px-3 md:px-4 py-2.5 md:py-3 rounded-xl border border-border";
 
 export function TurnVersionBubbles({
   versions,
   side,
+  pillColor,
 }: {
   versions?: Record<string, string>;
   side: "user" | "assistant";
+  /** Draws each name as a pill in this colour instead of plain text. */
+  pillColor?: string;
 }) {
   const { versions: safe } = readTurnExtras({ versions });
   if (!safe) return null;
@@ -901,11 +914,17 @@ export function TurnVersionBubbles({
       {Object.entries(safe).map(([name, text]) => (
         <div
           key={name}
-          className={`max-w-[88%] md:max-w-3/4 w-fit flex flex-col mt-2 ${
-            side === "user" ? "items-end" : ""
-          }`}
+          className={`max-w-[88%] md:max-w-3/4 w-fit flex flex-col ${
+            pillColor ? "mt-4" : "mt-2"
+          } ${side === "user" ? "items-end" : ""}`}
         >
-          <span className="text-[11px] font-medium text-muted-foreground mb-1">
+          <span
+            className={
+              pillColor
+                ? `${PILL_CLASS} ${pillColor} self-start mb-3`
+                : "text-[11px] font-medium text-muted-foreground mb-1"
+            }
+          >
             {name}
           </span>
           <div className={`${TURN_BUBBLE_CLASS} border-dashed bg-muted/30`}>

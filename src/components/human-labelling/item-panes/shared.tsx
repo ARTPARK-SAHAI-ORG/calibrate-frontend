@@ -1,22 +1,33 @@
 import React from "react";
-import type { TestCaseHistory } from "@/components/test-results/shared";
+import {
+  PILL_CLASS,
+  type TestCaseHistory,
+} from "@/components/test-results/shared";
 import { readTurnExtras } from "@/lib/messageVersions";
 
 export function Section({
   title,
   subtitle,
+  subtitleColor = "",
   children,
 }: {
   title: string;
   subtitle?: string;
+  subtitleColor?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="border border-border rounded-xl p-4 space-y-2">
+    <div
+      className={`border border-border rounded-xl p-4 ${
+        subtitle ? "space-y-3" : "space-y-2"
+      }`}
+    >
       <div>
         <h3 className="text-sm font-semibold">{title}</h3>
         {subtitle && (
-          <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+          <span className={`mt-3 ${PILL_CLASS} ${subtitleColor}`}>
+            {subtitle}
+          </span>
         )}
       </div>
       <div>{children}</div>

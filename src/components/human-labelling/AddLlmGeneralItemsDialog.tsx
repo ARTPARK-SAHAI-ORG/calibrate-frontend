@@ -554,9 +554,13 @@ export function AddLlmGeneralItemsDialog({
               the full dialog height. */}
           <div className="w-full md:flex-1 flex flex-col md:flex-row bg-muted/30 min-h-0">
             <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-4 md:p-6 border-b md:border-b-0 md:border-r border-border">
-              <label className="block text-base font-medium text-foreground mb-2">
-                Input
-              </label>
+              {/* As tall as the Output row beside it, which holds the tool
+                  buttons, so both headings start on the same line. */}
+              <div className="flex items-center min-h-9 mb-3">
+                <label className="block text-base font-medium text-foreground">
+                  Input
+                </label>
+              </div>
               <TextVersionsEditor
                 field="input"
                 extras={inputExtras}
@@ -574,7 +578,7 @@ export function AddLlmGeneralItemsDialog({
               </TextVersionsEditor>
             </div>
             <div className="flex-1 flex flex-col min-h-0 p-4 md:p-6">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <label className="block text-base font-medium text-foreground">
                   Output
                 </label>
