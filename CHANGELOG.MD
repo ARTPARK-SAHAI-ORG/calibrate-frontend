@@ -1,5 +1,6 @@
 ## October 2026
 
+- You can now edit the headings and other versions of the input and output on labelling items for basic agents, with a check before removing a version or discarding changes ([#693](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/693))
 - The windows for speech-to-text, text-to-speech and basic-agent items in a labelling task now show the title, the previous and next arrows, and the Preview and close buttons in one row, like the conversation windows ([#708](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/708))
 - Clicking Preview on a labelling task item while the next page of items is still loading no longer opens an empty window, and Preview no longer covers the Evaluators heading when editing a conversation item ([#703](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/703))
 - Duplicating a labelling item for a basic agent now keeps its tool calls, so the copy opens filled in and can be saved ([#699](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/699))
