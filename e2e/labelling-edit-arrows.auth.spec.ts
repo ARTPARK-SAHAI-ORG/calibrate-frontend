@@ -146,6 +146,7 @@ async function stepsBothWays(
   loadedWhen?: Locator,
 ): Promise<void> {
   await expect(page.getByText("1 of 2", { exact: true })).toBeVisible();
+  if (loadedWhen) await expect(loadedWhen).toBeVisible({ timeout: 15000 });
   await page.getByRole("button", { name: "Next item", exact: true }).click();
   if (loadedWhen) await expect(loadedWhen).toBeVisible({ timeout: 15000 });
   await expect(nameField).toHaveValue(other, { timeout: 15000 });
@@ -187,11 +188,14 @@ test.describe("Labelling item edit window: previous / next (authenticated, real 
   });
 
   test.afterEach(async ({ request }) => {
-    if (taskUuid) {
-      await api(request, `/annotation-tasks/${taskUuid}`, { method: "DELETE" });
+    try {
+      if (taskUuid) {
+        await api(request, `/annotation-tasks/${taskUuid}`, { method: "DELETE" });
+      }
+    } finally {
       taskUuid = null;
+      expect(consoleErrors).toEqual([]);
     }
-    expect(consoleErrors).toEqual([]);
   });
 
   test("a speech-to-text item steps to the next item, and asks first when edited", async ({
@@ -247,5 +251,47 @@ test.describe("Labelling item edit window: previous / next (authenticated, real 
         .getByText(seeded.evaluatorName, { exact: true }),
     );
     await viewsTheItem(page, nameField, first);
+  });
+
+  test("Preview while the next page is still loading keeps the item on screen", async ({
+    page,
+    request,
+  }) => {
+    test.setTimeout(120_000);
+    const names = Array.from(
+      { length: 11 },
+      (_, i) => `Paging item ${String(i + 1).padStart(2, "0")}`,
+    );
+    taskUuid = (await seedTask(request, "stt", names)).uuid;
+
+    await page.addInitScript(() =>
+      window.localStorage.setItem("calibrate:items-page-size", "10"),
+    );
+    await page.goto(`/human-alignment/tasks/${taskUuid}?tab=items`);
+    await waitForOrgReady(page);
+    await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveCount(
+      10,
+      { timeout: 45000 },
+    );
+
+    // The last item on the first page, so Next has to load the second page.
+    await page.getByRole("button", { name: "Edit", exact: true }).nth(9).click();
+    const nameField = page.getByPlaceholder("e.g. Clip 1");
+    await expect(nameField).toBeVisible({ timeout: 15000 });
+    const lastOnPage = await nameField.inputValue();
+
+    // Hold the second page back so Preview is clicked while it loads.
+    await page.route(/\/summary\?.*offset=10/, async (route) => {
+      await new Promise((r) => setTimeout(r, 3000));
+      await route.continue();
+    });
+    const secondPage = page.waitForResponse(/\/summary\?.*offset=10/);
+    await page.getByRole("button", { name: "Next item", exact: true }).click();
+    await page.getByRole("button", { name: "Preview", exact: true }).click();
+    await secondPage;
+    await page.waitForTimeout(1000);
+
+    await expect(page.getByRole("heading", { name: lastOnPage, exact: true })).toBeVisible();
+    await expect(nameField).toHaveCount(0);
   });
 });

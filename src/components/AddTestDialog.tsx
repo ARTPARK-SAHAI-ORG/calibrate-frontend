@@ -3532,6 +3532,10 @@ export function AddTestDialog({
     onNext: navNext,
     position,
   });
+  // Preview needs the top row too. With nothing to step through it would
+  // otherwise float over the first row of columns and cover the Evaluators
+  // heading on a narrow screen.
+  const hasTopRow = stepsBetweenTests || !!navView;
 
   // The left and right arrow keys step too, the same as the buttons. No
   // Escape: this window holds edits that have not been saved, and a stray
@@ -4284,7 +4288,7 @@ export function AddTestDialog({
             onClick={() => (isLabelItem ? confirmDiscard(onClose) : onClose())}
             disabled={isCreating || isLoading}
             className={`absolute ${
-              stepsBetweenTests ? "top-2.5 md:top-2" : "top-2.5 md:top-3"
+              hasTopRow ? "top-2.5 md:top-2" : "top-2.5 md:top-3"
             } right-3 z-20 w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
             aria-label="Close"
           >
@@ -4306,7 +4310,7 @@ export function AddTestDialog({
           {navView && (
             <div
               className={`absolute ${
-                stepsBetweenTests ? "top-2.5 md:top-2" : "top-2.5 md:top-3"
+                hasTopRow ? "top-2.5 md:top-2" : "top-2.5 md:top-3"
               } right-12 z-20`}
             >
               <ViewItemButton
@@ -4327,6 +4331,12 @@ export function AddTestDialog({
             hasNext={hasNext}
             position={position}
           />
+          {navView && !stepsBetweenTests && (
+            <div
+              className="shrink-0 h-12 border-b border-border hidden md:block"
+              data-testid="preview-row"
+            />
+          )}
 
           {/* Columns — row on desktop, stacked on mobile. The footer below
               sits outside this row so it spans the dialog's full width. */}
