@@ -736,3 +736,52 @@ describe("AddSttItemsDialog", () => {
     global.crypto = original;
   });
 });
+
+describe("previous / next item in the edit window", () => {
+  const step = {
+    hasPrev: true,
+    hasNext: true,
+    position: { index: 4, total: 9 },
+  };
+
+  it("draws the arrows and steps when the form is clean", async () => {
+    const user = setupUser();
+    const onPrev = jest.fn();
+    const onNext = jest.fn();
+    renderDialog({
+      mode: "edit",
+      initialRows: [{ uuid: "u1", name: "Clip 1", actual: "hello", predicted: "helo" }],
+      onPrev,
+      onNext,
+      ...step,
+    });
+    expect(screen.getByText("5 of 9")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next item" }));
+    expect(onNext).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "Previous item" }));
+    expect(onPrev).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks before stepping away from edits, and Discard steps", async () => {
+    const user = setupUser();
+    const onNext = jest.fn();
+    const { onClose } = renderDialog({
+      mode: "edit",
+      initialRows: [{ uuid: "u1", name: "Clip 1", actual: "hello", predicted: "helo" }],
+      onPrev: jest.fn(),
+      onNext,
+      ...step,
+    });
+    await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "x");
+    await user.click(screen.getByRole("button", { name: "Next item" }));
+    expect(onNext).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("draws no arrows when no steps are passed", () => {
+    renderDialog({ mode: "edit", initialRows: [{ uuid: "u1", name: "Clip 1", actual: "hello", predicted: "helo" }] });
+    expect(screen.queryByRole("button", { name: "Next item" })).not.toBeInTheDocument();
+  });
+});

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+
+import { useDialogNavKeys } from "@/hooks";
 
 type UnsavedCloseGuardOptions = {
   isOpen: boolean;
@@ -15,6 +17,24 @@ type UnsavedCloseGuardOptions = {
   onClose: () => void;
   // Optional cleanup to run right before actually closing (e.g. clear errors).
   onBeforeClose?: () => void;
+  // Step to the previous / next item while one item is open for edit.
+  // Stepping throws edits away just like closing, so it asks the same
+  // question first. The left and right arrow keys step too.
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+};
+
+/** Previous / next for an edit window opened on one item. Leave them out
+ * when several items are open at once: there is nothing to step between. */
+export type ItemStepProps = {
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  /** Place of the open item in the whole task, for "3 of 41". */
+  position?: { index: number; total: number };
 };
 
 /**
@@ -31,8 +51,15 @@ export function useUnsavedCloseGuard({
   submitting,
   onClose,
   onBeforeClose,
+  onPrev,
+  onNext,
+  hasPrev,
+  hasNext,
 }: UnsavedCloseGuardOptions) {
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+  // What Discard does when the question was raised by stepping rather than
+  // by closing.
+  const pendingStepRef = useRef<(() => void) | null>(null);
 
   // Reset the confirmation whenever the dialog opens/closes, using the
   // adjust-state-during-render pattern (no effect) so it stays clean on
@@ -43,9 +70,16 @@ export function useUnsavedCloseGuard({
     setDiscardConfirmOpen(false);
   }
 
+  // The Discard button: closes, or takes the step that raised the question.
   const doClose = () => {
-    onBeforeClose?.();
+    const step = pendingStepRef.current;
+    pendingStepRef.current = null;
     setDiscardConfirmOpen(false);
+    if (step) {
+      step();
+      return;
+    }
+    onBeforeClose?.();
     onClose();
   };
 
@@ -57,6 +91,30 @@ export function useUnsavedCloseGuard({
     else doClose();
   };
 
+  // A step asks the discard question when there are edits. While the
+  // question is on screen a step does nothing, so Discard cannot end up
+  // doing something other than what raised it.
+  const attemptStep = (step: () => void) => {
+    if (submitting || discardConfirmOpen) return;
+    if (!isDirty) {
+      step();
+      return;
+    }
+    pendingStepRef.current = step;
+    setDiscardConfirmOpen(true);
+  };
+  const navPrev = onPrev ? () => attemptStep(onPrev) : undefined;
+  const navNext = onNext ? () => attemptStep(onNext) : undefined;
+
+  // No Escape: the window holds edits that have not been saved.
+  useDialogNavKeys({
+    isOpen,
+    hasPrev,
+    onPrev: navPrev,
+    hasNext,
+    onNext: navNext,
+  });
+
   // Backdrop click handler — disabled in add mode, guarded in edit mode.
   const handleBackdropClick = () => {
     if (isEdit) attemptClose();
@@ -64,10 +122,15 @@ export function useUnsavedCloseGuard({
 
   return {
     discardConfirmOpen,
-    closeDiscardConfirm: () => setDiscardConfirmOpen(false),
+    closeDiscardConfirm: () => {
+      pendingStepRef.current = null;
+      setDiscardConfirmOpen(false);
+    },
     doClose,
     attemptClose,
     handleBackdropClick,
+    navPrev,
+    navNext,
   };
 }
 

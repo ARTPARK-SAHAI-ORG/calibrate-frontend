@@ -122,6 +122,82 @@ describe("useUnsavedCloseGuard", () => {
     });
     expect(util.result.current.discardConfirmOpen).toBe(false);
   });
+
+  describe("stepping to another item", () => {
+    it("steps at once when the form is clean", () => {
+      const onNext = jest.fn();
+      const { util, onClose } = setup({ onNext, hasNext: true });
+      act(() => util.result.current.navNext!());
+      expect(onNext).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(util.result.current.discardConfirmOpen).toBe(false);
+    });
+
+    it("asks first when there are edits, and Discard takes the step instead of closing", () => {
+      const onPrev = jest.fn();
+      const { util, onClose, onBeforeClose } = setup({
+        isDirty: true,
+        onPrev,
+        hasPrev: true,
+      });
+      act(() => util.result.current.navPrev!());
+      expect(onPrev).not.toHaveBeenCalled();
+      expect(util.result.current.discardConfirmOpen).toBe(true);
+      act(() => util.result.current.doClose());
+      expect(onPrev).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(onBeforeClose).not.toHaveBeenCalled();
+      expect(util.result.current.discardConfirmOpen).toBe(false);
+    });
+
+    it("Keep editing forgets the step, so a later Discard closes", () => {
+      const onNext = jest.fn();
+      const { util, onClose } = setup({ isDirty: true, onNext, hasNext: true });
+      act(() => util.result.current.navNext!());
+      act(() => util.result.current.closeDiscardConfirm());
+      act(() => util.result.current.attemptClose());
+      act(() => util.result.current.doClose());
+      expect(onNext).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("ignores a step while the question is already on screen", () => {
+      const onNext = jest.fn();
+      const { util, onClose } = setup({ isDirty: true, onNext, hasNext: true });
+      act(() => util.result.current.attemptClose());
+      act(() => util.result.current.navNext!());
+      act(() => util.result.current.doClose());
+      expect(onNext).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("does nothing while saving", () => {
+      const onNext = jest.fn();
+      const { util } = setup({ submitting: true, onNext, hasNext: true });
+      act(() => util.result.current.navNext!());
+      expect(onNext).not.toHaveBeenCalled();
+    });
+
+    it("gives no step handlers when none are passed", () => {
+      const { util } = setup();
+      expect(util.result.current.navPrev).toBeUndefined();
+      expect(util.result.current.navNext).toBeUndefined();
+    });
+
+    it("the left and right arrow keys step too", () => {
+      const onPrev = jest.fn();
+      const onNext = jest.fn();
+      setup({ onPrev, onNext, hasPrev: true, hasNext: true });
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+      });
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft" }));
+      });
+      expect(onNext).toHaveBeenCalledTimes(1);
+      expect(onPrev).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe("DiscardChangesDialog", () => {

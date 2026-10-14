@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
-import type { MetadataEntry } from "@/components/ui";
+import { DialogNavRow, type MetadataEntry } from "@/components/ui";
 import { FieldError } from "@/components/ui/FieldError";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
 import { humaniseDetailObject } from "./bulk-upload-shared";
@@ -24,6 +24,7 @@ import { uploadTtsAudioToS3, validateTtsAudioFile } from "./ttsAudioUpload";
 import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
+  type ItemStepProps,
 } from "./unsavedCloseGuard";
 
 type TtsRowDraft = {
@@ -64,7 +65,7 @@ type AddTtsItemsDialogProps = {
   }[];
   onClose: () => void;
   onSubmit: (rows: TtsItemRowSubmission[]) => Promise<void> | void;
-};
+} & ItemStepProps;
 
 function extractApiError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
@@ -146,6 +147,11 @@ export function AddTtsItemsDialog({
   initialRows,
   onClose,
   onSubmit,
+  onPrev,
+  onNext,
+  hasPrev,
+  hasNext,
+  position,
 }: AddTtsItemsDialogProps) {
   useHideFloatingButton(isOpen);
 
@@ -233,13 +239,24 @@ export function AddTtsItemsDialog({
     );
   });
 
-  const { discardConfirmOpen, closeDiscardConfirm, doClose, attemptClose } =
+  const {
+    discardConfirmOpen,
+    closeDiscardConfirm,
+    doClose,
+    attemptClose,
+    navPrev,
+    navNext,
+  } =
     useUnsavedCloseGuard({
       isOpen,
       isDirty,
       isEdit,
       submitting,
       onClose,
+      onPrev,
+      onNext,
+      hasPrev,
+      hasNext,
       onBeforeClose: () => {
         setError(null);
         setNameErrors({});
@@ -434,6 +451,16 @@ export function AddTtsItemsDialog({
         className="bg-background border border-border rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Previous / next item: a thin row of its own across the top, the
+            same as the test window. Only when one item is open. */}
+        <DialogNavRow
+          noun="item"
+          onPrev={navPrev}
+          onNext={navNext}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+          position={position}
+        />
         <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
           <div>
             <h2 className="text-base md:text-lg font-semibold text-foreground">

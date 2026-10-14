@@ -2406,6 +2406,30 @@ function LabellingTaskPageInner() {
     }
   };
 
+  // Previous / next in the edit window, the same walk as the item view.
+  // Only one of these is set, and only when one item is opened for edit;
+  // editing several ticked items at once leaves them all empty, so no arrows.
+  const editPager = useItemPager({
+    items,
+    openUuid:
+      editTtsSingleItemUuid ??
+      editSttSingleItemUuid ??
+      editLlmGeneralSingleItemUuid ??
+      editLlmItemUuid,
+    pageStart: loadedItemsOffset,
+    pageSize: itemsLimit,
+    total: itemsTotal,
+    onOpen: openItemEdit,
+    onPageStartChange: setItemsOffset,
+  });
+  const editStepProps = {
+    onPrev: editPager.prev,
+    onNext: editPager.next,
+    hasPrev: editPager.hasPrev,
+    hasNext: editPager.hasNext,
+    position: editPager.position,
+  };
+
   const editingInitialConfig = buildInitialConfig(editingPayload);
   const addItemInitialConfig = buildInitialConfig(duplicateSourcePayload);
 
@@ -3975,8 +3999,11 @@ function LabellingTaskPageInner() {
           key={editLlmItemUuid}
           isOpen={true}
           onClose={() => {
-            if (!savingLlmItem) setEditLlmItemUuid(null);
+            if (savingLlmItem) return;
+            editPager.cancel();
+            setEditLlmItemUuid(null);
           }}
+          {...editStepProps}
           isEditing={true}
           isLoading={false}
           isCreating={savingLlmItem}
@@ -4085,6 +4112,7 @@ function LabellingTaskPageInner() {
                   },
                 },
               );
+              editPager.cancel();
               setEditLlmItemUuid(null);
               await Promise.all([fetchTask(), fetchTaskSummary()]);
             } catch (err) {
@@ -4236,8 +4264,10 @@ function LabellingTaskPageInner() {
       />
 
       <AddSttItemsDialog
+        key={editSttSingleItemUuid ?? "several"}
         isOpen={editSttItemsOpen}
         mode="edit"
+        {...(editSttSingleItemUuid ? editStepProps : {})}
         initialRows={items
           .filter((it) =>
             editSttSingleItemUuid
@@ -4261,6 +4291,7 @@ function LabellingTaskPageInner() {
             };
           })}
         onClose={() => {
+          editPager.cancel();
           setEditSttItemsOpen(false);
           setEditSttSingleItemUuid(null);
         }}
@@ -4287,6 +4318,7 @@ function LabellingTaskPageInner() {
             },
           );
           await Promise.all([fetchTask(), fetchTaskSummary()]);
+          editPager.cancel();
           setEditSttItemsOpen(false);
           setEditSttSingleItemUuid(null);
           setSelectedItemIds(new Set());
@@ -4325,8 +4357,10 @@ function LabellingTaskPageInner() {
       />
 
       <AddTtsItemsDialog
+        key={editTtsSingleItemUuid ?? "several"}
         isOpen={editTtsItemsOpen}
         mode="edit"
+        {...(editTtsSingleItemUuid ? editStepProps : {})}
         accessToken={accessToken}
         initialRows={items
           .filter((it) =>
@@ -4345,6 +4379,7 @@ function LabellingTaskPageInner() {
             };
           })}
         onClose={() => {
+          editPager.cancel();
           setEditTtsItemsOpen(false);
           setEditTtsSingleItemUuid(null);
         }}
@@ -4371,6 +4406,7 @@ function LabellingTaskPageInner() {
             },
           );
           await Promise.all([fetchTask(), fetchTaskSummary()]);
+          editPager.cancel();
           setEditTtsItemsOpen(false);
           setEditTtsSingleItemUuid(null);
           setSelectedItemIds(new Set());
@@ -4416,8 +4452,10 @@ function LabellingTaskPageInner() {
       />
 
       <AddLlmGeneralItemsDialog
+        key={editLlmGeneralSingleItemUuid ?? "several"}
         isOpen={editLlmGeneralItemsOpen}
         mode="edit"
+        {...(editLlmGeneralSingleItemUuid ? editStepProps : {})}
         evaluators={llmGeneralEvaluatorDefs}
         initialRows={items
           .filter((it) =>
@@ -4442,6 +4480,7 @@ function LabellingTaskPageInner() {
             };
           })}
         onClose={() => {
+          editPager.cancel();
           setEditLlmGeneralItemsOpen(false);
           setEditLlmGeneralSingleItemUuid(null);
         }}
@@ -4482,6 +4521,7 @@ function LabellingTaskPageInner() {
             },
           );
           await Promise.all([fetchTask(), fetchTaskSummary()]);
+          editPager.cancel();
           setEditLlmGeneralItemsOpen(false);
           setEditLlmGeneralSingleItemUuid(null);
           setSelectedItemIds(new Set());
