@@ -22,6 +22,7 @@ import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
   type ItemStepProps,
+  ViewItemButton,
 } from "./unsavedCloseGuard";
 
 type SttRowDraft = {
@@ -108,6 +109,7 @@ export function AddSttItemsDialog({
   onNext,
   hasPrev,
   hasNext,
+  onView,
   position,
 }: AddSttItemsDialogProps) {
   useHideFloatingButton(isOpen);
@@ -184,6 +186,7 @@ export function AddSttItemsDialog({
     attemptClose,
     navPrev,
     navNext,
+    navView,
   } =
     useUnsavedCloseGuard({
     isOpen,
@@ -195,6 +198,7 @@ export function AddSttItemsDialog({
     onNext,
     hasPrev,
     hasNext,
+    onView,
     onBeforeClose: () => {
       setError(null);
       setNameErrors({});
@@ -328,7 +332,7 @@ export function AddSttItemsDialog({
           position={position}
         />
         <div className="flex items-start justify-between gap-3 px-5 md:px-6 py-4 border-b border-border">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-base md:text-lg font-semibold text-foreground">
               {isEdit ? "Edit items" : "Add items"}
             </h2>
@@ -338,25 +342,30 @@ export function AddSttItemsDialog({
                 : "Annotators will compare the predicted transcript against the reference"}
             </p>
           </div>
-          <button
-            onClick={attemptClose}
-            disabled={submitting}
-            className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {navView && (
+              <ViewItemButton onClick={navView} disabled={submitting} />
+            )}
+            <button
+              onClick={attemptClose}
+              disabled={submitting}
+              className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div
