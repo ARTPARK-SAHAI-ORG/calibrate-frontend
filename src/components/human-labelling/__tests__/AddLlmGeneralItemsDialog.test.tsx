@@ -1,4 +1,4 @@
-import { render, screen, setupUser, waitFor, within } from "@/test-utils";
+import { fireEvent, render, screen, setupUser, waitFor, within } from "@/test-utils";
 import {
   AddLlmGeneralItemsDialog,
   LlmGeneralEvaluatorDef,
@@ -1032,6 +1032,20 @@ describe("AddLlmGeneralItemsDialog headings and versions", () => {
     await user.click(screen.getByRole("button", { name: "Save item" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0][0].outputExtras).toEqual({});
+  });
+
+  it("does not step to another item while the remove question is up", async () => {
+    const user = setupUser();
+    const onNext = jest.fn();
+    renderDialog({
+      mode: "edit",
+      initialRows: [versioned],
+      onNext,
+      hasNext: true,
+    });
+    await user.click(screen.getAllByRole("button", { name: "Remove version" })[0]);
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(onNext).not.toHaveBeenCalled();
   });
 
   it("asks before closing when a heading was typed but not confirmed", async () => {

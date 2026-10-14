@@ -88,6 +88,18 @@ export function TextVersionsEditor({
     return () => onPendingChange?.(false);
   }, [pending, onPendingChange]);
 
+  // Keys pressed while the remove question is up must not reach the edit
+  // window behind it, where the arrow keys step to another item.
+  useEffect(() => {
+    if (toRemove === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.stopPropagation();
+      if (e.key === "Escape") setToRemove(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [toRemove]);
+
   const setDraft = (key: string, value: string) =>
     setDrafts((d) => ({ ...d, [key]: value }));
   const dropDraft = (key: string) =>

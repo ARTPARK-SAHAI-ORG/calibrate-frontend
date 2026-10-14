@@ -275,3 +275,24 @@ describe("TextVersionsEditor version name drafts", () => {
     expect(onPendingChange).toHaveBeenLastCalledWith(false);
   });
 });
+
+describe("TextVersionsEditor remove question keys", () => {
+  it("keeps key presses from the window behind and closes on Escape", async () => {
+    const user = setupUser();
+    const behind = jest.fn();
+    window.addEventListener("keydown", behind);
+    try {
+      render(<Harness initial={START} />);
+      await user.click(screen.getAllByRole("button", { name: "Remove version" })[0]);
+      fireEvent.keyDown(document.body, { key: "ArrowRight" });
+      expect(behind).not.toHaveBeenCalled();
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(screen.queryByText(/Remove "Hindi"/)).not.toBeInTheDocument();
+      expect(names()).toEqual(["Hindi", "Tamil"]);
+      fireEvent.keyDown(document.body, { key: "ArrowRight" });
+      expect(behind).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener("keydown", behind);
+    }
+  });
+});

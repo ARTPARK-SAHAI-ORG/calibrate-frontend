@@ -3541,16 +3541,17 @@ export function AddTestDialog({
   // The left and right arrow keys step too, the same as the buttons. No
   // Escape: this window holds edits that have not been saved, and a stray
   // press would throw them away.
-  // The save-or-discard prompt for running a test is the other thing that can
-  // be on top of this window. Its own question is not the discard question, so
-  // `confirmDiscard` does not know about it, and a key press behind it would
-  // raise a second prompt underneath the one on screen.
+  // The save-or-discard prompt for running a test, and the question about
+  // changing every message of a role, can also be on top of this window.
+  // Neither is the discard question, so `confirmDiscard` does not know about
+  // them, and a key press behind one would step away or raise a second
+  // prompt underneath it.
   useDialogNavKeys({
     isOpen,
     hasPrev,
-    onPrev: showRunUnsavedConfirm ? undefined : navPrev,
+    onPrev: showRunUnsavedConfirm || roleChange ? undefined : navPrev,
     hasNext,
-    onNext: showRunUnsavedConfirm ? undefined : navNext,
+    onNext: showRunUnsavedConfirm || roleChange ? undefined : navNext,
   });
 
   const evalTargetPill = (

@@ -678,3 +678,21 @@ describe("AddTestDialog labelling item headings and versions", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 });
+
+describe("AddTestDialog arrow keys behind the role question", () => {
+  it("does not step to another item while the rename-all question is up", async () => {
+    const user = setupUser();
+    const onNext = jest.fn();
+    renderDialog(jest.fn(), { onNext, hasNext: true });
+    await waitForHistory();
+    const [first] = agentHeadings();
+    await user.clear(first);
+    await user.type(first, "Doctor");
+    await user.click(screen.getByRole("button", { name: "Confirm heading" }));
+    expect(
+      screen.getByText('Use "Doctor" on all agent messages?'),
+    ).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(onNext).not.toHaveBeenCalled();
+  });
+});
