@@ -18,6 +18,12 @@ describe("readTurnExtras", () => {
     ).toEqual({ label: "AI draft", versions: { Nurse: "hello" } });
   });
 
+  it("drops a version with a blank name", () => {
+    expect(readTurnExtras({ versions: { "  ": "x", Hindi: "y" } })).toEqual({
+      versions: { Hindi: "y" },
+    });
+  });
+
   it("returns nothing for a blank label, non-object versions, or a non-object", () => {
     expect(readTurnExtras({ label: "  ", versions: ["x"] })).toEqual({});
     expect(readTurnExtras({ versions: { a: 1 } })).toEqual({});

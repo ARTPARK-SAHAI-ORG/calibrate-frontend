@@ -73,7 +73,6 @@ export function normaliseHistoryItem(raw: unknown): TestCaseHistory | null {
         ...(content != null ? { content } : {}),
         tool_calls: toolCalls as TestCaseHistory["tool_calls"],
         ...tsField,
-        ...extras,
       };
     }
     if (content != null) {
@@ -90,7 +89,6 @@ export function normaliseHistoryItem(raw: unknown): TestCaseHistory | null {
       content,
       ...(toolCallId ? { tool_call_id: toolCallId } : {}),
       ...tsField,
-      ...extras,
     };
   }
   return null;

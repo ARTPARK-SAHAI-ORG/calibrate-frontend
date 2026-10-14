@@ -1,4 +1,4 @@
-import { render, screen, setupUser, waitFor } from "@/test-utils";
+import { fireEvent, render, screen, setupUser, waitFor } from "@/test-utils";
 import { AddTestDialog, TestConfig } from "../AddTestDialog";
 
 class MockResizeObserver {
@@ -141,7 +141,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     expect(agentHeadings().map((i) => i.value)).toEqual(["Nurse", ""]);
     expect(
       screen
-        .getAllByLabelText("Heading for this version")
+        .getAllByLabelText("Version name")
         .map((i) => (i as HTMLInputElement).value),
     ).toEqual(["English", "English", "Hinglish"]);
     expect(
@@ -255,7 +255,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     const onSubmit = renderDialog();
     await waitForHistory();
 
-    const names = screen.getAllByLabelText("Heading for this version");
+    const names = screen.getAllByLabelText("Version name");
     await user.clear(names[1]);
     await user.type(names[1], "Translation");
     await user.click(screen.getByRole("button", { name: "Confirm version name" }));
@@ -269,20 +269,6 @@ describe("AddTestDialog labelling item headings and versions", () => {
       ["Translation", "How are you doing?"],
       ["Hinglish", "Kaise ho"],
     ]);
-  });
-
-  it("ignores a rename that would collide with another version's name", async () => {
-    const user = setupUser();
-    renderDialog();
-    await waitForHistory();
-
-    const hinglish = screen.getAllByLabelText(
-      "Heading for this version",
-    )[2] as HTMLInputElement;
-    await user.clear(hinglish);
-    await user.type(hinglish, "English");
-    await user.click(screen.getByRole("button", { name: "Confirm version name" }));
-    expect(hinglish.value).toBe("Hinglish");
   });
 
   it("asks before removing a version; Cancel keeps it and Remove deletes it", async () => {
@@ -346,7 +332,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     await waitForHistory();
 
     const hinglish = screen.getAllByLabelText(
-      "Heading for this version",
+      "Version name",
     )[2] as HTMLInputElement;
     await user.clear(hinglish);
     await user.type(hinglish, "toString");
@@ -397,7 +383,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
 
   const versionNames = () =>
     screen
-      .getAllByLabelText("Heading for this version")
+      .getAllByLabelText("Version name")
       .map((i) => (i as HTMLInputElement).value);
 
   it("renames a version on every agent message or puts the old name back", async () => {
@@ -405,7 +391,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     const onSubmit = renderDialog(jest.fn(), { initialConfig: SHARED });
     await waitForHistory();
 
-    const first = screen.getAllByLabelText("Heading for this version")[0];
+    const first = screen.getAllByLabelText("Version name")[0];
     await user.clear(first);
     await user.type(first, "Translation");
     expect(versionNames()[0]).toBe("Translation");
@@ -454,7 +440,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     renderDialog(jest.fn(), { initialConfig: SHARED });
     await waitForHistory();
 
-    const first = screen.getAllByLabelText("Heading for this version")[0];
+    const first = screen.getAllByLabelText("Version name")[0];
     await user.clear(first);
     await user.click(screen.getByRole("button", { name: "Confirm version name" }));
     expect(versionNames()[0]).toBe("English");
@@ -553,7 +539,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     renderDialog();
     await waitForHistory();
 
-    const first = screen.getAllByLabelText("Heading for this version")[0];
+    const first = screen.getAllByLabelText("Version name")[0];
     await user.type(first, "X");
     expect(versionNames()[0]).toBe("EnglishX");
     await user.click(screen.getByRole("button", { name: "Cancel version name" }));
@@ -578,5 +564,105 @@ describe("AddTestDialog labelling item headings and versions", () => {
     await user.type(first, "Nurse{Enter}");
     expect(screen.queryByText(/on all agent messages\?/)).not.toBeInTheDocument();
     expect(first.value).toBe("Nurse");
+  });
+
+  it("keeps a typed heading open while another heading is being edited", async () => {
+    const user = setupUser();
+    renderDialog();
+    await waitForHistory();
+
+    const [first, second] = agentHeadings();
+    await user.clear(first);
+    await user.type(first, "Doctor");
+    await user.click(second);
+    expect(first.value).toBe("Doctor");
+    expect(screen.getAllByRole("button", { name: "Confirm heading" })).toHaveLength(1);
+  });
+
+  it("applies Enter only to the version name it was pressed in", async () => {
+    const user = setupUser();
+    const onSubmit = renderDialog();
+    await waitForHistory();
+
+    const names = screen.getAllByLabelText("Version name") as HTMLInputElement[];
+    await user.clear(names[1]);
+    await user.type(names[1], "Translation");
+    await user.click(names[2]);
+    await user.keyboard("{Enter}");
+    expect(names[1].value).toBe("Translation");
+    expect(screen.getAllByRole("button", { name: "Confirm version name" })).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "Cancel version name" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    const [config] = onSubmit.mock.calls[0];
+    expect(Object.keys(config.history[1].versions)).toEqual(["English", "Hinglish"]);
+  });
+
+  it("says a version name is taken and will not apply it", async () => {
+    const user = setupUser();
+    renderDialog(jest.fn(), { initialConfig: SHARED });
+    await waitForHistory();
+
+    const first = screen.getAllByLabelText("Version name")[0];
+    await user.clear(first);
+    await user.type(first, "Hinglish");
+    expect(screen.getByText("Another version already has this name")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm version name" })).toBeDisabled();
+    await user.keyboard("{Enter}");
+    expect(screen.queryByText(/on all agent messages\?/)).not.toBeInTheDocument();
+    expect(versionNames()).toEqual(["Hinglish", "Hinglish", "English", "Hinglish"]);
+  });
+
+  it("gives a new message the role's heading and every version name used on that role", async () => {
+    const user = setupUser();
+    const mixed: TestConfig = {
+      history: [
+        { role: "user", content: "Namaste" },
+        { role: "assistant", content: "Kaise ho?", label: "Doctor" },
+        { role: "user", content: "Theek hoon" },
+        { role: "assistant", content: "Accha", versions: { Hindi: "अच्छा" } },
+      ],
+      evaluation: { type: "response" },
+    };
+    renderDialog(jest.fn(), { initialConfig: mixed });
+    await waitForHistory();
+
+    await user.click(screen.getAllByLabelText("Add message")[0]);
+    await user.click(screen.getByRole("button", { name: /Agent message/ }));
+    const headings = agentHeadings();
+    expect(headings[headings.length - 1].value).toBe("Doctor");
+    expect(versionNames()).toEqual(["Hindi", "Hindi"]);
+  });
+
+  it("ignores Enter while a word is still being typed with an input method", async () => {
+    renderDialog();
+    await waitForHistory();
+
+    const first = agentHeadings()[0];
+    fireEvent.focus(first);
+    fireEvent.change(first, { target: { value: "डॉक्टर" } });
+    fireEvent.keyDown(first, { key: "Enter", isComposing: true });
+    expect(screen.getByRole("button", { name: "Confirm heading" })).toBeInTheDocument();
+    fireEvent.keyDown(first, { key: "Enter" });
+    expect(screen.queryByRole("button", { name: "Confirm heading" })).not.toBeInTheDocument();
+  });
+
+  it("does not block saving a plain test whose history carries an empty version", async () => {
+    const user = setupUser();
+    const onSubmit = renderDialog(jest.fn(), {
+      mode: undefined,
+      requireAssistantLastMessage: undefined,
+      initialConfig: {
+        history: [
+          { role: "user", content: "Namaste", versions: { Hindi: "" } },
+        ],
+        evaluation: { type: "response" },
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getByDisplayValue("Namaste")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 });

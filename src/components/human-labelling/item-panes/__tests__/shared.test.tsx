@@ -67,6 +67,13 @@ describe("normaliseHistoryItem", () => {
   it.each([
     ["user", { role: "user", content: "Hi", ...extras }],
     ["assistant text", { role: "assistant", content: "Hello", ...extras }],
+  ])("keeps label and versions on a %s turn", (_name, raw) => {
+    const turn = normaliseHistoryItem(raw);
+    expect(turn?.label).toBe("English");
+    expect(turn?.versions).toEqual({ Hindi: "नमस्ते" });
+  });
+
+  it.each([
     [
       "assistant tool call",
       { role: "assistant", tool_calls: [toolCall], ...extras },
@@ -75,10 +82,11 @@ describe("normaliseHistoryItem", () => {
       "tool",
       { role: "tool", content: "ok", tool_call_id: "call-1", ...extras },
     ],
-  ])("keeps label and versions on a %s turn", (_name, raw) => {
+  ])("drops label and versions on a %s turn, which never shows them", (_name, raw) => {
     const turn = normaliseHistoryItem(raw);
-    expect(turn?.label).toBe("English");
-    expect(turn?.versions).toEqual({ Hindi: "नमस्ते" });
+    expect(turn).not.toBeNull();
+    expect(turn).not.toHaveProperty("label");
+    expect(turn).not.toHaveProperty("versions");
   });
 
   it.each([

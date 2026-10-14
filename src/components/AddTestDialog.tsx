@@ -1452,20 +1452,23 @@ export function AddTestDialog({
 
   const addChatMessage = (role: "agent" | "user") => {
     const id = Date.now().toString();
-    const like = isLabelItem
-      ? chatMessages.find((m) => m.role === role && (m.label || m.versions))
-      : undefined;
-    const versions = like?.versions
-      ? Object.fromEntries(Object.keys(like.versions).map((name) => [name, ""]))
-      : undefined;
+    const sameRole = isLabelItem
+      ? chatMessages.filter((m) => m.role === role)
+      : [];
+    const label = sameRole.find((m) => m.label)?.label;
+    const names = [
+      ...new Set(sameRole.flatMap((m) => Object.keys(m.versions ?? {}))),
+    ];
     setChatMessages([
       ...chatMessages,
       {
         id,
         role,
         content: "",
-        ...(like?.label ? { label: like.label } : {}),
-        ...(versions ? { versions } : {}),
+        ...(label ? { label } : {}),
+        ...(names.length > 0
+          ? { versions: Object.fromEntries(names.map((n) => [n, ""])) }
+          : {}),
       },
     ]);
     setPendingFocusId(id);
@@ -1576,112 +1579,114 @@ export function AddTestDialog({
 
   type ChatMessage = (typeof chatMessages)[number];
 
-  const patchChatMessage = (
-    id: string,
-    patch: (msg: ChatMessage) => ChatMessage,
-  ) => setChatMessages(chatMessages.map((m) => (m.id === id ? patch(m) : m)));
-
-  const setMessageLabel = (id: string, label: string) =>
-    patchChatMessage(id, (m) => ({ ...m, label: label || undefined }));
-
-  const setLabelForRole = (role: "agent" | "user", label: string) =>
-    setChatMessages(
-      chatMessages.map((m) =>
-        m.role === role ? { ...m, label: label || undefined } : m,
-      ),
-    );
-
-  const setMessageVersions = (
-    id: string,
-    next: (versions: Record<string, string>) => Record<string, string>,
-  ) =>
-    patchChatMessage(id, (m) => {
-      const versions = next(m.versions ?? {});
-      return Object.keys(versions).length > 0
-        ? { ...m, versions }
-        : { ...m, versions: undefined };
-    });
-
-  const renameVersion = (id: string, from: string, to: string) =>
-    setMessageVersions(id, (v) =>
-      to !== from && Object.hasOwn(v, to)
-        ? v
-        : Object.fromEntries(
-            Object.entries(v).map(([k, text]) => [k === from ? to : k, text]),
-          ),
-    );
-
   type MessageRole = "agent" | "user";
-  const isTextRole = (m: ChatMessage): m is ChatMessage & { role: MessageRole } =>
+  const isTextRole = (
+    m: ChatMessage,
+  ): m is ChatMessage & { role: MessageRole } =>
     m.role === "agent" || m.role === "user";
-  const patchRole = (role: MessageRole, patch: (msg: ChatMessage) => ChatMessage) =>
-    setChatMessages(chatMessages.map((m) => (m.role === role ? patch(m) : m)));
-  const renamedVersions = (v: Record<string, string>, from: string, to: string) =>
-    Object.hasOwn(v, from) && !Object.hasOwn(v, to)
-      ? Object.fromEntries(
-          Object.entries(v).map(([k, text]) => [k === from ? to : k, text]),
-        )
-      : v;
-  const withoutVersion = (v: Record<string, string>, name: string) =>
-    Object.fromEntries(Object.entries(v).filter(([k]) => k !== name));
+
   const versionsOf = (m: ChatMessage, next: Record<string, string>) =>
     Object.keys(next).length > 0
       ? { ...m, versions: next }
       : { ...m, versions: undefined };
 
+  const setMessageVersions = (
+    id: string,
+    next: (versions: Record<string, string>) => Record<string, string>,
+  ) =>
+    setChatMessages(
+      chatMessages.map((m) =>
+        m.id === id ? versionsOf(m, next(m.versions ?? {})) : m,
+      ),
+    );
+
+  const patchRole = (
+    role: MessageRole,
+    patch: (msg: ChatMessage) => ChatMessage,
+  ) => setChatMessages(chatMessages.map((m) => (m.role === role ? patch(m) : m)));
+
+  // Each heading and version name keeps its own draft, applied only by its
+  // tick or Enter, so editing one field never touches another's.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const headingKey = (id: string) => `heading:${id}`;
+  const versionKey = (id: string, name: string) => `version:${id}:${name}`;
+  const setDraft = (key: string, value: string) =>
+    setDrafts((d) => ({ ...d, [key]: value }));
+  const dropDrafts = (keep: (key: string) => boolean) =>
+    setDrafts((d) => Object.fromEntries(Object.entries(d).filter(([k]) => keep(k))));
+
   // Headings and version names are the same on every message of a role, so
-  // a change is applied to all of them or put back. The value at focus is
-  // what Cancel restores.
+  // a change asks once and then applies to all of them, or to none.
   const [roleChange, setRoleChange] = useState<
-    | { kind: "heading"; id: string; role: MessageRole; from: string; to: string }
-    | { kind: "rename"; id: string; role: MessageRole; from: string; to: string }
-    | { kind: "remove"; id: string; role: MessageRole; name: string }
+    | { kind: "heading"; role: MessageRole; to: string }
+    | { kind: "rename"; role: MessageRole; from: string; to: string }
+    | { kind: "remove"; role: MessageRole; name: string }
     | null
   >(null);
-  // A heading is typed into a draft and applied with its tick, never by
-  // clicking away. Focusing an empty one shows its default as the draft.
-  const [headingDraft, setHeadingDraft] = useState<{
-    id: string;
-    to: string;
-  } | null>(null);
 
-  const dropHeadingDraftIfUnchanged = (message: ChatMessage, placeholder: string) => {
-    if (!headingDraft || headingDraft.id !== message.id) return;
-    const current = message.label ?? "";
-    if (headingDraft.to === current || (!current && headingDraft.to === placeholder)) {
-      setHeadingDraft(null);
-    }
-  };
-
-  const confirmHeadingDraft = (message: ChatMessage, placeholder: string) => {
-    if (!headingDraft || headingDraft.id !== message.id || !isTextRole(message)) return;
+  const headingUnchanged = (message: ChatMessage, to: string, placeholder: string) => {
     const from = message.label ?? "";
-    const to = headingDraft.to.trim();
-    setHeadingDraft(null);
-    if (to === from || (!from && to === placeholder)) return;
-    const othersDiffer = chatMessages.some(
-      (m) => m.role === message.role && m.id !== message.id && (m.label ?? "") !== to,
-    );
-    if (othersDiffer) {
-      setRoleChange({ kind: "heading", id: message.id, role: message.role, from, to });
-    } else {
-      setMessageLabel(message.id, to);
-    }
+    return to === from || (!from && to === placeholder);
   };
 
-  // A version name is typed into a draft and applied with its tick, never
-  // by clicking away.
-  const [versionDraft, setVersionDraft] = useState<{
-    id: string;
-    from: string;
-    to: string;
-  } | null>(null);
+  const versionNameTaken = (message: ChatMessage, from: string, to: string) =>
+    to !== from &&
+    chatMessages.some(
+      (m) => m.role === message.role && Object.hasOwn(m.versions ?? {}, to),
+    );
 
-  const confirmVersionDraft = (message: ChatMessage) => {
-    if (!versionDraft || versionDraft.id !== message.id || !isTextRole(message)) return;
-    const { from } = versionDraft;
-    const to = versionDraft.to.trim();
-    setVersionDraft(null);
+  const applyHeading = (role: MessageRole, to: string) =>
+    patchRole(role, (m) => ({ ...m, label: to || undefined }));
+
+  const applyRename = (role: MessageRole, from: string, to: string) => {
+    patchRole(role, (m) => {
+      const v = m.versions ?? {};
+      return Object.hasOwn(v, from)
+        ? versionsOf(
+            m,
+            Object.fromEntries(
+              Object.entries(v).map(([k, text]) => [k === from ? to : k, text]),
+            ),
+          )
+        : m;
+    });
+    dropDrafts((k) => !(k.startsWith("version:") && k.endsWith(`:${from}`)));
+  };
+
+  const applyRemove = (role: MessageRole, name: string) => {
+    patchRole(role, (m) =>
+      versionsOf(
+        m,
+        Object.fromEntries(
+          Object.entries(m.versions ?? {}).filter(([k]) => k !== name),
+        ),
+      ),
+    );
+    dropDrafts((k) => !(k.startsWith("version:") && k.endsWith(`:${name}`)));
+  };
+
+  const confirmHeading = (message: ChatMessage, placeholder: string) => {
+    const key = headingKey(message.id);
+    const draft = drafts[key];
+    if (draft === undefined || !isTextRole(message)) return;
+    dropDrafts((k) => k !== key);
+    const to = draft.trim();
+    if (headingUnchanged(message, to, placeholder)) return;
+    const othersDiffer = chatMessages.some(
+      (m) =>
+        m.role === message.role && m.id !== message.id && (m.label ?? "") !== to,
+    );
+    if (othersDiffer) setRoleChange({ kind: "heading", role: message.role, to });
+    else applyHeading(message.role, to);
+  };
+
+  const confirmVersionName = (message: ChatMessage, from: string) => {
+    const key = versionKey(message.id, from);
+    const draft = drafts[key];
+    if (draft === undefined || !isTextRole(message)) return;
+    const to = draft.trim();
+    if (versionNameTaken(message, from, to)) return;
+    dropDrafts((k) => k !== key);
     if (!to || to === from) return;
     const othersHaveIt = chatMessages.some(
       (m) =>
@@ -1689,30 +1694,16 @@ export function AddTestDialog({
         m.id !== message.id &&
         Object.hasOwn(m.versions ?? {}, from),
     );
-    if (othersHaveIt) {
-      setRoleChange({ kind: "rename", id: message.id, role: message.role, from, to });
-    } else {
-      renameVersion(message.id, from, to);
-    }
-  };
-
-  const cancelRoleChange = () => {
-    if (!roleChange) return;
-    setRoleChange(null);
+    if (othersHaveIt) setRoleChange({ kind: "rename", role: message.role, from, to });
+    else applyRename(message.role, from, to);
   };
 
   const applyRoleChange = () => {
     if (!roleChange) return;
-    const { role } = roleChange;
-    if (roleChange.kind === "heading") setLabelForRole(role, roleChange.to);
-    if (roleChange.kind === "rename") {
-      const { from, to } = roleChange;
-      patchRole(role, (m) => versionsOf(m, renamedVersions(m.versions ?? {}, from, to)));
-    }
-    if (roleChange.kind === "remove") {
-      const { name } = roleChange;
-      patchRole(role, (m) => versionsOf(m, withoutVersion(m.versions ?? {}, name)));
-    }
+    if (roleChange.kind === "heading") applyHeading(roleChange.role, roleChange.to);
+    if (roleChange.kind === "rename")
+      applyRename(roleChange.role, roleChange.from, roleChange.to);
+    if (roleChange.kind === "remove") applyRemove(roleChange.role, roleChange.name);
     setRoleChange(null);
   };
 
@@ -3371,9 +3362,11 @@ export function AddTestDialog({
       if (hasEmptyChatMessage) {
         return;
       }
-      const hasEmptyVersion = chatMessages.some((m) =>
-        Object.values(m.versions ?? {}).some((text) => !text.trim()),
-      );
+      const hasEmptyVersion =
+        isLabelItem &&
+        chatMessages.some((m) =>
+          Object.values(m.versions ?? {}).some((text) => !text.trim()),
+        );
       if (hasEmptyVersion) {
         return;
       }
@@ -3554,14 +3547,43 @@ export function AddTestDialog({
     </span>
   );
 
+  const confirmCancelButtons = (
+    what: string,
+    onConfirm: () => void,
+    onCancel: () => void,
+    canConfirm = true,
+  ) => (
+    <>
+      <button
+        type="button"
+        aria-label={`Confirm ${what}`}
+        onClick={onConfirm}
+        disabled={!canConfirm}
+        className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <CheckIcon className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        aria-label={`Cancel ${what}`}
+        onClick={onCancel}
+        className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-muted-foreground hover:bg-muted transition-colors"
+      >
+        <CloseIcon className="w-4 h-4" />
+      </button>
+    </>
+  );
+
   const renderHeadingInput = (
     message: ChatMessage,
     placeholder: "Agent" | "User",
   ) => {
-    const draft = headingDraft?.id === message.id ? headingDraft : null;
+    const key = headingKey(message.id);
+    const draft = drafts[key];
     const current = message.label ?? "";
+    const shown = draft ?? current;
     const dirty =
-      !!draft && draft.to !== current && !(!current && draft.to === placeholder);
+      draft !== undefined && !headingUnchanged(message, draft, placeholder);
     const isUser = message.role === "user";
     return (
       <div
@@ -3569,26 +3591,24 @@ export function AddTestDialog({
           isUser ? "w-full flex-row-reverse" : ""
         }`}
       >
-        <div
-          className={`grid ${isUser ? "flex-1 min-w-0" : "max-w-64"}`}
-        >
+        <div className={`grid ${isUser ? "flex-1 min-w-0" : "max-w-64"}`}>
           <input
             type="text"
             size={1}
-            value={draft ? draft.to : current}
+            value={shown}
             placeholder={placeholder}
             aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
             onFocus={() => {
-              if (!draft)
-                setHeadingDraft({ id: message.id, to: current || placeholder });
+              if (draft === undefined) setDraft(key, current || placeholder);
             }}
-            onChange={(e) =>
-              setHeadingDraft({ id: message.id, to: e.target.value })
-            }
-            onBlur={() => dropHeadingDraftIfUnchanged(message, placeholder)}
+            onChange={(e) => setDraft(key, e.target.value)}
+            onBlur={() => {
+              if (draft !== undefined && !dirty) dropDrafts((k) => k !== key);
+            }}
             onKeyDown={(e) => {
-              if (e.key === "Enter") confirmHeadingDraft(message, placeholder);
-              if (e.key === "Escape") setHeadingDraft(null);
+              if (e.nativeEvent.isComposing) return;
+              if (e.key === "Enter") confirmHeading(message, placeholder);
+              if (e.key === "Escape") dropDrafts((k) => k !== key);
             }}
             className={`[grid-area:1/1/2/2] w-full min-w-0 h-7 rounded-md text-sm font-medium text-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
               isUser ? "pl-2 pr-4 text-right" : "pl-4 pr-2"
@@ -3600,29 +3620,15 @@ export function AddTestDialog({
               isUser ? "pl-2 pr-4" : "pl-4 pr-2"
             }`}
           >
-            {(draft ? draft.to : current) || placeholder}
+            {shown || placeholder}
           </span>
         </div>
-        {dirty && (
-          <>
-            <button
-              type="button"
-              aria-label="Confirm heading"
-              onClick={() => confirmHeadingDraft(message, placeholder)}
-              className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 transition-colors"
-            >
-              <CheckIcon className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              aria-label="Cancel heading"
-              onClick={() => setHeadingDraft(null)}
-              className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-muted-foreground hover:bg-muted transition-colors"
-            >
-              <CloseIcon className="w-4 h-4" />
-            </button>
-          </>
-        )}
+        {dirty &&
+          confirmCancelButtons(
+            "heading",
+            () => confirmHeading(message, placeholder),
+            () => dropDrafts((k) => k !== key),
+          )}
       </div>
     );
   };
@@ -3631,53 +3637,49 @@ export function AddTestDialog({
     isLabelItem && message.versions ? (
       <div className="my-3 flex flex-col gap-3 w-full">
         {Object.entries(message.versions).map(([name, text], i) => {
-          const draft =
-            versionDraft?.id === message.id && versionDraft.from === name
-              ? versionDraft
-              : null;
+          const key = versionKey(message.id, name);
+          const draft = drafts[key];
+          const dirty = draft !== undefined && draft !== name;
+          const taken = dirty && versionNameTaken(message, name, draft.trim());
+          const isUser = message.role === "user";
           return (
             <div key={i} className="flex flex-col w-full">
               <div
                 className={`flex items-center gap-1 w-full ${
-                  message.role === "user" ? "flex-row-reverse" : ""
+                  isUser ? "flex-row-reverse" : ""
                 }`}
               >
                 <input
                   type="text"
-                  value={draft ? draft.to : name}
-                  aria-label="Heading for this version"
-                  onChange={(e) =>
-                    setVersionDraft({ id: message.id, from: name, to: e.target.value })
-                  }
+                  value={draft ?? name}
+                  aria-label="Version name"
+                  onChange={(e) => setDraft(key, e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") confirmVersionDraft(message);
-                    if (e.key === "Escape") setVersionDraft(null);
+                    if (e.nativeEvent.isComposing) return;
+                    if (e.key === "Enter") confirmVersionName(message, name);
+                    if (e.key === "Escape") dropDrafts((k) => k !== key);
                   }}
                   className={`h-7 px-4 rounded-md text-xs text-muted-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
-                    message.role === "user" ? "flex-1 min-w-0 text-right" : ""
+                    isUser ? "flex-1 min-w-0 text-right" : ""
                   }`}
                 />
-                {draft && draft.to !== name && (
-                  <>
-                    <button
-                      type="button"
-                      aria-label="Confirm version name"
-                      onClick={() => confirmVersionDraft(message)}
-                      className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 transition-colors"
-                    >
-                      <CheckIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Cancel version name"
-                      onClick={() => setVersionDraft(null)}
-                      className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-muted-foreground hover:bg-muted transition-colors"
-                    >
-                      <CloseIcon className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
+                {dirty &&
+                  confirmCancelButtons(
+                    "version name",
+                    () => confirmVersionName(message, name),
+                    () => dropDrafts((k) => k !== key),
+                    !taken,
+                  )}
               </div>
+              {taken && (
+                <p
+                  className={`text-xs text-red-500 px-4 mb-1 ${
+                    isUser ? "text-right" : ""
+                  }`}
+                >
+                  Another version already has this name
+                </p>
+              )}
               <div
                 className={`flex items-start gap-2 ${
                   message.role === "user" ? "flex-row-reverse" : ""
@@ -3721,7 +3723,7 @@ export function AddTestDialog({
                     aria-label="Remove version"
                     onClick={() =>
                       isTextRole(message) &&
-                      setRoleChange({ kind: "remove", id: message.id, role: message.role, name })
+                      setRoleChange({ kind: "remove", role: message.role, name })
                     }
                     className="w-7 h-7 mt-1 flex-shrink-0 rounded-md flex items-center justify-center cursor-pointer text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
                   >
@@ -4164,7 +4166,7 @@ export function AddTestDialog({
 
       {roleChange && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/30" onClick={cancelRoleChange} />
+          <div className="absolute inset-0 bg-black/30" onClick={() => setRoleChange(null)} />
           <div className="relative bg-background rounded-xl shadow-2xl border border-border p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-semibold text-foreground mb-2">
               {roleChange.kind === "heading"
@@ -4181,7 +4183,7 @@ export function AddTestDialog({
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
-                onClick={cancelRoleChange}
+                onClick={() => setRoleChange(null)}
                 className="h-10 px-4 rounded-lg text-sm font-medium bg-background text-foreground hover:bg-muted transition-colors cursor-pointer border border-border"
               >
                 Cancel
@@ -5593,39 +5595,11 @@ export function AddTestDialog({
                                             }}
                                           />
                                           <div
-                                            style={(() => {
-                                              const r = toolCallAnchorRect;
-                                              if (!r)
-                                                return { left: -9999, top: 0 };
-                                              const margin = 8;
-                                              const estHeight = 360;
-                                              const spaceBelow =
-                                                window.innerHeight -
-                                                r.bottom -
-                                                margin;
-                                              const openAbove =
-                                                spaceBelow < estHeight &&
-                                                r.top > spaceBelow;
-                                              const alignRight =
-                                                message.role === "user";
-                                              return {
-                                                ...(openAbove
-                                                  ? {
-                                                      bottom:
-                                                        window.innerHeight -
-                                                        r.top +
-                                                        margin,
-                                                    }
-                                                  : { top: r.bottom + margin }),
-                                                ...(alignRight
-                                                  ? {
-                                                      right:
-                                                        window.innerWidth -
-                                                        r.right,
-                                                    }
-                                                  : { left: r.left }),
-                                              };
-                                            })()}
+                                            style={menuPosition(
+                                              toolCallAnchorRect,
+                                              360,
+                                              message.role === "user",
+                                            )}
                                             className="fixed bg-background border border-border rounded-xl shadow-xl z-[200] overflow-hidden min-w-[320px]"
                                           >
                                             {!pendingToolCall ? (

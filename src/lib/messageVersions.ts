@@ -27,7 +27,7 @@ export function readTurnExtras(raw: unknown): TurnExtras {
   if (obj.versions && typeof obj.versions === "object" && !Array.isArray(obj.versions)) {
     const versions: TurnVersions = {};
     for (const [k, v] of Object.entries(obj.versions as Record<string, unknown>)) {
-      if (typeof v === "string") versions[k] = v;
+      if (typeof v === "string" && k.trim()) versions[k] = v;
     }
     if (Object.keys(versions).length > 0) out.versions = versions;
   }

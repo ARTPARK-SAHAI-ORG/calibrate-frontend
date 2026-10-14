@@ -1329,3 +1329,29 @@ describe("TestDetailView with a malformed label or versions from the API", () =>
     expect(document.querySelectorAll(".border-dashed")).toHaveLength(1);
   });
 });
+
+describe("TestDetailView JSON view with versions hidden", () => {
+  it("leaves versions out of the JSON when showVersions is false", async () => {
+    const user = setupUser();
+    const history = [
+      {
+        role: "user" as const,
+        content: "hi",
+        label: "Caller",
+        versions: { Hindi: "namaste" },
+      },
+    ];
+    const { unmount } = render(
+      <TestDetailView history={history} passed={true} showVersions={false} />,
+    );
+    await user.click(screen.getByRole("button", { name: "JSON" }));
+    const json = document.querySelector("pre")?.textContent ?? "";
+    expect(json).toContain('"label": "Caller"');
+    expect(json).not.toContain("namaste");
+    unmount();
+
+    render(<TestDetailView history={history} passed={true} />);
+    await user.click(screen.getByRole("button", { name: "JSON" }));
+    expect(document.querySelector("pre")?.textContent ?? "").toContain("namaste");
+  });
+});
