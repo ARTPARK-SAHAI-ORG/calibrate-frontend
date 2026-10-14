@@ -292,7 +292,9 @@ export function AnnotationJobView({
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fields, setFields] = useState<Record<FieldKey, FieldValue>>({});
-  const [savedKeys, setSavedKeys] = useState<Set<FieldKey>>(new Set());
+  // What the server holds for each label, so an edit or a removal on screen
+  // can be told apart from what was saved.
+  const [saved, setSaved] = useState<Record<FieldKey, FieldValue>>({});
   // Per-item free-text comments, stored against the `evaluator_id IS NULL`
   // slot for each (job, item). `itemComments` holds the current editor
   // value; `savedComments` snapshots what the server has so we only POST
@@ -313,12 +315,12 @@ export function AnnotationJobView({
   // shared read-only link — that viewer gets the job as it was labelled,
   // with no controls of their own. It also waits for the first label,
   // since there is nothing to filter by on a job nobody has started.
-  const canFilterByValue = mode === "admin" && savedKeys.size > 0;
+  const canFilterByValue = mode === "admin" && Object.keys(saved).length > 0;
 
   const initialise = useCallback(
     (data: JobResponse) => {
       const next: Record<FieldKey, FieldValue> = {};
-      const saved = new Set<FieldKey>();
+      const savedNow: Record<FieldKey, FieldValue> = {};
       const comments: Record<string, string> = {};
       for (const a of data.annotations) {
         if (!a.evaluator_id) {
@@ -326,15 +328,15 @@ export function AnnotationJobView({
           if (c) comments[a.item_id] = c;
           continue;
         }
+        const value = readSavedValue(a.value);
+        // A row saved with no value is an old blank answer: not answered.
+        if (value === null || value === undefined) continue;
         const k = fieldKey(a.item_id, a.evaluator_id);
-        next[k] = {
-          value: readSavedValue(a.value),
-          comment: readSavedComment(a.value),
-        };
-        saved.add(k);
+        next[k] = { value, comment: readSavedComment(a.value) };
+        savedNow[k] = next[k];
       }
       setFields(next);
-      setSavedKeys(saved);
+      setSaved(savedNow);
       setItemComments(comments);
       setSavedComments(comments);
 
@@ -359,7 +361,7 @@ export function AnnotationJobView({
       }
       const firstIncomplete = data.items.findIndex((it) =>
         requiredOnly(evaluatorsForItem(data.evaluators, it)).some(
-          (ev) => !saved.has(fieldKey(it.uuid, ev.uuid)),
+          (ev) => !(fieldKey(it.uuid, ev.uuid) in savedNow),
         ),
       );
       setCurrentIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
@@ -545,8 +547,8 @@ export function AnnotationJobView({
       evaluators={evaluators}
       fields={fields}
       setFields={setFields}
-      savedKeys={savedKeys}
-      setSavedKeys={setSavedKeys}
+      saved={saved}
+      setSaved={setSaved}
       itemComments={itemComments}
       setItemComments={setItemComments}
       savedComments={savedComments}
@@ -578,8 +580,8 @@ type ViewProps = {
   evaluators: Evaluator[];
   fields: Record<FieldKey, FieldValue>;
   setFields: React.Dispatch<React.SetStateAction<Record<FieldKey, FieldValue>>>;
-  savedKeys: Set<FieldKey>;
-  setSavedKeys: React.Dispatch<React.SetStateAction<Set<FieldKey>>>;
+  saved: Record<FieldKey, FieldValue>;
+  setSaved: React.Dispatch<React.SetStateAction<Record<FieldKey, FieldValue>>>;
   itemComments: Record<string, string>;
   setItemComments: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   savedComments: Record<string, string>;
@@ -608,8 +610,8 @@ function AnnotateView({
   evaluators,
   fields,
   setFields,
-  savedKeys,
-  setSavedKeys,
+  saved,
+  setSaved,
   itemComments,
   setItemComments,
   savedComments,
@@ -683,30 +685,44 @@ function AnnotateView({
   const evaluatorAnswered = (itemId: string, ev: Evaluator) =>
     hasFieldValue(fields[fieldKey(itemId, ev.uuid)]);
 
-  // A row counts as finished only when every required evaluator is saved,
-  // something was actually saved for it (a task whose evaluators are all
-  // optional would otherwise read as finished before anyone touched it),
-  // and no answer is sitting on screen unsaved. That last part matters for
-  // optional evaluators: answering one on a row that is already saved has
-  // to leave the row unfinished, or the new answer is silently dropped
-  // when the annotator moves on.
-  const itemCompleted = useCallback(
-    (itemId: string) => {
-      const applicable = evaluatorsFor(itemId);
-      const savedFor = (ev: Evaluator) =>
-        savedKeys.has(fieldKey(itemId, ev.uuid));
-      if (!requiredOnly(applicable).every(savedFor)) return false;
-      if (!applicable.some(savedFor)) return false;
-      return !applicable.some(
-        (ev) => evaluatorAnswered(itemId, ev) && !savedFor(ev),
-      );
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [evaluatorsFor, savedKeys, fields],
-  );
+  const isSaved = (itemId: string, ev: Evaluator) =>
+    fieldKey(itemId, ev.uuid) in saved;
+  // The label on screen differs from what the server holds: a new answer,
+  // a changed answer or reasoning, or a saved answer that was removed.
+  const fieldDirty = (itemId: string, ev: Evaluator) => {
+    const k = fieldKey(itemId, ev.uuid);
+    const f = fields[k];
+    const s = saved[k];
+    if (!s) return hasFieldValue(f);
+    if (!hasFieldValue(f)) return true;
+    return f.value !== s.value || (f.comment ?? "") !== (s.comment ?? "");
+  };
   const commentChangedFor = (itemId: string) =>
     (itemComments[itemId] ?? "").trim() !==
     (savedComments[itemId] ?? "").trim();
+  const itemDirty = (itemId: string) =>
+    evaluatorsFor(itemId).some((ev) => fieldDirty(itemId, ev)) ||
+    commentChangedFor(itemId);
+
+  // A row counts as finished only when every required evaluator is saved,
+  // something was actually saved for it (a task whose evaluators are all
+  // optional would otherwise read as finished before anyone touched it),
+  // and nothing on screen differs from what was saved, so an edited or
+  // removed answer leaves the row unfinished until it is saved.
+  const itemCompleted = (itemId: string) => {
+    const applicable = evaluatorsFor(itemId);
+    const savedFor = (ev: Evaluator) => isSaved(itemId, ev);
+    if (!requiredOnly(applicable).every(savedFor)) return false;
+    if (!applicable.some(savedFor)) return false;
+    return !applicable.some((ev) => fieldDirty(itemId, ev));
+  };
+  // Something changed, and every required evaluator is either answered or
+  // was saved before (blank now because the annotator removed it).
+  const canSaveItem = (itemId: string) =>
+    itemDirty(itemId) &&
+    requiredEvaluatorsFor(itemId).every(
+      (ev) => evaluatorAnswered(itemId, ev) || isSaved(itemId, ev),
+    );
 
   // Labels the annotator touched in this sitting. A job that asks for
   // reasoning asks for it on these only: a label that arrived already
@@ -724,7 +740,12 @@ function AnnotateView({
 
   const setField = (key: FieldKey, partial: Partial<FieldValue>) => {
     setTouchedKeys((prev) => new Set(prev).add(key));
-    if (typeof partial.comment === "string" && partial.comment.trim()) {
+    // Removing an answer empties its reasoning box too.
+    if (partial.value === null) partial = { value: null, comment: "" };
+    if (
+      partial.value === null ||
+      (typeof partial.comment === "string" && partial.comment.trim())
+    ) {
       setMissingReasoningKeys((prev) => {
         if (!prev.has(key)) return prev;
         const next = new Set(prev);
@@ -788,16 +809,24 @@ function AnnotateView({
 
     const annotationsBody: {
       evaluator_id: string | null;
-      value: Record<string, unknown>;
+      value: Record<string, unknown> | null;
     }[] = [];
+    const sent: Record<FieldKey, FieldValue> = {};
+    const removed: FieldKey[] = [];
     // The row's own evaluators, not the task's whole list: an AI judge that
     // does not apply to this row has no answer and would refuse the save.
     for (const ev of evaluatorsFor(currentItem.uuid)) {
       const k = fieldKey(currentItem.uuid, ev.uuid);
       const f = fields[k];
       if (!hasFieldValue(f)) {
-        // A blank optional evaluator is simply not sent; a blank required
-        // one means there is nothing valid to save yet.
+        // A blank answer that was saved before was removed: a null value
+        // deletes it. A blank optional evaluator never saved is not sent; a
+        // blank required one never saved means there is nothing to save yet.
+        if (k in saved) {
+          annotationsBody.push({ evaluator_id: ev.uuid, value: null });
+          removed.push(k);
+          continue;
+        }
         if (ev.is_optional === true) continue;
         return false;
       }
@@ -808,6 +837,7 @@ function AnnotateView({
           ...(f.comment ? { reasoning: f.comment } : {}),
         },
       });
+      sent[k] = { value: f.value, comment: f.comment ?? "" };
     }
 
     // Item-level free-text comment lives on the `evaluator_id IS NULL`
@@ -822,6 +852,11 @@ function AnnotateView({
         evaluator_id: null,
         value: { comment: currentComment },
       });
+    }
+    // Nothing answered and nothing to remove: Submit & Next just moves on.
+    if (annotationsBody.length === 0) {
+      if (advance && currentIndex < total - 1) onJumpTo(currentIndex + 1);
+      return true;
     }
 
     setSubmitting(true);
@@ -838,24 +873,13 @@ function AnnotateView({
         },
       });
       if (!result.ok) {
-        if (result.status === 400) {
-          setTopError("This job has already been marked complete.");
-        } else {
-          setTopError(`Save failed (${result.status})`);
-        }
+        setTopError(`Save failed (${result.status})`);
         return false;
       }
 
-      const justSaved = new Set<FieldKey>();
-      for (const a of annotationsBody) {
-        if (a.evaluator_id)
-          justSaved.add(fieldKey(currentItem.uuid, a.evaluator_id));
-      }
-      setSavedKeys((prev) => {
-        const next = new Set(prev);
-        justSaved.forEach((k) => next.add(k));
-        return next;
-      });
+      const nextSaved = { ...saved, ...sent };
+      for (const k of removed) delete nextSaved[k];
+      setSaved(nextSaved);
       if (commentChanged) {
         setSavedComments((prev) => ({
           ...prev,
@@ -871,15 +895,18 @@ function AnnotateView({
         });
         return true;
       }
+      // Removing an answer can reopen a job that was complete.
+      if (isCompleted) {
+        onJobUpdate({ ...data.job, status: "in_progress", completed_at: null });
+      }
 
       if (advance) {
         // Asked of the row's own evaluators, so a tool-call row already
         // answered is not offered again as the next unfinished one.
         const isItemDone = (itemId: string) =>
-          requiredEvaluatorsFor(itemId).every((ev) => {
-            const k = fieldKey(itemId, ev.uuid);
-            return justSaved.has(k) || savedKeys.has(k);
-          });
+          requiredEvaluatorsFor(itemId).every(
+            (ev) => fieldKey(itemId, ev.uuid) in nextSaved,
+          );
         const nextIncomplete = items.findIndex(
           (it, i) => i !== currentIndex && !isItemDone(it.uuid),
         );
@@ -901,14 +928,13 @@ function AnnotateView({
   >("unanswered");
 
   // Every way of leaving the current item (Previous, Next, the index list)
-  // routes through here.
-  //   - Every evaluator answered but never submitted: save it before moving
-  //     on, otherwise the annotator believes it's done while the admin sees
+  // routes through here. Only an item with something unsaved on it stops:
+  //   - It can be saved (a new, changed or removed answer, with every
+  //     required evaluator answered or saved): save it before moving on,
+  //     otherwise the annotator believes it is recorded while the admin sees
   //     nothing. A failed save keeps them on the item so the error is visible.
-  //   - Some (but not all) evaluators answered, or a comment typed: the
-  //     backend needs every evaluator, so this can't be saved. Warn before
-  //     leaving so they don't assume it was recorded.
-  //   - No progress, or already saved: just navigate.
+  //   - It cannot be saved yet (a required evaluator still blank, or
+  //     reasoning missing): warn before leaving.
   const navigateTo = async (target: number) => {
     if (target === currentIndex) return;
     // Ignore navigation while a save is in flight so a rapid second click
@@ -916,7 +942,7 @@ function AnnotateView({
     if (submitting) return;
     if (!isAdmin && currentItem) {
       const uuid = currentItem.uuid;
-      if (!itemCompleted(uuid)) {
+      if (itemDirty(uuid)) {
         // Reasoning is missing, so this item cannot be saved. Offer the
         // leave-without-saving choice rather than refusing to move, which
         // would strand the annotator on an item they cannot finish and
@@ -926,23 +952,15 @@ function AnnotateView({
           setPendingNav(target);
           return;
         }
-        if (
-          evaluatorsFor(uuid).length > 0 &&
-          requiredEvaluatorsFor(uuid).every((ev) => evaluatorAnswered(uuid, ev))
-        ) {
+        if (canSaveItem(uuid)) {
           const ok = await handleSubmitItem({ advance: false });
           if (!ok) return;
           onJumpTo(target);
           return;
         }
-        if (
-          evaluatorsFor(uuid).some((ev) => evaluatorAnswered(uuid, ev)) ||
-          commentChangedFor(uuid)
-        ) {
-          setPendingNavReason("unanswered");
-          setPendingNav(target);
-          return;
-        }
+        setPendingNavReason("unanswered");
+        setPendingNav(target);
+        return;
       }
     }
     onJumpTo(target);
@@ -1059,6 +1077,12 @@ function AnnotateView({
                 const currentItemSaved = currentItem
                   ? itemCompleted(currentItem.uuid)
                   : false;
+                const currentHasSaved =
+                  !!currentItem &&
+                  evaluatorsFor(currentItem.uuid).some((ev) =>
+                    isSaved(currentItem.uuid, ev),
+                  );
+                const canSave = !!currentItem && canSaveItem(currentItem.uuid);
                 const unsavedCount = items.reduce(
                   (n, it) => (itemCompleted(it.uuid) ? n : n + 1),
                   0,
@@ -1072,17 +1096,21 @@ function AnnotateView({
                     evaluatorAnswered(currentItem.uuid, ev),
                   );
                 const disabled =
-                  submitting || total === 0 || !allEvaluatorsAnswered;
+                  submitting ||
+                  total === 0 ||
+                  !(allEvaluatorsAnswered || canSave);
                 const label = submitting
                   ? "Saving..."
-                  : currentItemSaved
-                    ? "Update"
-                    : isLastUnsaved
-                      ? "Mark as complete"
+                  : // Saving a removed required answer does not finish the job.
+                    isLastUnsaved && (allEvaluatorsAnswered || !currentHasSaved)
+                    ? "Mark as complete"
+                    : currentHasSaved
+                      ? "Update"
                       : "Submit & Next";
-                const tooltip = !allEvaluatorsAnswered
-                  ? "Judgements should be given for all required evaluators before submitting"
-                  : undefined;
+                const tooltip =
+                  !allEvaluatorsAnswered && !canSave
+                    ? "Judgements should be given for all required evaluators before submitting"
+                    : undefined;
                 const submitButton = (
                   <button
                     onClick={() => handleSubmitItem()}
@@ -1238,10 +1266,10 @@ function AnnotateView({
                   }`}
                 >
                   <ItemPane
-                  item={currentItem}
-                  taskType={data.task.type}
-                  showVersions={showVersions}
-                />
+                    item={currentItem}
+                    taskType={data.task.type}
+                    showVersions={showVersions}
+                  />
                 </div>
                 <div
                   ref={evaluatorsPaneRef}
@@ -1342,9 +1370,7 @@ export function ItemPane({
   // so its own pane draws the tool call too. Only a next-reply item swaps to
   // the tool-call pane, which reads `chat_history` / `agent_response`.
   if (taskType === "llm-general")
-    return (
-      <LlmGeneralItemPane payload={payload} showVersions={showVersions} />
-    );
+    return <LlmGeneralItemPane payload={payload} showVersions={showVersions} />;
   if (item.is_tool_call === true)
     return <ToolCallItemPane payload={payload} showVersions={showVersions} />;
   if (taskType === "llm")

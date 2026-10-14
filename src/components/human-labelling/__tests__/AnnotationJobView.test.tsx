@@ -384,7 +384,7 @@ describe("AnnotationJobView", () => {
     expect(confettiMock).not.toHaveBeenCalled();
   });
 
-  it("shows an already-completed error on a 400 save response", async () => {
+  it("shows the save-failed error on a 400 save response", async () => {
     const user = setupUser();
     fetchMock.mockResolvedValueOnce(
       jsonResponse(jobResponse({ items: [items[0]] })),
@@ -400,9 +400,7 @@ describe("AnnotationJobView", () => {
     await user.click(screen.getByRole("button", { name: "Mark as complete" }));
 
     await waitFor(() =>
-      expect(
-        screen.getByText("This job has already been marked complete."),
-      ).toBeInTheDocument(),
+      expect(screen.getByText("Save failed (400)")).toBeInTheDocument(),
     );
   });
 
@@ -852,6 +850,129 @@ describe("AnnotationJobView", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  describe("editing and removing saved answers", () => {
+    const ann = (item: string, ev: string, value: unknown) => ({
+      uuid: `${item}-${ev}`,
+      job_id: "job-1",
+      item_id: item,
+      evaluator_id: ev,
+      value: { value },
+      created_at: "",
+      updated_at: "",
+    });
+    // item-1 saved as Correct / 3; item-2 untouched.
+    const savedItemOne = [ann("item-1", "ev-1", true), ann("item-1", "ev-2", 3)];
+    const postBody = () =>
+      JSON.parse(fetchMock.mock.calls[fetchMock.mock.calls.length - 1][1].body);
+
+    async function renderJob(overrides: Record<string, unknown> = {}) {
+      setSearch(`?${ITEM_PARAM}=item-1`);
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(jobResponse({ annotations: savedItemOne, ...overrides })),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      );
+    }
+    afterEach(() => setSearch(""));
+
+    it("sends a null value for a removed saved answer and unmarks the item", async () => {
+      const user = setupUser();
+      await renderJob();
+      expect(
+        screen.getAllByRole("button", { name: "Item 1 (completed)" }).length,
+      ).toBeGreaterThan(0);
+
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: [], count: 1, status: "in_progress" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Update" }));
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(postBody().annotations).toEqual([
+        { evaluator_id: "ev-1", value: null },
+        { evaluator_id: "ev-2", value: { value: 3 } },
+      ]);
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Item 1 (completed)" }),
+        ).not.toBeInTheDocument(),
+      );
+    });
+
+    it("saves a removed answer when the annotator presses Next", async () => {
+      const user = setupUser();
+      await renderJob();
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: [], count: 1, status: "in_progress" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Next" }));
+
+      await waitFor(() =>
+        expect(screen.getByText("Item 2 of 2")).toBeInTheDocument(),
+      );
+      expect(postBody().annotations).toContainEqual({
+        evaluator_id: "ev-1",
+        value: null,
+      });
+    });
+
+    it("saves a changed answer when the annotator moves to another item", async () => {
+      const user = setupUser();
+      await renderJob();
+      await user.click(screen.getByRole("button", { name: "5" }));
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: [], count: 2, status: "in_progress" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Next" }));
+
+      await waitFor(() =>
+        expect(screen.getByText("Item 2 of 2")).toBeInTheDocument(),
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(postBody().annotations).toContainEqual({
+        evaluator_id: "ev-2",
+        value: { value: 5 },
+      });
+    });
+
+    it("drops the Completed pill when a save reopens a completed job", async () => {
+      const user = setupUser();
+      await renderJob({
+        job: { ...jobResponse().job, status: "completed" },
+        annotations: [
+          ...savedItemOne,
+          ann("item-2", "ev-1", true),
+          ann("item-2", "ev-2", 4),
+        ],
+      });
+      expect(screen.getByText("Completed")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: [], count: 1, status: "in_progress" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Update" }));
+
+      await waitFor(() =>
+        expect(screen.queryByText("Completed")).not.toBeInTheDocument(),
+      );
+    });
+
+    it("treats a saved answer with no value as unanswered", async () => {
+      await renderJob({
+        annotations: [ann("item-1", "ev-1", null), ann("item-1", "ev-2", 3)],
+      });
+      expect(
+        screen.queryByRole("button", { name: "Item 1 (completed)" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Update" })).toBeDisabled();
+    });
   });
 
   it("keeps the annotator on the item and shows an error if the auto-save fails", async () => {
@@ -1319,6 +1440,26 @@ describe("AnnotationJobView", () => {
       expect(
         screen.queryByRole("button", { name: "Update" }),
       ).not.toBeInTheDocument();
+    });
+
+    it("moves to the next item without saving when nothing was answered", async () => {
+      const user = setupUser();
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(
+          jobResponse({
+            evaluators: evaluators.map((ev) => ({ ...ev, is_optional: true })),
+          }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await waitFor(() =>
+        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Submit & Next" }));
+
+      expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   });
 
