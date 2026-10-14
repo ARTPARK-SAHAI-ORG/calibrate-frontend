@@ -157,14 +157,14 @@ async function stepsBothWays(
   await expect(page.getByText("1 of 2", { exact: true })).toBeVisible();
 }
 
-/** View item leaves the edit window for the item view window, on the same
+/** Preview leaves the edit window for the item view window, on the same
  * item. */
 async function viewsTheItem(
   page: Page,
   nameField: Locator,
   name: string,
 ): Promise<void> {
-  await page.getByRole("button", { name: "View item", exact: true }).click();
+  await page.getByRole("button", { name: "Preview", exact: true }).click();
   await expect(nameField).toHaveCount(0);
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible({
     timeout: 15000,

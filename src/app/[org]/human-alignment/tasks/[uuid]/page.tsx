@@ -2468,7 +2468,7 @@ function LabellingTaskPageInner() {
   });
   const openItemDetail = itemPager.open;
 
-  // The edit window's View item button: closes whichever edit window is open
+  // The edit window's Preview button: closes whichever edit window is open
   // and opens the item view window on the same item.
   const viewEditedItem = (uuid: string) => {
     editPager.cancel();

@@ -2594,12 +2594,12 @@ describe("AddTestDialog — stepping to another test", () => {
   });
 });
 
-describe("AddTestDialog — View item", () => {
-  it("draws no View item button when no handler is passed", async () => {
+describe("AddTestDialog — Preview", () => {
+  it("draws no Preview button when no handler is passed", async () => {
     render(<AddTestDialog {...baseProps({ isEditing: true, testName: "Saved" })} />);
     await screen.findByText("Test name");
     expect(
-      screen.queryByRole("button", { name: "View item" }),
+      screen.queryByRole("button", { name: "Preview" }),
     ).not.toBeInTheDocument();
   });
 
@@ -2623,7 +2623,7 @@ describe("AddTestDialog — View item", () => {
     await act(async () => {
       for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0));
     });
-    await user.click(screen.getByRole("button", { name: "View item" }));
+    await user.click(screen.getByRole("button", { name: "Preview" }));
     expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
     expect(onView).toHaveBeenCalledTimes(1);
   });
@@ -2642,7 +2642,7 @@ describe("AddTestDialog — View item", () => {
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
     await user.type(screen.getByPlaceholderText("Your test name"), "Edited");
-    await user.click(screen.getByRole("button", { name: "View item" }));
+    await user.click(screen.getByRole("button", { name: "Preview" }));
     expect(onView).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Discard" }));
     expect(onView).toHaveBeenCalledTimes(1);

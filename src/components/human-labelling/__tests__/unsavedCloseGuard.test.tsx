@@ -179,7 +179,7 @@ describe("useUnsavedCloseGuard", () => {
       expect(onNext).not.toHaveBeenCalled();
     });
 
-    it("View item asks first when there are edits, and Discard opens the view", () => {
+    it("Preview asks first when there are edits, and Discard opens the view", () => {
       const onView = jest.fn();
       const { util, onClose } = setup({ isDirty: true, onView });
       act(() => util.result.current.navView!());
@@ -266,7 +266,7 @@ describe("ViewItemButton", () => {
     const user = setupUser();
     const onClick = jest.fn();
     render(<ViewItemButton onClick={onClick} />);
-    await user.click(screen.getByRole("button", { name: "View item" }));
+    await user.click(screen.getByRole("button", { name: "Preview" }));
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

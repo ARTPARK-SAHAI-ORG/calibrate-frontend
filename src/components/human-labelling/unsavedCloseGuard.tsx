@@ -156,7 +156,7 @@ export function ViewItemButton({
       disabled={disabled}
       className="h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      View item
+      Preview
     </button>
   );
 }
