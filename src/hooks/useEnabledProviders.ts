@@ -3,13 +3,16 @@
 import { useEffect, useState } from "react";
 import { getBackendUrl, getDefaultHeaders } from "@/lib/api";
 import { reportError } from "@/lib/reportError";
+import { getActiveOrgUuid } from "@/lib/orgs";
+import { useOrgUuid } from "@/lib/nav";
 import { useAccessToken } from "./useAccessToken";
 
 /**
  * Provider gating for the STT/TTS pickers.
  *
- * The backend's `GET /providers` returns the providers whose API keys are
- * configured in the current environment, as a plain name list:
+ * The backend's `GET /providers` returns the providers the active workspace
+ * can run: those with a key on the server, or, once the workspace saves its own
+ * keys, only those. It is a plain name list:
  *   { "providers": ["deepgram", "openai", "google", "sarvam", ...] }
  *
  * These names match our STT/TTS provider `value`s exactly (case-insensitive),
@@ -22,12 +25,22 @@ import { useAccessToken } from "./useAccessToken";
 
 type EnabledProviders = Set<string> | null;
 
-type CacheEntry = { token: string; providers: EnabledProviders };
+// Keyed by token and workspace, since the answer depends on both.
+type CacheEntry = { key: string; providers: EnabledProviders };
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
 let cache: (CacheEntry & { timestamp: number }) | null = null;
-let inflight: { token: string; promise: Promise<EnabledProviders> } | null = null;
+let inflight: { key: string; promise: Promise<EnabledProviders> } | null = null;
+
+const cacheKey = (token: string) => `${token}:${getActiveOrgUuid() ?? ""}`;
+
+/** Forget the stored list, so the next read asks the backend again. Called
+ *  after the workspace's provider keys change. */
+export function clearEnabledProvidersCache(): void {
+  cache = null;
+  inflight = null;
+}
 
 async function fetchEnabledProviders(token: string): Promise<EnabledProviders> {
   const backendUrl = getBackendUrl();
@@ -56,24 +69,28 @@ async function fetchEnabledProviders(token: string): Promise<EnabledProviders> {
 }
 
 function getOrFetch(token: string): Promise<EnabledProviders> {
-  if (cache && cache.token === token && Date.now() - cache.timestamp < CACHE_TTL_MS) {
+  const key = cacheKey(token);
+  if (cache && cache.key === key && Date.now() - cache.timestamp < CACHE_TTL_MS) {
     return Promise.resolve(cache.providers);
   }
 
-  if (inflight && inflight.token === token) return inflight.promise;
+  if (inflight && inflight.key === key) return inflight.promise;
 
-  const promise = fetchEnabledProviders(token)
+  const promise: Promise<EnabledProviders> = fetchEnabledProviders(token)
     .then((providers) => {
-      cache = { token, providers, timestamp: Date.now() };
-      inflight = null;
+      // A clear while this was in flight means the answer may be stale.
+      if (inflight?.promise === promise) {
+        cache = { key, providers, timestamp: Date.now() };
+        inflight = null;
+      }
       return providers;
     })
     .catch((err) => {
-      inflight = null;
+      if (inflight?.promise === promise) inflight = null;
       throw err;
     });
 
-  inflight = { token, promise };
+  inflight = { key, promise };
   return promise;
 }
 
@@ -83,8 +100,11 @@ function getOrFetch(token: string): Promise<EnabledProviders> {
  */
 export function useEnabledProviders(): EnabledProviders {
   const accessToken = useAccessToken();
+  const orgUuid = useOrgUuid();
   const [enabled, setEnabled] = useState<EnabledProviders>(() =>
-    cache && accessToken && cache.token === accessToken ? cache.providers : null,
+    cache && accessToken && cache.key === cacheKey(accessToken)
+      ? cache.providers
+      : null,
   );
 
   useEffect(() => {
@@ -103,7 +123,7 @@ export function useEnabledProviders(): EnabledProviders {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, orgUuid]);
 
   return enabled;
 }

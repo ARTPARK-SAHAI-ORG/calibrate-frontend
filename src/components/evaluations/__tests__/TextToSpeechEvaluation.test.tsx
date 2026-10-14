@@ -7,6 +7,7 @@ import { TextToSpeechEvaluation } from "../TextToSpeechEvaluation";
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
   useMaxRowsPerEval: () => 20,
+  useUsesOwnProviderKeys: () => false,
   useEnabledProviders: () => null,
   isProviderEnabled: (enabled: Set<string> | null, value: string) =>
     !enabled || enabled.has(value.toLowerCase()),

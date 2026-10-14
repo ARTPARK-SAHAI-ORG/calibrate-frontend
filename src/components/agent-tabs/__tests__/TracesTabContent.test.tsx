@@ -618,6 +618,30 @@ describe("TracesTabContent", () => {
       ).toBeInTheDocument();
     });
 
+    it("says nothing about the scoring limit when the workspace has none", async () => {
+      // Traces skipped before the workspace added its own keys still carry
+      // over_limit, but there is no limit left to have reached.
+      fetchTraceUsage.mockResolvedValue({
+        traces_stored: 3,
+        max_traces: 50000,
+        traces_scored: 1,
+        max_scored_traces: null,
+      });
+      mockUseTraces.mockReturnValue(
+        tracesResult([
+          trace({
+            latest_run_status: "skipped",
+            latest_run_error: "over_limit",
+          }),
+        ]),
+      );
+      render(<TracesTabContent {...tabProps} />);
+      await act(async () => {});
+      expect(
+        screen.queryByText(/were not scored because this workspace/i),
+      ).not.toBeInTheDocument();
+    });
+
     it("asks how much of the limit is used on every visit", () => {
       // The storage limit leaves no mark on this screen: past it the backend
       // turns down the customer's own app and the refusal lands in that app's

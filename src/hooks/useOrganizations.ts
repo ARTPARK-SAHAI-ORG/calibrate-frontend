@@ -2,7 +2,7 @@
 import { reportError } from "@/lib/reportError";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiClient, apiDelete, apiGet, apiPost } from "@/lib/api";
+import { apiClient, apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
 import { createRequestCache } from "@/lib/requestCache";
 import type { InviteLink } from "@/lib/invites";
 import {
@@ -13,11 +13,16 @@ import {
   type OrganizationApiKeyWithSecret,
   type OrganizationMember,
   type OrganizationSettings,
+  type ProviderKey,
+  type ProviderKeyProvider,
+  type ProviderKeys,
   getRememberedOrgUuid,
   notifyOrganizationsChanged,
   setActiveOrgUuid as persistActiveOrgUuid,
 } from "@/lib/orgs";
 import { useOrgUuid } from "@/lib/nav";
+import { clearOrgLimitsCache } from "./useMaxRowsPerEval";
+import { clearEnabledProvidersCache } from "./useEnabledProviders";
 
 type UseOrganizationsReturn = {
   organizations: Organization[];
@@ -639,4 +644,137 @@ export function useWorkspaceApiKeys(
   );
 
   return { apiKeys, isLoading, error, refetch, createApiKey, revokeApiKey };
+}
+
+type UseProviderKeysReturn = {
+  keys: ProviderKey[];
+  usesOwnKeys: boolean;
+  isLoading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+  saveProviderKey: (
+    provider: ProviderKeyProvider,
+    value: string,
+  ) => Promise<ProviderKey>;
+  removeProviderKey: (provider: ProviderKeyProvider) => Promise<void>;
+};
+
+const providerKeysCache = createRequestCache<ProviderKeys>({
+  ttlMs: 30_000,
+});
+const providerKeysKey = (accessToken: string, orgUuid: string) =>
+  `${accessToken}:${orgUuid}`;
+
+const EMPTY_PROVIDER_KEYS: ProviderKeys = { uses_own_keys: false, keys: [] };
+
+/** Saving or removing a key changes which providers the workspace can run and
+ *  whether its limits apply, so both stored answers are dropped. */
+function forgetProviderDependentCaches(): void {
+  clearOrgLimitsCache();
+  clearEnabledProvidersCache();
+}
+
+export function useProviderKeys(
+  accessToken: string | null | undefined,
+  orgUuid: string | null,
+): UseProviderKeysReturn {
+  const cached =
+    accessToken && orgUuid
+      ? providerKeysCache.peek(providerKeysKey(accessToken, orgUuid))
+      : undefined;
+  const [data, setData] = useState<ProviderKeys>(
+    cached ?? EMPTY_PROVIDER_KEYS,
+  );
+  const [isLoading, setIsLoading] = useState(!cached);
+  const [error, setError] = useState<string | null>(null);
+
+  const refetch = useCallback(async () => {
+    if (!accessToken || !orgUuid) {
+      setData(EMPTY_PROVIDER_KEYS);
+      setIsLoading(false);
+      return;
+    }
+    try {
+      setIsLoading(true);
+      setError(null);
+      const next = await providerKeysCache.fetch(
+        providerKeysKey(accessToken, orgUuid),
+        () => apiGet<ProviderKeys>("/provider-keys", accessToken),
+      );
+      setData(next);
+    } catch (err) {
+      reportError("Error fetching provider keys:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to load provider keys",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [accessToken, orgUuid]);
+
+  useEffect(() => {
+    if (accessToken && orgUuid) {
+      const hit = providerKeysCache.peek(providerKeysKey(accessToken, orgUuid));
+      if (hit) {
+        setData(hit);
+        setIsLoading(false);
+        return;
+      }
+    }
+    refetch();
+  }, [accessToken, orgUuid, refetch]);
+
+  const saveProviderKey = useCallback(
+    async (
+      provider: ProviderKeyProvider,
+      value: string,
+    ): Promise<ProviderKey> => {
+      if (!accessToken || !orgUuid) {
+        throw new Error("Not signed in");
+      }
+      const saved = await apiPut<ProviderKey>(
+        `/provider-keys/${provider}`,
+        accessToken,
+        { value },
+      );
+      forgetProviderDependentCaches();
+      setData((prev) => {
+        const next: ProviderKeys = {
+          uses_own_keys: true,
+          keys: [...prev.keys.filter((k) => k.provider !== provider), saved],
+        };
+        providerKeysCache.set(providerKeysKey(accessToken, orgUuid), next);
+        return next;
+      });
+      return saved;
+    },
+    [accessToken, orgUuid],
+  );
+
+  const removeProviderKey = useCallback(
+    async (provider: ProviderKeyProvider): Promise<void> => {
+      if (!accessToken || !orgUuid) {
+        throw new Error("Not signed in");
+      }
+      await apiDelete(`/provider-keys/${provider}`, accessToken);
+      forgetProviderDependentCaches();
+      setData((prev) => {
+        const keys = prev.keys.filter((k) => k.provider !== provider);
+        const next: ProviderKeys = { uses_own_keys: keys.length > 0, keys };
+        providerKeysCache.set(providerKeysKey(accessToken, orgUuid), next);
+        return next;
+      });
+    },
+    [accessToken, orgUuid],
+  );
+
+  return {
+    keys: data.keys,
+    usesOwnKeys: data.uses_own_keys,
+    isLoading,
+    error,
+    refetch,
+    saveProviderKey,
+    removeProviderKey,
+  };
 }

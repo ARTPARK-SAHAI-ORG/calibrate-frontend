@@ -8,6 +8,11 @@ jest.mock("sonner", () => ({
 }));
 import { toast } from "sonner";
 
+let mockUsesOwnKeys = false;
+jest.mock("../../../hooks/useMaxRowsPerEval", () => ({
+  useUsesOwnProviderKeys: () => mockUsesOwnKeys,
+}));
+
 function makeItem(overrides: Partial<DatasetItem> = {}): DatasetItem {
   return {
     uuid: "item-1",
@@ -31,6 +36,7 @@ function getHandle(): TTSDatasetEditorHandle {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockUsesOwnKeys = false;
   (global as any).URL.createObjectURL = jest.fn(() => "blob:mock");
   (global as any).URL.revokeObjectURL = jest.fn();
 });
@@ -133,6 +139,21 @@ describe("TTSDatasetEditor", () => {
     expect(
       screen.getAllByPlaceholderText("Enter text to synthesize"),
     ).toHaveLength(1);
+  });
+
+  it("adds rows freely when the workspace has no row limit", async () => {
+    const user = setupUser();
+    render(<Harness maxRowsPerEval={null} />);
+    await user.type(
+      screen.getByPlaceholderText("Enter text to synthesize"),
+      "Row one",
+    );
+    await user.click(screen.getByText("Add another row"));
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(
+      screen.getAllByPlaceholderText("Enter text to synthesize"),
+    ).toHaveLength(2);
   });
 
   it("does not show a delete button for the only new row when there are no saved items", () => {
@@ -480,6 +501,21 @@ describe("TTSDatasetEditor", () => {
       expect(
         screen.getAllByPlaceholderText("Enter text to synthesize"),
       ).toHaveLength(1);
+    });
+
+    it("accepts long text when the workspace uses its own provider keys", async () => {
+      mockUsesOwnKeys = true;
+      const { container } = render(<Harness />);
+      const input = container.querySelector(
+        "#tts-csv-upload",
+      ) as HTMLInputElement;
+      const longText = "a".repeat(201);
+      await setupUser().upload(input, csvFile(`text\n${longText}`));
+
+      await waitFor(() =>
+        expect(screen.getByDisplayValue(longText)).toBeInTheDocument(),
+      );
+      expect(toast.error).not.toHaveBeenCalled();
     });
 
     it("no-ops when no file is selected", async () => {

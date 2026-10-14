@@ -10,6 +10,7 @@ import {
   useAccessToken,
   useVerifyConnection,
   usePageErrorState,
+  useUsesOwnProviderKeys,
 } from "@/hooks";
 import { toast } from "sonner";
 import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
@@ -90,6 +91,7 @@ export default function SimulationDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const backendAccessToken = useAccessToken();
+  const usesOwnKeys = useUsesOwnProviderKeys();
   const uuid = params.uuid as string;
   const [sidebarOpen, setSidebarOpen] = useSidebarState();
   const [simulation, setSimulation] = useState<SimulationData | null>(null);
@@ -175,7 +177,7 @@ export default function SimulationDetailPage() {
 
   // Handle personas change with limit check
   const handlePersonasChange = (items: PickerItem[]) => {
-    if (items.length > LIMITS.SIMULATION_MAX_PERSONAS) {
+    if (!usesOwnKeys && items.length > LIMITS.SIMULATION_MAX_PERSONAS) {
       showLimitToast(
         `You can only select up to ${LIMITS.SIMULATION_MAX_PERSONAS} personas at a time.`,
       );
@@ -186,7 +188,7 @@ export default function SimulationDetailPage() {
 
   // Handle scenarios change with limit check
   const handleScenariosChange = (items: PickerItem[]) => {
-    if (items.length > LIMITS.SIMULATION_MAX_SCENARIOS) {
+    if (!usesOwnKeys && items.length > LIMITS.SIMULATION_MAX_SCENARIOS) {
       showLimitToast(
         `You can only select up to ${LIMITS.SIMULATION_MAX_SCENARIOS} scenarios at a time.`,
       );

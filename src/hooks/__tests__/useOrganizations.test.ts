@@ -18,11 +18,14 @@ import {
   useActiveOrgUuid,
   useOrgMembers,
   useWorkspaceApiKeys,
+  useProviderKeys,
   clearOrgsCache,
   seedOrgsCache,
   fetchOrganizationsDedup,
 } from "@/hooks/useOrganizations";
-import { apiClient, apiDelete, apiGet, apiPost } from "@/lib/api";
+import { apiClient, apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
+import { clearOrgLimitsCache } from "@/hooks/useMaxRowsPerEval";
+import { clearEnabledProvidersCache } from "@/hooks/useEnabledProviders";
 import {
   ACTIVE_ORG_CHANGED_EVENT,
   ACTIVE_ORG_UUID_KEY,
@@ -47,6 +50,15 @@ jest.mock("../../lib/api", () => ({
   apiDelete: jest.fn(),
   apiGet: jest.fn(),
   apiPost: jest.fn(),
+  apiPut: jest.fn(),
+}));
+
+jest.mock("../useMaxRowsPerEval", () => ({
+  clearOrgLimitsCache: jest.fn(),
+}));
+
+jest.mock("../useEnabledProviders", () => ({
+  clearEnabledProvidersCache: jest.fn(),
 }));
 
 jest.mock("../../lib/orgs", () => {
@@ -787,6 +799,123 @@ describe("useOrganizations hooks", () => {
       const again = renderHook(() => useWorkspaceApiKeys("tok", "org-1"));
       expect(again.result.current.apiKeys).toEqual([]);
       expect(mockApiGet).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("useProviderKeys", () => {
+    const openrouter = {
+      provider: "openrouter" as const,
+      masked_value: "sk-or-****1234",
+      updated_at: "2024-01-01",
+    };
+
+    it("skips the fetch when accessToken or orgUuid is missing", () => {
+      const { result } = renderHook(() => useProviderKeys(null, null));
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.keys).toEqual([]);
+      expect(result.current.usesOwnKeys).toBe(false);
+      expect(mockApiGet).not.toHaveBeenCalled();
+    });
+
+    it("loads the saved keys", async () => {
+      mockApiGet.mockResolvedValueOnce({
+        uses_own_keys: true,
+        keys: [openrouter],
+      });
+      const { result } = renderHook(() => useProviderKeys("tok", "org-1"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.keys).toEqual([openrouter]);
+      expect(result.current.usesOwnKeys).toBe(true);
+      expect(mockApiGet).toHaveBeenCalledWith("/provider-keys", "tok");
+    });
+
+    it("reuses the stored keys on the next mount", async () => {
+      mockApiGet.mockResolvedValueOnce({
+        uses_own_keys: true,
+        keys: [openrouter],
+      });
+      const first = renderHook(() => useProviderKeys("tok", "org-1"));
+      await waitFor(() => expect(first.result.current.isLoading).toBe(false));
+      first.unmount();
+
+      const again = renderHook(() => useProviderKeys("tok", "org-1"));
+      expect(again.result.current.isLoading).toBe(false);
+      expect(again.result.current.keys).toEqual([openrouter]);
+      expect(mockApiGet).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports a failed load", async () => {
+      mockApiGet.mockRejectedValueOnce("weird failure");
+      const { result } = renderHook(() => useProviderKeys("tok", "org-1"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.error).toBe("Failed to load provider keys");
+    });
+
+    it("saving the first key switches the workspace to its own keys and forgets the limits and providers", async () => {
+      mockApiGet.mockResolvedValueOnce({ uses_own_keys: false, keys: [] });
+      const { result } = renderHook(() => useProviderKeys("tok", "org-1"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      (apiPut as jest.Mock).mockResolvedValueOnce(openrouter);
+      await act(async () => {
+        await result.current.saveProviderKey("openrouter", "sk-or-secret");
+      });
+      expect(apiPut).toHaveBeenCalledWith(
+        "/provider-keys/openrouter",
+        "tok",
+        { value: "sk-or-secret" },
+      );
+      expect(result.current.keys).toEqual([openrouter]);
+      expect(result.current.usesOwnKeys).toBe(true);
+      expect(clearOrgLimitsCache).toHaveBeenCalled();
+      expect(clearEnabledProvidersCache).toHaveBeenCalled();
+    });
+
+    it("replacing a key keeps one row for the provider", async () => {
+      mockApiGet.mockResolvedValueOnce({
+        uses_own_keys: true,
+        keys: [openrouter],
+      });
+      const { result } = renderHook(() => useProviderKeys("tok", "org-1"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      const replaced = { ...openrouter, masked_value: "sk-or-****9999" };
+      (apiPut as jest.Mock).mockResolvedValueOnce(replaced);
+      await act(async () => {
+        await result.current.saveProviderKey("openrouter", "sk-or-new");
+      });
+      expect(result.current.keys).toEqual([replaced]);
+    });
+
+    it("removing the last key switches the workspace back", async () => {
+      mockApiGet.mockResolvedValueOnce({
+        uses_own_keys: true,
+        keys: [openrouter],
+      });
+      const { result } = renderHook(() => useProviderKeys("tok", "org-1"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      mockApiDelete.mockResolvedValueOnce({});
+      await act(async () => {
+        await result.current.removeProviderKey("openrouter");
+      });
+      expect(mockApiDelete).toHaveBeenCalledWith(
+        "/provider-keys/openrouter",
+        "tok",
+      );
+      expect(result.current.keys).toEqual([]);
+      expect(result.current.usesOwnKeys).toBe(false);
+      expect(clearOrgLimitsCache).toHaveBeenCalled();
+    });
+
+    it("refuses to save or remove when signed out", async () => {
+      const { result } = renderHook(() => useProviderKeys(null, "org-1"));
+      await expect(
+        result.current.saveProviderKey("openai", "x"),
+      ).rejects.toThrow("Not signed in");
+      await expect(
+        result.current.removeProviderKey("openai"),
+      ).rejects.toThrow("Not signed in");
     });
   });
 });

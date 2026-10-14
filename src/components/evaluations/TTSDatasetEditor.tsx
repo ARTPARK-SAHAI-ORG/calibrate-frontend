@@ -10,6 +10,7 @@ import {
 import { Tooltip } from "@/components/Tooltip";
 import { toast } from "sonner";
 import { LIMITS, showLimitToast } from "@/constants/limits";
+import { useUsesOwnProviderKeys } from "@/hooks/useMaxRowsPerEval";
 import { DeleteConfirmationDialog } from "../DeleteConfirmationDialog";
 import { RowIndexBadge } from "./RowIndexBadge";
 import type { DatasetItem } from "@/lib/datasets";
@@ -46,7 +47,8 @@ type Props = {
   onDatasetNameChange?: (name: string) => void;
   datasetNameInvalid?: boolean;
   /** Dynamic max rows per eval from backend */
-  maxRowsPerEval?: number;
+  /** Null means the workspace has no limit. */
+  maxRowsPerEval?: number | null;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -66,6 +68,7 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
     },
     ref,
   ) {
+    const usesOwnKeys = useUsesOwnProviderKeys();
     const [newRows, setNewRows] = useState<NewRow[]>([{ id: "1", text: "" }]);
     const [invalidRowIds, setInvalidRowIds] = useState<Set<string>>(new Set());
     const [deleteNewRowId, setDeleteNewRowId] = useState<string | null>(null);
@@ -125,7 +128,7 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
     // ── Row management ─────────────────────────────────────────────────────
 
     const addRow = () => {
-      if (newRows.length >= maxRowsPerEval) {
+      if (maxRowsPerEval !== null && newRows.length >= maxRowsPerEval) {
         showLimitToast(
           `You can only add up to ${maxRowsPerEval} rows at a time.`,
         );
@@ -209,13 +212,13 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
           const text = cols[textIdx]?.trim();
           if (text) parsed.push({ id: Date.now().toString() + i, text });
         }
-        if (parsed.length > maxRowsPerEval) {
+        if (maxRowsPerEval !== null && parsed.length > maxRowsPerEval) {
           showLimitToast(`You can only upload up to ${maxRowsPerEval} rows.`);
           return;
         }
-        const longRow = parsed.find(
-          (r) => r.text.length > LIMITS.TTS_MAX_TEXT_LENGTH,
-        );
+        const longRow =
+          !usesOwnKeys &&
+          parsed.find((r) => r.text.length > LIMITS.TTS_MAX_TEXT_LENGTH);
         if (longRow) {
           showLimitToast(
             `Text must be ${LIMITS.TTS_MAX_TEXT_LENGTH} characters or less.`,

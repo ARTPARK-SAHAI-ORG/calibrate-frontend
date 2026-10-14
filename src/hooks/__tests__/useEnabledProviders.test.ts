@@ -2,7 +2,9 @@ import { renderHook, waitFor } from "@testing-library/react";
 import {
   useEnabledProviders,
   isProviderEnabled,
+  clearEnabledProvidersCache,
 } from "@/hooks/useEnabledProviders";
+import { ACTIVE_ORG_UUID_KEY } from "@/lib/orgs";
 
 // Relative specifiers (not the "@/" alias): next/jest's SWC transform only
 // rewrites "@/..." inside import/export declarations, and jest mocks are keyed
@@ -107,5 +109,31 @@ describe("useEnabledProviders", () => {
 
     expect(result.current).toBeNull();
     expect(global.fetch as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  it("asks again for another workspace and after the stored list is cleared", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(
+        providersResponse({ providers: ["openai"] }),
+      ) as unknown as typeof fetch;
+    const fetchMock = global.fetch as jest.Mock;
+
+    localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-a");
+    const first = renderHook(() => useEnabledProviders());
+    await waitFor(() => expect(first.result.current).not.toBeNull());
+    const second = renderHook(() => useEnabledProviders());
+    await waitFor(() => expect(second.result.current).not.toBeNull());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-b");
+    const third = renderHook(() => useEnabledProviders());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(third.result.current).not.toBeNull());
+
+    clearEnabledProvidersCache();
+    renderHook(() => useEnabledProviders());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    localStorage.removeItem(ACTIVE_ORG_UUID_KEY);
   });
 });

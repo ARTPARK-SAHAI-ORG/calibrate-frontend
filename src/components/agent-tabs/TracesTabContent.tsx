@@ -589,7 +589,6 @@ export function TracesTabContent({
     [scoreAverages],
   );
 
-  const overLimit = items.some((t) => t.latest_run_error === "over_limit");
   // Read on every visit, because the storage limit leaves no trace of itself
   // here: past it the backend turns down the customer's own app, that app
   // logs the refusal on its own server, and this tab just looks like a quiet
@@ -607,6 +606,10 @@ export function TracesTabContent({
       cancelled = true;
     };
   }, [accessToken]);
+  // Rows skipped before the workspace's limit was lifted still say over_limit.
+  const overLimit =
+    usage?.max_scored_traces !== null &&
+    items.some((t) => t.latest_run_error === "over_limit");
   const storageFull =
     usage != null && usage.traces_stored >= usage.max_traces;
   const isScoringLive = traceScoring.enabled && !overLimit && !storageFull;
@@ -807,7 +810,7 @@ export function TracesTabContent({
           {overLimit && (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
               <p className="text-sm text-amber-700 dark:text-amber-300">
-                {usage
+                {usage?.max_scored_traces != null
                   ? `Some traces were not scored because this workspace has reached its limit of scoring ${traceCount(usage.max_scored_traces)}.`
                   : "Some traces were not scored because this workspace has reached its limit for scoring traces."}{" "}
                 <a

@@ -11,7 +11,11 @@ export { useJobDeletion } from "./useJobDeletion";
 export { useAgentDeletion } from "./useAgentDeletion";
 export { useVerifyConnection } from "./useVerifyConnection";
 export type { VerifyConnectionResult } from "./useVerifyConnection";
-export { useMaxRowsPerEval, getMaxRowsPerEval } from "./useMaxRowsPerEval";
+export {
+  useMaxRowsPerEval,
+  getMaxRowsPerEval,
+  useUsesOwnProviderKeys,
+} from "./useMaxRowsPerEval";
 export { useTraces } from "./useTraces";
 export { useAgentTraceScoring } from "./useAgentTraceScoring";
 export { useTraceLabels } from "./useTraceLabels";
@@ -36,6 +40,7 @@ export {
   useOrgMembers,
   useOrgInviteLink,
   useWorkspaceApiKeys,
+  useProviderKeys,
   clearOrgsCache,
   seedOrgsCache,
 } from "./useOrganizations";

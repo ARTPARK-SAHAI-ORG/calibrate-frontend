@@ -10,6 +10,7 @@ import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import {
   useAccessToken,
   useMaxRowsPerEval,
+  useUsesOwnProviderKeys,
   useEnabledProviders,
   isProviderEnabled,
 } from "@/hooks";
@@ -121,6 +122,7 @@ export function TextToSpeechEvaluation({
 
   const editorRef = useRef<TTSDatasetEditorHandle | null>(null);
   const maxRowsPerEval = useMaxRowsPerEval();
+  const usesOwnKeys = useUsesOwnProviderKeys();
 
   // Evaluators (filtered to TTS purpose). Org defaults (`is_default`) are
   // pre-selected on first load — see /evaluators page for the same
@@ -304,9 +306,9 @@ export function TextToSpeechEvaluation({
         return;
       }
 
-      const longTextRow = newRows.find(
-        (r) => r.text.length > LIMITS.TTS_MAX_TEXT_LENGTH,
-      );
+      const longTextRow =
+        !usesOwnKeys &&
+        newRows.find((r) => r.text.length > LIMITS.TTS_MAX_TEXT_LENGTH);
       if (longTextRow) {
         showLimitToast(
           `Text must be ${LIMITS.TTS_MAX_TEXT_LENGTH} characters or less.`,
@@ -520,6 +522,12 @@ export function TextToSpeechEvaluation({
               ({selectedProviders.size} selected)
             </span>
           </div>
+          {!ttsProviders.some((p) => isProviderEnabled(enabledProviders, p.value)) && (
+            <p className="text-[13px] text-muted-foreground">
+              This workspace has no text-to-speech provider key. Add one in Workspace
+              settings, under AI provider keys.
+            </p>
+          )}
           {/* Desktop: Table layout */}
           <div className="hidden md:block border border-border rounded-lg overflow-hidden">
             <table className="w-full">

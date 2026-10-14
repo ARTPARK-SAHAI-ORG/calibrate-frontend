@@ -330,7 +330,8 @@ export type TraceUsage = {
   traces_stored: number;
   max_traces: number;
   traces_scored: number;
-  max_scored_traces: number;
+  /** Null means the workspace has no scoring limit. */
+  max_scored_traces: number | null;
 };
 
 export async function fetchTraceUsage(

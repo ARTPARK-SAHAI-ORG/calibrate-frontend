@@ -582,6 +582,12 @@ export function SpeechToTextEvaluation({
               ({selectedProviders.size} selected)
             </span>
           </div>
+          {!sttProviders.some((p) => isProviderEnabled(enabledProviders, p.value)) && (
+            <p className="text-[13px] text-muted-foreground">
+              This workspace has no speech-to-text provider key. Add one in Workspace
+              settings, under AI provider keys.
+            </p>
+          )}
           {/* Desktop: Table layout */}
           <div className="hidden md:block border border-border rounded-lg overflow-hidden">
             <table className="w-full">

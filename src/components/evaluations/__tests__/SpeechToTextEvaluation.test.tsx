@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 import { SpeechToTextEvaluation } from "../SpeechToTextEvaluation";
 
 // ─── Hooks ──────────────────────────────────────────────────────────────────
+let mockEnabledProviders: Set<string> | null = null;
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
   useMaxRowsPerEval: () => 20,
-  useEnabledProviders: () => null,
+  useEnabledProviders: () => mockEnabledProviders,
   isProviderEnabled: (enabled: Set<string> | null, value: string) =>
     !enabled || enabled.has(value.toLowerCase()),
   // Pulled in by the create-evaluator flow behind the Evaluators tab.
@@ -137,6 +138,7 @@ const mockEvaluatorsResponse = (
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockEnabledProviders = null;
   mockListDatasets.mockResolvedValue([]);
   editorHandleMock = {
     validate: jest.fn().mockReturnValue(true),
@@ -201,6 +203,21 @@ describe("SpeechToTextEvaluation", () => {
     await waitFor(() =>
       expect(screen.getByTestId("evaluator-e1")).toBeInTheDocument(),
     );
+  });
+
+  it("does not mention keys while every provider is available", async () => {
+    render(<SpeechToTextEvaluation initialDatasetId="ds-1" />);
+    expect(
+      screen.queryByText(/has no speech-to-text provider key/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("explains an empty provider list when only non-speech keys exist", async () => {
+    mockEnabledProviders = new Set(["openrouter"]);
+    render(<SpeechToTextEvaluation initialDatasetId="ds-1" />);
+    expect(
+      screen.getByText(/This workspace has no speech-to-text provider key/),
+    ).toBeInTheDocument();
   });
 
   it("lists STT evaluators (excluding other types) with none pre-selected", async () => {
