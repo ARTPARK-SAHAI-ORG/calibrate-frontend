@@ -6,7 +6,7 @@ import { Tooltip } from "@/components/Tooltip";
 import type { TurnExtras } from "@/lib/messageVersions";
 
 const NAME_INPUT_CLASS =
-  "h-7 px-2 rounded-md bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground";
+  "h-7 pl-4 pr-2 rounded-md bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground";
 
 /** True when every version has text. */
 export function versionsComplete(extras: TurnExtras): boolean {
@@ -21,7 +21,8 @@ export function sameExtras(a: TurnExtras, b: TurnExtras): boolean {
   );
 }
 
-function ConfirmCancel({
+/** The tick and cross beside a typed heading or version name. */
+export function ConfirmCancel({
   what,
   onConfirm,
   onCancel,
@@ -84,6 +85,7 @@ export function TextVersionsEditor({
   const pending = Object.keys(drafts).length > 0;
   useEffect(() => {
     onPendingChange?.(pending);
+    return () => onPendingChange?.(false);
   }, [pending, onPendingChange]);
 
   const setDraft = (key: string, value: string) =>
@@ -171,7 +173,7 @@ export function TextVersionsEditor({
           {Object.entries(versions).map(([name, text], i) => {
             const key = `version:${name}`;
             const draft = drafts[key];
-            const dirty = draft !== undefined && draft !== name;
+            const dirty = draft !== undefined && draft.trim() !== name;
             const taken = dirty && nameTaken(name, draft.trim());
             return (
               <div key={i} className="flex flex-col gap-1">
@@ -182,6 +184,9 @@ export function TextVersionsEditor({
                     aria-label="Version name"
                     disabled={disabled}
                     onChange={(e) => setDraft(key, e.target.value)}
+                    onBlur={() => {
+                      if (draft !== undefined && !dirty) dropDraft(key);
+                    }}
                     onKeyDown={onKey(
                       () => confirmName(name),
                       () => dropDraft(key),
@@ -209,7 +214,7 @@ export function TextVersionsEditor({
                   </Tooltip>
                 </div>
                 {taken && (
-                  <p className="text-xs text-red-500 px-2">
+                  <p className="text-xs text-red-500 px-4">
                     Another version already has this name
                   </p>
                 )}

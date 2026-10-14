@@ -704,12 +704,9 @@ describe("AddLlmGeneralItemsDialog", () => {
 
   it("closes via the header close button and Cancel-equivalent backdrop when clean", async () => {
     const user = setupUser();
-    const { onClose, container } = renderDialog();
+    const { onClose } = renderDialog();
 
-    const headerCloseButton = container.querySelector(
-      ".border-b button",
-    ) as Element;
-    await user.click(headerCloseButton);
+    await user.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -1006,9 +1003,15 @@ describe("AddLlmGeneralItemsDialog headings and versions", () => {
   it("keeps Save off while a version has no text", async () => {
     const user = setupUser();
     renderDialog({ mode: "edit", initialRows: [versioned] });
-    await user.clear(screen.getAllByLabelText("Version text")[0]);
+    const [inputVersion, outputVersion] = screen.getAllByLabelText("Version text");
+    const save = screen.getByRole("button", { name: "Save item" });
+    await user.clear(inputVersion);
     expect(screen.getByText("Version cannot be empty")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save item" })).toBeDisabled();
+    expect(save).toBeDisabled();
+    await user.type(inputVersion, "x");
+    expect(save).toBeEnabled();
+    await user.clear(outputVersion);
+    expect(save).toBeDisabled();
   });
 
   it("sends no output versions when the answer is a tool call", async () => {
@@ -1033,12 +1036,12 @@ describe("AddLlmGeneralItemsDialog headings and versions", () => {
 
   it("asks before closing when a heading was typed but not confirmed", async () => {
     const user = setupUser();
-    const { onClose, container } = renderDialog({
+    const { onClose } = renderDialog({
       mode: "edit",
       initialRows: [versioned],
     });
     await user.type(screen.getByLabelText("Heading for the output"), "Hindi");
-    await user.click(container.querySelector(".border-b button") as Element);
+    await user.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByText("Discard changes?")).toBeInTheDocument();
   });

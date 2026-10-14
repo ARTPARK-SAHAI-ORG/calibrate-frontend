@@ -189,7 +189,6 @@ describe("TextVersionsEditor", () => {
     await user.type(heading, "{Backspace}");
     await user.click(screen.getByLabelText("Main text"));
     expect(onPendingChange).toHaveBeenLastCalledWith(false);
-    expect(screen.queryByLabelText("Version name")).not.toBeInTheDocument();
   });
 
   it("does nothing on Enter when nothing was typed or the text is unchanged", async () => {
@@ -226,5 +225,53 @@ describe("TextVersionsEditor", () => {
     await user.clear(name);
     await user.type(name, "Marathi{Enter}");
     expect(onChange).toHaveBeenLastCalledWith({ versions: { Marathi: "x" } });
+  });
+});
+
+describe("TextVersionsEditor version name drafts", () => {
+  it("treats a name typed back to the original as unchanged", async () => {
+    const user = setupUser();
+    const onPendingChange = jest.fn();
+    render(<Harness initial={START} onPendingChange={onPendingChange} />);
+    await user.type(screen.getAllByLabelText("Version name")[0], "x{Backspace} ");
+    expect(
+      screen.queryByRole("button", { name: "Confirm version name" }),
+    ).not.toBeInTheDocument();
+    expect(onPendingChange).toHaveBeenLastCalledWith(true);
+    await user.click(screen.getByLabelText("Main text"));
+    expect(onPendingChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("keeps a changed name typed when the field loses focus", async () => {
+    const user = setupUser();
+    const onPendingChange = jest.fn();
+    render(<Harness initial={START} onPendingChange={onPendingChange} />);
+    await user.type(screen.getAllByLabelText("Version name")[0], "X");
+    await user.click(screen.getByLabelText("Main text"));
+    expect(onPendingChange).toHaveBeenLastCalledWith(true);
+    expect(names()).toEqual(["HindiX", "Tamil"]);
+  });
+
+  it("drops a version's typed name when the version is removed", async () => {
+    const user = setupUser();
+    const onPendingChange = jest.fn();
+    render(<Harness initial={START} onPendingChange={onPendingChange} />);
+    await user.type(screen.getAllByLabelText("Version name")[0], "X");
+    await user.click(screen.getAllByRole("button", { name: "Remove version" })[0]);
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    expect(names()).toEqual(["Tamil"]);
+    expect(onPendingChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("stops reporting a typed name once the editor is gone", async () => {
+    const user = setupUser();
+    const onPendingChange = jest.fn();
+    const { rerender } = render(
+      <Harness initial={START} onPendingChange={onPendingChange} />,
+    );
+    await user.type(screen.getAllByLabelText("Version name")[0], "X");
+    expect(onPendingChange).toHaveBeenLastCalledWith(true);
+    rerender(<></>);
+    expect(onPendingChange).toHaveBeenLastCalledWith(false);
   });
 });

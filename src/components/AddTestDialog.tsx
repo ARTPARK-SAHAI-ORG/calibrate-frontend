@@ -48,7 +48,8 @@ import {
   type InputFieldType,
 } from "@/components/CustomFieldsEditor";
 import { RobotIcon, ToolIcon } from "@/components/icons";
-import { CheckIcon, CloseIcon } from "@/components/icons";
+import { CloseIcon } from "@/components/icons";
+import { ConfirmCancel } from "@/components/human-labelling/TextVersionsEditor";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { sampleTest } from "@/lib/testSamples";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
@@ -3558,33 +3559,6 @@ export function AddTestDialog({
     </span>
   );
 
-  const confirmCancelButtons = (
-    what: string,
-    onConfirm: () => void,
-    onCancel: () => void,
-    canConfirm = true,
-  ) => (
-    <>
-      <button
-        type="button"
-        aria-label={`Confirm ${what}`}
-        onClick={onConfirm}
-        disabled={!canConfirm}
-        className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <CheckIcon className="w-4 h-4" />
-      </button>
-      <button
-        type="button"
-        aria-label={`Cancel ${what}`}
-        onClick={onCancel}
-        className="w-7 h-7 rounded-md flex items-center justify-center cursor-pointer text-muted-foreground hover:bg-muted transition-colors"
-      >
-        <CloseIcon className="w-4 h-4" />
-      </button>
-    </>
-  );
-
   const renderHeadingInput = (
     message: ChatMessage,
     placeholder: "Agent" | "User",
@@ -3635,11 +3609,11 @@ export function AddTestDialog({
           </span>
         </div>
         {dirty &&
-          confirmCancelButtons(
-            "heading",
-            () => confirmHeading(message, placeholder),
-            () => dropDrafts((k) => k !== key),
-          )}
+          <ConfirmCancel
+            what="heading"
+            onConfirm={() => confirmHeading(message, placeholder)}
+            onCancel={() => dropDrafts((k) => k !== key)}
+          />}
       </div>
     );
   };
@@ -3675,12 +3649,12 @@ export function AddTestDialog({
                   }`}
                 />
                 {dirty &&
-                  confirmCancelButtons(
-                    "version name",
-                    () => confirmVersionName(message, name),
-                    () => dropDrafts((k) => k !== key),
-                    !taken,
-                  )}
+                  <ConfirmCancel
+                    what="version name"
+                    onConfirm={() => confirmVersionName(message, name)}
+                    onCancel={() => dropDrafts((k) => k !== key)}
+                    canConfirm={!taken}
+                  />}
               </div>
               {taken && (
                 <p

@@ -3,6 +3,7 @@ import {
   readTextField,
   writeTextField,
   type TextField,
+  type TurnExtras,
 } from "@/lib/messageVersions";
 import { normaliseHistoryItem } from "./item-panes/shared";
 
@@ -58,4 +59,17 @@ export function historyToPayloadFields(
     };
   }
   return { chat_history: history, agent_response: "" };
+}
+
+/** The dialog's input and output back as payload fields. */
+export function textFieldsToPayload(fields: {
+  input: string;
+  output: string;
+  inputExtras?: TurnExtras;
+  outputExtras?: TurnExtras;
+}) {
+  return {
+    input: writeTextField(fields.input, fields.inputExtras),
+    output: writeTextField(fields.output, fields.outputExtras),
+  };
 }

@@ -1,6 +1,7 @@
 import {
   historyToPayloadFields,
   payloadToHistory,
+  textFieldsToPayload,
   type HistoryItem,
 } from "../itemConversation";
 
@@ -198,6 +199,22 @@ describe("historyToPayloadFields", () => {
     ];
     expect(historyToPayloadFields(history, "conversation")).toEqual({
       transcript: history,
+    });
+  });
+});
+
+describe("textFieldsToPayload", () => {
+  it("writes a plain string unless a heading or version is set", () => {
+    expect(
+      textFieldsToPayload({
+        input: "Summarise",
+        output: "A summary",
+        inputExtras: { label: "English", versions: { Hindi: "सार" } },
+        outputExtras: {},
+      }),
+    ).toEqual({
+      input: { content: "Summarise", label: "English", versions: { Hindi: "सार" } },
+      output: "A summary",
     });
   });
 });
