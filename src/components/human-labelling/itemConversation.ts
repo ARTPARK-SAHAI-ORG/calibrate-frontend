@@ -1,7 +1,6 @@
 import type { TestConfig } from "@/components/AddTestDialog";
 import {
   readTextField,
-  readTurnExtras,
   writeTextField,
   type TextField,
 } from "@/lib/messageVersions";
@@ -59,13 +58,4 @@ export function historyToPayloadFields(
     };
   }
   return { chat_history: history, agent_response: "" };
-}
-
-/** A reply field with new default text and the label and versions the stored
- * field already carried. */
-export function replaceText(
-  existing: unknown,
-  text: string,
-): string | TextField {
-  return writeTextField(text, readTurnExtras(existing));
 }
