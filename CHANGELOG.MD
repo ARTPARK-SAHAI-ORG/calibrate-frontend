@@ -1,5 +1,6 @@
 ## October 2026
 
+- Clicking Preview on a labelling task item while the next page of items is still loading no longer opens an empty window, and Preview no longer covers the Evaluators heading when editing a conversation item ([#703](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/703))
 - Duplicating a labelling item for a basic agent now keeps its tool calls, so the copy opens filled in and can be saved ([#699](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/699))
 - The edit window for a labelling item now has a View item button that opens the item view, and it asks before discarding any unsaved changes ([#696](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/696))
 - Labelling items now show a message's heading and its other versions, such as a translation or a rewrite, and you can edit the heading and each version's name and text ([#683](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/683))
