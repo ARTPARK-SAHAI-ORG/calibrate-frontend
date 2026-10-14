@@ -67,8 +67,6 @@ export const PROVIDER_KEY_SECTIONS: {
   },
 ];
 
-type Provider = ProviderEntry;
-
 /**
  * The backend answers 503 with a sentence written for the reader (the server
  * is not set up to store keys), so it is shown as is rather than replaced with
@@ -95,7 +93,7 @@ function ProviderKeyRow({
   onSave,
   onRemove,
 }: {
-  provider: Provider;
+  provider: ProviderEntry;
   saved: ProviderKey | null;
   needsConfirm: boolean;
   onSave: (value: string) => Promise<unknown>;
@@ -106,6 +104,7 @@ function ProviderKeyRow({
   const [isConfirming, setIsConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputId = `provider-key-${provider.id}`;
+  const errorId = `${inputId}-error`;
 
   const save = async () => {
     setIsConfirming(false);
@@ -141,8 +140,10 @@ function ProviderKeyRow({
   return (
     <section className="space-y-2">
       <div>
-        <h3 className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-          <label htmlFor={inputId}>{provider.name}</label>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-sm font-medium text-foreground">
+            <label htmlFor={inputId}>{provider.name}</label>
+          </h3>
           <Tooltip
             content={`Visit ${provider.name} website`}
             position="top"
@@ -158,7 +159,7 @@ function ProviderKeyRow({
               <ExternalLinkIcon className="w-4 h-4" />
             </a>
           </Tooltip>
-        </h3>
+        </div>
         {provider.note && (
           <p className="text-[13px] text-muted-foreground">{provider.note}</p>
         )}
@@ -191,6 +192,8 @@ function ProviderKeyRow({
                 placeholder="Paste your service account JSON"
                 spellCheck={false}
                 onChange={onChange}
+                aria-invalid={!!error}
+                aria-describedby={error ? errorId : undefined}
                 disabled={isSaving}
                 className={`flex-1 px-3 py-2 rounded-md border bg-background text-sm font-mono text-foreground placeholder:font-sans placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${borderClass}`}
               />
@@ -202,6 +205,8 @@ function ProviderKeyRow({
                 placeholder={`Paste your ${provider.name} API key`}
                 autoComplete="off"
                 onChange={onChange}
+                aria-invalid={!!error}
+                aria-describedby={error ? errorId : undefined}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleSave();
                 }}
@@ -213,14 +218,24 @@ function ProviderKeyRow({
               type="button"
               onClick={handleSave}
               disabled={isSaving || !value.trim()}
-              aria-label={`Save the ${provider.name} key`}
+              aria-label={
+                isSaving ? "Verifying" : `Save the ${provider.name} key`
+              }
               className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
               {isSaving ? "Verifying" : "Save"}
             </button>
           </div>
-          {error && <p className="mt-1 text-[13px] text-red-500">{error}</p>}
+          {error && (
+            <p
+              id={errorId}
+              role="alert"
+              className="mt-1 text-[13px] text-red-500"
+            >
+              {error}
+            </p>
+          )}
         </div>
       )}
 
@@ -248,9 +263,8 @@ export function ProviderKeysSection({ orgUuid }: { orgUuid: string }) {
     removeProviderKey,
   } = useProviderKeys(accessToken, orgUuid);
 
-  const [providerToRemove, setProviderToRemove] = useState<Provider | null>(
-    null,
-  );
+  const [providerToRemove, setProviderToRemove] =
+    useState<ProviderEntry | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
 
   const handleRemove = async () => {
@@ -320,7 +334,7 @@ export function ProviderKeysSection({ orgUuid }: { orgUuid: string }) {
           providerToRemove
             ? isLastKey
               ? "This will make the evaluation runs rely on Calibrate's default API keys and rate limits"
-              : `Runs that need ${providerToRemove.name} will fail until you add it again`
+              : `Runs that need ${providerToRemove.name} will fail until you add a key for ${providerToRemove.name} again`
             : ""
         }
         confirmText="Remove"
