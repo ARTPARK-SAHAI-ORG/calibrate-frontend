@@ -530,8 +530,8 @@ export function TextToSpeechEvaluation({
               {ttsProviders.some((p) =>
                 isProviderEnabled(enabledProviders, p.value),
               )
-                ? `None of this workspace's text-to-speech provider keys support ${languageDisplayName[language]}. Add a key for a provider that does in Workspace settings, under AI provider keys.`
-                : "This workspace has no text-to-speech provider key. Add one in Workspace settings, under AI provider keys."}
+                ? `None of this workspace's text-to-speech provider keys support ${languageDisplayName[language]}. Add a key for a provider that does in Workspace settings, under Bring your own keys (BYOK).`
+                : "This workspace has no text-to-speech provider key. Add one in Workspace settings, under Bring your own keys (BYOK)."}
             </p>
           )}
           {/* Desktop: Table layout */}

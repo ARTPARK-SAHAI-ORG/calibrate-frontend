@@ -314,7 +314,7 @@ describe("TextToSpeechEvaluation", () => {
     await user.selectOptions(screen.getByRole("combobox"), "odia");
     expect(
       screen.getByText(
-        "None of this workspace's text-to-speech provider keys support Odia. Add a key for a provider that does in Workspace settings, under AI provider keys.",
+        "None of this workspace's text-to-speech provider keys support Odia. Add a key for a provider that does in Workspace settings, under Bring your own keys (BYOK).",
       ),
     ).toBeInTheDocument();
   });
