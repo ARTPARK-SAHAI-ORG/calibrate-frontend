@@ -2468,6 +2468,20 @@ function LabellingTaskPageInner() {
   });
   const openItemDetail = itemPager.open;
 
+  // The edit window's View item button: closes whichever edit window is open
+  // and opens the item view window on the same item.
+  const viewEditedItem = (uuid: string) => {
+    editPager.cancel();
+    setEditLlmItemUuid(null);
+    setEditSttItemsOpen(false);
+    setEditSttSingleItemUuid(null);
+    setEditTtsItemsOpen(false);
+    setEditTtsSingleItemUuid(null);
+    setEditLlmGeneralItemsOpen(false);
+    setEditLlmGeneralSingleItemUuid(null);
+    openItemDetail(uuid);
+  };
+
   const handleAssignAnnotators = async (
     annotatorIds: string[],
     evaluatorIds: string[],
@@ -4004,6 +4018,7 @@ function LabellingTaskPageInner() {
             setEditLlmItemUuid(null);
           }}
           {...editStepProps}
+          onView={() => viewEditedItem(editLlmItemUuid)}
           isEditing={true}
           isLoading={false}
           isCreating={savingLlmItem}
@@ -4267,7 +4282,12 @@ function LabellingTaskPageInner() {
         key={`stt-${editSttSingleItemUuid ?? "several"}`}
         isOpen={editSttItemsOpen}
         mode="edit"
-        {...(editSttSingleItemUuid ? editStepProps : {})}
+        {...(editSttSingleItemUuid
+          ? {
+              ...editStepProps,
+              onView: () => viewEditedItem(editSttSingleItemUuid),
+            }
+          : {})}
         initialRows={items
           .filter((it) =>
             editSttSingleItemUuid
@@ -4360,7 +4380,12 @@ function LabellingTaskPageInner() {
         key={`tts-${editTtsSingleItemUuid ?? "several"}`}
         isOpen={editTtsItemsOpen}
         mode="edit"
-        {...(editTtsSingleItemUuid ? editStepProps : {})}
+        {...(editTtsSingleItemUuid
+          ? {
+              ...editStepProps,
+              onView: () => viewEditedItem(editTtsSingleItemUuid),
+            }
+          : {})}
         accessToken={accessToken}
         initialRows={items
           .filter((it) =>
@@ -4455,7 +4480,12 @@ function LabellingTaskPageInner() {
         key={`llm-general-${editLlmGeneralSingleItemUuid ?? "several"}`}
         isOpen={editLlmGeneralItemsOpen}
         mode="edit"
-        {...(editLlmGeneralSingleItemUuid ? editStepProps : {})}
+        {...(editLlmGeneralSingleItemUuid
+          ? {
+              ...editStepProps,
+              onView: () => viewEditedItem(editLlmGeneralSingleItemUuid),
+            }
+          : {})}
         evaluators={llmGeneralEvaluatorDefs}
         initialRows={items
           .filter((it) =>

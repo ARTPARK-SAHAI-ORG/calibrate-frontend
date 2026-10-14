@@ -2593,3 +2593,58 @@ describe("AddTestDialog — stepping to another test", () => {
     expect(screen.queryByLabelText("Next test")).not.toBeInTheDocument();
   });
 });
+
+describe("AddTestDialog — View item", () => {
+  it("draws no View item button when no handler is passed", async () => {
+    render(<AddTestDialog {...baseProps({ isEditing: true, testName: "Saved" })} />);
+    await screen.findByText("Test name");
+    expect(
+      screen.queryByRole("button", { name: "View item" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the view window at once when nothing has been edited", async () => {
+    const user = setupUser();
+    const onView = jest.fn();
+    render(
+      <ControlledDialog
+        {...baseProps({
+          initialTab: "next-reply" as const,
+          testName: "",
+          onView,
+        })}
+      />,
+    );
+    // The form is only compared with what it opened with once it has
+    // loaded; until then every way out asks first.
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
+    await act(async () => {
+      for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0));
+    });
+    await user.click(screen.getByRole("button", { name: "View item" }));
+    expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
+    expect(onView).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks before throwing away unsaved edits, and opens the view on Discard", async () => {
+    const user = setupUser();
+    const onView = jest.fn();
+    const props = baseProps({
+      isEditing: false,
+      initialTab: "next-reply" as const,
+      testName: "",
+      onView,
+    });
+    render(<ControlledDialog {...props} />);
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
+    await user.type(screen.getByPlaceholderText("Your test name"), "Edited");
+    await user.click(screen.getByRole("button", { name: "View item" }));
+    expect(onView).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    expect(onView).toHaveBeenCalledTimes(1);
+  });
+});

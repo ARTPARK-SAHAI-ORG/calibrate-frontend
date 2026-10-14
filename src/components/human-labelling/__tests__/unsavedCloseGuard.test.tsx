@@ -3,6 +3,7 @@ import { render, screen, setupUser } from "@/test-utils";
 import {
   useUnsavedCloseGuard,
   DiscardChangesDialog,
+  ViewItemButton,
 } from "../unsavedCloseGuard";
 
 describe("useUnsavedCloseGuard", () => {
@@ -178,10 +179,21 @@ describe("useUnsavedCloseGuard", () => {
       expect(onNext).not.toHaveBeenCalled();
     });
 
+    it("View item asks first when there are edits, and Discard opens the view", () => {
+      const onView = jest.fn();
+      const { util, onClose } = setup({ isDirty: true, onView });
+      act(() => util.result.current.navView!());
+      expect(onView).not.toHaveBeenCalled();
+      act(() => util.result.current.doClose());
+      expect(onView).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
     it("gives no step handlers when none are passed", () => {
       const { util } = setup();
       expect(util.result.current.navPrev).toBeUndefined();
       expect(util.result.current.navNext).toBeUndefined();
+      expect(util.result.current.navView).toBeUndefined();
     });
 
     it("the left and right arrow keys step too", () => {
@@ -246,5 +258,15 @@ describe("DiscardChangesDialog", () => {
     );
     await user.click(screen.getByRole("button", { name: "Discard" }));
     expect(onDiscard).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ViewItemButton", () => {
+  it("calls its handler when clicked", async () => {
+    const user = setupUser();
+    const onClick = jest.fn();
+    render(<ViewItemButton onClick={onClick} />);
+    await user.click(screen.getByRole("button", { name: "View item" }));
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

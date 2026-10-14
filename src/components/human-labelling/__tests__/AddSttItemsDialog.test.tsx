@@ -780,8 +780,29 @@ describe("previous / next item in the edit window", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("View item opens the view window, asking first when there are edits", async () => {
+    const user = setupUser();
+    const onView = jest.fn();
+    renderDialog({ mode: "edit", initialRows: [{ uuid: "u1", name: "Clip 1", actual: "hello", predicted: "helo" }], onView });
+    await user.click(screen.getByRole("button", { name: "View item" }));
+    expect(onView).toHaveBeenCalledTimes(1);
+  });
+
+  it("View item asks before throwing away edits, and opens the view on Discard", async () => {
+    const user = setupUser();
+    const onView = jest.fn();
+    const { onClose } = renderDialog({ mode: "edit", initialRows: [{ uuid: "u1", name: "Clip 1", actual: "hello", predicted: "helo" }], onView });
+    await user.type(screen.getByPlaceholderText("e.g. Clip 1"), "x");
+    await user.click(screen.getByRole("button", { name: "View item" }));
+    expect(onView).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    expect(onView).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("draws no arrows when no steps are passed", () => {
     renderDialog({ mode: "edit", initialRows: [{ uuid: "u1", name: "Clip 1", actual: "hello", predicted: "helo" }] });
     expect(screen.queryByRole("button", { name: "Next item" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View item" })).not.toBeInTheDocument();
   });
 });
