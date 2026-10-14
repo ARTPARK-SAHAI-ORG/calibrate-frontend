@@ -31,6 +31,10 @@ import {
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
 import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
+import {
+  renameSelectedTool,
+  renameToolInMessages,
+} from "@/lib/renameToolInForm";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
 import { attachToolsToAgent } from "@/lib/agentTools";
 import { toast } from "sonner";
@@ -1029,10 +1033,18 @@ export function AddTestDialog({
     );
   }, [isOpen, initialConfig]);
 
+  // The fill below reads the tool list through this, so saving or creating a
+  // tool (which replaces the list) does not refill the form and wipe edits.
+  const availableToolsRef = useRef(availableTools);
+  useEffect(() => {
+    availableToolsRef.current = availableTools;
+  }, [availableTools]);
+
   // Populate fields from initialConfig when editing an existing test
   // Wait for tools fetch to complete so we can properly determine tool types
   useEffect(() => {
     if (initialConfig && toolsFetched) {
+      const availableTools = availableToolsRef.current;
       // Parse history and convert to chatMessages format
       if (initialConfig.history && initialConfig.history.length > 0) {
         const messages: Array<{
@@ -1294,7 +1306,7 @@ export function AddTestDialog({
         }
       }
     }
-  }, [initialConfig, toolsFetched, availableTools]);
+  }, [initialConfig, toolsFetched]);
 
   const [selectedTools, setSelectedTools] = useState<SelectedToolConfig[]>([]);
 
@@ -2381,6 +2393,20 @@ export function AddTestDialog({
 
     setSelectedTools([...selectedTools, newTool]);
     setToolDropdownOpen(false);
+  };
+
+  // A tool opened from either picker was saved: refresh the list, and carry a
+  // new name onto the copies of it this form already holds.
+  const handleToolSaved = (
+    tool: AvailableTool,
+    previousName: string,
+    allTools: AvailableTool[],
+  ) => {
+    setAvailableTools(allTools);
+    if (tool.name === previousName) return;
+    const renamed = { uuid: tool.uuid, previousName, name: tool.name };
+    setSelectedTools((prev) => renameSelectedTool(prev, renamed));
+    setChatMessages((prev) => renameToolInMessages(prev, renamed));
   };
 
   const selectInbuiltTool = (toolId: string, toolName: string) => {
@@ -4521,6 +4547,8 @@ export function AddTestDialog({
                                 addToolFromSelection(tool);
                               }}
                               selectedToolIds={selectedTools.map((t) => t.id)}
+                              accessToken={backendAccessToken ?? undefined}
+                              onToolSaved={handleToolSaved}
                             />
                           </div>
                         </>
@@ -5659,6 +5687,11 @@ export function AddTestDialog({
                                                       "webhook",
                                                   );
                                                 }}
+                                                accessToken={
+                                                  backendAccessToken ??
+                                                  undefined
+                                                }
+                                                onToolSaved={handleToolSaved}
                                               />
                                             ) : (
                                               <div className="p-4">

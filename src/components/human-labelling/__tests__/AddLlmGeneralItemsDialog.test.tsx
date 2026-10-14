@@ -43,14 +43,33 @@ jest.mock("../../ToolPicker", () => ({
   ToolPicker: ({
     onSelectCustomTool,
     onSelectInbuiltTool,
+    onToolSaved,
   }: {
     onSelectCustomTool: (
       tool: { name: string },
       params: { name: string; value: string }[],
     ) => void;
     onSelectInbuiltTool: (toolId: string, toolName: string) => void;
+    onToolSaved?: (
+      tool: { uuid: string; name: string },
+      previousName: string,
+      allTools: { uuid: string; name: string }[],
+    ) => void;
   }) => (
     <>
+      <button
+        type="button"
+        onClick={() =>
+          onToolSaved?.({ uuid: "t-dummy", name: "renamed_tool" }, "dummy", [
+            { uuid: "t-dummy", name: "renamed_tool" },
+          ])
+        }
+      >
+        Save dummy as renamed_tool
+      </button>
+      <div data-tool-side-panel>
+        <input aria-label="Tool side panel field" />
+      </div>
       <button
         type="button"
         onClick={() => onSelectCustomTool({ name: "book_flight" }, [])}
@@ -258,6 +277,22 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     ]);
   });
 
+  it("keeps the tool list open on Escape pressed inside the tool side panel", async () => {
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(screen.getByLabelText("Tool side panel field"));
+    await user.keyboard("{Escape}");
+    expect(
+      screen.getByRole("button", { name: "Pick book_flight" }),
+    ).toBeInTheDocument();
+  });
+
   it("closes the tool list on Escape and on the Add tool call button again", async () => {
     const user = setupUser();
     renderDialog({
@@ -394,6 +429,40 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
       { tool: "book_flight", arguments: { city: "Bengaluru" } },
+    ]);
+  });
+
+  it("renames the item's tool calls when their tool is renamed from the picker", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [
+            { tool: "dummy", arguments: { success: true } },
+            { tool: "other", arguments: {} },
+          ],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(
+      screen.getByRole("button", { name: "Save dummy as renamed_tool" }),
+    );
+
+    expect(screen.getByText("renamed_tool")).toBeInTheDocument();
+    expect(createToolFlowProps.knownTools).toEqual([
+      { uuid: "t-dummy", name: "renamed_tool" },
+    ]);
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "renamed_tool", arguments: { success: true } },
+      { tool: "other", arguments: {} },
     ]);
   });
 
@@ -567,7 +636,9 @@ describe("AddLlmGeneralItemsDialog", () => {
     await user.click(screen.getByRole("button", { name: "Add field" }));
     await user.type(screen.getByLabelText("Metadata field name 1"), "source");
     await user.type(screen.getByLabelText("Metadata field name 2"), "source");
-    expect(screen.getByText(/is already used by another field/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/is already used by another field/),
+    ).toBeInTheDocument();
     expect(addButton).toBeDisabled();
     await user.click(addButton);
     expect(onSubmit).not.toHaveBeenCalled();
@@ -913,7 +984,9 @@ describe("previous / next item in the edit window", () => {
     const onNext = jest.fn();
     renderDialog({
       mode: "edit",
-      initialRows: [{ uuid: "u1", name: "Item 1", input: "hi", output: "hello" }],
+      initialRows: [
+        { uuid: "u1", name: "Item 1", input: "hi", output: "hello" },
+      ],
       onPrev,
       onNext,
       ...step,
@@ -930,7 +1003,9 @@ describe("previous / next item in the edit window", () => {
     const onNext = jest.fn();
     const { onClose } = renderDialog({
       mode: "edit",
-      initialRows: [{ uuid: "u1", name: "Item 1", input: "hi", output: "hello" }],
+      initialRows: [
+        { uuid: "u1", name: "Item 1", input: "hi", output: "hello" },
+      ],
       onPrev: jest.fn(),
       onNext,
       ...step,
@@ -946,7 +1021,13 @@ describe("previous / next item in the edit window", () => {
   it("Preview opens the view window at once when nothing has been edited", async () => {
     const user = setupUser();
     const onView = jest.fn();
-    renderDialog({ mode: "edit", initialRows: [{ uuid: "u1", name: "Item 1", input: "hi", output: "hello" }], onView });
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "u1", name: "Item 1", input: "hi", output: "hello" },
+      ],
+      onView,
+    });
     await user.click(screen.getByRole("button", { name: "Preview" }));
     expect(onView).toHaveBeenCalledTimes(1);
   });
@@ -954,7 +1035,13 @@ describe("previous / next item in the edit window", () => {
   it("Preview asks before throwing away edits, and opens the view on Discard", async () => {
     const user = setupUser();
     const onView = jest.fn();
-    const { onClose } = renderDialog({ mode: "edit", initialRows: [{ uuid: "u1", name: "Item 1", input: "hi", output: "hello" }], onView });
+    const { onClose } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "u1", name: "Item 1", input: "hi", output: "hello" },
+      ],
+      onView,
+    });
     await user.type(screen.getByPlaceholderText("Your item name"), "x");
     await user.click(screen.getByRole("button", { name: "Preview" }));
     expect(onView).not.toHaveBeenCalled();
@@ -964,8 +1051,17 @@ describe("previous / next item in the edit window", () => {
   });
 
   it("draws no arrows when no steps are passed", () => {
-    renderDialog({ mode: "edit", initialRows: [{ uuid: "u1", name: "Item 1", input: "hi", output: "hello" }] });
-    expect(screen.queryByRole("button", { name: "Next item" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Preview" })).not.toBeInTheDocument();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "u1", name: "Item 1", input: "hi", output: "hello" },
+      ],
+    });
+    expect(
+      screen.queryByRole("button", { name: "Next item" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Preview" }),
+    ).not.toBeInTheDocument();
   });
 });

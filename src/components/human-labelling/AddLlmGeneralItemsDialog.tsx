@@ -229,6 +229,10 @@ export function AddLlmGeneralItemsDialog({
   useEffect(() => {
     if (!pickerOpen) return;
     const onKey = (e: KeyboardEvent) => {
+      // A tool opened from the list is edited in a side panel the list draws;
+      // closing the list there would close the panel and lose the edit.
+      if ((e.target as Element | null)?.closest?.("[data-tool-side-panel]"))
+        return;
       if (e.key === "Escape") {
         e.stopPropagation();
         setPickerOpen(false);
@@ -589,6 +593,21 @@ export function AddLlmGeneralItemsDialog({
                             onSelectCustomTool={(tool) =>
                               addToolCall(tool.name, getToolParams(tool))
                             }
+                            accessToken={accessToken ?? undefined}
+                            onToolSaved={(tool, previousName, allTools) => {
+                              setAvailableTools(allTools);
+                              // Tool calls hold the tool by name, so a rename
+                              // has to reach the ones already on this item.
+                              if (tool.name !== previousName) {
+                                setToolCalls((prev) =>
+                                  prev.map((tc) =>
+                                    tc.tool === previousName
+                                      ? { ...tc, tool: tool.name }
+                                      : tc,
+                                  ),
+                                );
+                              }
+                            }}
                           />
                         </div>
                       </>
