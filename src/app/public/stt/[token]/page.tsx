@@ -26,12 +26,10 @@ import {
   STT_RESERVED_METRIC_KEYS,
 } from "@/lib/evaluatorColumns";
 import type { LatencyMetric } from "@/components/eval-details/ttsEvalTypes";
-import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import type { AudioCostBreakdown } from "@/lib/audioCost";
-import {
-  ExportResultsButton,
-  type ExportColumn,
-} from "@/components/ExportResultsButton";
+import { ExportZipButton } from "@/components/ExportZipButton";
+import { sttExportContents } from "@/components/eval-details/speechExport";
+import { fetchRunForExport } from "@/lib/audioExport";
 import {
   getPublicDefaultEvaluator,
   type PublicDefaultEvaluator,
@@ -83,6 +81,7 @@ type ProviderResult = {
   metrics: ProviderMetrics;
   results: Array<{
     id: string;
+    audio_url?: string;
     gt: string;
     pred: string;
     wer: string;
@@ -230,55 +229,17 @@ export default function PublicSTTPage() {
               (pr) => (pr.results?.length ?? 0) > 0,
             ) && (
               <div className="flex items-center justify-end">
-                <ExportResultsButton
+                <ExportZipButton
                   filename={`stt-results-${data.task_id}`}
-                  getRows={() => {
-                    const columns: ExportColumn[] = [
-                      { key: "provider", header: "Provider" },
-                      { key: "reference_text", header: "Reference text" },
-                      { key: "predicted_text", header: "Predicted text" },
-                      { key: "wer", header: "WER" },
-                      { key: "cer", header: "CER" },
-                      ...evaluatorColumns.map((c) => ({
-                        key: c.key,
-                        header: c.label,
-                      })),
-                    ];
-                    const rows: Record<string, unknown>[] = [];
-                    for (const pr of data.provider_results ?? []) {
-                      for (const r of pr.results ?? []) {
-                        const row: Record<string, unknown> = {
-                          provider: getProviderLabel(pr.provider),
-                          reference_text: r.gt,
-                          predicted_text: r.pred,
-                          wer: r.wer,
-                          cer: r.cer,
-                        };
-                        for (const c of evaluatorColumns) {
-                          const { score, error } = readEvaluatorCell(
-                            r as unknown as Record<string, unknown>,
-                            c,
-                          );
-                          if (error || score === undefined) {
-                            row[c.key] = "";
-                            continue;
-                          }
-                          if (c.outputType === "binary") {
-                            const norm = score.toLowerCase();
-                            row[c.key] =
-                              norm === "true" || norm === "1"
-                                ? "true"
-                                : "false";
-                          } else {
-                            const n = parseFloat(score);
-                            row[c.key] = Number.isFinite(n) ? n : score;
-                          }
-                        }
-                        rows.push(row);
-                      }
-                    }
-                    return { columns, rows };
-                  }}
+                  getContents={async () =>
+                    sttExportContents(
+                      // Read the run again: its clip links stop working an hour
+                      // after the page first loaded them.
+                      await fetchRunForExport<EvaluationResult>(`/public/stt/${token}`),
+                      evaluatorColumns,
+                      getProviderLabel,
+                    )
+                  }
                 />
               </div>
             )}

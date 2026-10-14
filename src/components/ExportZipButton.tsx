@@ -1,6 +1,7 @@
 "use client";
 import { reportError } from "@/lib/reportError";
 import { Tooltip } from "@/components/Tooltip";
+import { toast } from "sonner";
 
 import React, { useState } from "react";
 import JSZip from "jszip";
@@ -11,6 +12,11 @@ export type ExportZipFile = {
   path: string;
   /** Absolute URL the browser can `fetch()` directly. */
   url: string;
+};
+
+export type ExportZipContents = {
+  csv: { columns: ExportColumn[]; rows: Record<string, unknown>[] };
+  files: ExportZipFile[];
 };
 
 type ExportZipButtonProps = {
@@ -25,10 +31,7 @@ type ExportZipButtonProps = {
    *   Failures are logged and surfaced as `<path>.error.txt` so the user has
    *   a record without the whole download blowing up.
    */
-  getContents: () => {
-    csv: { columns: ExportColumn[]; rows: Record<string, unknown>[] };
-    files: ExportZipFile[];
-  };
+  getContents: () => ExportZipContents | Promise<ExportZipContents>;
   disabled?: boolean;
   label?: string;
   className?: string;
@@ -74,11 +77,11 @@ export function ExportZipButton({
 
   const handleClick = async () => {
     if (isExporting) return;
-    const { csv, files } = getContents();
-    if (csv.rows.length === 0 && files.length === 0) return;
-
     setIsExporting(true);
     try {
+      const { csv, files } = await getContents();
+      if (csv.rows.length === 0 && files.length === 0) return;
+
       const zip = new JSZip();
       zip.file("results.csv", buildCsv(csv.columns, csv.rows));
 
@@ -86,7 +89,10 @@ export function ExportZipButton({
       // 404 / network error doesn't kill the whole export.
       const fetched = await Promise.allSettled(
         files.map(async (f) => {
-          const res = await fetch(f.url);
+          // Skip the browser's stored copy: a clip already played on the page
+          // was stored from a request that did not ask for read permission,
+          // so reusing it makes this read fail with "Failed to fetch".
+          const res = await fetch(f.url, { cache: "no-store" });
           if (!res.ok) {
             throw new Error(`HTTP ${res.status} for ${f.url}`);
           }
@@ -118,6 +124,9 @@ export function ExportZipButton({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+    } catch (err) {
+      reportError("Export: failed to build the zip", err);
+      toast.error("Could not export the results. Try again");
     } finally {
       setIsExporting(false);
     }

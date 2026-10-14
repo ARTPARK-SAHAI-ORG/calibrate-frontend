@@ -36,9 +36,7 @@ import {
   hasSttTopPicks,
 } from "@/components/eval-details";
 import type { LatencyMetric } from "@/components/eval-details/ttsEvalTypes";
-import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
-import { SARVAM_METRIC_FIELDS } from "@/components/eval-details/sarvamMetrics";
 import {
   AddRunToLabellingTaskDialog,
   type SttLabellingRow,
@@ -51,10 +49,9 @@ import {
 } from "@/components/human-labelling/labellingSubmit";
 import { useSidebarState } from "@/lib/sidebar";
 import { ShareButton } from "@/components/ShareButton";
-import {
-  ExportResultsButton,
-  ExportColumn,
-} from "@/components/ExportResultsButton";
+import { ExportZipButton } from "@/components/ExportZipButton";
+import { sttExportContents } from "@/components/eval-details/speechExport";
+import { fetchRunForExport } from "@/lib/audioExport";
 import { retryEvaluation } from "@/lib/retryEvaluation";
 import {
   deriveEvaluatorColumns,
@@ -823,96 +820,26 @@ export default function STTEvaluationDetailPage() {
               )}
               {/* Actions, pushed to the right of the labels. */}
               <div className="flex items-center gap-3 flex-wrap ml-auto">
-                {/* Export per-row results to CSV. Placed before Share so the
-                    Export ↔ Share button order matches TestRunnerDialog /
-                    BenchmarkResultsDialog. One row per (provider, row);
-                    columns: reference / predicted text, WER, and one column
-                    per attached evaluator (binary → "true"/"false", rating →
-                    raw numeric score). Built at click time so it reflects
-                    the latest state if the user re-runs the page. */}
+                {/* Export results as a zip (what goes in it: speechExport.ts).
+                    Placed before Share, matching TestRunnerDialog. */}
                 {evaluationResult.status === "done" &&
                   (evaluationResult.provider_results ?? []).some(
                     (pr) => (pr.results?.length ?? 0) > 0,
                   ) && (
-                    <ExportResultsButton
+                    <ExportZipButton
                       filename={`stt-results-${evaluationResult.dataset_name ?? taskId}`}
-                      getRows={() => {
-                        const columns: ExportColumn[] = [
-                          { key: "provider", header: "Provider" },
-                          { key: "reference_text", header: "Reference text" },
-                          { key: "predicted_text", header: "Predicted text" },
-                          { key: "wer", header: "WER" },
-                          { key: "cer", header: "CER" },
-                          // Semantic WER, only when the run computed it.
-                          ...(hasSemanticWer
-                            ? [{ key: "semantic_wer", header: "Semantic WER" }]
-                            : []),
-                          // Sarvam LLM metrics, only when the run computed them.
-                          ...(hasSarvamMetrics
-                            ? SARVAM_METRIC_FIELDS.map((f) => ({
-                                key: f.csvKey,
-                                header: f.label,
-                              }))
-                            : []),
-                          ...evaluatorColumns.map((c) => ({
-                            key: c.key,
-                            header: c.label,
-                          })),
-                        ];
-                        const rows: Record<string, unknown>[] = [];
-                        for (const pr of evaluationResult.provider_results ??
-                          []) {
-                          for (const r of pr.results ?? []) {
-                            const row: Record<string, unknown> = {
-                              provider: getProviderLabel(pr.provider),
-                              reference_text: r.gt,
-                              predicted_text: r.pred,
-                              wer: r.wer,
-                              cer: r.cer,
-                              ...(hasSemanticWer
-                                ? { semantic_wer: r.semantic_wer ?? "" }
-                                : {}),
-                              ...(hasSarvamMetrics
-                                ? Object.fromEntries(
-                                    SARVAM_METRIC_FIELDS.map((f) => [
-                                      f.csvKey,
-                                      r[f.key] ?? "",
-                                    ]),
-                                  )
-                                : {}),
-                            };
-                            // Read via `readEvaluatorCell` so the refreshed
-                            // `evaluator_outputs[<uuid>]` shape is preferred
-                            // over the legacy flat scoreField. Matches what
-                            // STTResultsTable renders on screen.
-                            for (const c of evaluatorColumns) {
-                              const { score, error } = readEvaluatorCell(
-                                r as unknown as Record<string, unknown>,
-                                c,
-                              );
-                              if (error || score === undefined) {
-                                row[c.key] = "";
-                                continue;
-                              }
-                              if (c.outputType === "binary") {
-                                // Mirrors EvaluatorScoreCell: lowercase the
-                                // raw string before comparing so judges that
-                                // emit "True"/"TRUE" still register as Pass.
-                                const norm = score.toLowerCase();
-                                row[c.key] =
-                                  norm === "true" || norm === "1"
-                                    ? "true"
-                                    : "false";
-                              } else {
-                                const n = parseFloat(score);
-                                row[c.key] = Number.isFinite(n) ? n : score;
-                              }
-                            }
-                            rows.push(row);
-                          }
-                        }
-                        return { columns, rows };
-                      }}
+                      getContents={async () =>
+                        sttExportContents(
+                          // Read the run again: its clip links stop working an hour
+                          // after the page first loaded them.
+                          await fetchRunForExport<EvaluationResult>(
+                            `/stt/evaluate/${taskId}`,
+                            backendAccessToken,
+                          ),
+                          evaluatorColumns,
+                          getProviderLabel,
+                        )
+                      }
                     />
                   )}
                 {/* Sharing only makes sense once the run is complete — earlier
