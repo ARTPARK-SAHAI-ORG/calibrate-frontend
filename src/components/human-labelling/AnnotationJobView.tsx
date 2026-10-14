@@ -269,6 +269,19 @@ export function jobStatusLabel(status: AnnotationJobMeta["jobStatus"]): string {
 const NO_ITEMS: Item[] = [];
 const NO_EVALUATORS: Evaluator[] = [];
 
+// How each item in the item list reads, by its state.
+type ItemListStatus = "completed" | "in progress";
+const ITEM_LIST_STATUS_TEXT: Record<ItemListStatus, string> = {
+  completed: "Completed",
+  "in progress": "In progress",
+};
+const ITEM_LIST_STATUS_CLASS: Record<ItemListStatus, string> = {
+  completed:
+    "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400",
+  "in progress":
+    "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400",
+};
+
 export function AnnotationJobView({
   token,
   mode,
@@ -725,22 +738,17 @@ function AnnotateView({
     );
   // How an item reads in the item list: finished, started (some answer on
   // screen, saved or not), or untouched.
-  const itemListStatus = (itemId: string) =>
+  const itemListStatus = (itemId: string): ItemListStatus | null =>
     itemCompleted(itemId)
       ? "completed"
       : evaluatorsFor(itemId).some((ev) => evaluatorAnswered(itemId, ev))
         ? "in progress"
         : null;
-  const ITEM_LIST_STATUS_TEXT = {
-    completed: "Completed",
-    "in progress": "In progress",
-  };
-  const ITEM_LIST_STATUS_CLASS = {
-    completed:
-      "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400",
-    "in progress":
-      "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400",
-  };
+  // Worked out once per render: the phone list, the desktop list and the
+  // count of unfinished items all read it.
+  const statusByItem = new Map(
+    items.map((it) => [it.uuid, itemListStatus(it.uuid)]),
+  );
 
   // Labels the annotator touched in this sitting. A job that asks for
   // reasoning asks for it on these only: a label that arrived already
@@ -1108,7 +1116,8 @@ function AnnotateView({
                   );
                 const canSave = !!currentItem && canSaveItem(currentItem.uuid);
                 const unsavedCount = items.reduce(
-                  (n, it) => (itemCompleted(it.uuid) ? n : n + 1),
+                  (n, it) =>
+                    statusByItem.get(it.uuid) === "completed" ? n : n + 1,
                   0,
                 );
                 const isLastUnsaved =
@@ -1175,7 +1184,7 @@ function AnnotateView({
           <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
             <div className="p-2 grid grid-cols-8 gap-2">
               {items.map((it, i) => {
-                const status = itemListStatus(it.uuid);
+                const status = statusByItem.get(it.uuid) ?? null;
                 const isCurrent = i === currentIndex;
                 const position = originalIndexByUuid.get(it.uuid);
                 return (
@@ -1208,7 +1217,7 @@ function AnnotateView({
             <div className="absolute inset-0 overflow-y-auto">
               <div className="p-3 grid grid-cols-1 gap-2">
                 {items.map((it, i) => {
-                  const status = itemListStatus(it.uuid);
+                  const status = statusByItem.get(it.uuid) ?? null;
                   const isCurrent = i === currentIndex;
                   const position = originalIndexByUuid.get(it.uuid);
                   return (
