@@ -610,6 +610,98 @@ describe("EvaluatorVerdictCard - write mode binary", () => {
   });
 });
 
+describe("EvaluatorVerdictCard - write mode removing an answer", () => {
+  const CLEAR_HINT = "Click again to remove this answer";
+
+  it("clears a binary answer when the picked option is clicked again", async () => {
+    const user = setupUser();
+    const onValueChange = jest.fn();
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        value={true}
+        onValueChange={onValueChange}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    expect(onValueChange).toHaveBeenLastCalledWith(null);
+    await user.click(screen.getByRole("button", { name: "Wrong" }));
+    expect(onValueChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("clears a rating when the picked level is clicked again", async () => {
+    const user = setupUser();
+    const onValueChange = jest.fn();
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="rating"
+        scaleMin={1}
+        scaleMax={3}
+        value={2}
+        onValueChange={onValueChange}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "2" }));
+    expect(onValueChange).toHaveBeenLastCalledWith(null);
+    await user.click(screen.getByRole("button", { name: "3" }));
+    expect(onValueChange).toHaveBeenLastCalledWith(3);
+  });
+
+  it("shows the remove hint on hover over the picked option only", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        value={false}
+      />,
+    );
+    await user.hover(screen.getByRole("button", { name: "Correct" }));
+    expect(screen.queryByText(CLEAR_HINT)).not.toBeInTheDocument();
+    await user.unhover(screen.getByRole("button", { name: "Correct" }));
+    await user.hover(screen.getByRole("button", { name: "Wrong" }));
+    expect(await screen.findByText(CLEAR_HINT)).toBeInTheDocument();
+  });
+
+  it("shows the remove hint on a picked rating level", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="rating"
+        scaleMin={1}
+        scaleMax={3}
+        value={3}
+      />,
+    );
+    await user.hover(screen.getByRole("button", { name: "1" }));
+    expect(screen.queryByText(CLEAR_HINT)).not.toBeInTheDocument();
+    await user.hover(screen.getByRole("button", { name: "3" }));
+    expect(await screen.findByText(CLEAR_HINT)).toBeInTheDocument();
+  });
+
+  it("shows no remove hint while the controls are disabled", async () => {
+    const user = setupUser();
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        value={true}
+        disabled
+      />,
+    );
+    await user.hover(screen.getByRole("button", { name: "Correct" }));
+    expect(screen.queryByText(CLEAR_HINT)).not.toBeInTheDocument();
+  });
+});
+
 describe("EvaluatorVerdictCard - write mode rating", () => {
   it("shows an error when scale bounds are missing", () => {
     render(

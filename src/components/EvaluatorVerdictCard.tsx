@@ -22,7 +22,7 @@ import { Tooltip } from "@/components/Tooltip";
 // other callers (tool-call verdicts in test-results/shared.tsx) reuse the
 // exact same toggle visual without duplicating it.
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   DEFAULT_BINARY_FALSE_LABEL,
   DEFAULT_BINARY_TRUE_LABEL,
@@ -92,11 +92,12 @@ type WriteProps = CommonProps & {
   trueDescription?: string | null;
   falseDescription?: string | null;
   /** Current value the annotator picked. Boolean for binary, number for rating. */
-  value?: boolean | number;
+  value?: boolean | number | null;
   /** Current free-text reasoning the annotator entered. */
   comment?: string;
-  /** Called when the annotator picks a new verdict. */
-  onValueChange?: (v: boolean | number) => void;
+  /** Called when the annotator picks a new verdict, or with null when they
+   * click the option already picked to remove their answer. */
+  onValueChange?: (v: boolean | number | null) => void;
   /** Called when the reasoning textarea changes. */
   onCommentChange?: (s: string) => void;
   /** Renders the controls but disables interaction (e.g. saving in flight). */
@@ -454,6 +455,30 @@ function OptionDescription({
   );
 }
 
+// Every option sits inside a Tooltip at all times, so picking one does not
+// rebuild the button and drop keyboard focus. Only the picked option has hover
+// text; on the others the popup is hidden.
+function PickedOptionTooltip({
+  picked,
+  className,
+  children,
+}: {
+  picked: boolean;
+  className: string;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip
+      content={picked ? "Click again to remove this answer" : null}
+      contentStyle={picked ? undefined : { display: "none" }}
+      position="top"
+      className={className}
+    >
+      {children}
+    </Tooltip>
+  );
+}
+
 function WriteControls({
   outputType,
   scaleMin,
@@ -470,8 +495,8 @@ function WriteControls({
   outputType: EvaluatorOutputType;
   scaleMin?: number;
   scaleMax?: number;
-  value?: boolean | number;
-  onChange: (v: boolean | number) => void;
+  value?: boolean | number | null;
+  onChange: (v: boolean | number | null) => void;
   disabled?: boolean;
   trueLabel?: string | null;
   falseLabel?: string | null;
@@ -490,6 +515,8 @@ function WriteControls({
     const baseBtn = described
       ? `${DESCRIBED_OPTION_BTN} text-sm font-medium`
       : "h-9 px-4 rounded-md text-sm font-medium border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed";
+    // The tooltip wrapper is the flex item now, so it carries the stretch.
+    const wrapClass = described ? "flex flex-1 min-w-40" : "flex";
     return (
       <div
         className={
@@ -498,46 +525,56 @@ function WriteControls({
             : "flex items-center gap-2"
         }
       >
-        <button
-          type="button"
-          disabled={disabled}
-          aria-pressed={value === true}
-          onClick={() => onChange(true)}
-          className={`${baseBtn} ${
-            value === true
-              ? "border-green-600 bg-green-600 text-white"
-              : "border-border bg-background text-foreground hover:bg-muted/50"
-          }`}
+        <PickedOptionTooltip
+          picked={value === true && !disabled}
+          className={wrapClass}
         >
-          {trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL}
-          {trueText && (
-            <OptionDescription
-              text={trueText}
-              active={value === true}
-              activeClass="text-white/80"
-            />
-          )}
-        </button>
-        <button
-          type="button"
-          disabled={disabled}
-          aria-pressed={value === false}
-          onClick={() => onChange(false)}
-          className={`${baseBtn} ${
-            value === false
-              ? "border-red-600 bg-red-600 text-white"
-              : "border-border bg-background text-foreground hover:bg-muted/50"
-          }`}
+          <button
+            type="button"
+            disabled={disabled}
+            aria-pressed={value === true}
+            onClick={() => onChange(value === true ? null : true)}
+            className={`${baseBtn} ${
+              value === true
+                ? "border-green-600 bg-green-600 text-white"
+                : "border-border bg-background text-foreground hover:bg-muted/50"
+            }`}
+          >
+            {trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL}
+            {trueText && (
+              <OptionDescription
+                text={trueText}
+                active={value === true}
+                activeClass="text-white/80"
+              />
+            )}
+          </button>
+        </PickedOptionTooltip>
+        <PickedOptionTooltip
+          picked={value === false && !disabled}
+          className={wrapClass}
         >
-          {falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL}
-          {falseText && (
-            <OptionDescription
-              text={falseText}
-              active={value === false}
-              activeClass="text-white/80"
-            />
-          )}
-        </button>
+          <button
+            type="button"
+            disabled={disabled}
+            aria-pressed={value === false}
+            onClick={() => onChange(value === false ? null : false)}
+            className={`${baseBtn} ${
+              value === false
+                ? "border-red-600 bg-red-600 text-white"
+                : "border-border bg-background text-foreground hover:bg-muted/50"
+            }`}
+          >
+            {falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL}
+            {falseText && (
+              <OptionDescription
+                text={falseText}
+                active={value === false}
+                activeClass="text-white/80"
+              />
+            )}
+          </button>
+        </PickedOptionTooltip>
       </div>
     );
   }
@@ -582,47 +619,52 @@ function WriteControls({
             readVerdictTone({ score: n, scaleMin, scaleMax })
           ];
         return (
-          <button
+          <PickedOptionTooltip
             key={n}
-            type="button"
-            disabled={disabled}
-            aria-pressed={active}
-            onClick={() => onChange(n)}
-            className={`${
-              described
-                ? DESCRIBED_OPTION_BTN
-                : hasLabels
-                  ? "min-w-[3.25rem] px-2.5 h-auto py-1.5 flex flex-col items-center gap-0.5 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                  : "w-9 h-9 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            } text-sm font-medium ${
-              active
-                ? activeClass
-                : "border-border bg-background hover:bg-muted/50"
-            }`}
+            picked={active && !disabled}
+            className={described ? "flex flex-1 min-w-40" : "flex"}
           >
-            {described ? (
-              <span>{label ? `${n} · ${label}` : n}</span>
-            ) : (
-              <span>{n}</span>
-            )}
-            {described
-              ? text && (
-                  <OptionDescription
-                    text={text}
-                    active={active}
-                    activeClass="text-white/80"
-                  />
-                )
-              : hasLabels && (
-                  <span
-                    className={`text-[10px] font-normal leading-tight ${
-                      active ? "text-white/80" : "text-muted-foreground"
-                    }`}
-                  >
-                    {label ?? ""}
-                  </span>
-                )}
-          </button>
+            <button
+              type="button"
+              disabled={disabled}
+              aria-pressed={active}
+              onClick={() => onChange(active ? null : n)}
+              className={`${
+                described
+                  ? DESCRIBED_OPTION_BTN
+                  : hasLabels
+                    ? "min-w-[3.25rem] px-2.5 h-auto py-1.5 flex flex-col items-center gap-0.5 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    : "w-9 h-9 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              } text-sm font-medium ${
+                active
+                  ? activeClass
+                  : "border-border bg-background hover:bg-muted/50"
+              }`}
+            >
+              {described ? (
+                <span>{label ? `${n} · ${label}` : n}</span>
+              ) : (
+                <span>{n}</span>
+              )}
+              {described
+                ? text && (
+                    <OptionDescription
+                      text={text}
+                      active={active}
+                      activeClass="text-white/80"
+                    />
+                  )
+                : hasLabels && (
+                    <span
+                      className={`text-[10px] font-normal leading-tight ${
+                        active ? "text-white/80" : "text-muted-foreground"
+                      }`}
+                    >
+                      {label ?? ""}
+                    </span>
+                  )}
+            </button>
+          </PickedOptionTooltip>
         );
       })}
     </div>
