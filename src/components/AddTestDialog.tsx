@@ -3569,31 +3569,40 @@ export function AddTestDialog({
           isUser ? "w-full flex-row-reverse" : ""
         }`}
       >
-        <input
-          type="text"
-          value={draft ? draft.to : current}
-          size={Math.min(
-            40,
-            Math.max(placeholder.length, (draft ? draft.to : current).length) + 1,
-          )}
-          placeholder={placeholder}
-          aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
-          onFocus={() => {
-            if (!draft)
-              setHeadingDraft({ id: message.id, to: current || placeholder });
-          }}
-          onChange={(e) =>
-            setHeadingDraft({ id: message.id, to: e.target.value })
-          }
-          onBlur={() => dropHeadingDraftIfUnchanged(message, placeholder)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") confirmHeadingDraft(message, placeholder);
-            if (e.key === "Escape") setHeadingDraft(null);
-          }}
-          className={`h-7 px-4 rounded-md text-sm font-medium text-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
-            isUser ? "flex-1 min-w-0 text-right" : ""
-          }`}
-        />
+        <div
+          className={`grid ${isUser ? "flex-1 min-w-0" : "max-w-64"}`}
+        >
+          <input
+            type="text"
+            size={1}
+            value={draft ? draft.to : current}
+            placeholder={placeholder}
+            aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
+            onFocus={() => {
+              if (!draft)
+                setHeadingDraft({ id: message.id, to: current || placeholder });
+            }}
+            onChange={(e) =>
+              setHeadingDraft({ id: message.id, to: e.target.value })
+            }
+            onBlur={() => dropHeadingDraftIfUnchanged(message, placeholder)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") confirmHeadingDraft(message, placeholder);
+              if (e.key === "Escape") setHeadingDraft(null);
+            }}
+            className={`[grid-area:1/1/2/2] w-full min-w-0 h-7 rounded-md text-sm font-medium text-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
+              isUser ? "pl-2 pr-4 text-right" : "pl-4 pr-2"
+            }`}
+          />
+          <span
+            aria-hidden="true"
+            className={`[grid-area:1/1/2/2] invisible h-7 border whitespace-pre text-sm font-medium overflow-hidden ${
+              isUser ? "pl-2 pr-4" : "pl-4 pr-2"
+            }`}
+          >
+            {(draft ? draft.to : current) || placeholder}
+          </span>
+        </div>
         {dirty && (
           <>
             <button
@@ -5007,7 +5016,7 @@ export function AddTestDialog({
                                       )}
                                     {message.role === "agent" &&
                                       isLabelItem && (
-                                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                                        <div className="flex items-center gap-2 mb-1 w-max">
                                           {renderHeadingInput(message, "Agent")}
                                           {isEvalTarget && evalTargetPill}
                                         </div>
