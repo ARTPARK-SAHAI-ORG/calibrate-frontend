@@ -191,4 +191,52 @@ describe("LlmItemPane", () => {
     render(<LlmItemPane payload={{ actual_tool_calls: [] }} />);
     expect(screen.getByText("—")).toBeInTheDocument();
   });
+
+  it("renders an object agent_response with its text, label and versions", () => {
+    render(
+      <LlmItemPane
+        payload={{
+          chat_history: [{ role: "user", content: "Hi" }],
+          agent_response: {
+            content: "Hello there",
+            label: "English",
+            versions: { Hindi: "नमस्ते" },
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText("Hello there")).toBeInTheDocument();
+    expect(screen.getByText("English")).toBeInTheDocument();
+    expect(screen.getByText("Hindi")).toBeInTheDocument();
+    expect(screen.getByText("नमस्ते")).toBeInTheDocument();
+  });
+
+  it("hides an object agent_response's versions when showVersions is false", () => {
+    render(
+      <LlmItemPane
+        showVersions={false}
+        payload={{
+          agent_response: {
+            content: "Hello there",
+            versions: { Hindi: "नमस्ते" },
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText("Hello there")).toBeInTheDocument();
+    expect(screen.queryByText("नमस्ते")).not.toBeInTheDocument();
+  });
+
+  it("ignores an object agent_response without content", () => {
+    render(
+      <LlmItemPane
+        payload={{
+          chat_history: [{ role: "user", content: "Hi" }],
+          agent_response: { label: "English" },
+        }}
+      />,
+    );
+    expect(screen.getByText("Hi")).toBeInTheDocument();
+    expect(screen.queryByText("English")).not.toBeInTheDocument();
+  });
 });

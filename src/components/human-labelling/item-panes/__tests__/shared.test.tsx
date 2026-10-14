@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen } from "@/test-utils";
-import { Section, ChatMessage } from "../shared";
+import { Section, ChatMessage, normaliseHistoryItem } from "../shared";
 
 describe("Section", () => {
   it("renders title, subtitle, and children", () => {
@@ -53,5 +53,64 @@ describe("ChatMessage", () => {
   it("shows an em-dash placeholder when content is empty", () => {
     render(<ChatMessage role="user" content="" />);
     expect(screen.getByText("—")).toBeInTheDocument();
+  });
+});
+
+describe("normaliseHistoryItem", () => {
+  const extras = { label: "English", versions: { Hindi: "नमस्ते" } };
+  const toolCall = {
+    id: "call-1",
+    type: "function",
+    function: { name: "lookup", arguments: "{}" },
+  };
+
+  it.each([
+    ["user", { role: "user", content: "Hi", ...extras }],
+    ["assistant text", { role: "assistant", content: "Hello", ...extras }],
+  ])("keeps label and versions on a %s turn", (_name, raw) => {
+    const turn = normaliseHistoryItem(raw);
+    expect(turn?.label).toBe("English");
+    expect(turn?.versions).toEqual({ Hindi: "नमस्ते" });
+  });
+
+  it.each([
+    [
+      "assistant tool call",
+      { role: "assistant", tool_calls: [toolCall], ...extras },
+    ],
+    [
+      "tool",
+      { role: "tool", content: "ok", tool_call_id: "call-1", ...extras },
+    ],
+  ])("drops label and versions on a %s turn, which never shows them", (_name, raw) => {
+    const turn = normaliseHistoryItem(raw);
+    expect(turn).not.toBeNull();
+    expect(turn).not.toHaveProperty("label");
+    expect(turn).not.toHaveProperty("versions");
+  });
+
+  it.each([
+    ["user", { role: "user", content: "Hi" }],
+    ["assistant text", { role: "assistant", content: "Hello" }],
+    ["assistant tool call", { role: "assistant", tool_calls: [toolCall] }],
+    ["tool", { role: "tool", content: "ok" }],
+  ])(
+    "has no label or versions keys on a %s turn without them",
+    (_name, raw) => {
+      const turn = normaliseHistoryItem(raw);
+      expect(turn).not.toBeNull();
+      expect(turn).not.toHaveProperty("label");
+      expect(turn).not.toHaveProperty("versions");
+    },
+  );
+
+  it("drops a blank label and a versions map with no text", () => {
+    const turn = normaliseHistoryItem({
+      role: "user",
+      content: "Hi",
+      label: "  ",
+      versions: { Hindi: 5 },
+    });
+    expect(turn).toEqual({ role: "user", content: "Hi" });
   });
 });

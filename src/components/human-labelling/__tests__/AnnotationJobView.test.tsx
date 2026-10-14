@@ -1814,3 +1814,79 @@ describe("AnnotationJobView picks the evaluators per row", () => {
     expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
   });
 });
+
+describe("AnnotationJobView message versions", () => {
+  let fetchMock: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  const withVersions = {
+    ...items[0],
+    payload: {
+      name: "Item One",
+      chat_history: [
+        {
+          role: "user",
+          content: "hello",
+          label: "English",
+          versions: { Hindi: "namaste" },
+        },
+      ],
+      agent_response: "hi",
+    },
+  };
+
+  it("draws no version toggle for an item whose turns carry no versions", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Item One")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("All versions")).not.toBeInTheDocument();
+    expect(screen.queryByText("Default only")).not.toBeInTheDocument();
+  });
+
+  it("shows every version by default and hides the others on Default only", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValue(
+      jsonResponse(jobResponse({ items: [withVersions] })),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("All versions")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("All versions")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByText("namaste")).toBeInTheDocument();
+
+    await user.click(screen.getByText("Default only"));
+    expect(screen.getByText("Default only")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByText("All versions")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.queryByText("namaste")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("All versions"));
+    expect(screen.getByText("namaste")).toBeInTheDocument();
+  });
+
+  it("keeps the version toggle in the admin read-only view", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(jobResponse({ items: [withVersions], read_only: true })),
+    );
+    render(<AnnotationJobView token="tok" mode="admin" />);
+    await waitFor(() =>
+      expect(screen.getByText("Default only")).toBeInTheDocument(),
+    );
+  });
+});

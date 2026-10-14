@@ -493,6 +493,21 @@ describe("extractPayloadInputValues", () => {
     );
     expect(out).toEqual(["user: hi", "hello"]);
   });
+  it("exports the default text of a reply stored with versions", () => {
+    expect(
+      extractPayloadInputValues(
+        {
+          chat_history: [],
+          agent_response: {
+            content: "hello",
+            label: "English",
+            versions: { Hindi: "namaste" },
+          },
+        },
+        "llm",
+      ),
+    ).toEqual(["", "hello"]);
+  });
   it("defaults llm fields when missing/malformed", () => {
     expect(
       extractPayloadInputValues({ chat_history: "not-array" }, "llm"),
@@ -2801,6 +2816,67 @@ describe("ItemDetailPane", () => {
     const pane = screen.getByTestId("item-detail-left-pane");
     expect(pane.className).toContain("py-4");
     expect(pane.className).toContain("md:py-6");
+  });
+
+  const versionsNote =
+    "The evaluator read the default text of each message. Other versions are shown for comparison and were not sent to it";
+
+  const renderWithPayload = (
+    payload: Record<string, unknown>,
+    showJudgeNote = true,
+  ) =>
+    render(
+      <ItemDetailPane
+        showJudgeNote={showJudgeNote}
+        item={{
+          id: 0,
+          uuid: "item-1",
+          task_id: "task-1",
+          payload,
+          created_at: "",
+          deleted_at: null,
+        }}
+        taskType="llm"
+        evaluators={[]}
+        evaluatorNamesById={{}}
+        getJobEvaluator={() => null}
+        runs={[]}
+        versionLabels={{}}
+        jobStatus="completed"
+        humanAgreementForItem={null}
+        evaluatorVariablesByEvaluatorId={{}}
+      />,
+    );
+
+  it("says the evaluator read only the default text when a turn carries versions", () => {
+    renderWithPayload({
+      chat_history: [
+        { role: "user", content: "hello", versions: { Hindi: "namaste" } },
+      ],
+      agent_response: "hi",
+    });
+    expect(screen.getByText(versionsNote)).toBeInTheDocument();
+  });
+
+  it("shows no such note outside an evaluator run, where no judge read the item", () => {
+    renderWithPayload(
+      {
+        chat_history: [
+          { role: "user", content: "hello", versions: { Hindi: "namaste" } },
+        ],
+        agent_response: "hi",
+      },
+      false,
+    );
+    expect(screen.queryByText(versionsNote)).not.toBeInTheDocument();
+  });
+
+  it("shows no such note when no turn carries versions", () => {
+    renderWithPayload({
+      chat_history: [{ role: "user", content: "hello" }],
+      agent_response: "hi",
+    });
+    expect(screen.queryByText(versionsNote)).not.toBeInTheDocument();
   });
 });
 

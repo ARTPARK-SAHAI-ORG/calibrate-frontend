@@ -91,4 +91,37 @@ describe("ToolCallItemPane", () => {
     expect(container.querySelector(".border-l-green-500")).toBeNull();
     expect(container.querySelector(".border-l-red-500")).toBeNull();
   });
+
+  it("shows an object agent_response with its label and versions", () => {
+    render(
+      <ToolCallItemPane
+        payload={{
+          chat_history: [{ role: "user", content: "Hi" }],
+          actual_tool_calls: [],
+          agent_response: {
+            content: "I cannot do that",
+            label: "English",
+            versions: { Hindi: "मैं यह नहीं कर सकता" },
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText("I cannot do that")).toBeInTheDocument();
+    expect(screen.getByText("English")).toBeInTheDocument();
+    expect(screen.getByText("Hindi")).toBeInTheDocument();
+    expect(screen.getByText("मैं यह नहीं कर सकता")).toBeInTheDocument();
+  });
+
+  it("ignores an object agent_response without content", () => {
+    render(
+      <ToolCallItemPane
+        payload={{
+          chat_history: [{ role: "user", content: "Hi" }],
+          agent_response: { label: "English" },
+        }}
+      />,
+    );
+    expect(screen.getByText("Hi")).toBeInTheDocument();
+    expect(screen.queryByText("English")).not.toBeInTheDocument();
+  });
 });

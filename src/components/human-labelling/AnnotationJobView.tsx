@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { getBackendUrl } from "@/lib/api";
+import { payloadHasVersions } from "@/lib/messageVersions";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
 import { type MetadataEntry } from "@/components/ui";
@@ -713,6 +714,7 @@ function AnnotateView({
   // reasoning) is not the annotator's to explain, and asking would leave
   // them unable to save the item at all.
   const [touchedKeys, setTouchedKeys] = useState<Set<FieldKey>>(new Set());
+  const [showVersions, setShowVersions] = useState(true);
   // Labels whose reasoning box is empty, marked red after a save was
   // refused. Emptied as soon as the annotator starts typing in one.
   const [missingReasoningKeys, setMissingReasoningKeys] = useState<
@@ -999,11 +1001,37 @@ function AnnotateView({
         }
       >
         <header className="border-b border-border px-4 md:px-6 py-3 flex flex-col gap-3 md:grid md:grid-cols-3 md:items-center md:gap-4">
-          <div className="min-w-0">
+          <div className="min-w-0 flex items-center gap-3">
             {currentItem && (
               <h2 className="text-sm font-semibold truncate">
                 {currentItemName || "Item"}
               </h2>
+            )}
+            {currentItem && payloadHasVersions(currentItem.payload) && (
+              <div className="shrink-0 inline-flex" role="group">
+                {(
+                  [
+                    ["All versions", true],
+                    ["Default only", false],
+                  ] as const
+                ).map(([label, value], i) => (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-pressed={showVersions === value}
+                    onClick={() => setShowVersions(value)}
+                    className={`h-9 px-3 text-sm font-medium border border-border transition-colors cursor-pointer ${
+                      i === 0 ? "rounded-l-md" : "rounded-r-md -ml-px"
+                    } ${
+                      showVersions === value
+                        ? "bg-muted"
+                        : "bg-background hover:bg-muted/50"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
           <div className="flex items-center justify-center gap-2 flex-wrap">
@@ -1171,7 +1199,11 @@ function AnnotateView({
                 ref={evaluatorsPaneRef}
                 className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full md:overflow-y-auto"
               >
-                <ItemPane item={currentItem} taskType={data.task.type} />
+                <ItemPane
+                  item={currentItem}
+                  taskType={data.task.type}
+                  showVersions={showVersions}
+                />
                 <EvaluatorsPane
                   evaluators={evaluators}
                   item={currentItem}
@@ -1205,7 +1237,11 @@ function AnnotateView({
                       : "py-4 md:py-6"
                   }`}
                 >
-                  <ItemPane item={currentItem} taskType={data.task.type} />
+                  <ItemPane
+                  item={currentItem}
+                  taskType={data.task.type}
+                  showVersions={showVersions}
+                />
                 </div>
                 <div
                   ref={evaluatorsPaneRef}
@@ -1293,9 +1329,11 @@ export function itemPaneHasOwnPadding(taskType: Task["type"]): boolean {
 export function ItemPane({
   item,
   taskType,
+  showVersions = true,
 }: {
   item: Item;
   taskType: Task["type"];
+  showVersions?: boolean;
 }) {
   const payload = (item.payload ?? {}) as Record<string, unknown>;
   if (taskType === "stt") return <SttItemPane payload={payload} />;
@@ -1304,11 +1342,17 @@ export function ItemPane({
   // so its own pane draws the tool call too. Only a next-reply item swaps to
   // the tool-call pane, which reads `chat_history` / `agent_response`.
   if (taskType === "llm-general")
-    return <LlmGeneralItemPane payload={payload} />;
-  if (item.is_tool_call === true) return <ToolCallItemPane payload={payload} />;
-  if (taskType === "llm") return <LlmItemPane payload={payload} />;
+    return (
+      <LlmGeneralItemPane payload={payload} showVersions={showVersions} />
+    );
+  if (item.is_tool_call === true)
+    return <ToolCallItemPane payload={payload} showVersions={showVersions} />;
+  if (taskType === "llm")
+    return <LlmItemPane payload={payload} showVersions={showVersions} />;
   if (taskType === "conversation")
-    return <ConversationItemPane payload={payload} />;
+    return (
+      <ConversationItemPane payload={payload} showVersions={showVersions} />
+    );
   return (
     <div className="space-y-2">
       <Section title="Item payload">

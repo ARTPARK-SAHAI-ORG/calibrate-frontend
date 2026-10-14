@@ -1,5 +1,6 @@
 import React from "react";
 import type { TestCaseHistory } from "@/components/test-results/shared";
+import { readTurnExtras } from "@/lib/messageVersions";
 
 export function Section({
   title,
@@ -64,6 +65,7 @@ export function normaliseHistoryItem(raw: unknown): TestCaseHistory | null {
   const createdAt =
     typeof obj.created_at === "string" ? obj.created_at : undefined;
   const tsField = createdAt ? { created_at: createdAt } : {};
+  const extras = readTurnExtras(obj);
   if (role === "assistant") {
     if (Array.isArray(toolCalls) && toolCalls.length > 0) {
       return {
@@ -73,11 +75,13 @@ export function normaliseHistoryItem(raw: unknown): TestCaseHistory | null {
         ...tsField,
       };
     }
-    if (content != null) return { role: "assistant", content, ...tsField };
+    if (content != null) {
+      return { role: "assistant", content, ...tsField, ...extras };
+    }
     return null;
   }
   if (role === "user" && content != null) {
-    return { role: "user", content, ...tsField };
+    return { role: "user", content, ...tsField, ...extras };
   }
   if (role === "tool" && content != null) {
     return {
