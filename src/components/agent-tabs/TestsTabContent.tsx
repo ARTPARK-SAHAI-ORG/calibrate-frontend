@@ -43,6 +43,8 @@ import type { InputFieldType } from "@/components/CustomFieldsEditor";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import { useAgentDefaultsPrompt } from "@/hooks/useAgentDefaultsPrompt";
 import { testTypeLabel } from "@/lib/testTypes";
+import { Link } from "@/lib/nav";
+import { openInPlace } from "@/lib/openInPlace";
 import {
   TestTypeFilter,
   matchesTestTypeFilter,
@@ -464,6 +466,15 @@ export function TestsTabContent({
       void openEditTest(uuid);
     },
     onPageStartChange: setTestsOffset,
+  });
+
+  // Each row is also a link to this test, so it can be opened in a new tab; a
+  // plain click opens it here.
+  const testLinkProps = (uuid: string) => ({
+    href: `/agents/${agentUuid}?tab=tests&testId=${uuid}`,
+    prefetch: false,
+    onClick: (e: React.MouseEvent) =>
+      openInPlace(e, () => testPager.open(uuid)),
   });
 
   // Selection state for bulk operations
@@ -2076,11 +2087,10 @@ export function TestsTabContent({
                       {agentTests.map((test) => (
                         <div
                           key={test.uuid}
-                          onClick={() => testPager.open(test.uuid)}
-                          className="grid grid-cols-[40px_minmax(0,1fr)_160px_300px] gap-4 px-4 py-2 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                          className="grid grid-cols-[40px_minmax(0,1fr)_160px_300px] gap-4 px-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-center"
                         >
                           {/* Checkbox */}
-                          <div className="flex items-center">
+                          <div className="flex items-center py-2">
                             <Tooltip content="Select test">
                               <button
                                 type="button"
@@ -2099,13 +2109,19 @@ export function TestsTabContent({
                             </Tooltip>
                           </div>
                           {/* Name Column */}
-                          <div className="flex items-center min-w-0">
+                          <Link
+                            {...testLinkProps(test.uuid)}
+                            className="flex items-center min-w-0 self-stretch py-2"
+                          >
                             <span className="text-sm font-medium text-foreground overflow-x-auto whitespace-nowrap">
                               {test.name}
                             </span>
-                          </div>
+                          </Link>
                           {/* Type Column with Icon */}
-                          <div className="flex items-center gap-2">
+                          <Link
+                            {...testLinkProps(test.uuid)}
+                            className="flex items-center gap-2 self-stretch py-2"
+                          >
                             {test.type === "tool_call" ? (
                               <svg
                                 className="w-4 h-4 text-muted-foreground flex-shrink-0"
@@ -2138,8 +2154,8 @@ export function TestsTabContent({
                             <span className="text-sm text-muted-foreground">
                               {testTypeLabel(test.type)}
                             </span>
-                          </div>
-                          <div>
+                          </Link>
+                          <div className="py-2">
                             <TestRowActions
                               onRun={() =>
                                 void launchTestRun([test], false, test.uuid)
@@ -2161,9 +2177,16 @@ export function TestsTabContent({
                     {agentTests.map((test) => (
                       <div
                         key={test.uuid}
-                        onClick={() => testPager.open(test.uuid)}
-                        className="border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
+                        className="relative border border-border rounded-xl p-3 bg-background hover:bg-muted/20 transition-colors cursor-pointer"
                       >
+                        {/* One link over the whole card, so the checkbox and
+                            the row buttons (raised above it) never sit inside
+                            it. */}
+                        <Link
+                          {...testLinkProps(test.uuid)}
+                          aria-label={test.name}
+                          className="absolute inset-0 rounded-xl"
+                        />
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start gap-2 flex-1 min-w-0">
                             <Tooltip content="Select test">
@@ -2191,7 +2214,7 @@ export function TestsTabContent({
                               </p>
                             </div>
                           </div>
-                          <div className="flex-shrink-0">
+                          <div className="relative flex-shrink-0">
                             <TestRowActions
                               onRun={() =>
                                 void launchTestRun([test], false, test.uuid)

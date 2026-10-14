@@ -1229,6 +1229,28 @@ describe("TestsTabContent — populated table", () => {
     expect(screen.getByTestId("add-test-editing")).toHaveTextContent("editing");
   });
 
+  it("makes every row a link to the open test, and a Cmd-click leaves it to the browser", async () => {
+    const user = setupUser();
+    renderComponent();
+    const name = (await screen.findAllByText("Greeting test"))[0];
+    const link = name.closest("a");
+    expect(link).toHaveAttribute("href", "/agents/agent-1?tab=tests&testId=t1");
+    // The card list carries the same link, named after the test.
+    const cardLinks = screen
+      .getAllByRole("link", { name: "Greeting test" })
+      .filter((a) => a.hasAttribute("aria-label"));
+    expect(cardLinks).toHaveLength(1);
+    expect(cardLinks[0]).toHaveAttribute(
+      "href",
+      "/agents/agent-1?tab=tests&testId=t1",
+    );
+
+    await user.keyboard("{Meta>}");
+    await user.click(link!);
+    await user.keyboard("{/Meta}");
+    expect(screen.queryByTestId("add-test-dialog")).not.toBeInTheDocument();
+  });
+
   it("saves an edit via PUT /tests/{uuid}", async () => {
     const user = setupUser();
     renderComponent();

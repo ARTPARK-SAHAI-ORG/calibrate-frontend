@@ -103,6 +103,7 @@ async function createExerciseDeleteDataset(
   await expect(page).toHaveURL(workspacePath(/\/datasets\/[0-9a-f-]{36}/), {
     timeout: 15000,
   });
+  const datasetPath = new URL(page.url()).pathname;
 
   // The detail page mounts the editor — its header shows the dataset name.
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible({
@@ -119,9 +120,13 @@ async function createExerciseDeleteDataset(
   // override it).
   await page.goto(`${listPath}?tab=datasets`);
   await waitForOrgReady(page);
-  const row = page.locator("div.cursor-pointer").filter({ hasText: name });
-  await expect(row).toBeVisible({ timeout: 15000 });
-  await row.getByRole("button", { name: `Delete ${name}` }).click();
+  // The dataset name is a real link, so right-click offers "Open in new tab".
+  await expect(page.getByRole("link", { name, exact: true })).toHaveAttribute(
+    "href",
+    datasetPath,
+    { timeout: 15000 },
+  );
+  await page.getByRole("button", { name: `Delete ${name}` }).click();
   await expect(
     page.getByRole("heading", { name: "Delete dataset", exact: true }),
   ).toBeVisible();

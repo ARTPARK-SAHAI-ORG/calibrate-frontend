@@ -44,6 +44,8 @@ import {
   writeUrlParam,
 } from "@/components/human-labelling/valueFilterUrl";
 import { displayModelName } from "@/lib/modelName";
+import { Link } from "@/lib/nav";
+import { openInPlace } from "@/lib/openInPlace";
 
 // Which page of results is open, so a reload reopens on the same one instead
 // of resetting to the first. Written with `replaceState` like the other
@@ -510,6 +512,14 @@ export function RunsTabContent({
     setRunIdParam(run.uuid);
   };
 
+  // Each row is also a link to this run, so it can be opened in a new tab; a
+  // plain click opens it here.
+  const runLinkProps = (run: AgentRun) => ({
+    href: `/agents/${agentUuid}?tab=runs&runId=${run.uuid}`,
+    prefetch: false,
+    onClick: (e: React.MouseEvent) => openInPlace(e, () => openRun(run)),
+  });
+
   // Previous / next across every run the filters match, not just the page on
   // screen, the same way the Tests tab steps from one test to the next:
   // stepping off either end of the page turns it and opens the run at the far
@@ -779,28 +789,47 @@ export function RunsTabContent({
                 {items.map((run) => (
                   <tr
                     key={run.uuid}
-                    onClick={() => openRun(run)}
                     className="border-t border-border hover:bg-muted/20 transition-colors cursor-pointer"
                   >
-                    <td className="px-4 py-3">
-                      <RunName run={run} />
+                    <td className="p-0">
+                      <Link {...runLinkProps(run)} className="block px-4 py-3">
+                        <RunName run={run} />
+                      </Link>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
+                    <td className="p-0">
+                      <Link
+                        {...runLinkProps(run)}
+                        className="flex flex-wrap items-center gap-2 px-4 py-3"
+                      >
                         <RunResult run={run} />
-                      </div>
+                      </Link>
                     </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground tabular-nums">
-                      {countCell(runTestCount(run))}
+                    <td className="p-0">
+                      <Link
+                        {...runLinkProps(run)}
+                        className="block px-4 py-3 text-sm text-muted-foreground tabular-nums"
+                      >
+                        {countCell(runTestCount(run))}
+                      </Link>
                     </td>
-                    <td className="px-4 py-3">
-                      <RunModels run={run} />
+                    <td className="p-0">
+                      <Link {...runLinkProps(run)} className="block px-4 py-3">
+                        <RunModels run={run} />
+                      </Link>
                     </td>
-                    <td className="px-4 py-3">
+                    {/* The evaluator pills are buttons of their own, so this
+                        cell cannot be a link; a plain click still opens the
+                        run. */}
+                    <td className="px-4 py-3" onClick={() => openRun(run)}>
                       <RunEvaluators run={run} />
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                      {whenText(run)}
+                    <td className="p-0">
+                      <Link
+                        {...runLinkProps(run)}
+                        className="block px-4 py-3 text-xs text-muted-foreground whitespace-nowrap"
+                      >
+                        {whenText(run)}
+                      </Link>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end">
@@ -821,9 +850,15 @@ export function RunsTabContent({
             {items.map((run) => (
               <div
                 key={run.uuid}
-                onClick={() => openRun(run)}
-                className="border border-border rounded-xl p-3 cursor-pointer hover:bg-muted/20 transition-colors"
+                className="relative border border-border rounded-xl p-3 cursor-pointer hover:bg-muted/20 transition-colors"
               >
+                {/* One link over the whole card, so the delete button and the
+                    evaluator pills (raised above it) never sit inside it. */}
+                <Link
+                  {...runLinkProps(run)}
+                  aria-label={runDisplayName(run.type, run.name)}
+                  className="absolute inset-0 rounded-xl"
+                />
                 <div className="flex items-center justify-between gap-2">
                   <RunName run={run} />
                   <span className="text-xs text-muted-foreground tabular-nums shrink-0">
@@ -836,17 +871,19 @@ export function RunsTabContent({
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <RunResult run={run} />
                 </div>
-                <div className="mt-2">
+                <div className="relative mt-2 w-fit">
                   <RunEvaluators run={run} />
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-2">
                   <p className="text-xs text-muted-foreground">
                     {whenText(run)}
                   </p>
-                  <RunDeleteButton
-                    run={run}
-                    onDelete={() => setRunToDelete(run)}
-                  />
+                  <div className="relative">
+                    <RunDeleteButton
+                      run={run}
+                      onDelete={() => setRunToDelete(run)}
+                    />
+                  </div>
                 </div>
               </div>
             ))}

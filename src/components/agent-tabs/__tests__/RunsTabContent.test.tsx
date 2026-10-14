@@ -325,19 +325,36 @@ describe("RunsTabContent", () => {
     // answered passed, and the third is counted on its own.
     state.runs = [unitRun];
     renderTab();
-    expect((await screen.findAllByText("50% passed")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("50% passed")).length).toBeGreaterThan(
+      0,
+    );
     expect(screen.getAllByText("1 Not run").length).toBeGreaterThan(0);
   });
 
   it("colours the share by how good it is", async () => {
     const bands = [
       { total_tests: 4, passed: 1, label: "25% passed", colour: "bg-red-100" },
-      { total_tests: 4, passed: 3, label: "75% passed", colour: "bg-amber-100" },
-      { total_tests: 4, passed: 4, label: "100% passed", colour: "bg-green-100" },
+      {
+        total_tests: 4,
+        passed: 3,
+        label: "75% passed",
+        colour: "bg-amber-100",
+      },
+      {
+        total_tests: 4,
+        passed: 4,
+        label: "100% passed",
+        colour: "bg-green-100",
+      },
     ];
     for (const band of bands) {
       state.runs = [
-        { ...unitRun, ...band, failed: band.total_tests - band.passed, unanswered_tests: 0 },
+        {
+          ...unitRun,
+          ...band,
+          failed: band.total_tests - band.passed,
+          unanswered_tests: 0,
+        },
       ];
       const view = render(
         <RunsTabContent agentUuid={AGENT_UUID} agentName="Test agent" />,
@@ -351,7 +368,9 @@ describe("RunsTabContent", () => {
   it("says a run that answered nothing has no results, rather than scoring it zero", async () => {
     state.runs = [{ ...unitRun, passed: 0, failed: 0, unanswered_tests: 3 }];
     renderTab();
-    expect((await screen.findAllByText("No results")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("No results")).length).toBeGreaterThan(
+      0,
+    );
     expect(screen.queryByText(/% passed/)).not.toBeInTheDocument();
   });
 
@@ -404,7 +423,13 @@ describe("RunsTabContent", () => {
     state.runs = [
       // Every test answered, so this is the only finished one: `unitRun` has
       // a test that produced no answer.
-      { ...unitRun, uuid: "run-whole", passed: 2, failed: 1, unanswered_tests: 0 },
+      {
+        ...unitRun,
+        uuid: "run-whole",
+        passed: 2,
+        failed: 1,
+        unanswered_tests: 0,
+      },
       unitRun,
       { ...benchmarkRun, uuid: "run-going", status: "in_progress" },
       { ...benchmarkRun, uuid: "run-broke", status: "failed" },
@@ -437,11 +462,8 @@ describe("RunsTabContent", () => {
     state.runs = [unitRun];
     renderTab();
     expect(
-      (
-        await screen.findAllByLabelText(
-          "Some of the tests could not be run",
-        )
-      ).length,
+      (await screen.findAllByLabelText("Some of the tests could not be run"))
+        .length,
     ).toBeGreaterThan(0);
     expect(
       screen.queryByLabelText("The evaluation ran every test"),
@@ -451,7 +473,9 @@ describe("RunsTabContent", () => {
   it("says there are no results when the run was stopped before any test ran", async () => {
     state.runs = [{ ...unitRun, aborted: true, total_tests: null }];
     renderTab();
-    expect((await screen.findAllByText("No results")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("No results")).length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("says a stopped model comparison was stopped rather than complete", async () => {
@@ -482,7 +506,9 @@ describe("RunsTabContent", () => {
       },
     ];
     renderTab();
-    expect((await screen.findAllByText("88\u201396% passed")).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByText("88\u201396% passed")).length,
+    ).toBeGreaterThan(0);
     expect(screen.queryByText("Complete")).not.toBeInTheDocument();
   });
 
@@ -497,7 +523,9 @@ describe("RunsTabContent", () => {
       },
     ];
     renderTab();
-    expect((await screen.findAllByText("94% passed")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("94% passed")).length).toBeGreaterThan(
+      0,
+    );
     expect(screen.getAllByText("1 model failed").length).toBeGreaterThan(0);
   });
 
@@ -505,11 +533,16 @@ describe("RunsTabContent", () => {
     state.runs = [
       {
         ...benchmarkRun,
-        model_results: [{ model: "a", success: false }, { model: "b", success: false }],
+        model_results: [
+          { model: "a", success: false },
+          { model: "b", success: false },
+        ],
       },
     ];
     renderTab();
-    expect((await screen.findAllByText("2 models failed")).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByText("2 models failed")).length,
+    ).toBeGreaterThan(0);
     expect(screen.queryByText(/% passed/)).not.toBeInTheDocument();
   });
 
@@ -555,7 +588,9 @@ describe("RunsTabContent", () => {
       },
     ];
     renderTab();
-    expect((await screen.findAllByText("100% passed")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("100% passed")).length).toBeGreaterThan(
+      0,
+    );
     expect(screen.getAllByText("1 Not run").length).toBeGreaterThan(0);
     expect(
       screen.getAllByLabelText("Some of the tests could not be run").length,
@@ -724,6 +759,26 @@ describe("RunsTabContent", () => {
     );
   });
 
+  it("makes every row a link to its run, and a Cmd-click leaves it to the browser", async () => {
+    state.runs = [unitRun];
+    const user = setupUser();
+    renderTab();
+    const result = (await screen.findAllByText("50% passed"))[0];
+    const href = `/agents/${AGENT_UUID}?tab=runs&runId=run-unit`;
+    expect(result.closest("a")).toHaveAttribute("href", href);
+    // The card list carries the same link, named after the run.
+    const cardLinks = screen
+      .getAllByRole("link", { name: "Evaluation run" })
+      .filter((a) => a.hasAttribute("aria-label"));
+    expect(cardLinks).toHaveLength(1);
+    expect(cardLinks[0]).toHaveAttribute("href", href);
+
+    await user.keyboard("{Meta>}");
+    await user.click(result);
+    await user.keyboard("{/Meta}");
+    expect(screen.queryByTestId("test-runner")).not.toBeInTheDocument();
+  });
+
   it("opens the model comparison window for a benchmark", async () => {
     state.runs = [benchmarkRun];
     const user = setupUser();
@@ -800,10 +855,14 @@ describe("RunsTabContent", () => {
       });
     });
 
-    expect(openCompare).toHaveBeenCalledWith([{ uuid: "t1", name: "A" }], false, {
-      models: ["gpt-4"],
-      parallelModels: undefined,
-    });
+    expect(openCompare).toHaveBeenCalledWith(
+      [{ uuid: "t1", name: "A" }],
+      false,
+      {
+        models: ["gpt-4"],
+        parallelModels: undefined,
+      },
+    );
   });
 
   it("keeps a test whose name the comparison did not carry", async () => {
@@ -1191,5 +1250,4 @@ describe("running tests from an open results window", () => {
     expect(new URLSearchParams(window.location.search).get("runId")).toBeNull();
     await waitFor(() => expect(runsListCalls()).toBe(before + 1));
   });
-
 });

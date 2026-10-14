@@ -6,8 +6,9 @@ import {
   useState,
   useCallback,
   type MouseEvent,
+  type ReactNode,
 } from "react";
-import { replaceUrl, useRouter, useSearchParams } from "@/lib/nav";
+import { Link, replaceUrl, useRouter, useSearchParams } from "@/lib/nav";
 import {
   CartesianGrid,
   Line,
@@ -126,6 +127,8 @@ type AgreementResponse = {
 type Bucket = "week" | "month" | "year";
 
 const ALL_TASKS = "all";
+
+const taskHref = (uuid: string) => `/human-alignment/tasks/${uuid}`;
 const DEFAULT_BUCKET: Bucket = "month";
 const DEFAULT_DAYS = 180;
 
@@ -588,15 +591,20 @@ function HumanLabellingPageInner() {
                   return (
                     <div
                       key={task.uuid}
-                      onClick={() =>
-                        router.push(`/human-alignment/tasks/${task.uuid}`)
-                      }
-                      className="grid grid-cols-[minmax(0,1fr)_200px_100px_260px_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center"
+                      className="grid grid-cols-[minmax(0,1fr)_200px_100px_260px_40px] gap-4 [&>*:nth-child(3)]:pl-6 px-4 border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors items-stretch"
                     >
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {task.name}
-                      </p>
-                      <div>
+                      <Link
+                        href={taskHref(task.uuid)}
+                        className="flex items-center py-3 min-w-0 cursor-pointer"
+                      >
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {task.name}
+                        </p>
+                      </Link>
+                      <Link
+                        href={taskHref(task.uuid)}
+                        className="flex items-center py-3 cursor-pointer"
+                      >
                         {evaluatorType ? (
                           <EvaluatorTypePill evaluatorType={evaluatorType} />
                         ) : (
@@ -604,35 +612,45 @@ function HumanLabellingPageInner() {
                             —
                           </span>
                         )}
-                      </div>
-                      <p className="text-sm text-muted-foreground tabular-nums">
+                      </Link>
+                      <Link
+                        href={taskHref(task.uuid)}
+                        className="flex items-center py-3 text-sm text-muted-foreground tabular-nums cursor-pointer"
+                      >
                         {task.item_count ?? 0}
-                      </p>
-                      <EvaluatorPillList evaluators={evaluators} />
-                      <HoverText content="Delete task" position="top">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setTaskToDelete(task);
-                          }}
-                          aria-label={`Delete ${task.name}`}
-                          className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={1.8}
+                      </Link>
+                      <Link
+                        href={taskHref(task.uuid)}
+                        className="flex items-center py-3 cursor-pointer"
+                      >
+                        <EvaluatorPillList evaluators={evaluators} />
+                      </Link>
+                      <div className="flex items-center">
+                        <HoverText content="Delete task" position="top">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTaskToDelete(task);
+                            }}
+                            aria-label={`Delete ${task.name}`}
+                            className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                            />
-                          </svg>
-                        </button>
-                      </HoverText>
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={1.8}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                              />
+                            </svg>
+                          </button>
+                        </HoverText>
+                      </div>
                     </div>
                   );
                 })}
@@ -647,12 +665,12 @@ function HumanLabellingPageInner() {
                   return (
                     <div
                       key={task.uuid}
-                      onClick={() =>
-                        router.push(`/human-alignment/tasks/${task.uuid}`)
-                      }
-                      className="border border-border rounded-xl p-4 hover:bg-muted/20 transition-colors cursor-pointer flex items-start gap-3"
+                      className="border border-border rounded-xl hover:bg-muted/20 transition-colors flex items-start"
                     >
-                      <div className="flex-1 min-w-0">
+                      <Link
+                        href={taskHref(task.uuid)}
+                        className="flex-1 min-w-0 p-4 cursor-pointer"
+                      >
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <p className="text-sm font-medium text-foreground truncate">
                             {task.name}
@@ -670,14 +688,14 @@ function HumanLabellingPageInner() {
                             <EvaluatorPillList evaluators={evaluators} />
                           </div>
                         )}
-                      </div>
+                      </Link>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setTaskToDelete(task);
                         }}
                         aria-label={`Delete ${task.name}`}
-                        className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0"
+                        className="w-8 h-8 mt-3 mr-3 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0"
                       >
                         <svg
                           className="w-4 h-4"
@@ -806,26 +824,29 @@ function HumanLabellingPageInner() {
                   {visibleAnnotators.map((annotator) => {
                     const agreement = annotator.current_agreement;
                     const isEditing = editingAnnotatorUuid === annotator.uuid;
+                    const href = `/human-alignment/annotators/${annotator.uuid}`;
+                    // While the name is being edited the row does not open the
+                    // annotator, so its cells are plain rather than links.
+                    const cell = (className: string, children: ReactNode) =>
+                      isEditing ? (
+                        <div className={className}>{children}</div>
+                      ) : (
+                        <Link
+                          href={href}
+                          className={`${className} cursor-pointer`}
+                        >
+                          {children}
+                        </Link>
+                      );
                     return (
                       <div
                         key={annotator.uuid}
-                        onClick={() => {
-                          if (isEditing) return;
-                          router.push(
-                            `/human-alignment/annotators/${annotator.uuid}`,
-                          );
-                        }}
-                        className={`grid grid-cols-[minmax(0,1fr)_120px_180px_88px] gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors items-center ${
-                          isEditing
-                            ? "bg-muted/20"
-                            : "hover:bg-muted/20 cursor-pointer"
+                        className={`grid grid-cols-[minmax(0,1fr)_120px_180px_88px] gap-4 px-4 border-b border-border last:border-b-0 transition-colors items-stretch ${
+                          isEditing ? "bg-muted/20" : "hover:bg-muted/20"
                         }`}
                       >
                         {isEditing ? (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex flex-col gap-1 min-w-0"
-                          >
+                          <div className="flex flex-col justify-center gap-1 py-3 min-w-0">
                             <input
                               type="text"
                               value={editingAnnotatorName}
@@ -852,24 +873,24 @@ function HumanLabellingPageInner() {
                             )}
                           </div>
                         ) : (
-                          <p className="text-sm font-medium text-foreground truncate">
-                            {annotator.name}
-                          </p>
+                          cell(
+                            "flex items-center py-3 min-w-0",
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {annotator.name}
+                            </p>,
+                          )
                         )}
-                        <p className="text-sm text-muted-foreground tabular-nums">
-                          {annotator.jobs_count ?? 0}
-                        </p>
-                        <p
-                          className={`text-sm font-semibold tabular-nums ${agreementColor(agreement)}`}
-                        >
-                          {agreement != null
+                        {cell(
+                          "flex items-center py-3 text-sm text-muted-foreground tabular-nums",
+                          annotator.jobs_count ?? 0,
+                        )}
+                        {cell(
+                          `flex items-center py-3 text-sm font-semibold tabular-nums ${agreementColor(agreement)}`,
+                          agreement != null
                             ? `${Math.round(agreement * 100)}%`
-                            : "—"}
-                        </p>
-                        <div
-                          className="flex items-center justify-end gap-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                            : "—",
+                        )}
+                        <div className="flex items-center justify-end gap-1">
                           {isEditing ? (
                             <>
                               <HoverText content="Save" position="top">
@@ -927,10 +948,7 @@ function HumanLabellingPageInner() {
                                 position="top"
                               >
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    startEditAnnotator(annotator);
-                                  }}
+                                  onClick={() => startEditAnnotator(annotator)}
                                   aria-label={`Rename ${annotator.name}`}
                                   className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                                 >
@@ -954,10 +972,9 @@ function HumanLabellingPageInner() {
                                 position="top"
                               >
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setAnnotatorToDelete(annotator);
-                                  }}
+                                  onClick={() =>
+                                    setAnnotatorToDelete(annotator)
+                                  }
                                   aria-label={`Remove ${annotator.name}`}
                                   className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                                 >
@@ -989,73 +1006,75 @@ function HumanLabellingPageInner() {
                   {visibleAnnotators.map((annotator) => {
                     const agreement = annotator.current_agreement;
                     const isEditing = editingAnnotatorUuid === annotator.uuid;
+                    const details = (
+                      <>
+                        {isEditing ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editingAnnotatorName}
+                              onChange={(e) =>
+                                setEditingAnnotatorName(e.target.value)
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveEditAnnotator();
+                                else if (e.key === "Escape")
+                                  cancelEditAnnotator();
+                              }}
+                              disabled={savingAnnotatorEdit}
+                              autoFocus
+                              className={`w-full text-sm font-medium bg-background border rounded-md px-2 py-1 mb-1 outline-none focus:border-foreground disabled:opacity-50 ${
+                                annotatorEditError
+                                  ? "border-red-500"
+                                  : "border-border"
+                              }`}
+                            />
+                            {annotatorEditError && (
+                              <p className="text-xs text-red-500 mb-1">
+                                {annotatorEditError}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-sm font-medium text-foreground truncate mb-1">
+                            {annotator.name}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {annotator.jobs_count ?? 0} job
+                          {(annotator.jobs_count ?? 0) === 1 ? "" : "s"}
+                          {" · "}
+                          <span
+                            className={`font-semibold tabular-nums ${agreementColor(agreement)}`}
+                          >
+                            {agreement != null
+                              ? `${Math.round(agreement * 100)}% agreement`
+                              : "No agreement yet"}
+                          </span>
+                        </p>
+                      </>
+                    );
                     return (
                       <div
                         key={annotator.uuid}
-                        onClick={() => {
-                          if (isEditing) return;
-                          router.push(
-                            `/human-alignment/annotators/${annotator.uuid}`,
-                          );
-                        }}
-                        className={`border border-border rounded-xl p-4 transition-colors flex items-start gap-3 ${
-                          isEditing
-                            ? "bg-muted/20"
-                            : "hover:bg-muted/20 cursor-pointer"
+                        className={`border border-border rounded-xl transition-colors flex items-start ${
+                          isEditing ? "bg-muted/20" : "hover:bg-muted/20"
                         }`}
                       >
-                        <div className="flex-1 min-w-0">
-                          {isEditing ? (
-                            <>
-                              <input
-                                type="text"
-                                value={editingAnnotatorName}
-                                onChange={(e) =>
-                                  setEditingAnnotatorName(e.target.value)
-                                }
-                                onClick={(e) => e.stopPropagation()}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") saveEditAnnotator();
-                                  else if (e.key === "Escape")
-                                    cancelEditAnnotator();
-                                }}
-                                disabled={savingAnnotatorEdit}
-                                autoFocus
-                                className={`w-full text-sm font-medium bg-background border rounded-md px-2 py-1 mb-1 outline-none focus:border-foreground disabled:opacity-50 ${
-                                  annotatorEditError
-                                    ? "border-red-500"
-                                    : "border-border"
-                                }`}
-                              />
-                              {annotatorEditError && (
-                                <p className="text-xs text-red-500 mb-1">
-                                  {annotatorEditError}
-                                </p>
-                              )}
-                            </>
-                          ) : (
-                            <p className="text-sm font-medium text-foreground truncate mb-1">
-                              {annotator.name}
-                            </p>
-                          )}
-                          <p className="text-xs text-muted-foreground">
-                            {annotator.jobs_count ?? 0} job
-                            {(annotator.jobs_count ?? 0) === 1 ? "" : "s"}
-                            {" · "}
-                            <span
-                              className={`font-semibold tabular-nums ${agreementColor(agreement)}`}
-                            >
-                              {agreement != null
-                                ? `${Math.round(agreement * 100)}% agreement`
-                                : "No agreement yet"}
-                            </span>
-                          </p>
-                        </div>
                         {isEditing ? (
-                          <div
-                            className="flex items-center gap-1 flex-shrink-0"
-                            onClick={(e) => e.stopPropagation()}
+                          <div className="flex-1 min-w-0 py-4 pl-4 pr-3">
+                            {details}
+                          </div>
+                        ) : (
+                          <Link
+                            href={`/human-alignment/annotators/${annotator.uuid}`}
+                            className="flex-1 min-w-0 py-4 pl-4 pr-3 cursor-pointer"
                           >
+                            {details}
+                          </Link>
+                        )}
+                        {isEditing ? (
+                          <div className="flex items-center gap-1 flex-shrink-0 mt-4 mr-4">
                             <button
                               onClick={saveEditAnnotator}
                               disabled={
@@ -1101,12 +1120,9 @@ function HumanLabellingPageInner() {
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1 flex-shrink-0">
+                          <div className="flex items-center gap-1 flex-shrink-0 mt-4 mr-4">
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                startEditAnnotator(annotator);
-                              }}
+                              onClick={() => startEditAnnotator(annotator)}
                               aria-label={`Rename ${annotator.name}`}
                               className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                             >
@@ -1125,10 +1141,7 @@ function HumanLabellingPageInner() {
                               </svg>
                             </button>
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setAnnotatorToDelete(annotator);
-                              }}
+                              onClick={() => setAnnotatorToDelete(annotator)}
                               aria-label={`Remove ${annotator.name}`}
                               className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0"
                             >
@@ -1164,7 +1177,7 @@ function HumanLabellingPageInner() {
           onClose={() => setCreateDialogOpen(false)}
           onCreated={(taskUuid) => {
             setCreateDialogOpen(false);
-            router.push(`/human-alignment/tasks/${taskUuid}`);
+            router.push(taskHref(taskUuid));
           }}
         />
       )}

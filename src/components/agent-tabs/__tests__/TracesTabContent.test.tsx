@@ -1541,9 +1541,7 @@ describe("TracesTabContent", () => {
 
     render(<TracesTabContent {...tabProps} />);
 
-    expect(
-      screen.getByText("Failed to load traces"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Failed to load traces")).toBeInTheDocument();
     expect(
       screen.queryByText("No traces match your search"),
     ).not.toBeInTheDocument();
@@ -1595,9 +1593,7 @@ describe("TracesTabContent", () => {
 
     render(<TracesTabContent {...tabProps} />);
 
-    expect(
-      screen.getByText("Failed to load traces"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Failed to load traces")).toBeInTheDocument();
     // Nothing that describes traces nobody can see.
     expect(
       screen.queryByPlaceholderText("Search traces"),
@@ -1638,9 +1634,7 @@ describe("TracesTabContent", () => {
     // A ?traceId= in the address asks for that trace.
     act(() => openFromUrl?.("trace-1"));
 
-    expect(
-      screen.getByText("Failed to load traces"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Failed to load traces")).toBeInTheDocument();
     expect(screen.queryByTestId("trace-detail")).not.toBeInTheDocument();
   });
 
@@ -1705,9 +1699,7 @@ describe("TracesTabContent", () => {
     // The API key the reader just made lives only on this screen and is shown
     // once, so a failed check must not take it away.
     expect(screen.getByTestId("traces-empty-state")).toBeInTheDocument();
-    expect(
-      screen.getByText("Failed to load traces"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Failed to load traces")).toBeInTheDocument();
   });
 
   it("shows the spinner on the first load only", () => {
@@ -2328,6 +2320,18 @@ describe("TracesTabContent", () => {
     await user.click(screen.getAllByText("Second")[0]);
 
     expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+  });
+
+  it("links each trace row to that trace on this agent's Monitoring tab", () => {
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-2", input_preview: "Second" })]),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    expect(screen.getAllByText("Second")[0].closest("a")).toHaveAttribute(
+      "href",
+      "/agents/agent-1?tab=monitoring&traceId=trace-2",
+    );
   });
 
   it("keeps the ticks when the reader moves to another page", async () => {

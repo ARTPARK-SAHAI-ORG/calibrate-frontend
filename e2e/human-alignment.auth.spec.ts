@@ -70,8 +70,15 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
     // Back to the Tasks list to verify + delete. The row exposes a titled
     // delete button (aria-label `Delete <name>`) in both desktop and mobile
     // layouts, so scope to the first match.
+    const taskPath = new URL(page.url()).pathname;
     await page.goto("/human-alignment?tab=tasks");
     await waitForOrgReady(page);
+
+    // The task name is a real link, so right-click offers "Open in new tab".
+    const taskLink = page.getByRole("link", { name, exact: true }).first();
+    await expect(taskLink).toHaveAttribute("href", taskPath, {
+      timeout: 20000,
+    });
 
     const deleteTaskBtn = page
       .getByRole("button", { name: `Delete ${name}` })
@@ -118,6 +125,11 @@ test.describe("Human alignment page (authenticated, real backend)", () => {
       .getByRole("button", { name: `Rename ${name}` })
       .first();
     await expect(renameBtn).toBeVisible({ timeout: 20000 });
+
+    // The annotator name is a real link, so right-click offers "Open in new tab".
+    await expect(
+      page.getByRole("link", { name, exact: true }).first(),
+    ).toHaveAttribute("href", /\/human-alignment\/annotators\/[^/]+$/);
 
     // Rename: clicking rename swaps the name cell for an autofocused input.
     await renameBtn.click();
