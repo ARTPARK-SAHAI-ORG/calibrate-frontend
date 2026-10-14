@@ -26,11 +26,10 @@ import {
   STT_RESERVED_METRIC_KEYS,
 } from "@/lib/evaluatorColumns";
 import type { LatencyMetric } from "@/components/eval-details/ttsEvalTypes";
-import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import type { AudioCostBreakdown } from "@/lib/audioCost";
-import type { ExportColumn } from "@/components/ExportResultsButton";
 import { ExportZipButton } from "@/components/ExportZipButton";
-import { audioFileExtension, fetchRunForExport } from "@/lib/audioExport";
+import { sttExportContents } from "@/components/eval-details/speechExport";
+import { fetchRunForExport } from "@/lib/audioExport";
 import {
   getPublicDefaultEvaluator,
   type PublicDefaultEvaluator,
@@ -232,72 +231,15 @@ export default function PublicSTTPage() {
               <div className="flex items-center justify-end">
                 <ExportZipButton
                   filename={`stt-results-${data.task_id}`}
-                  getContents={async () => {
-                    // Read the run again: its clip links stop working an hour
-                    // after the page first loaded them.
-                    const run = await fetchRunForExport<EvaluationResult>(
-                      `/public/stt/${token}`,
-                    );
-                    const columns: ExportColumn[] = [
-                      { key: "provider", header: "Provider" },
-                      { key: "audio_name", header: "Audio name" },
-                      { key: "reference_text", header: "Reference text" },
-                      { key: "predicted_text", header: "Predicted text" },
-                      { key: "wer", header: "WER" },
-                      { key: "cer", header: "CER" },
-                      ...evaluatorColumns.map((c) => ({
-                        key: c.key,
-                        header: c.label,
-                      })),
-                    ];
-                    const rows: Record<string, unknown>[] = [];
-                    // Every provider transcribed the same clip, so each clip
-                    // goes in the zip once, named after its row id.
-                    const files = new Map<string, string>();
-                    for (const pr of run.provider_results ?? []) {
-                      for (const r of pr.results ?? []) {
-                        const audioName = r.audio_url
-                          ? `${r.id}.${audioFileExtension(r.audio_url)}`
-                          : "";
-                        if (audioName && r.audio_url) {
-                          files.set(`audios/${audioName}`, r.audio_url);
-                        }
-                        const row: Record<string, unknown> = {
-                          provider: getProviderLabel(pr.provider),
-                          audio_name: audioName,
-                          reference_text: r.gt,
-                          predicted_text: r.pred,
-                          wer: r.wer,
-                          cer: r.cer,
-                        };
-                        for (const c of evaluatorColumns) {
-                          const { score, error } = readEvaluatorCell(
-                            r as unknown as Record<string, unknown>,
-                            c,
-                          );
-                          if (error || score === undefined) {
-                            row[c.key] = "";
-                            continue;
-                          }
-                          if (c.outputType === "binary") {
-                            const norm = score.toLowerCase();
-                            row[c.key] =
-                              norm === "true" || norm === "1"
-                                ? "true"
-                                : "false";
-                          } else {
-                            const n = parseFloat(score);
-                            row[c.key] = Number.isFinite(n) ? n : score;
-                          }
-                        }
-                        rows.push(row);
-                      }
-                    }
-                    return {
-                      csv: { columns, rows },
-                      files: [...files].map(([path, url]) => ({ path, url })),
-                    };
-                  }}
+                  getContents={async () =>
+                    sttExportContents(
+                      // Read the run again: its clip links stop working an hour
+                      // after the page first loaded them.
+                      await fetchRunForExport<EvaluationResult>(`/public/stt/${token}`),
+                      evaluatorColumns,
+                      getProviderLabel,
+                    )
+                  }
                 />
               </div>
             )}

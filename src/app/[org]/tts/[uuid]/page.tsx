@@ -32,7 +32,6 @@ import {
   TTSEvaluationTopPicks,
   hasTtsTopPicks,
 } from "@/components/eval-details";
-import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import type { AudioCostBreakdown } from "@/lib/audioCost";
 import {
@@ -52,9 +51,9 @@ import {
 } from "@/components/human-labelling/ttsLabellingSource";
 import { useSidebarState } from "@/lib/sidebar";
 import { ShareButton } from "@/components/ShareButton";
-import { audioFileExtension, fetchRunForExport } from "@/lib/audioExport";
+import { fetchRunForExport } from "@/lib/audioExport";
 import { ExportZipButton } from "@/components/ExportZipButton";
-import type { ExportColumn } from "@/components/ExportResultsButton";
+import { ttsExportContents } from "@/components/eval-details/speechExport";
 import { retryEvaluation } from "@/lib/retryEvaluation";
 import {
   deriveEvaluatorColumns,
@@ -751,91 +750,26 @@ export default function TTSEvaluationDetailPage() {
               )}
               {/* Actions, pushed to the right of the labels. */}
               <div className="flex items-center gap-3 flex-wrap ml-auto">
-                {/* Export per-row results as a zip containing `results.csv`
-                    (row id, audio_name, evaluator scores — same convention
-                    as the STT CSV) and an `audios/` folder of every
-                    synthesized clip. Each audio is named
-                    `<provider>_<row>.<ext>` so the audio_name CSV column
-                    points directly at the file inside the zip. Placed
-                    before Share so the Export ↔ Share ordering matches
-                    TestRunnerDialog / BenchmarkResultsDialog / STT. */}
+                {/* Export results as a zip (what goes in it: speechExport.ts).
+                    Placed before Share, matching TestRunnerDialog. */}
                 {evaluationResult.status === "done" &&
                   (evaluationResult.provider_results ?? []).some(
                     (pr) => (pr.results?.length ?? 0) > 0,
                   ) && (
                     <ExportZipButton
                       filename={`tts-results-${evaluationResult.dataset_name ?? taskId}`}
-                      getContents={async () => {
-                        // Read the run again: its clip links stop working an hour
-                        // after the page first loaded them.
-                        const run = await fetchRunForExport<EvaluationResult>(
-                          `/tts/evaluate/${taskId}`,
-                          backendAccessToken,
-                        );
-                        const columns: ExportColumn[] = [
-                          { key: "provider", header: "Provider" },
-                          { key: "audio_name", header: "Audio name" },
-                          { key: "text", header: "Text" },
-                          ...evaluatorColumns.map((c) => ({
-                            key: c.key,
-                            header: c.label,
-                          })),
-                        ];
-                        const rows: Record<string, unknown>[] = [];
-                        const files: { path: string; url: string }[] = [];
-                        for (const pr of run.provider_results ??
-                          []) {
-                          for (const r of pr.results ?? []) {
-                            const ext = audioFileExtension(r.audio_path ?? "");
-                            const audioName = r.audio_path
-                              ? `${pr.provider}_${r.id}.${ext}`
-                              : "";
-                            const row: Record<string, unknown> = {
-                              provider: getProviderLabel(pr.provider),
-                              audio_name: audioName,
-                              text: r.text,
-                            };
-                            // Read via `readEvaluatorCell` so the refreshed
-                            // `evaluator_outputs[<uuid>]` shape is preferred
-                            // over the legacy flat scoreField. Matches what
-                            // TTSResultsTable renders on screen.
-                            for (const c of evaluatorColumns) {
-                              const { score, error } = readEvaluatorCell(
-                                r as unknown as Record<string, unknown>,
-                                c,
-                              );
-                              if (error || score === undefined) {
-                                row[c.key] = "";
-                                continue;
-                              }
-                              if (c.outputType === "binary") {
-                                // Mirrors EvaluatorScoreCell: lowercase the
-                                // raw string before comparing so judges that
-                                // emit "True"/"TRUE" still register as Pass.
-                                const norm = score.toLowerCase();
-                                row[c.key] =
-                                  norm === "true" || norm === "1"
-                                    ? "true"
-                                    : "false";
-                              } else {
-                                const n = parseFloat(score);
-                                row[c.key] = Number.isFinite(n) ? n : score;
-                              }
-                            }
-                            rows.push(row);
-                            if (audioName && r.audio_path) {
-                              files.push({
-                                path: `audios/${audioName}`,
-                                url: r.audio_path,
-                              });
-                            }
-                          }
-                        }
-                        return {
-                          csv: { columns, rows },
-                          files,
-                        };
-                      }}
+                      getContents={async () =>
+                        ttsExportContents(
+                          // Read the run again: its clip links stop working an hour
+                          // after the page first loaded them.
+                          await fetchRunForExport<EvaluationResult>(
+                            `/tts/evaluate/${taskId}`,
+                            backendAccessToken,
+                          ),
+                          evaluatorColumns,
+                          getProviderLabel,
+                        )
+                      }
                     />
                   )}
                 {/* Sharing only makes sense once the run is complete — earlier

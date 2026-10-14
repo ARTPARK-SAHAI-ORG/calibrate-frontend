@@ -14,7 +14,7 @@ export type ExportZipFile = {
   url: string;
 };
 
-type ExportZipContents = {
+export type ExportZipContents = {
   csv: { columns: ExportColumn[]; rows: Record<string, unknown>[] };
   files: ExportZipFile[];
 };

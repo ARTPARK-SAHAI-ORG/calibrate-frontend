@@ -24,10 +24,9 @@ import {
   publicEvaluatorColumnArgs,
   TTS_RESERVED_METRIC_KEYS,
 } from "@/lib/evaluatorColumns";
-import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import { ExportZipButton } from "@/components/ExportZipButton";
-import { audioFileExtension, fetchRunForExport } from "@/lib/audioExport";
-import type { ExportColumn } from "@/components/ExportResultsButton";
+import { ttsExportContents } from "@/components/eval-details/speechExport";
+import { fetchRunForExport } from "@/lib/audioExport";
 import {
   getPublicDefaultEvaluator,
   type PublicDefaultEvaluator,
@@ -211,65 +210,15 @@ export default function PublicTTSPage() {
               <div className="flex items-center justify-end">
                 <ExportZipButton
                   filename={`tts-results-${data.dataset_name ?? data.task_id}`}
-                  getContents={async () => {
-                    // Read the run again: its clip links stop working an hour
-                    // after the page first loaded them.
-                    const run = await fetchRunForExport<EvaluationResult>(
-                      `/public/tts/${token}`,
-                    );
-                    const columns: ExportColumn[] = [
-                      { key: "provider", header: "Provider" },
-                      { key: "audio_name", header: "Audio name" },
-                      { key: "text", header: "Text" },
-                      ...evaluatorColumns.map((c) => ({
-                        key: c.key,
-                        header: c.label,
-                      })),
-                    ];
-                    const rows: Record<string, unknown>[] = [];
-                    const files: { path: string; url: string }[] = [];
-                    for (const pr of run.provider_results ?? []) {
-                      for (const r of pr.results ?? []) {
-                        const ext = audioFileExtension(r.audio_path ?? "");
-                        const audioName = r.audio_path
-                          ? `${pr.provider}_${r.id}.${ext}`
-                          : "";
-                        const row: Record<string, unknown> = {
-                          provider: getProviderLabel(pr.provider),
-                          audio_name: audioName,
-                          text: r.text,
-                        };
-                        for (const c of evaluatorColumns) {
-                          const { score, error } = readEvaluatorCell(
-                            r as unknown as Record<string, unknown>,
-                            c,
-                          );
-                          if (error || score === undefined) {
-                            row[c.key] = "";
-                            continue;
-                          }
-                          if (c.outputType === "binary") {
-                            const norm = score.toLowerCase();
-                            row[c.key] =
-                              norm === "true" || norm === "1"
-                                ? "true"
-                                : "false";
-                          } else {
-                            const n = parseFloat(score);
-                            row[c.key] = Number.isFinite(n) ? n : score;
-                          }
-                        }
-                        rows.push(row);
-                        if (audioName && r.audio_path) {
-                          files.push({
-                            path: `audios/${audioName}`,
-                            url: r.audio_path,
-                          });
-                        }
-                      }
-                    }
-                    return { csv: { columns, rows }, files };
-                  }}
+                  getContents={async () =>
+                    ttsExportContents(
+                      // Read the run again: its clip links stop working an hour
+                      // after the page first loaded them.
+                      await fetchRunForExport<EvaluationResult>(`/public/tts/${token}`),
+                      evaluatorColumns,
+                      getProviderLabel,
+                    )
+                  }
                 />
               </div>
             )}
