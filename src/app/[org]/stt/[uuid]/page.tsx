@@ -51,10 +51,9 @@ import {
 } from "@/components/human-labelling/labellingSubmit";
 import { useSidebarState } from "@/lib/sidebar";
 import { ShareButton } from "@/components/ShareButton";
-import {
-  ExportResultsButton,
-  ExportColumn,
-} from "@/components/ExportResultsButton";
+import type { ExportColumn } from "@/components/ExportResultsButton";
+import { ExportZipButton } from "@/components/ExportZipButton";
+import { audioFileExtension } from "@/lib/audioExport";
 import { retryEvaluation } from "@/lib/retryEvaluation";
 import {
   deriveEvaluatorColumns,
@@ -823,7 +822,8 @@ export default function STTEvaluationDetailPage() {
               )}
               {/* Actions, pushed to the right of the labels. */}
               <div className="flex items-center gap-3 flex-wrap ml-auto">
-                {/* Export per-row results to CSV. Placed before Share so the
+                {/* Export per-row results as a zip: results.csv plus an audios/
+                    folder holding each clip once. Placed before Share so the
                     Export ↔ Share button order matches TestRunnerDialog /
                     BenchmarkResultsDialog. One row per (provider, row);
                     columns: reference / predicted text, WER, and one column
@@ -834,11 +834,12 @@ export default function STTEvaluationDetailPage() {
                   (evaluationResult.provider_results ?? []).some(
                     (pr) => (pr.results?.length ?? 0) > 0,
                   ) && (
-                    <ExportResultsButton
+                    <ExportZipButton
                       filename={`stt-results-${evaluationResult.dataset_name ?? taskId}`}
-                      getRows={() => {
+                      getContents={() => {
                         const columns: ExportColumn[] = [
                           { key: "provider", header: "Provider" },
+                          { key: "audio_name", header: "Audio name" },
                           { key: "reference_text", header: "Reference text" },
                           { key: "predicted_text", header: "Predicted text" },
                           { key: "wer", header: "WER" },
@@ -860,11 +861,21 @@ export default function STTEvaluationDetailPage() {
                           })),
                         ];
                         const rows: Record<string, unknown>[] = [];
+                        // Every provider transcribed the same clip, so each clip
+                        // goes in the zip once, named after its row id.
+                        const files = new Map<string, string>();
                         for (const pr of evaluationResult.provider_results ??
                           []) {
                           for (const r of pr.results ?? []) {
+                            const audioName = r.audio_url
+                              ? `${r.id}.${audioFileExtension(r.audio_url)}`
+                              : "";
+                            if (audioName && r.audio_url) {
+                              files.set(`audios/${audioName}`, r.audio_url);
+                            }
                             const row: Record<string, unknown> = {
                               provider: getProviderLabel(pr.provider),
+                              audio_name: audioName,
                               reference_text: r.gt,
                               predicted_text: r.pred,
                               wer: r.wer,
@@ -911,7 +922,10 @@ export default function STTEvaluationDetailPage() {
                             rows.push(row);
                           }
                         }
-                        return { columns, rows };
+                        return {
+                          csv: { columns, rows },
+                          files: [...files].map(([path, url]) => ({ path, url })),
+                        };
                       }}
                     />
                   )}

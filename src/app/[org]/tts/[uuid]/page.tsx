@@ -52,6 +52,7 @@ import {
 } from "@/components/human-labelling/ttsLabellingSource";
 import { useSidebarState } from "@/lib/sidebar";
 import { ShareButton } from "@/components/ShareButton";
+import { audioFileExtension } from "@/lib/audioExport";
 import { ExportZipButton } from "@/components/ExportZipButton";
 import type { ExportColumn } from "@/components/ExportResultsButton";
 import { retryEvaluation } from "@/lib/retryEvaluation";
@@ -779,26 +780,7 @@ export default function TTSEvaluationDetailPage() {
                         for (const pr of evaluationResult.provider_results ??
                           []) {
                           for (const r of pr.results ?? []) {
-                            // audio_path is rendered as <audio src=...> on the
-                            // page, so it's already a fetchable URL. Use the
-                            // path's extension if present; fall back to `.wav`
-                            // (the backend's default container) when the URL
-                            // has no extension or has querystring noise.
-                            const ext = (() => {
-                              try {
-                                const u = new URL(
-                                  r.audio_path,
-                                  window.location.origin,
-                                );
-                                const m = u.pathname.match(/\.([a-z0-9]+)$/i);
-                                return m ? m[1].toLowerCase() : "wav";
-                              } catch {
-                                const m = r.audio_path.match(
-                                  /\.([a-z0-9]+)(?:\?|$)/i,
-                                );
-                                return m ? m[1].toLowerCase() : "wav";
-                              }
-                            })();
+                            const ext = audioFileExtension(r.audio_path ?? "");
                             const audioName = r.audio_path
                               ? `${pr.provider}_${r.id}.${ext}`
                               : "";

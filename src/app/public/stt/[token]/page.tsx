@@ -28,10 +28,9 @@ import {
 import type { LatencyMetric } from "@/components/eval-details/ttsEvalTypes";
 import { readEvaluatorCell } from "@/components/eval-details/EvaluatorScoreCell";
 import type { AudioCostBreakdown } from "@/lib/audioCost";
-import {
-  ExportResultsButton,
-  type ExportColumn,
-} from "@/components/ExportResultsButton";
+import type { ExportColumn } from "@/components/ExportResultsButton";
+import { ExportZipButton } from "@/components/ExportZipButton";
+import { audioFileExtension } from "@/lib/audioExport";
 import {
   getPublicDefaultEvaluator,
   type PublicDefaultEvaluator,
@@ -83,6 +82,7 @@ type ProviderResult = {
   metrics: ProviderMetrics;
   results: Array<{
     id: string;
+    audio_url?: string;
     gt: string;
     pred: string;
     wer: string;
@@ -230,11 +230,12 @@ export default function PublicSTTPage() {
               (pr) => (pr.results?.length ?? 0) > 0,
             ) && (
               <div className="flex items-center justify-end">
-                <ExportResultsButton
+                <ExportZipButton
                   filename={`stt-results-${data.task_id}`}
-                  getRows={() => {
+                  getContents={() => {
                     const columns: ExportColumn[] = [
                       { key: "provider", header: "Provider" },
+                      { key: "audio_name", header: "Audio name" },
                       { key: "reference_text", header: "Reference text" },
                       { key: "predicted_text", header: "Predicted text" },
                       { key: "wer", header: "WER" },
@@ -245,10 +246,20 @@ export default function PublicSTTPage() {
                       })),
                     ];
                     const rows: Record<string, unknown>[] = [];
+                    // Every provider transcribed the same clip, so each clip
+                    // goes in the zip once, named after its row id.
+                    const files = new Map<string, string>();
                     for (const pr of data.provider_results ?? []) {
                       for (const r of pr.results ?? []) {
+                        const audioName = r.audio_url
+                          ? `${r.id}.${audioFileExtension(r.audio_url)}`
+                          : "";
+                        if (audioName && r.audio_url) {
+                          files.set(`audios/${audioName}`, r.audio_url);
+                        }
                         const row: Record<string, unknown> = {
                           provider: getProviderLabel(pr.provider),
+                          audio_name: audioName,
                           reference_text: r.gt,
                           predicted_text: r.pred,
                           wer: r.wer,
@@ -277,7 +288,10 @@ export default function PublicSTTPage() {
                         rows.push(row);
                       }
                     }
-                    return { columns, rows };
+                    return {
+                      csv: { columns, rows },
+                      files: [...files].map(([path, url]) => ({ path, url })),
+                    };
                   }}
                 />
               </div>
