@@ -168,6 +168,63 @@ describe("ProviderKeyDialog", () => {
     expect(screen.getByRole("button", { name: "Save the key" })).toBeDisabled();
   });
 
+  it("says so when the file cannot be read", async () => {
+    const user = setupUser();
+    renderDialog({ providerName: "Google Cloud", isFile: true });
+    const file = new File(["{}"], "sa.json", { type: "application/json" });
+    Object.defineProperty(file, "text", {
+      value: () => Promise.reject(new Error("NotReadableError")),
+    });
+    await user.upload(screen.getByLabelText("Service account file"), file);
+
+    expect(
+      await screen.findByText(
+        "Could not read the file. Choose the service account file again.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save the key" })).toBeDisabled();
+  });
+
+  it("keeps the newer file when an older one finishes reading later", async () => {
+    const user = setupUser();
+    renderDialog({ providerName: "Google Cloud", isFile: true });
+    const input = screen.getByLabelText("Service account file");
+    let finishOld: (text: string) => void = () => {};
+    const oldFile = new File(["{}"], "old.json", { type: "application/json" });
+    Object.defineProperty(oldFile, "text", {
+      value: () => new Promise<string>((resolve) => (finishOld = resolve)),
+    });
+    const newFile = new File(["{}"], "new.json", { type: "application/json" });
+    Object.defineProperty(newFile, "text", { value: async () => "new" });
+
+    await user.upload(input, oldFile);
+    await user.upload(input, newFile);
+    await act(async () => finishOld("old"));
+
+    await user.click(screen.getByRole("button", { name: "Save the key" }));
+    expect(onSave).toHaveBeenCalledWith("new");
+  });
+
+  it("ignores a failed read of a file that was already replaced", async () => {
+    const user = setupUser();
+    renderDialog({ providerName: "Google Cloud", isFile: true });
+    const input = screen.getByLabelText("Service account file");
+    let failOld: (err: Error) => void = () => {};
+    const oldFile = new File(["{}"], "old.json", { type: "application/json" });
+    Object.defineProperty(oldFile, "text", {
+      value: () => new Promise<string>((_, reject) => (failOld = reject)),
+    });
+    const newFile = new File(["{}"], "new.json", { type: "application/json" });
+    Object.defineProperty(newFile, "text", { value: async () => "new" });
+
+    await user.upload(input, oldFile);
+    await user.upload(input, newFile);
+    await act(async () => failOld(new Error("NotReadableError")));
+
+    expect(screen.queryByText(/Could not read the file/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save the key" })).toBeEnabled();
+  });
+
   it("names the action when replacing a key", () => {
     renderDialog({ isReplace: true });
     expect(

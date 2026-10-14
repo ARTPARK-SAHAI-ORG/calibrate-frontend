@@ -24,6 +24,7 @@ import { EmptyState, LoadingState } from "@/components/ui/LoadingState";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
+import { formatDate } from "@/lib/formatDate";
 import {
   clearActiveOrgUuid,
   notifyOrganizationsChanged,
@@ -473,16 +474,6 @@ function MembersSection({
       />
     </section>
   );
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function ApiKeysSection({ orgUuid }: { orgUuid: string }) {

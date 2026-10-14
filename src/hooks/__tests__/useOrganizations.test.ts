@@ -844,6 +844,31 @@ describe("useOrganizations hooks", () => {
       expect(mockApiGet).toHaveBeenCalledTimes(1);
     });
 
+    it("asks the backend again on refetch instead of reusing the stored keys", async () => {
+      mockApiGet.mockResolvedValueOnce({ uses_own_keys: false, keys: [] });
+      const { result } = renderHook(() => useProviderKeys("tok", "org-1"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      mockApiGet.mockResolvedValueOnce({
+        uses_own_keys: true,
+        keys: [openrouter],
+      });
+      await act(async () => {
+        await result.current.refetch();
+      });
+      expect(mockApiGet).toHaveBeenCalledTimes(2);
+      expect(result.current.keys).toEqual([openrouter]);
+    });
+
+    it("shows the backend's message when the load fails", async () => {
+      mockApiGet.mockRejectedValueOnce(
+        new Error('Request failed: 409 - {"detail":"Keys are unreadable."}'),
+      );
+      const { result } = renderHook(() => useProviderKeys("tok", "org-1"));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.error).toBe("Keys are unreadable.");
+    });
+
     it("reports a failed load", async () => {
       mockApiGet.mockRejectedValueOnce("weird failure");
       const { result } = renderHook(() => useProviderKeys("tok", "org-1"));

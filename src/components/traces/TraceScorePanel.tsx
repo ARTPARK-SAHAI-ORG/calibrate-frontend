@@ -3,6 +3,7 @@
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { SpinnerIcon } from "@/components/icons";
 import { CONTACT_LINK } from "@/constants/limits";
+import { useUsesOwnProviderKeys } from "@/hooks";
 import {
   isTraceScoringInProgress,
   scoringRunErrorCopy,
@@ -37,6 +38,7 @@ function RunBody({
   run: TraceScoringRun;
   descriptions?: Record<string, string>;
 }) {
+  const usesOwnProviderKeys = useUsesOwnProviderKeys();
   if (isTraceScoringInProgress(run.status)) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -56,8 +58,10 @@ function RunBody({
           {/* The reason is hover text elsewhere, so it carries no full stop
               of its own. Here it is a sentence, and the limit one is followed
               by another, so this is where the stop belongs. */}
-          {scoringRunErrorCopy(run.error)}.
-          {run.error === "over_limit" && (
+          {run.error === "over_limit" && usesOwnProviderKeys
+            ? "This trace was not scored because the workspace had reached its scoring limit at the time."
+            : `${scoringRunErrorCopy(run.error)}.`}
+          {run.error === "over_limit" && !usesOwnProviderKeys && (
             <>
               {" "}
               <a

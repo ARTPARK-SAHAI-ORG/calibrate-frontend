@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAccessToken, useProviderKeys } from "@/hooks";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { formatDate } from "@/lib/formatDate";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 import type { ProviderKeyProvider } from "@/lib/orgs";
 import { ProviderKeyDialog } from "./ProviderKeyDialog";
@@ -26,16 +27,6 @@ export const PROVIDER_KEY_PROVIDERS: {
 ];
 
 type Provider = (typeof PROVIDER_KEY_PROVIDERS)[number];
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "Unknown";
-  return d.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 const neutralButton =
   "px-3 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer";
@@ -119,8 +110,8 @@ export function ProviderKeysSection({ orgUuid }: { orgUuid: string }) {
       <p className="text-sm md:text-base text-muted-foreground">
         Add your own keys so this workspace&apos;s runs are billed to your
         accounts. Once you add any key, every run in this workspace uses only
-        your keys and usage limits are removed. Runs that need a provider you
-        have not added will fail. Evaluators run through OpenRouter, so add an
+        your keys, and the limits on rows per run and on scored traces are
+        removed. Runs that need a provider you have not added will fail. Evaluators run through OpenRouter, so add an
         OpenRouter key.
       </p>
 
@@ -232,7 +223,7 @@ export function ProviderKeysSection({ orgUuid }: { orgUuid: string }) {
         message={
           providerToRemove
             ? isLastKey
-              ? `Remove the ${providerToRemove.name} key? It is the last key, so runs in this workspace go back to the keys Calibrate provides and usage limits apply again.`
+              ? `Remove the ${providerToRemove.name} key? It is the last key, so runs in this workspace go back to the keys Calibrate provides and the limits on rows per run and on scored traces apply again.`
               : `Remove the ${providerToRemove.name} key? Runs that need ${providerToRemove.name} will fail until you add a key again.`
             : ""
         }

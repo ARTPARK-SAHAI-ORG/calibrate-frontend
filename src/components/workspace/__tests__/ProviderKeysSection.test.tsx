@@ -69,7 +69,9 @@ describe("ProviderKeysSection", () => {
   it("explains what adding a key does", () => {
     render(<ProviderKeysSection orgUuid="org-1" />);
     expect(
-      screen.getByText(/Once you add any key, every run in this workspace uses only your keys/),
+      screen.getByText(
+        /every run in this workspace uses only your keys, and the limits on rows per run and on scored traces are removed/,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -99,6 +101,21 @@ describe("ProviderKeysSection", () => {
     expect(saveProviderKey).toHaveBeenCalledWith("openrouter", "sk-or-secret");
   });
 
+  it("saves another key with one click once the workspace uses its own keys", async () => {
+    hookState = { ...hookState, keys: [openrouter], usesOwnKeys: true };
+    const user = setupUser();
+    render(<ProviderKeysSection orgUuid="org-1" />);
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Add the OpenAI key" })[0],
+    );
+    await user.type(screen.getByLabelText("Key"), "sk-openai");
+    await user.click(screen.getByRole("button", { name: "Save the key" }));
+
+    expect(screen.queryByText(/After this, runs use only your keys/)).not.toBeInTheDocument();
+    expect(saveProviderKey).toHaveBeenCalledWith("openai", "sk-openai");
+  });
+
   it("removes a key after confirming", async () => {
     hookState = { ...hookState, keys: [openrouter], usesOwnKeys: true };
     const user = setupUser();
@@ -107,7 +124,11 @@ describe("ProviderKeysSection", () => {
     await user.click(
       screen.getAllByRole("button", { name: "Remove the OpenRouter key" })[0],
     );
-    expect(screen.getByText(/It is the last key/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /It is the last key, .* the limits on rows per run and on scored traces apply again\./,
+      ),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(removeProviderKey).toHaveBeenCalledWith("openrouter");
@@ -153,7 +174,8 @@ describe("ProviderKeysSection", () => {
 
   it("shows the loading state before the keys arrive", () => {
     hookState = { ...hookState, isLoading: true };
-    render(<ProviderKeysSection orgUuid="org-1" />);
+    const { container } = render(<ProviderKeysSection orgUuid="org-1" />);
+    expect(container.querySelector(".animate-spin")).toBeInTheDocument();
     expect(screen.queryByText("Not added")).not.toBeInTheDocument();
   });
 

@@ -116,6 +116,9 @@ export function SpeechToTextEvaluation({
   // Get filtered providers based on selected language + enabled API keys
   const filteredProviders = getFilteredProviders(language, enabledProviders);
   const providerLabels = filteredProviders.map((p) => p.label);
+  const allProvidersSelected =
+    providerLabels.length > 0 &&
+    selectedProviders.size === providerLabels.length;
 
   useEffect(() => {
     const only = getFilteredProviders(language, enabledProviders);
@@ -582,10 +585,13 @@ export function SpeechToTextEvaluation({
               ({selectedProviders.size} selected)
             </span>
           </div>
-          {!sttProviders.some((p) => isProviderEnabled(enabledProviders, p.value)) && (
+          {enabledProviders && providerLabels.length === 0 && (
             <p className="text-[13px] text-muted-foreground">
-              This workspace has no speech-to-text provider key. Add one in Workspace
-              settings, under AI provider keys.
+              {sttProviders.some((p) =>
+                isProviderEnabled(enabledProviders, p.value),
+              )
+                ? `None of this workspace's speech-to-text provider keys support ${languageDisplayName[language]}. Add a key for a provider that does in Workspace settings, under AI provider keys.`
+                : "This workspace has no speech-to-text provider key. Add one in Workspace settings, under AI provider keys."}
             </p>
           )}
           {/* Desktop: Table layout */}
@@ -596,21 +602,21 @@ export function SpeechToTextEvaluation({
                   <th className="w-12 px-4 py-2 text-left">
                     <div
                       className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer ${
-                        selectedProviders.size === providerLabels.length
+                        allProvidersSelected
                           ? "bg-foreground border-foreground"
                           : selectedProviders.size > 0
                             ? "bg-foreground/50 border-foreground"
                             : "border-border hover:border-foreground/50"
                       }`}
                       onClick={() => {
-                        if (selectedProviders.size === providerLabels.length) {
+                        if (allProvidersSelected) {
                           setSelectedProviders(new Set());
                         } else {
                           selectAllProviders();
                         }
                       }}
                     >
-                      {selectedProviders.size === providerLabels.length ? (
+                      {allProvidersSelected ? (
                         <svg
                           className="w-3 h-3 text-background"
                           fill="none"
@@ -768,7 +774,7 @@ export function SpeechToTextEvaluation({
             <div
               className="flex items-center gap-3 px-3 py-2.5 border border-border rounded-lg cursor-pointer hover:bg-muted/30 transition-colors"
               onClick={() => {
-                if (selectedProviders.size === providerLabels.length) {
+                if (allProvidersSelected) {
                   setSelectedProviders(new Set());
                 } else {
                   selectAllProviders();
@@ -777,14 +783,14 @@ export function SpeechToTextEvaluation({
             >
               <div
                 className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
-                  selectedProviders.size === providerLabels.length
+                  allProvidersSelected
                     ? "bg-foreground border-foreground"
                     : selectedProviders.size > 0
                       ? "bg-foreground/50 border-foreground"
                       : "border-border"
                 }`}
               >
-                {selectedProviders.size === providerLabels.length ? (
+                {allProvidersSelected ? (
                   <svg
                     className="w-3 h-3 text-background"
                     fill="none"

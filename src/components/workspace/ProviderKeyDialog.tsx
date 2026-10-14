@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { SpinnerIcon } from "@/components/icons";
 import {
@@ -58,6 +58,7 @@ export function ProviderKeyDialog({
   const [confirmed, setConfirmed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const latestFile = useRef<File | undefined>(undefined);
 
   useEffect(() => {
     if (!isOpen) {
@@ -99,6 +100,7 @@ export function ProviderKeyDialog({
   };
 
   const handleFile = async (file: File | undefined) => {
+    latestFile.current = file;
     setError(null);
     if (!file) {
       setValue("");
@@ -106,7 +108,16 @@ export function ProviderKeyDialog({
       return;
     }
     setFileName(file.name);
-    setValue(await file.text());
+    try {
+      const text = await file.text();
+      if (latestFile.current === file) setValue(text);
+    } catch {
+      if (latestFile.current !== file) return;
+      setError(
+        "Could not read the file. Choose the service account file again.",
+      );
+      setValue("");
+    }
   };
 
   const savingLabel = `Checking the key with ${providerName}…`;
@@ -140,6 +151,7 @@ export function ProviderKeyDialog({
               type="button"
               onClick={() => void save()}
               disabled={isSubmitting}
+              autoFocus
               className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSubmitting && spinner}

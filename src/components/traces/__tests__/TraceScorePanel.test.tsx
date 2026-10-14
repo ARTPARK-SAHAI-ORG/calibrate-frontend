@@ -3,6 +3,16 @@ import { CONTACT_LINK } from "@/constants/limits";
 import { TraceScorePanel } from "../TraceScorePanel";
 import type { TraceScoringRun } from "@/lib/tracesApi";
 
+let mockUsesOwnKeys = false;
+jest.mock("../../../hooks/useMaxRowsPerEval", () => ({
+  ...jest.requireActual("../../../hooks/useMaxRowsPerEval"),
+  useUsesOwnProviderKeys: () => mockUsesOwnKeys,
+}));
+
+beforeEach(() => {
+  mockUsesOwnKeys = false;
+});
+
 jest.mock("../../EvaluatorVerdictCard", () => ({
   EvaluatorVerdictCard: ({
     name,
@@ -193,6 +203,16 @@ it("says the workspace is over its scoring limit and offers the contact link", (
   // Bold, with no underline, the same as the limit message shown elsewhere.
   expect(link.className).toContain("font-bold");
   expect(link.className).not.toContain("underline");
+});
+
+it("does not offer the contact link once the workspace uses its own provider keys", () => {
+  mockUsesOwnKeys = true;
+  const { container } = render(<TraceScorePanel run={prior} />);
+
+  expect(container.querySelector(".border-amber-500\\/40")).toHaveTextContent(
+    "This trace was not scored because the workspace had reached its scoring limit at the time.",
+  );
+  expect(screen.queryByRole("link")).not.toBeInTheDocument();
 });
 
 it("gives each card what its own evaluator is for, and nothing for one with no words", () => {

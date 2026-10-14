@@ -4,6 +4,7 @@ import { reportError } from "@/lib/reportError";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient, apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
 import { createRequestCache } from "@/lib/requestCache";
+import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 import type { InviteLink } from "@/lib/invites";
 import {
   ACTIVE_ORG_CHANGED_EVENT,
@@ -272,10 +273,7 @@ export function useOrganizations(
  * it falls back to the workspace last opened, read after mount and kept
  * current through the "active-org-changed" event.
  */
-export function useActiveOrgUuid(): [
-  string | null,
-  (uuid: string) => void,
-] {
+export function useActiveOrgUuid(): [string | null, (uuid: string) => void] {
   const fromAddress = useOrgUuid();
   const [remembered, setRemembered] = useState<string | null>(null);
 
@@ -540,6 +538,66 @@ type UseWorkspaceApiKeysReturn = {
   revokeApiKey: (keyUuid: string) => Promise<void>;
 };
 
+const workspaceKey = (accessToken: string, orgUuid: string) =>
+  `${accessToken}:${orgUuid}`;
+
+/** Loads one workspace-scoped list through a 30-second cache. A mount reuses
+ *  the stored copy; `refetch` always asks the backend again. */
+function useCachedWorkspaceGet<T>(
+  cache: ReturnType<typeof createRequestCache<T>>,
+  path: string,
+  empty: T,
+  noun: string,
+  accessToken: string | null | undefined,
+  orgUuid: string | null,
+) {
+  const cached =
+    accessToken && orgUuid
+      ? cache.peek(workspaceKey(accessToken, orgUuid))
+      : undefined;
+  const [data, setData] = useState<T>(cached ?? empty);
+  const [isLoading, setIsLoading] = useState(!cached);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(
+    async (fresh: boolean) => {
+      if (!accessToken || !orgUuid) {
+        setData(empty);
+        setIsLoading(false);
+        return;
+      }
+      try {
+        setIsLoading(true);
+        setError(null);
+        const key = workspaceKey(accessToken, orgUuid);
+        if (fresh) cache.invalidate(key);
+        setData(await cache.fetch(key, () => apiGet<T>(path, accessToken)));
+      } catch (err) {
+        reportError(`Error fetching ${noun}:`, err);
+        setError(parseBackendErrorMessage(err, `Failed to load ${noun}`));
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [accessToken, orgUuid, cache, path, empty, noun],
+  );
+  const refetch = useCallback(() => load(true), [load]);
+
+  useEffect(() => {
+    if (accessToken && orgUuid) {
+      const hit = cache.peek(workspaceKey(accessToken, orgUuid));
+      if (hit) {
+        setData(hit);
+        setIsLoading(false);
+        return;
+      }
+    }
+    void load(false);
+  }, [accessToken, orgUuid, cache, load]);
+
+  return { data, setData, isLoading, error, refetch };
+}
+
 /**
  * List + create + revoke API keys for the active workspace. Keys are scoped by
  * the `X-Org-UUID` header (attached automatically in api.ts), so the endpoints
@@ -556,54 +614,26 @@ type UseWorkspaceApiKeysReturn = {
 const apiKeysCache = createRequestCache<OrganizationApiKey[]>({
   ttlMs: 30_000,
 });
-const apiKeysKey = (accessToken: string, orgUuid: string) =>
-  `${accessToken}:${orgUuid}`;
+const EMPTY_API_KEYS: OrganizationApiKey[] = [];
 
 export function useWorkspaceApiKeys(
   accessToken: string | null | undefined,
   orgUuid: string | null,
 ): UseWorkspaceApiKeysReturn {
-  const cached =
-    accessToken && orgUuid
-      ? apiKeysCache.peek(apiKeysKey(accessToken, orgUuid))
-      : undefined;
-  const [apiKeys, setApiKeys] = useState<OrganizationApiKey[]>(cached ?? []);
-  const [isLoading, setIsLoading] = useState(!cached);
-  const [error, setError] = useState<string | null>(null);
-
-  const refetch = useCallback(async () => {
-    if (!accessToken || !orgUuid) {
-      setApiKeys([]);
-      setIsLoading(false);
-      return;
-    }
-    try {
-      setIsLoading(true);
-      setError(null);
-      const data = await apiKeysCache.fetch(
-        apiKeysKey(accessToken, orgUuid),
-        () => apiGet<OrganizationApiKey[]>("/api-keys", accessToken),
-      );
-      setApiKeys(data);
-    } catch (err) {
-      reportError("Error fetching API keys:", err);
-      setError(err instanceof Error ? err.message : "Failed to load API keys");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [accessToken, orgUuid]);
-
-  useEffect(() => {
-    if (accessToken && orgUuid) {
-      const hit = apiKeysCache.peek(apiKeysKey(accessToken, orgUuid));
-      if (hit) {
-        setApiKeys(hit);
-        setIsLoading(false);
-        return;
-      }
-    }
-    refetch();
-  }, [accessToken, orgUuid, refetch]);
+  const {
+    data: apiKeys,
+    setData: setApiKeys,
+    isLoading,
+    error,
+    refetch,
+  } = useCachedWorkspaceGet(
+    apiKeysCache,
+    "/api-keys",
+    EMPTY_API_KEYS,
+    "API keys",
+    accessToken,
+    orgUuid,
+  );
 
   const createApiKey = useCallback(
     async (name: string): Promise<OrganizationApiKeyWithSecret> => {
@@ -620,12 +650,12 @@ export function useWorkspaceApiKeys(
       void _key;
       setApiKeys((prev) => {
         const next = [...prev, masked];
-        apiKeysCache.set(apiKeysKey(accessToken, orgUuid), next);
+        apiKeysCache.set(workspaceKey(accessToken, orgUuid), next);
         return next;
       });
       return created;
     },
-    [accessToken, orgUuid],
+    [accessToken, orgUuid, setApiKeys],
   );
 
   const revokeApiKey = useCallback(
@@ -636,11 +666,11 @@ export function useWorkspaceApiKeys(
       await apiDelete(`/api-keys/${keyUuid}`, accessToken);
       setApiKeys((prev) => {
         const next = prev.filter((k) => k.uuid !== keyUuid);
-        apiKeysCache.set(apiKeysKey(accessToken, orgUuid), next);
+        apiKeysCache.set(workspaceKey(accessToken, orgUuid), next);
         return next;
       });
     },
-    [accessToken, orgUuid],
+    [accessToken, orgUuid, setApiKeys],
   );
 
   return { apiKeys, isLoading, error, refetch, createApiKey, revokeApiKey };
@@ -662,8 +692,6 @@ type UseProviderKeysReturn = {
 const providerKeysCache = createRequestCache<ProviderKeys>({
   ttlMs: 30_000,
 });
-const providerKeysKey = (accessToken: string, orgUuid: string) =>
-  `${accessToken}:${orgUuid}`;
 
 const EMPTY_PROVIDER_KEYS: ProviderKeys = { uses_own_keys: false, keys: [] };
 
@@ -678,51 +706,14 @@ export function useProviderKeys(
   accessToken: string | null | undefined,
   orgUuid: string | null,
 ): UseProviderKeysReturn {
-  const cached =
-    accessToken && orgUuid
-      ? providerKeysCache.peek(providerKeysKey(accessToken, orgUuid))
-      : undefined;
-  const [data, setData] = useState<ProviderKeys>(
-    cached ?? EMPTY_PROVIDER_KEYS,
+  const { data, setData, isLoading, error, refetch } = useCachedWorkspaceGet(
+    providerKeysCache,
+    "/provider-keys",
+    EMPTY_PROVIDER_KEYS,
+    "provider keys",
+    accessToken,
+    orgUuid,
   );
-  const [isLoading, setIsLoading] = useState(!cached);
-  const [error, setError] = useState<string | null>(null);
-
-  const refetch = useCallback(async () => {
-    if (!accessToken || !orgUuid) {
-      setData(EMPTY_PROVIDER_KEYS);
-      setIsLoading(false);
-      return;
-    }
-    try {
-      setIsLoading(true);
-      setError(null);
-      const next = await providerKeysCache.fetch(
-        providerKeysKey(accessToken, orgUuid),
-        () => apiGet<ProviderKeys>("/provider-keys", accessToken),
-      );
-      setData(next);
-    } catch (err) {
-      reportError("Error fetching provider keys:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to load provider keys",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [accessToken, orgUuid]);
-
-  useEffect(() => {
-    if (accessToken && orgUuid) {
-      const hit = providerKeysCache.peek(providerKeysKey(accessToken, orgUuid));
-      if (hit) {
-        setData(hit);
-        setIsLoading(false);
-        return;
-      }
-    }
-    refetch();
-  }, [accessToken, orgUuid, refetch]);
 
   const saveProviderKey = useCallback(
     async (
@@ -743,12 +734,12 @@ export function useProviderKeys(
           uses_own_keys: true,
           keys: [...prev.keys.filter((k) => k.provider !== provider), saved],
         };
-        providerKeysCache.set(providerKeysKey(accessToken, orgUuid), next);
+        providerKeysCache.set(workspaceKey(accessToken, orgUuid), next);
         return next;
       });
       return saved;
     },
-    [accessToken, orgUuid],
+    [accessToken, orgUuid, setData],
   );
 
   const removeProviderKey = useCallback(
@@ -761,11 +752,11 @@ export function useProviderKeys(
       setData((prev) => {
         const keys = prev.keys.filter((k) => k.provider !== provider);
         const next: ProviderKeys = { uses_own_keys: keys.length > 0, keys };
-        providerKeysCache.set(providerKeysKey(accessToken, orgUuid), next);
+        providerKeysCache.set(workspaceKey(accessToken, orgUuid), next);
         return next;
       });
     },
-    [accessToken, orgUuid],
+    [accessToken, orgUuid, setData],
   );
 
   return {
