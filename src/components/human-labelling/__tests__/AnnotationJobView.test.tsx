@@ -863,7 +863,10 @@ describe("AnnotationJobView", () => {
       updated_at: "",
     });
     // item-1 saved as Correct / 3; item-2 untouched.
-    const savedItemOne = [ann("item-1", "ev-1", true), ann("item-1", "ev-2", 3)];
+    const savedItemOne = [
+      ann("item-1", "ev-1", true),
+      ann("item-1", "ev-2", 3),
+    ];
     const postBody = () =>
       JSON.parse(fetchMock.mock.calls[fetchMock.mock.calls.length - 1][1].body);
 
@@ -947,9 +950,15 @@ describe("AnnotationJobView", () => {
 
       await user.click(screen.getByRole("button", { name: "Correct" }));
 
+      const started = screen.getAllByRole("button", {
+        name: "Item 1 (in progress)",
+      });
+      await user.hover(started[0]);
+      // The hover text names only the state, not the item again.
+      expect(await screen.findByText("In progress")).toBeInTheDocument();
       expect(
-        screen.getAllByRole("button", { name: "Item 1 (in progress)" }).length,
-      ).toBeGreaterThan(0);
+        screen.queryByText("Item 1 (in progress)"),
+      ).not.toBeInTheDocument();
     });
 
     it("saves a removed answer when the annotator presses Next", async () => {

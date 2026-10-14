@@ -731,6 +731,10 @@ function AnnotateView({
       : evaluatorsFor(itemId).some((ev) => evaluatorAnswered(itemId, ev))
         ? "in progress"
         : null;
+  const ITEM_LIST_STATUS_TEXT = {
+    completed: "Completed",
+    "in progress": "In progress",
+  };
   const ITEM_LIST_STATUS_CLASS = {
     completed:
       "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400",
@@ -1177,7 +1181,8 @@ function AnnotateView({
                 return (
                   <Tooltip
                     key={it.uuid}
-                    content={`Item ${position}${status ? ` (${status})` : ""}`}
+                    content={status ? ITEM_LIST_STATUS_TEXT[status] : null}
+                    contentStyle={status ? undefined : { display: "none" }}
                     position="top"
                   >
                     <button
@@ -1209,7 +1214,8 @@ function AnnotateView({
                   return (
                     <Tooltip
                       key={it.uuid}
-                      content={`Item ${position}${status ? ` (${status})` : ""}`}
+                      content={status ? ITEM_LIST_STATUS_TEXT[status] : null}
+                      contentStyle={status ? undefined : { display: "none" }}
                       position="right"
                     >
                       <button
