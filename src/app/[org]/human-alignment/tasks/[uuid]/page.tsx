@@ -1263,11 +1263,9 @@ function LabellingTaskPageInner() {
   const [deletingJobs, setDeletingJobs] = useState(false);
   const [deletingJobUuid, setDeletingJobUuid] = useState<string | null>(null);
   const [deletingJobInFlight, setDeletingJobInFlight] = useState(false);
-  const [editSttItemsOpen, setEditSttItemsOpen] = useState(false);
   const [editSttSingleItemUuid, setEditSttSingleItemUuid] = useState<
     string | null
   >(null);
-  const [editTtsItemsOpen, setEditTtsItemsOpen] = useState(false);
   const [editTtsSingleItemUuid, setEditTtsSingleItemUuid] = useState<
     string | null
   >(null);
@@ -1308,7 +1306,6 @@ function LabellingTaskPageInner() {
     | null
   >(null);
   // llm-general items use their own input/output dialog (non-conversational).
-  const [editLlmGeneralItemsOpen, setEditLlmGeneralItemsOpen] = useState(false);
   const [editLlmGeneralSingleItemUuid, setEditLlmGeneralSingleItemUuid] =
     useState<string | null>(null);
   const [duplicateLlmGeneralRows, setDuplicateLlmGeneralRows] = useState<
@@ -2352,21 +2349,17 @@ function LabellingTaskPageInner() {
     const form = itemEditForm(taskType);
     if (form === "tts") {
       setEditTtsSingleItemUuid(uuid);
-      setEditTtsItemsOpen(true);
     } else if (form === "stt") {
       setEditSttSingleItemUuid(uuid);
-      setEditSttItemsOpen(true);
     } else if (form === "llm-general") {
       setEditLlmGeneralSingleItemUuid(uuid);
-      setEditLlmGeneralItemsOpen(true);
     } else {
       setEditLlmItemUuid(uuid);
     }
   };
 
   // Previous / next in the edit window, the same walk as the item view.
-  // Only one of these is set, and only when one item is opened for edit;
-  // editing several ticked items at once leaves them all empty, so no arrows.
+  // Only one of these is set at a time: the item open for edit.
   const editPager = useItemPager({
     items,
     openUuid:
@@ -2434,11 +2427,8 @@ function LabellingTaskPageInner() {
     // holds this item, or the view window loses it when that page lands.
     setItemsOffset(loadedItemsOffset);
     setEditLlmItemUuid(null);
-    setEditSttItemsOpen(false);
     setEditSttSingleItemUuid(null);
-    setEditTtsItemsOpen(false);
     setEditTtsSingleItemUuid(null);
-    setEditLlmGeneralItemsOpen(false);
     setEditLlmGeneralSingleItemUuid(null);
     openItemDetail(uuid);
   };
@@ -4174,8 +4164,8 @@ function LabellingTaskPageInner() {
       />
 
       <AddSttItemsDialog
-        key={`stt-${editSttSingleItemUuid ?? "several"}`}
-        isOpen={editSttItemsOpen}
+        key={`stt-${editSttSingleItemUuid}`}
+        isOpen={!!editSttSingleItemUuid}
         mode="edit"
         {...(editSttSingleItemUuid
           ? {
@@ -4184,11 +4174,7 @@ function LabellingTaskPageInner() {
             }
           : {})}
         initialRows={items
-          .filter((it) =>
-            editSttSingleItemUuid
-              ? it.uuid === editSttSingleItemUuid
-              : selectedItemIds.has(it.uuid),
-          )
+          .filter((it) => it.uuid === editSttSingleItemUuid)
           .map((it) => {
             const p = (it.payload ?? {}) as Record<string, unknown>;
             return {
@@ -4207,7 +4193,6 @@ function LabellingTaskPageInner() {
           })}
         onClose={() => {
           editPager.cancel();
-          setEditSttItemsOpen(false);
           setEditSttSingleItemUuid(null);
         }}
         onSubmit={async (rows) => {
@@ -4234,7 +4219,6 @@ function LabellingTaskPageInner() {
           );
           await Promise.all([fetchTask(), fetchTaskSummary()]);
           editPager.cancel();
-          setEditSttItemsOpen(false);
           setEditSttSingleItemUuid(null);
           setSelectedItemIds(new Set());
           setSelectAllTotal(false);
@@ -4272,8 +4256,8 @@ function LabellingTaskPageInner() {
       />
 
       <AddTtsItemsDialog
-        key={`tts-${editTtsSingleItemUuid ?? "several"}`}
-        isOpen={editTtsItemsOpen}
+        key={`tts-${editTtsSingleItemUuid}`}
+        isOpen={!!editTtsSingleItemUuid}
         mode="edit"
         {...(editTtsSingleItemUuid
           ? {
@@ -4283,11 +4267,7 @@ function LabellingTaskPageInner() {
           : {})}
         accessToken={accessToken}
         initialRows={items
-          .filter((it) =>
-            editTtsSingleItemUuid
-              ? it.uuid === editTtsSingleItemUuid
-              : selectedItemIds.has(it.uuid),
-          )
+          .filter((it) => it.uuid === editTtsSingleItemUuid)
           .map((it) => {
             const p = (it.payload ?? {}) as Record<string, unknown>;
             return {
@@ -4300,7 +4280,6 @@ function LabellingTaskPageInner() {
           })}
         onClose={() => {
           editPager.cancel();
-          setEditTtsItemsOpen(false);
           setEditTtsSingleItemUuid(null);
         }}
         onSubmit={async (rows) => {
@@ -4327,7 +4306,6 @@ function LabellingTaskPageInner() {
           );
           await Promise.all([fetchTask(), fetchTaskSummary()]);
           editPager.cancel();
-          setEditTtsItemsOpen(false);
           setEditTtsSingleItemUuid(null);
           setSelectedItemIds(new Set());
           setSelectAllTotal(false);
@@ -4378,8 +4356,8 @@ function LabellingTaskPageInner() {
       />
 
       <AddLlmGeneralItemsDialog
-        key={`llm-general-${editLlmGeneralSingleItemUuid ?? "several"}`}
-        isOpen={editLlmGeneralItemsOpen}
+        key={`llm-general-${editLlmGeneralSingleItemUuid}`}
+        isOpen={!!editLlmGeneralSingleItemUuid}
         mode="edit"
         {...(editLlmGeneralSingleItemUuid
           ? {
@@ -4389,15 +4367,10 @@ function LabellingTaskPageInner() {
           : {})}
         evaluators={llmGeneralEvaluatorDefs}
         initialRows={items
-          .filter((it) =>
-            editLlmGeneralSingleItemUuid
-              ? it.uuid === editLlmGeneralSingleItemUuid
-              : selectedItemIds.has(it.uuid),
-          )
+          .filter((it) => it.uuid === editLlmGeneralSingleItemUuid)
           .map(llmGeneralDialogRow)}
         onClose={() => {
           editPager.cancel();
-          setEditLlmGeneralItemsOpen(false);
           setEditLlmGeneralSingleItemUuid(null);
         }}
         onSubmit={async (rows) => {
@@ -4441,7 +4414,6 @@ function LabellingTaskPageInner() {
           );
           await Promise.all([fetchTask(), fetchTaskSummary()]);
           editPager.cancel();
-          setEditLlmGeneralItemsOpen(false);
           setEditLlmGeneralSingleItemUuid(null);
           setSelectedItemIds(new Set());
           setSelectAllTotal(false);
