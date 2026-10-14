@@ -8,11 +8,9 @@
  * screen shows first. `versions` maps a display name to another form of the
  * same text, such as a translation or a human rewrite.
  */
-export type TurnVersions = Record<string, string>;
-
 export type TurnExtras = {
   label?: string;
-  versions?: TurnVersions;
+  versions?: Record<string, string>;
 };
 
 export type TextField = TurnExtras & { content: string };
@@ -25,7 +23,7 @@ export function readTurnExtras(raw: unknown): TurnExtras {
   const out: TurnExtras = {};
   if (typeof obj.label === "string" && obj.label.trim()) out.label = obj.label;
   if (obj.versions && typeof obj.versions === "object" && !Array.isArray(obj.versions)) {
-    const versions: TurnVersions = {};
+    const versions: Record<string, string> = {};
     for (const [k, v] of Object.entries(obj.versions as Record<string, unknown>)) {
       if (typeof v === "string" && k.trim()) versions[k] = v;
     }

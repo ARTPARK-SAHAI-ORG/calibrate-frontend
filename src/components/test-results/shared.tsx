@@ -1264,7 +1264,7 @@ export function TestDetailView({
                 </div>
               </div>
               <div className="max-w-[88%] md:max-w-3/4 w-fit">
-                <div className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl bg-background border border-border">
+                <div className={`${TURN_BUBBLE_CLASS} bg-background`}>
                   <p className="text-sm text-foreground whitespace-pre-wrap">
                     {output.response}
                   </p>

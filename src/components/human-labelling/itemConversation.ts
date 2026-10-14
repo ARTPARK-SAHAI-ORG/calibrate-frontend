@@ -9,13 +9,11 @@ import { normaliseHistoryItem } from "./item-panes/shared";
 
 export type HistoryItem = NonNullable<TestConfig["history"]>[number];
 
-type ConversationTaskType = "llm" | "conversation";
-
 function parseHistory(raw: unknown): HistoryItem[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .map(normaliseHistoryItem)
-    .filter((turn) => turn !== null && turn.role !== "system") as HistoryItem[];
+    .filter((turn) => turn !== null) as HistoryItem[];
 }
 
 /** The dialog's history for a stored item: the transcript for a
@@ -23,7 +21,7 @@ function parseHistory(raw: unknown): HistoryItem[] {
  * as a trailing assistant turn. */
 export function payloadToHistory(
   payload: Record<string, unknown>,
-  taskType: ConversationTaskType,
+  taskType: string | undefined,
 ): HistoryItem[] {
   if (taskType === "conversation") return parseHistory(payload.transcript);
   const history = parseHistory(payload.chat_history);
@@ -40,7 +38,7 @@ export function payloadToHistory(
  * graded reply and stays in `chat_history`. */
 export function historyToPayloadFields(
   history: HistoryItem[],
-  taskType: ConversationTaskType,
+  taskType: string | undefined,
 ):
   | { transcript: HistoryItem[] }
   | { chat_history: HistoryItem[]; agent_response: string | TextField } {

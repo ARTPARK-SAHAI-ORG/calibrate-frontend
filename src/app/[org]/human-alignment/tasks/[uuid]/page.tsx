@@ -1287,8 +1287,6 @@ function LabellingTaskPageInner() {
   const [editLlmGeneralItemsOpen, setEditLlmGeneralItemsOpen] = useState(false);
   const [editLlmGeneralSingleItemUuid, setEditLlmGeneralSingleItemUuid] =
     useState<string | null>(null);
-  const [duplicateLlmGeneralSource, setDuplicateLlmGeneralSource] =
-    useState<Record<string, unknown> | null>(null);
   const [duplicateLlmGeneralRows, setDuplicateLlmGeneralRows] = useState<
     {
       uuid: string;
@@ -2341,7 +2339,7 @@ function LabellingTaskPageInner() {
     return {
       history: payloadToHistory(
         payload,
-        taskType === "conversation" ? "conversation" : "llm",
+        taskType,
       ),
       evaluation: { type: "response" as const, criteria: "" },
     };
@@ -3614,7 +3612,6 @@ function LabellingTaskPageInner() {
                                   ? (p.name as string)
                                   : `Item ${item.id}`;
                               if (taskType === "llm-general") {
-                                setDuplicateLlmGeneralSource(p ?? null);
                                 setDuplicateLlmGeneralRows([
                                   {
                                     uuid: item.uuid,
@@ -3866,7 +3863,7 @@ function LabellingTaskPageInner() {
               ...descriptionField,
               ...historyToPayloadFields(
                 history,
-                taskType === "conversation" ? "conversation" : "llm",
+                taskType,
               ),
               evaluator_variables,
             };
@@ -3966,7 +3963,7 @@ function LabellingTaskPageInner() {
               ...descriptionField,
               ...historyToPayloadFields(
                 history,
-                taskType === "conversation" ? "conversation" : "llm",
+                taskType,
               ),
               evaluator_variables,
             };
@@ -4289,7 +4286,6 @@ function LabellingTaskPageInner() {
         onClose={() => {
           setAddLlmGeneralItemsOpen(false);
           setDuplicateLlmGeneralRows(null);
-          setDuplicateLlmGeneralSource(null);
         }}
         onSubmit={async (rows) => {
           if (!accessToken) return;
@@ -4300,8 +4296,14 @@ function LabellingTaskPageInner() {
                 payload: {
                   ...(r.name ? { name: r.name } : {}),
                   ...(r.description ? { description: r.description } : {}),
-                  input: replaceText(duplicateLlmGeneralSource?.input, r.input),
-                  output: replaceText(duplicateLlmGeneralSource?.output, r.output),
+                  input: replaceText(
+                    (items.find((it) => it.uuid === r.uuid)?.payload as Record<string, unknown> | undefined)?.input,
+                    r.input,
+                  ),
+                  output: replaceText(
+                    (items.find((it) => it.uuid === r.uuid)?.payload as Record<string, unknown> | undefined)?.output,
+                    r.output,
+                  ),
                   ...(r.toolCalls.length > 0
                     ? { actual_tool_calls: r.toolCalls }
                     : {}),
@@ -4317,7 +4319,6 @@ function LabellingTaskPageInner() {
           await Promise.all([fetchTask(), fetchTaskSummary()]);
           setAddLlmGeneralItemsOpen(false);
           setDuplicateLlmGeneralRows(null);
-          setDuplicateLlmGeneralSource(null);
         }}
       />
 

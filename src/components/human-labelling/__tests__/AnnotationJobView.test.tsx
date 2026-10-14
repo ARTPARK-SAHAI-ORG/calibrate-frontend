@@ -28,19 +28,6 @@ jest.mock("../../../lib/api", () => ({
   getBackendUrl: () => "https://backend.example.com",
 }));
 
-const mockLlmPaneProps = jest.fn();
-jest.mock("../item-panes/LlmItemPane", () => {
-  const React = jest.requireActual("react");
-  const actual = jest.requireActual("../item-panes/LlmItemPane");
-  return {
-    ...actual,
-    LlmItemPane: (props: Record<string, unknown>) => {
-      mockLlmPaneProps(props);
-      return React.createElement(actual.LlmItemPane, props);
-    },
-  };
-});
-
 function jsonResponse(body: unknown, status = 200) {
   return {
     ok: status >= 200 && status < 300,
@@ -1876,9 +1863,7 @@ describe("AnnotationJobView message versions", () => {
       "aria-pressed",
       "true",
     );
-    expect(mockLlmPaneProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({ showVersions: true }),
-    );
+    expect(screen.getByText("namaste")).toBeInTheDocument();
 
     await user.click(screen.getByText("Default only"));
     expect(screen.getByText("Default only")).toHaveAttribute(
@@ -1889,14 +1874,10 @@ describe("AnnotationJobView message versions", () => {
       "aria-pressed",
       "false",
     );
-    expect(mockLlmPaneProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({ showVersions: false }),
-    );
+    expect(screen.queryByText("namaste")).not.toBeInTheDocument();
 
     await user.click(screen.getByText("All versions"));
-    expect(mockLlmPaneProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({ showVersions: true }),
-    );
+    expect(screen.getByText("namaste")).toBeInTheDocument();
   });
 
   it("keeps the version toggle in the admin read-only view", async () => {
