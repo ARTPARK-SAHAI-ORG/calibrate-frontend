@@ -3658,7 +3658,11 @@ export function AddTestDialog({
                   </>
                 )}
               </div>
-              <div className="flex items-start gap-2">
+              <div
+                className={`flex items-start gap-2 ${
+                  message.role === "user" ? "flex-row-reverse" : ""
+                }`}
+              >
                 <div className="flex flex-col flex-1 min-w-0">
                   <textarea
                     value={text}
