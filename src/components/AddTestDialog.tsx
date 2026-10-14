@@ -3547,6 +3547,12 @@ export function AddTestDialog({
     onNext: showRunUnsavedConfirm ? undefined : navNext,
   });
 
+  const evalTargetPill = (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
+      Evaluation target
+    </span>
+  );
+
   const renderHeadingInput = (
     message: ChatMessage,
     placeholder: "Agent" | "User",
@@ -3565,6 +3571,10 @@ export function AddTestDialog({
         <input
           type="text"
           value={draft ? draft.to : current}
+          size={Math.min(
+            40,
+            Math.max(placeholder.length, (draft ? draft.to : current).length) + 1,
+          )}
           placeholder={placeholder}
           aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
           onFocus={() => {
@@ -3664,29 +3674,31 @@ export function AddTestDialog({
                 }`}
               >
                 <div className="flex flex-col flex-1 min-w-0">
-                  <textarea
-                    value={text}
-                    aria-label="Version text"
-                    rows={1}
-                    ref={autoSizeOnMount}
-                    onInput={(e) => {
-                      const target = e.target as HTMLTextAreaElement;
-                      target.style.height = "auto";
-                      target.style.height = `${target.scrollHeight}px`;
-                    }}
-                    onChange={(e) =>
-                      setMessageVersions(message.id, (v) => ({
-                        ...v,
-                        [name]: e.target.value,
-                      }))
-                    }
-                    placeholder="Enter this version"
-                    className={`[field-sizing:content] w-full px-4 py-2 rounded-xl text-sm text-foreground border focus:outline-none focus:ring-1 resize-none overflow-hidden placeholder:text-muted-foreground border-dashed bg-muted/30 ${
-                      localValidationAttempted && !text.trim()
-                        ? "border-red-500 focus:ring-red-500"
-                        : "border-border focus:ring-accent"
-                    }`}
-                  />
+                  <div className="grid w-full">
+                    <textarea
+                      value={text}
+                      aria-label="Version text"
+                      rows={1}
+                      onChange={(e) =>
+                        setMessageVersions(message.id, (v) => ({
+                          ...v,
+                          [name]: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter this version"
+                      className={`[grid-area:1/1/2/2] w-full px-4 py-2 rounded-xl text-sm text-foreground border focus:outline-none focus:ring-1 resize-none overflow-hidden placeholder:text-muted-foreground border-dashed bg-muted/30 ${
+                        localValidationAttempted && !text.trim()
+                          ? "border-red-500 focus:ring-red-500"
+                          : "border-border focus:ring-accent"
+                      }`}
+                    />
+                    <div
+                      aria-hidden="true"
+                      className="[grid-area:1/1/2/2] invisible px-4 py-2 text-sm border whitespace-pre-wrap break-words"
+                    >
+                      {text || "Enter this version"}{" "}
+                    </div>
+                  </div>
                   {localValidationAttempted && !text.trim() && (
                     <p className="text-xs text-red-500 mt-1">
                       Version cannot be empty
@@ -4931,23 +4943,15 @@ export function AddTestDialog({
                           }`}
                         >
                           {/* Message Header - show for agent messages and tool calls */}
-                          {(message.role === "agent" ||
+                          {((message.role === "agent" && !isLabelItem) ||
                             message.role === "tool_call") && (
                             <div className="flex items-center gap-2 flex-wrap">
-                              {message.role === "agent" && isLabelItem ? (
-                                renderHeadingInput(message, "Agent")
-                              ) : (
-                                <span className="text-sm font-medium text-foreground">
-                                  {message.role === "tool_call"
-                                    ? "Agent Tool Call"
-                                    : "Agent"}
-                                </span>
-                              )}
-                              {isEvalTarget && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                                  Evaluation target
-                                </span>
-                              )}
+                              <span className="text-sm font-medium text-foreground">
+                                {message.role === "tool_call"
+                                  ? "Agent Tool Call"
+                                  : "Agent"}
+                              </span>
+                              {isEvalTarget && evalTargetPill}
                             </div>
                           )}
 
@@ -4999,6 +5003,13 @@ export function AddTestDialog({
                                     {message.role === "user" &&
                                       isLabelItem && (
                                         renderHeadingInput(message, "User")
+                                      )}
+                                    {message.role === "agent" &&
+                                      isLabelItem && (
+                                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                                          {renderHeadingInput(message, "Agent")}
+                                          {isEvalTarget && evalTargetPill}
+                                        </div>
                                       )}
                                     <textarea
                                       value={message.content}
