@@ -956,17 +956,45 @@ function AnnotateView({
   const [pendingNav, setPendingNav] = useState<number | null>(null);
   // Why the item cannot be saved, so the warning says the right thing.
   const [pendingNavReason, setPendingNavReason] = useState<
-    "unanswered" | "reasoning"
+    "unanswered" | "reasoning" | "discard"
   >("unanswered");
 
   // Every way of leaving the current item (Previous, Next, the index list)
   // routes through here. Only an item with something unsaved on it stops:
+  //   - It already had answers saved: ask whether to discard the changes, so
+  //     it is never saved without the annotator pressing Update.
   //   - It can be saved (a new, changed or removed answer, with every
   //     required evaluator answered or saved): save it before moving on,
   //     otherwise the annotator believes it is recorded while the admin sees
   //     nothing. A failed save keeps them on the item so the error is visible.
   //   - It cannot be saved yet (a required evaluator still blank, or
   //     reasoning missing): warn before leaving.
+  // Puts an item back to what is saved for it.
+  const discardChanges = (itemId: string) => {
+    const keys = evaluatorsFor(itemId).map((ev) => fieldKey(itemId, ev.uuid));
+    setFields((prev) => {
+      const next = { ...prev };
+      for (const k of keys) {
+        if (saved[k]) next[k] = saved[k];
+        else delete next[k];
+      }
+      return next;
+    });
+    setItemComments((prev) => ({
+      ...prev,
+      [itemId]: savedComments[itemId] ?? "",
+    }));
+    const drop = (prev: Set<FieldKey>) => {
+      const next = new Set(prev);
+      keys.forEach((k) => next.delete(k));
+      return next;
+    };
+    setMissingReasoningKeys(drop);
+    // Put back answers count as untouched, so they are not asked for
+    // reasoning they never had.
+    setTouchedKeys(drop);
+  };
+
   const navigateTo = async (target: number) => {
     if (target === currentIndex) return;
     // Ignore navigation while a save is in flight so a rapid second click
@@ -975,6 +1003,11 @@ function AnnotateView({
     if (!isAdmin && currentItem) {
       const uuid = currentItem.uuid;
       if (itemDirty(uuid)) {
+        if (evaluatorsFor(uuid).some((ev) => isSaved(uuid, ev))) {
+          setPendingNavReason("discard");
+          setPendingNav(target);
+          return;
+        }
         // Reasoning is missing, so this item cannot be saved. Offer the
         // leave-without-saving choice rather than refusing to move, which
         // would strand the annotator on an item they cannot finish and
@@ -1345,12 +1378,16 @@ function AnnotateView({
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold text-foreground">
-              Review incomplete
+              {pendingNavReason === "discard"
+                ? "Discard your changes?"
+                : "Review incomplete"}
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              {pendingNavReason === "reasoning"
-                ? "This sample cannot be saved yet because some labels still need reasoning. If you leave, your answers will not be saved."
-                : "This sample is not completely reviewed yet and a few questions are still unanswered. If you leave, your answers will not be saved."}
+              {pendingNavReason === "discard"
+                ? "You changed answers on this item but did not press Update. If you leave, those changes are discarded."
+                : pendingNavReason === "reasoning"
+                  ? "This sample cannot be saved yet because some labels still need reasoning. If you leave, your answers will not be saved."
+                  : "This sample is not completely reviewed yet and a few questions are still unanswered. If you leave, your answers will not be saved."}
             </p>
             <div className="mt-5 flex items-center justify-end gap-2 md:gap-3">
               <button
@@ -1364,11 +1401,15 @@ function AnnotateView({
                   if (pendingNav === null) return;
                   const target = pendingNav;
                   setPendingNav(null);
+                  if (pendingNavReason === "discard" && currentItem)
+                    discardChanges(currentItem.uuid);
                   onJumpTo(target);
                 }}
                 className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer"
               >
-                Leave without saving
+                {pendingNavReason === "discard"
+                  ? "Discard changes"
+                  : "Leave without saving"}
               </button>
             </div>
           </div>

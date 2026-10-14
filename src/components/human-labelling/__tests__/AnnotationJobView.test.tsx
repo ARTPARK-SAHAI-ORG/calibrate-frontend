@@ -961,37 +961,39 @@ describe("AnnotationJobView", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("saves a removed answer when the annotator presses Next", async () => {
+    it("asks before discarding a removed answer and puts it back on Discard", async () => {
       const user = setupUser();
       await renderJob();
       await user.click(screen.getByRole("button", { name: "Correct" }));
-      fetchMock.mockResolvedValueOnce(
-        jsonResponse({ saved: [], count: 1, status: "in_progress" }),
-      );
       await user.click(screen.getByRole("button", { name: "Next" }));
 
-      await waitFor(() =>
-        expect(screen.getByText("Item 2 of 2")).toBeInTheDocument(),
-      );
-      expect(postBody().annotations).toContainEqual({
-        evaluator_id: "ev-1",
-        value: null,
-      });
+      expect(screen.getByText("Discard your changes?")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Discard changes" }));
+
+      expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      // Back to what was saved, so item 1 is finished again.
+      expect(
+        screen.getAllByRole("button", { name: "Item 1 (completed)" }).length,
+      ).toBeGreaterThan(0);
     });
 
-    it("saves a changed answer when the annotator moves to another item", async () => {
+    it("keeps a changed answer on Stay and saves it only on Update", async () => {
       const user = setupUser();
       await renderJob();
       await user.click(screen.getByRole("button", { name: "5" }));
+      await user.click(screen.getByRole("button", { name: "Next" }));
+
+      expect(screen.getByText("Discard your changes?")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Stay" }));
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
       fetchMock.mockResolvedValueOnce(
         jsonResponse({ saved: [], count: 2, status: "in_progress" }),
       );
-      await user.click(screen.getByRole("button", { name: "Next" }));
-
-      await waitFor(() =>
-        expect(screen.getByText("Item 2 of 2")).toBeInTheDocument(),
-      );
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      await user.click(screen.getByRole("button", { name: "Update" }));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
       expect(postBody().annotations).toContainEqual({
         evaluator_id: "ev-2",
         value: { value: 5 },
@@ -1434,7 +1436,7 @@ describe("AnnotationJobView", () => {
       expect(screen.getByText("Quality")).toBeInTheDocument();
     });
 
-    it("saves an optional answer added to a row that was already submitted", async () => {
+    it("asks before leaving an optional answer added to a row that was already submitted", async () => {
       const user = setupUser();
       fetchMock.mockResolvedValueOnce(
         jsonResponse(
@@ -1457,24 +1459,17 @@ describe("AnnotationJobView", () => {
 
       // Item 1 is already saved with only its required evaluator answered,
       // so the view opens on item 2. Go back to item 1, answer the optional
-      // evaluator there, and move on: that answer must be saved.
+      // evaluator there, and move on: the annotator is asked, so the new
+      // answer is never dropped without them knowing.
       await user.click(screen.getAllByLabelText(/^Item 1/)[0]);
       await waitFor(() =>
         expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
       );
       await user.click(screen.getByRole("button", { name: "3" }));
-      fetchMock.mockResolvedValueOnce(
-        jsonResponse({ saved: ["ev-1", "ev-2"], count: 2, status: "pending" }),
-      );
       await user.click(screen.getAllByLabelText(/^Item 2/)[0]);
 
-      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-      const body = JSON.parse(fetchMock.mock.calls[1][1].body);
-      expect(body.item_id).toBe(items[0].uuid);
-      expect(body.annotations).toContainEqual({
-        evaluator_id: "ev-2",
-        value: { value: 3 },
-      });
+      expect(screen.getByText("Discard your changes?")).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
     it("does not mark rows finished before anything is saved when every evaluator is optional", async () => {
