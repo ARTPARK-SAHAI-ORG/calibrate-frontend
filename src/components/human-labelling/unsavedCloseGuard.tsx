@@ -24,6 +24,8 @@ type UnsavedCloseGuardOptions = {
   onNext?: () => void;
   hasPrev?: boolean;
   hasNext?: boolean;
+  // Leave the edit window for the item view window. Asks the same question.
+  onView?: () => void;
 };
 
 /** Previous / next for an edit window opened on one item. Leave them out
@@ -33,6 +35,8 @@ export type ItemStepProps = {
   onNext?: () => void;
   hasPrev?: boolean;
   hasNext?: boolean;
+  /** Opens the same item in the item view window. */
+  onView?: () => void;
   /** Place of the open item in the whole task, for "3 of 41". */
   position?: { index: number; total: number };
 };
@@ -55,6 +59,7 @@ export function useUnsavedCloseGuard({
   onNext,
   hasPrev,
   hasNext,
+  onView,
 }: UnsavedCloseGuardOptions) {
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   // What Discard does when the question was raised by stepping rather than
@@ -105,6 +110,7 @@ export function useUnsavedCloseGuard({
   };
   const navPrev = onPrev ? () => attemptStep(onPrev) : undefined;
   const navNext = onNext ? () => attemptStep(onNext) : undefined;
+  const navView = onView ? () => attemptStep(onView) : undefined;
 
   // No Escape: the window holds edits that have not been saved.
   useDialogNavKeys({
@@ -131,7 +137,28 @@ export function useUnsavedCloseGuard({
     handleBackdropClick,
     navPrev,
     navNext,
+    navView,
   };
+}
+
+/** The button that leaves an edit window for the item view window. */
+export function ViewItemButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="h-8 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      Preview
+    </button>
+  );
 }
 
 /**

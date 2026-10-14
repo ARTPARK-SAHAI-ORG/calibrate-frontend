@@ -1,5 +1,6 @@
 ## October 2026
 
+- The edit window for a labelling item now has a View item button that opens the item view, and it asks before discarding any unsaved changes ([#696](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/696))
 - Labelling items now show a message's heading and its other versions, such as a translation or a rewrite, and you can edit the heading and each version's name and text ([#683](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/683))
 - You can now step to the previous or next item while editing an item in a labelling task, using arrows or the left and right arrow keys, and you are asked before losing unsaved changes ([#691](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/691))
 - The rating an annotator picks in the labelling job editor now shows green at the top of the scale, red at the bottom and amber in between, the same as the read-only view ([#688](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/688))

@@ -21,6 +21,7 @@ import {
   matchesDefaultSlug,
 } from "@/lib/defaultEvaluators";
 import { DialogNavRow, showsDialogNav } from "@/components/ui";
+import { ViewItemButton } from "@/components/human-labelling/unsavedCloseGuard";
 import {
   MetadataFieldsEditor,
   metadataRowErrors,
@@ -819,6 +820,9 @@ type AddTestDialogProps = {
   hasPrev?: boolean;
   hasNext?: boolean;
   position?: { index: number; total: number };
+  /** Opens the same item in the item view window, behind the same discard
+   * prompt. No button when left out. */
+  onView?: () => void;
 };
 
 export function AddTestDialog({
@@ -856,6 +860,7 @@ export function AddTestDialog({
   hasPrev,
   hasNext,
   position,
+  onView,
 }: AddTestDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
@@ -3517,6 +3522,7 @@ export function AddTestDialog({
   // does, so both go through the same prompt.
   const navPrev = onPrev ? () => confirmDiscard(onPrev) : undefined;
   const navNext = onNext ? () => confirmDiscard(onNext) : undefined;
+  const navView = onView ? () => confirmDiscard(onView) : undefined;
 
   // Whether the stepping row is drawn, which is what the close button above
   // it is centred on. The row itself is desktop only, so below that width the
@@ -4296,6 +4302,19 @@ export function AddTestDialog({
               />
             </svg>
           </button>
+
+          {navView && (
+            <div
+              className={`absolute ${
+                stepsBetweenTests ? "top-2.5 md:top-2" : "top-2.5 md:top-3"
+              } right-12 z-20`}
+            >
+              <ViewItemButton
+                onClick={navView}
+                disabled={isCreating || isLoading}
+              />
+            </div>
+          )}
 
           {/* Previous / next test: a thin row of its own across the top, so
               nothing sits on the information banner below it. The close

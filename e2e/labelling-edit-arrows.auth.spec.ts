@@ -50,7 +50,7 @@ async function api<T>(
   return (await res.json()) as T;
 }
 
-type Evaluator = { uuid: string; evaluator_type?: string };
+type Evaluator = { uuid: string; name: string; evaluator_type?: string };
 
 async function evaluatorOfType(
   request: APIRequestContext,
@@ -71,7 +71,7 @@ async function seedTask(
   request: APIRequestContext,
   type: "stt" | "llm",
   names: string[],
-): Promise<string> {
+): Promise<{ uuid: string; evaluatorName: string }> {
   const evaluator = await evaluatorOfType(request, type);
   const task = await api<{ uuid: string }>(request, "/annotation-tasks", {
     method: "POST",
@@ -100,7 +100,7 @@ async function seedTask(
       })),
     },
   });
-  return task.uuid;
+  return { uuid: task.uuid, evaluatorName: evaluator.name };
 }
 
 /**
@@ -140,33 +140,58 @@ async function stepsBothWays(
   nameField: Locator,
   first: string,
   other: string,
-  /** Address the window reads while it loads, if any. Until it has
-   * loaded, the window does not know what it started with and asks
-   * before every step, so the test waits for it like a person would. */
-  loadsFrom?: string,
+  /** Something the window shows once it has loaded, if it loads at all.
+   * Until then it does not know what it started with and asks before
+   * every step, so the test waits for it like a person would. */
+  loadedWhen?: Locator,
 ): Promise<void> {
   await expect(page.getByText("1 of 2", { exact: true })).toBeVisible();
-  const loaded = loadsFrom
-    ? page.waitForResponse((r) => r.url().includes(loadsFrom))
-    : Promise.resolve();
   await page.getByRole("button", { name: "Next item", exact: true }).click();
-  await loaded;
+  if (loadedWhen) await expect(loadedWhen).toBeVisible({ timeout: 15000 });
   await expect(nameField).toHaveValue(other, { timeout: 15000 });
   await expect(page.getByText("2 of 2", { exact: true })).toBeVisible();
 
   await pressOffField(page, "ArrowLeft");
   await expect(nameField).toHaveValue(first, { timeout: 15000 });
+  if (loadedWhen) await expect(loadedWhen).toBeVisible({ timeout: 15000 });
   await expect(page.getByText("1 of 2", { exact: true })).toBeVisible();
+}
+
+/** Preview leaves the edit window for the item view window, on the same
+ * item. */
+async function viewsTheItem(
+  page: Page,
+  nameField: Locator,
+  name: string,
+): Promise<void> {
+  await page.getByRole("button", { name: "Preview", exact: true }).click();
+  await expect(nameField).toHaveCount(0);
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible({
+    timeout: 15000,
+  });
 }
 
 test.describe("Labelling item edit window: previous / next (authenticated, real backend)", () => {
   let taskUuid: string | null = null;
+  // React's own warnings land in the browser console. Any of them on this
+  // page fails the test (two edit windows sharing a key slipped through once).
+  let consoleErrors: string[] = [];
+
+  test.beforeEach(async ({ page }) => {
+    consoleErrors = [];
+    page.on("console", (m) => {
+      if (m.type() === "error" && m.text().includes("same key")) {
+        consoleErrors.push(m.text());
+      }
+    });
+  });
 
   test.afterEach(async ({ request }) => {
     if (taskUuid) {
       await api(request, `/annotation-tasks/${taskUuid}`, { method: "DELETE" });
       taskUuid = null;
     }
+    expect(consoleErrors).toEqual([]);
   });
 
   test("a speech-to-text item steps to the next item, and asks first when edited", async ({
@@ -175,7 +200,7 @@ test.describe("Labelling item edit window: previous / next (authenticated, real 
   }) => {
     test.setTimeout(120_000);
     const names = ["Arrows clip one", "Arrows clip two"];
-    taskUuid = await seedTask(request, "stt", names);
+    taskUuid = (await seedTask(request, "stt", names)).uuid;
 
     const { nameField, first, other } = await openFirstItemEdit(
       page,
@@ -193,6 +218,8 @@ test.describe("Labelling item edit window: previous / next (authenticated, real 
     await page.getByRole("button", { name: "Discard", exact: true }).click();
     await expect(nameField).toHaveValue(other, { timeout: 15000 });
     await expect(page.getByText("2 of 2", { exact: true })).toBeVisible();
+
+    await viewsTheItem(page, nameField, other);
   });
 
   test("a next-reply item steps to the next item and back", async ({
@@ -201,7 +228,8 @@ test.describe("Labelling item edit window: previous / next (authenticated, real 
   }) => {
     test.setTimeout(120_000);
     const names = ["Arrows reply one", "Arrows reply two"];
-    taskUuid = await seedTask(request, "llm", names);
+    const seeded = await seedTask(request, "llm", names);
+    taskUuid = seeded.uuid;
 
     const { nameField, first, other } = await openFirstItemEdit(
       page,
@@ -209,6 +237,15 @@ test.describe("Labelling item edit window: previous / next (authenticated, real 
       names,
       "Your item name",
     );
-    await stepsBothWays(page, nameField, first, other, "/evaluators?include_defaults=true");
+    await stepsBothWays(
+      page,
+      nameField,
+      first,
+      other,
+      page
+        .getByTestId("label-item-evaluators-column")
+        .getByText(seeded.evaluatorName, { exact: true }),
+    );
+    await viewsTheItem(page, nameField, first);
   });
 });
