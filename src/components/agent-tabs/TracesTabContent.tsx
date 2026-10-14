@@ -59,6 +59,7 @@ import {
   fetchTraces,
   type TraceUsage,
   type TraceDetail,
+  traceLabellingMetadata,
   type TraceSummary,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
@@ -341,6 +342,7 @@ export function TracesTabContent({
               ? trace.input
               : (trace.input ?? []).filter((turn) => turn.role !== "system"),
           output: trace.output,
+          metadata: traceLabellingMetadata(trace),
         })),
       );
     } finally {
