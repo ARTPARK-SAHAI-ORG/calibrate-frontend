@@ -340,5 +340,28 @@ describe("getToolParams", () => {
       await user.click(screen.getByRole("button", { name: "Save missing" }));
       expect(onOuterClick).not.toHaveBeenCalled();
     });
+
+    it("keeps key presses after opening from reaching the page behind", async () => {
+      const user = setupUser();
+      const onWindowKey = jest.fn();
+      window.addEventListener("keydown", onWindowKey);
+      render(
+        <ToolPicker
+          availableTools={CUSTOM_TOOLS}
+          isLoading={false}
+          onSelectInbuiltTool={jest.fn()}
+          onSelectCustomTool={jest.fn()}
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Open Webhook Tool" }),
+      );
+      // Right after opening, and after a click on an empty part of the panel.
+      await user.keyboard("{ArrowRight}");
+      await user.click(screen.getByTestId("tool-panel"));
+      await user.keyboard("{ArrowLeft}");
+      window.removeEventListener("keydown", onWindowKey);
+      expect(onWindowKey).not.toHaveBeenCalled();
+    });
   });
 });

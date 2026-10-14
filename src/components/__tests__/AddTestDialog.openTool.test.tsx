@@ -153,7 +153,7 @@ it("renames a tool loaded from a saved test", async () => {
   await waitFor(() =>
     expect(screen.getByText("get_weather")).toBeInTheDocument(),
   );
-  // Opened from the Open button on the tool call's card.
+  // Opened from the Open button on the Tools to test card.
   await openAndRename(user);
 
   await waitFor(() =>

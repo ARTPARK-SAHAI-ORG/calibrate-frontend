@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AddToolDialog, ToolData } from "@/components/AddToolDialog";
 import { Tooltip } from "@/components/Tooltip";
@@ -29,6 +29,17 @@ export function OpenToolButton({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Keep key presses inside the panel from the moment it opens, so the arrow
+  // keys and Escape that the dialog behind it listens for cannot step to
+  // another item or close the tool list, which would close the panel.
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (open && panel && !panel.contains(document.activeElement)) {
+      panel.focus();
+    }
+  }, [open]);
 
   return (
     <>
@@ -61,8 +72,12 @@ export function OpenToolButton({
       {open &&
         createPortal(
           <div
+            ref={panelRef}
             data-tool-side-panel
-            className="relative z-[300]"
+            // Focusable, so a click on an empty part of the panel keeps the
+            // key presses that follow inside it.
+            tabIndex={-1}
+            className="relative z-[300] outline-none"
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
