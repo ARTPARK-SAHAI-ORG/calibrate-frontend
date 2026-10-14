@@ -952,7 +952,8 @@ function AnnotateView({
   };
 
   // Target index the annotator is trying to reach while the current item has
-  // partial, un-saveable progress. Non-null shows the confirmation overlay.
+  // changes that will not be saved on the way out. Non-null shows the
+  // confirmation overlay.
   const [pendingNav, setPendingNav] = useState<number | null>(null);
   // Why the item cannot be saved, so the warning says the right thing.
   const [pendingNavReason, setPendingNavReason] = useState<
@@ -1384,7 +1385,7 @@ function AnnotateView({
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
               {pendingNavReason === "discard"
-                ? "You changed answers on this item but did not press Update. If you leave, those changes are discarded."
+                ? "You made changes to this item but did not press Update. If you leave, those changes are discarded."
                 : pendingNavReason === "reasoning"
                   ? "This sample cannot be saved yet because some labels still need reasoning. If you leave, your answers will not be saved."
                   : "This sample is not completely reviewed yet and a few questions are still unanswered. If you leave, your answers will not be saved."}

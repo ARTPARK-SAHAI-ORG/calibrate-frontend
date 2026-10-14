@@ -978,6 +978,28 @@ describe("AnnotationJobView", () => {
       ).toBeGreaterThan(0);
     });
 
+    it("does not ask for reasoning on answers put back by Discard", async () => {
+      const user = setupUser();
+      await renderJob({
+        job: { ...jobResponse().job, reasoning_mode: "required" },
+      });
+      await user.click(screen.getByRole("button", { name: "5" }));
+      await user.click(screen.getByRole("button", { name: "Next" }));
+      await user.click(screen.getByRole("button", { name: "Discard changes" }));
+      await user.click(screen.getByRole("button", { name: "Previous" }));
+      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: [], count: 2, status: "in_progress" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Update" }));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(postBody().annotations).toContainEqual({
+        evaluator_id: "ev-2",
+        value: { value: 3 },
+      });
+    });
+
     it("keeps a changed answer on Stay and saves it only on Update", async () => {
       const user = setupUser();
       await renderJob();
