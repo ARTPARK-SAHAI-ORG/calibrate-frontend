@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import {
   useEnabledProviders,
   isProviderEnabled,
@@ -135,5 +135,30 @@ describe("useEnabledProviders", () => {
     renderHook(() => useEnabledProviders());
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     localStorage.removeItem(ACTIVE_ORG_UUID_KEY);
+  });
+  it("re-reads the list in a mounted hook when the stored list is cleared", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(providersResponse({ providers: ["openai"] }))
+      .mockResolvedValueOnce(
+        providersResponse({ providers: ["openai", "deepgram"] }),
+      ) as unknown as typeof fetch;
+
+    const { result, unmount } = renderHook(() => useEnabledProviders());
+    await waitFor(() => expect(result.current).not.toBeNull());
+    expect([...(result.current as Set<string>)]).toEqual(["openai"]);
+
+    act(() => clearEnabledProvidersCache());
+    await waitFor(() =>
+      expect([...(result.current as Set<string>)].sort()).toEqual([
+        "deepgram",
+        "openai",
+      ]),
+    );
+    expect(global.fetch as jest.Mock).toHaveBeenCalledTimes(2);
+
+    unmount();
+    clearEnabledProvidersCache();
+    expect(global.fetch as jest.Mock).toHaveBeenCalledTimes(2);
   });
 });

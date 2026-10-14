@@ -7,6 +7,7 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ExternalLinkIcon, SpinnerIcon } from "@/components/icons";
 import { Tooltip } from "@/components/Tooltip";
+import { KeyField } from "./KeyField";
 import { LoadingState } from "@/components/ui/LoadingState";
 import {
   getErrorStatusCode,
@@ -152,15 +153,6 @@ function ProviderKeyRow({
   };
 
   const isJson = provider.id === "google";
-  const onChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    setValue(e.target.value);
-    setError(null);
-  };
-  const borderClass = error
-    ? "border-red-500/60 focus:ring-red-500/20"
-    : "border-border focus:ring-foreground/10";
 
   const handleSave = () => {
     if (!value.trim() || isSaving) return;
@@ -196,36 +188,20 @@ function ProviderKeyRow({
           <div
             className={`flex flex-col sm:flex-row gap-2 ${isJson ? "sm:items-start" : "sm:items-center"}`}
           >
-            {isJson ? (
-              <textarea
-                id={inputId}
-                value={value}
-                rows={6}
-                placeholder="Paste your service account JSON"
-                spellCheck={false}
-                onChange={onChange}
-                aria-invalid={!!error}
-                aria-describedby={error ? errorId : undefined}
-                disabled={isSaving}
-                className={`flex-1 px-3 py-2 rounded-md border bg-background text-sm font-mono text-foreground placeholder:font-sans placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${borderClass}`}
-              />
-            ) : (
-              <input
-                id={inputId}
-                type="password"
-                value={value}
-                placeholder={`Paste your ${provider.name} API key`}
-                autoComplete="off"
-                onChange={onChange}
-                aria-invalid={!!error}
-                aria-describedby={error ? errorId : undefined}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSave();
-                }}
-                disabled={isSaving}
-                className={`flex-1 h-10 px-3 rounded-md border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 disabled:opacity-50 ${borderClass}`}
-              />
-            )}
+            <KeyField
+              id={inputId}
+              name={provider.name}
+              value={value}
+              onChange={(v) => {
+                setValue(v);
+                setError(null);
+              }}
+              onEnter={handleSave}
+              multiline={isJson}
+              disabled={isSaving}
+              error={!!error}
+              errorId={errorId}
+            />
             <button
               type="button"
               onClick={handleSave}

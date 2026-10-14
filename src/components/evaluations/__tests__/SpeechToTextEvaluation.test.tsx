@@ -1,16 +1,18 @@
 import React from "react";
-import { render, screen, setupUser, waitFor, act } from "@/test-utils";
+import {
+  render,
+  screen,
+  setupUser,
+  waitFor,
+  act,
+  fireEvent,
+} from "@/test-utils";
 import { useRouter } from "next/navigation";
 import { SpeechToTextEvaluation } from "../SpeechToTextEvaluation";
 
 // ─── Hooks ──────────────────────────────────────────────────────────────────
 let mockEnabledProviders: Set<string> | null = null;
 jest.mock("../../../hooks", () => ({
-  useProviderKeys: () => ({
-    keys: [],
-    usesOwnKeys: true,
-    saveProviderKey: jest.fn(),
-  }),
   useAccessToken: () => "test-token",
   useMaxRowsPerEval: () => 20,
   useEnabledProviders: () => mockEnabledProviders,
@@ -20,6 +22,57 @@ jest.mock("../../../hooks", () => ({
   useOpenRouterModels: () => ({ providers: [], isLoading: false }),
   findModelInProviders: () => null,
 }));
+
+// ─── Missing provider keys ─────────────────────────────────────────────────
+let mockUsesOwnKeys = false;
+let mockMissingKeys = new Set<string>();
+let mockKeyErrors: Record<string, string | undefined> = {};
+const mockSaveMissingKeys = jest.fn();
+jest.mock("../../workspace/MissingProviderKeys", () => {
+  const { useState } = jest.requireActual<typeof import("react")>("react");
+  return {
+    useMissingProviderKeys: () => {
+      const [values, setValues] = useState<Record<string, string>>({});
+      return {
+        usesOwnKeys: mockUsesOwnKeys,
+        isMissingKey: (p: string) => mockMissingKeys.has(p),
+        values,
+        errors: mockKeyErrors,
+        setValue: (p: string, v: string) =>
+          setValues((prev) => ({ ...prev, [p]: v })),
+        saveMissingKeys: (...args: unknown[]) => mockSaveMissingKeys(...args),
+        isSaving: false,
+        isSavingKey: () => false,
+      };
+    },
+    NoKeyBadge: () => <span>API key needed</span>,
+    ProviderKeyInput: ({
+      name,
+      value,
+      error,
+      onChange,
+      onSave,
+    }: {
+      name: string;
+      value: string;
+      error?: string;
+      onChange: (v: string) => void;
+      onSave: () => void;
+    }) => (
+      <div>
+        <input
+          aria-label={`${name} API key`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <button type="button" onClick={onSave}>
+          {`Save the ${name} key`}
+        </button>
+        {error && <p role="alert">{error}</p>}
+      </div>
+    ),
+  };
+});
 
 // ─── reportError ────────────────────────────────────────────────────────────
 const mockReportError = jest.fn();
@@ -144,6 +197,10 @@ const mockEvaluatorsResponse = (
 beforeEach(() => {
   jest.clearAllMocks();
   mockEnabledProviders = null;
+  mockUsesOwnKeys = false;
+  mockMissingKeys = new Set();
+  mockKeyErrors = {};
+  mockSaveMissingKeys.mockResolvedValue(true);
   mockListDatasets.mockResolvedValue([]);
   editorHandleMock = {
     validate: jest.fn().mockReturnValue(true),
@@ -210,23 +267,6 @@ describe("SpeechToTextEvaluation", () => {
     );
   });
 
-  it("does not mention keys while every provider is available", async () => {
-    render(<SpeechToTextEvaluation initialDatasetId="ds-1" />);
-    expect(
-      screen.queryByText(/add an API key for at least one of these providers/),
-    ).not.toBeInTheDocument();
-  });
-
-  it("explains an empty provider list when only non-speech keys exist", async () => {
-    mockEnabledProviders = new Set(["openrouter"]);
-    render(<SpeechToTextEvaluation initialDatasetId="ds-1" />);
-    expect(
-      screen.getByText(
-        /To run a speech-to-text evaluation, add an API key for at least one of these providers/,
-      ),
-    ).toBeInTheDocument();
-  });
-
   it("does not show select all as ticked when no provider is listed", async () => {
     mockEnabledProviders = new Set(["openrouter"]);
     const user = setupUser();
@@ -239,21 +279,6 @@ describe("SpeechToTextEvaluation", () => {
       expect(box.className).not.toContain("bg-foreground border-foreground");
       expect(box.querySelector("svg")).toBeNull();
     }
-  });
-
-  it("says no key supports the chosen language when the keys cover other languages", async () => {
-    mockEnabledProviders = new Set(["deepgram"]);
-    const user = setupUser();
-    render(<SpeechToTextEvaluation />);
-    await user.click(screen.getByText("Evaluators"));
-    expect(screen.queryByText(/provider key/)).not.toBeInTheDocument();
-
-    await user.selectOptions(screen.getByRole("combobox"), "odia");
-    expect(
-      screen.getByText(
-        "None of this workspace's speech-to-text provider keys support Odia. Add a key for a provider that does in Workspace settings, under Bring your own keys (BYOK)",
-      ),
-    ).toBeInTheDocument();
   });
 
   it("selects and clears every provider from the table header and the mobile row", async () => {
@@ -519,6 +544,141 @@ describe("SpeechToTextEvaluation", () => {
       expect(calledUrls.some((u: string) => u.includes("/stt/evaluate"))).toBe(
         true,
       );
+    });
+  });
+
+  describe("on the workspace's own keys", () => {
+    beforeEach(() => {
+      mockUsesOwnKeys = true;
+      // The workspace only has a key for OpenAI.
+      mockEnabledProviders = new Set(["openai"]);
+      mockMissingKeys = new Set(["deepgram"]);
+    });
+
+    async function pickSavedDataset(user: ReturnType<typeof setupUser>) {
+      await user.click(screen.getByText("Dataset"));
+      await user.click(screen.getByText("Use existing dataset"));
+      await waitFor(() => screen.getByTestId("dataset-picker"));
+      await user.click(screen.getByTestId("pick-ds-1"));
+    }
+
+    it("lists a provider with no key and marks it", async () => {
+      const user = setupUser();
+      render(<SpeechToTextEvaluation />);
+      await user.click(screen.getByText("Evaluators"));
+      const deepgramRow = screen.getAllByText("Deepgram")[0].closest("tr")!;
+      expect(deepgramRow).toHaveTextContent("API key needed");
+      const openaiRow = screen.getAllByText("OpenAI")[0].closest("tr")!;
+      expect(openaiRow).not.toHaveTextContent("API key needed");
+    });
+
+    it("shows the key field once a provider with no key is selected", async () => {
+      const user = setupUser();
+      render(<SpeechToTextEvaluation />);
+      await user.click(screen.getByText("Evaluators"));
+      expect(screen.queryAllByLabelText("Deepgram API key")).toHaveLength(0);
+
+      await selectProvider(user, "Deepgram");
+
+      expect(
+        screen.getAllByLabelText("Deepgram API key").length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("saves the key from either copy of the field without unselecting the provider", async () => {
+      mockSaveMissingKeys.mockResolvedValue(true);
+      const user = setupUser();
+      render(<SpeechToTextEvaluation />);
+      await user.click(screen.getByText("Evaluators"));
+      // Opening the provider's website does not select it.
+      for (const link of screen.getAllByRole("link", {
+        name: "Visit Deepgram website",
+      }))
+        fireEvent.click(link);
+      expect(screen.queryAllByLabelText("Deepgram API key")).toHaveLength(0);
+      await selectProvider(user, "Deepgram");
+
+      const fields = screen.getAllByLabelText("Deepgram API key");
+      const saves = screen.getAllByRole("button", {
+        name: "Save the Deepgram key",
+      });
+      expect(fields).toHaveLength(2);
+      for (const field of fields) await user.type(field, "k");
+      for (const save of saves) await user.click(save);
+
+      expect(mockSaveMissingKeys).toHaveBeenCalledTimes(2);
+      expect(mockSaveMissingKeys).toHaveBeenNthCalledWith(1, ["deepgram"]);
+      expect(mockSaveMissingKeys).toHaveBeenNthCalledWith(2, ["deepgram"]);
+      expect(screen.getAllByLabelText("Deepgram API key")).toHaveLength(2);
+    });
+
+    it("does not start the run when the key could not be saved", async () => {
+      mockListDatasets.mockResolvedValue([
+        { uuid: "ds-1", name: "Small Dataset", item_count: 5 },
+      ]);
+      mockSaveMissingKeys.mockImplementation(async () => {
+        mockKeyErrors = { deepgram: "Paste a key for this provider" };
+        return false;
+      });
+      const user = setupUser();
+      const evaluateRef = { current: null as (() => void) | null };
+      render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
+      await user.click(screen.getByText("Evaluators"));
+      await selectProvider(user, "Deepgram");
+      await pickSavedDataset(user);
+
+      await act(async () => {
+        evaluateRef.current?.();
+      });
+
+      expect(mockSaveMissingKeys).toHaveBeenCalledWith(["deepgram"]);
+      // Back on the providers tab, where the key field shows the reason.
+      expect(screen.getByText("Language")).toBeInTheDocument();
+      expect(
+        screen.getAllByText("Paste a key for this provider").length,
+      ).toBeGreaterThan(0);
+      const calledUrls = (global.fetch as jest.Mock).mock.calls.map(
+        (c) => c[0],
+      );
+      expect(calledUrls.some((u: string) => u.includes("/stt/evaluate"))).toBe(
+        false,
+      );
+    });
+
+    it("starts the run once the key is saved", async () => {
+      mockListDatasets.mockResolvedValue([
+        { uuid: "ds-1", name: "Small Dataset", item_count: 5 },
+      ]);
+      const user = setupUser();
+      const evaluateRef = { current: null as (() => void) | null };
+      render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
+      await user.click(screen.getByText("Evaluators"));
+      await selectProvider(user, "Deepgram");
+      await user.type(
+        screen.getAllByLabelText("Deepgram API key")[0],
+        "dg-key",
+      );
+      await pickSavedDataset(user);
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ task_id: "task-ok", status: "queued" }),
+      });
+
+      await act(async () => {
+        evaluateRef.current?.();
+      });
+
+      expect(mockSaveMissingKeys).toHaveBeenCalledWith(["deepgram"]);
+      await waitFor(() => {
+        const calledUrls = (global.fetch as jest.Mock).mock.calls.map(
+          (c) => c[0],
+        );
+        expect(
+          calledUrls.some((u: string) => u.includes("/stt/evaluate")),
+        ).toBe(true);
+      });
     });
   });
 
