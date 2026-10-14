@@ -1,5 +1,6 @@
 ## October 2026
 
+- Exporting the results of a speech-to-text run, or its shared link, now downloads a zip with the results file and the audio clips, and the results file has a new column naming each row's clip ([#723](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/723))
 - A workspace using its own provider keys can now see every speech provider that supports the language on the Speech-to-Text and Text-to-Speech pages and add a missing key right there before running an evaluation ([#717](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/717))
 - A workspace can now add its own AI provider keys in workspace settings, so its runs use those keys and are no longer held to the usual limits on rows, traces, personas, scenarios and text length ([#694](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/694))
 - You can now open a tool from the tool list when adding a tool call to a test or a labelling item, edit it in the side panel, and see the tool calls already in the form pick up the changes ([#712](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/712))
