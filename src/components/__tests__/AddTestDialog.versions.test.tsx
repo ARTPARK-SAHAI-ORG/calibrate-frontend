@@ -606,7 +606,7 @@ describe("AddTestDialog labelling item headings and versions", () => {
     const first = screen.getAllByLabelText("Version name")[0];
     await user.clear(first);
     await user.type(first, "Hinglish");
-    expect(screen.getByText("Another version already has this name")).toBeInTheDocument();
+    expect(screen.getByText("The heading or another version already has this name")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirm version name" })).toBeDisabled();
     await user.keyboard("{Enter}");
     expect(screen.queryByText(/on all agent messages\?/)).not.toBeInTheDocument();
@@ -694,5 +694,25 @@ describe("AddTestDialog arrow keys behind the role question", () => {
     ).toBeInTheDocument();
     fireEvent.keyDown(document.body, { key: "ArrowRight" });
     expect(onNext).not.toHaveBeenCalled();
+  });
+});
+
+describe("AddTestDialog heading and version names stay apart", () => {
+  it("refuses a heading that a version of that role already uses", async () => {
+    const user = setupUser();
+    renderDialog();
+    await waitForHistory();
+    const [first] = agentHeadings();
+    await user.clear(first);
+    await user.type(first, "Hinglish{Enter}");
+    expect(
+      screen.getByText("The heading or another version already has this name"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Confirm heading" }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByText('Use "Hinglish" on all agent messages?'),
+    ).not.toBeInTheDocument();
   });
 });

@@ -6,6 +6,9 @@ import { Tooltip } from "@/components/Tooltip";
 import type { TurnExtras } from "@/lib/messageVersions";
 import { TEXT_FIELD_COLOR_CLASS } from "@/components/test-results/shared";
 
+export const TAKEN_MESSAGE =
+  "The heading or another version already has this name";
+
 const NAME_INPUT_CLASS =
   "h-7 pl-4 pr-2 rounded-md border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground";
 
@@ -104,7 +107,9 @@ export function TextVersionsEditor({
   const setDraft = (key: string, value: string) =>
     setDrafts((d) => ({ ...d, [key]: value }));
   const dropDraft = (key: string) =>
-    setDrafts((d) => Object.fromEntries(Object.entries(d).filter(([k]) => k !== key)));
+    setDrafts((d) =>
+      Object.fromEntries(Object.entries(d).filter(([k]) => k !== key)),
+    );
 
   const versions = extras.versions ?? {};
   const withVersions = (next: Record<string, string>): TurnExtras => ({
@@ -116,8 +121,10 @@ export function TextVersionsEditor({
   const headingDraft = drafts.heading;
   const headingDirty =
     headingDraft !== undefined && headingDraft.trim() !== label;
+  const headingTaken =
+    headingDirty && Object.hasOwn(versions, headingDraft.trim());
   const confirmHeading = () => {
-    if (headingDraft === undefined) return;
+    if (headingDraft === undefined || headingTaken) return;
     dropDraft("heading");
     const to = headingDraft.trim();
     if (to === label) return;
@@ -128,7 +135,7 @@ export function TextVersionsEditor({
   };
 
   const nameTaken = (from: string, to: string) =>
-    to !== from && Object.hasOwn(versions, to);
+    to !== from && (Object.hasOwn(versions, to) || (!!to && to === label));
   const confirmName = (from: string) => {
     const key = `version:${from}`;
     const draft = drafts[key];
@@ -140,7 +147,10 @@ export function TextVersionsEditor({
     onChange(
       withVersions(
         Object.fromEntries(
-          Object.entries(versions).map(([k, text]) => [k === from ? to : k, text]),
+          Object.entries(versions).map(([k, text]) => [
+            k === from ? to : k,
+            text,
+          ]),
         ),
       ),
     );
@@ -165,7 +175,8 @@ export function TextVersionsEditor({
           disabled={disabled}
           onChange={(e) => setDraft("heading", e.target.value)}
           onBlur={() => {
-            if (headingDraft !== undefined && !headingDirty) dropDraft("heading");
+            if (headingDraft !== undefined && !headingDirty)
+              dropDraft("heading");
           }}
           onKeyDown={onKey(confirmHeading, () => dropDraft("heading"))}
           className={`${NAME_INPUT_CLASS} ${TEXT_FIELD_COLOR_CLASS[field]} flex-1 min-w-0 text-sm font-medium`}
@@ -175,9 +186,13 @@ export function TextVersionsEditor({
             what="heading"
             onConfirm={confirmHeading}
             onCancel={() => dropDraft("heading")}
+            canConfirm={!headingTaken}
           />
         )}
       </div>
+      {headingTaken && (
+        <p className="text-xs text-red-500 px-4 -mt-1 mb-3">{TAKEN_MESSAGE}</p>
+      )}
 
       {children}
 
@@ -227,9 +242,7 @@ export function TextVersionsEditor({
                   </Tooltip>
                 </div>
                 {taken && (
-                  <p className="text-xs text-red-500 px-4">
-                    Another version already has this name
-                  </p>
+                  <p className="text-xs text-red-500 px-4">{TAKEN_MESSAGE}</p>
                 )}
                 <textarea
                   value={text}
@@ -238,7 +251,9 @@ export function TextVersionsEditor({
                   disabled={disabled}
                   placeholder="Enter this version"
                   onChange={(e) =>
-                    onChange(withVersions({ ...versions, [name]: e.target.value }))
+                    onChange(
+                      withVersions({ ...versions, [name]: e.target.value }),
+                    )
                   }
                   className={`w-full px-4 py-3 rounded-lg text-base text-foreground placeholder:text-muted-foreground border border-dashed bg-muted/30 focus:outline-none focus:ring-2 resize-y disabled:opacity-50 ${
                     text.trim()
@@ -247,7 +262,9 @@ export function TextVersionsEditor({
                   }`}
                 />
                 {!text.trim() && (
-                  <p className="text-xs text-red-500">Version cannot be empty</p>
+                  <p className="text-xs text-red-500">
+                    Version cannot be empty
+                  </p>
                 )}
               </div>
             );
@@ -282,7 +299,9 @@ export function TextVersionsEditor({
                   onChange(
                     withVersions(
                       Object.fromEntries(
-                        Object.entries(versions).filter(([k]) => k !== toRemove),
+                        Object.entries(versions).filter(
+                          ([k]) => k !== toRemove,
+                        ),
                       ),
                     ),
                   );

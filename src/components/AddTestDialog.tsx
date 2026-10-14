@@ -49,7 +49,10 @@ import {
 } from "@/components/CustomFieldsEditor";
 import { RobotIcon, ToolIcon } from "@/components/icons";
 import { CloseIcon } from "@/components/icons";
-import { ConfirmCancel } from "@/components/human-labelling/TextVersionsEditor";
+import {
+  ConfirmCancel,
+  TAKEN_MESSAGE,
+} from "@/components/human-labelling/TextVersionsEditor";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { sampleTest } from "@/lib/testSamples";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
@@ -1638,6 +1641,14 @@ export function AddTestDialog({
   const versionNameTaken = (message: ChatMessage, from: string, to: string) =>
     to !== from &&
     chatMessages.some(
+      (m) =>
+        m.role === message.role &&
+        (Object.hasOwn(m.versions ?? {}, to) || (!!to && m.label === to)),
+    );
+
+  const headingTaken = (message: ChatMessage, to: string) =>
+    !!to &&
+    chatMessages.some(
       (m) => m.role === message.role && Object.hasOwn(m.versions ?? {}, to),
     );
 
@@ -1675,8 +1686,9 @@ export function AddTestDialog({
     const key = headingKey(message.id);
     const draft = drafts[key];
     if (draft === undefined || !isTextRole(message)) return;
-    dropDrafts((k) => k !== key);
     const to = draft.trim();
+    if (headingTaken(message, to)) return;
+    dropDrafts((k) => k !== key);
     if (headingUnchanged(message, to, placeholder)) return;
     const othersDiffer = chatMessages.some(
       (m) =>
@@ -3570,51 +3582,64 @@ export function AddTestDialog({
     const shown = draft ?? current;
     const dirty =
       draft !== undefined && !headingUnchanged(message, draft, placeholder);
+    const taken = dirty && headingTaken(message, draft.trim());
     const isUser = message.role === "user";
     return (
-      <div
-        className={`flex items-center gap-1 ${
-          isUser ? "w-full flex-row-reverse" : ""
-        }`}
-      >
-        <div className={`grid ${isUser ? "flex-1 min-w-0" : "max-w-64"}`}>
-          <input
-            type="text"
-            size={1}
-            value={shown}
-            placeholder={placeholder}
-            aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
-            onFocus={() => {
-              if (draft === undefined) setDraft(key, current || placeholder);
-            }}
-            onChange={(e) => setDraft(key, e.target.value)}
-            onBlur={() => {
-              if (draft !== undefined && !dirty) dropDrafts((k) => k !== key);
-            }}
-            onKeyDown={(e) => {
-              if (e.nativeEvent.isComposing) return;
-              if (e.key === "Enter") confirmHeading(message, placeholder);
-              if (e.key === "Escape") dropDrafts((k) => k !== key);
-            }}
-            className={`[grid-area:1/1/2/2] w-full min-w-0 h-7 rounded-md text-sm font-medium text-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
-              isUser ? "pl-2 pr-4 text-right" : "pl-4 pr-2"
-            }`}
-          />
-          <span
-            aria-hidden="true"
-            className={`[grid-area:1/1/2/2] invisible h-7 border whitespace-pre text-sm font-medium overflow-hidden ${
-              isUser ? "pl-2 pr-4" : "pl-4 pr-2"
+      <div className={`flex flex-col ${isUser ? "w-full" : ""}`}>
+        <div
+          className={`flex items-center gap-1 ${
+            isUser ? "w-full flex-row-reverse" : ""
+          }`}
+        >
+          <div className={`grid ${isUser ? "flex-1 min-w-0" : "max-w-64"}`}>
+            <input
+              type="text"
+              size={1}
+              value={shown}
+              placeholder={placeholder}
+              aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
+              onFocus={() => {
+                if (draft === undefined) setDraft(key, current || placeholder);
+              }}
+              onChange={(e) => setDraft(key, e.target.value)}
+              onBlur={() => {
+                if (draft !== undefined && !dirty) dropDrafts((k) => k !== key);
+              }}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) return;
+                if (e.key === "Enter") confirmHeading(message, placeholder);
+                if (e.key === "Escape") dropDrafts((k) => k !== key);
+              }}
+              className={`[grid-area:1/1/2/2] w-full min-w-0 h-7 rounded-md text-sm font-medium text-foreground bg-transparent border border-transparent hover:border-border focus:border-border focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-muted-foreground ${
+                isUser ? "pl-2 pr-4 text-right" : "pl-4 pr-2"
+              }`}
+            />
+            <span
+              aria-hidden="true"
+              className={`[grid-area:1/1/2/2] invisible h-7 border whitespace-pre text-sm font-medium overflow-hidden ${
+                isUser ? "pl-2 pr-4" : "pl-4 pr-2"
+              }`}
+            >
+              {shown || placeholder}
+            </span>
+          </div>
+          {dirty &&
+            <ConfirmCancel
+              what="heading"
+              onConfirm={() => confirmHeading(message, placeholder)}
+              onCancel={() => dropDrafts((k) => k !== key)}
+              canConfirm={!taken}
+            />}
+        </div>
+        {taken && (
+          <p
+            className={`text-xs text-red-500 px-4 mt-1 ${
+              isUser ? "text-right" : ""
             }`}
           >
-            {shown || placeholder}
-          </span>
-        </div>
-        {dirty &&
-          <ConfirmCancel
-            what="heading"
-            onConfirm={() => confirmHeading(message, placeholder)}
-            onCancel={() => dropDrafts((k) => k !== key)}
-          />}
+            {TAKEN_MESSAGE}
+          </p>
+        )}
       </div>
     );
   };
@@ -3663,7 +3688,7 @@ export function AddTestDialog({
                     isUser ? "text-right" : ""
                   }`}
                 >
-                  Another version already has this name
+                  {TAKEN_MESSAGE}
                 </p>
               )}
               <div

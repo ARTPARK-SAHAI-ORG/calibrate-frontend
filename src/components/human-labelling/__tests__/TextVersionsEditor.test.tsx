@@ -120,7 +120,7 @@ describe("TextVersionsEditor", () => {
     const first = screen.getAllByLabelText("Version name")[0];
     await user.clear(first);
     await user.type(first, "Tamil");
-    expect(screen.getByText("Another version already has this name")).toBeInTheDocument();
+    expect(screen.getByText("The heading or another version already has this name")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirm version name" })).toBeDisabled();
     await user.keyboard("{Enter}");
     await user.click(screen.getByRole("button", { name: "Cancel version name" }));
@@ -294,5 +294,34 @@ describe("TextVersionsEditor remove question keys", () => {
     } finally {
       window.removeEventListener("keydown", behind);
     }
+  });
+});
+
+describe("TextVersionsEditor heading and version names stay apart", () => {
+  it("refuses a heading that a version already uses", async () => {
+    const user = setupUser();
+    const onChange = jest.fn();
+    render(<Harness initial={START} onChange={onChange} />);
+    const heading = screen.getByLabelText("Heading for the input");
+    await user.clear(heading);
+    await user.type(heading, "Hindi{Enter}");
+    expect(
+      screen.getByText("The heading or another version already has this name"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm heading" })).toBeDisabled();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("refuses a version name that the heading already uses", async () => {
+    const user = setupUser();
+    const onChange = jest.fn();
+    render(<Harness initial={START} onChange={onChange} />);
+    const name = screen.getAllByLabelText("Version name")[0];
+    await user.clear(name);
+    await user.type(name, "English{Enter}");
+    expect(
+      screen.getByText("The heading or another version already has this name"),
+    ).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
