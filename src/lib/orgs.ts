@@ -132,6 +132,33 @@ export type OrganizationApiKeyWithSecret = OrganizationApiKey & {
   key: string;
 };
 
+/** The AI providers a workspace can save its own key for. */
+export type ProviderKeyProvider =
+  | "openrouter"
+  | "openai"
+  | "deepgram"
+  | "elevenlabs"
+  | "sarvam"
+  | "cartesia"
+  | "smallest"
+  | "groq"
+  | "gemini"
+  | "google";
+
+/** A saved provider key. The key itself never comes back, only a masked form
+ *  (for Google Cloud, the service account email). */
+export type ProviderKey = {
+  provider: ProviderKeyProvider;
+  masked_value: string;
+  updated_at: string;
+};
+
+/** `GET /provider-keys`. `uses_own_keys` is true once any key is saved. */
+export type ProviderKeys = {
+  uses_own_keys: boolean;
+  keys: ProviderKey[];
+};
+
 /**
  * The workspace this page belongs to: the one named by the address, falling
  * back to the last one opened while a page that does not name a workspace

@@ -19,6 +19,7 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
 import { InviteDialog } from "@/components/workspace/InviteDialog";
 import { RunModelsSection } from "@/components/workspace/RunModelsSection";
+import { ProviderKeysSection } from "@/components/workspace/ProviderKeysSection";
 import { EmptyState, LoadingState } from "@/components/ui/LoadingState";
 import { useSidebarState } from "@/lib/sidebar";
 import { apiGet } from "@/lib/api";
@@ -36,6 +37,7 @@ import {
 const SETTINGS_TABS = [
   { id: "members", label: "Members" },
   { id: "api-keys", label: "API keys" },
+  { id: "provider-keys", label: "Bring your own keys (BYOK)" },
   { id: "general", label: "General" },
 ] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
@@ -223,6 +225,8 @@ export default function WorkspaceSettingsPage() {
                 </div>
                 <RunModelsSection org={activeOrg} />
               </div>
+            ) : activeTab === "provider-keys" ? (
+              <ProviderKeysSection orgUuid={activeOrg.uuid} />
             ) : (
               <ApiKeysSection orgUuid={activeOrg.uuid} />
             )}

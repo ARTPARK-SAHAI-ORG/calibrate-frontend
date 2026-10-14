@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 import { SpeechToTextEvaluation } from "../SpeechToTextEvaluation";
 
 // ─── Hooks ──────────────────────────────────────────────────────────────────
+let mockEnabledProviders: Set<string> | null = null;
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
   useMaxRowsPerEval: () => 20,
-  useEnabledProviders: () => null,
+  useEnabledProviders: () => mockEnabledProviders,
   isProviderEnabled: (enabled: Set<string> | null, value: string) =>
     !enabled || enabled.has(value.toLowerCase()),
   // Pulled in by the create-evaluator flow behind the Evaluators tab.
@@ -137,6 +138,7 @@ const mockEvaluatorsResponse = (
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockEnabledProviders = null;
   mockListDatasets.mockResolvedValue([]);
   editorHandleMock = {
     validate: jest.fn().mockReturnValue(true),
@@ -201,6 +203,69 @@ describe("SpeechToTextEvaluation", () => {
     await waitFor(() =>
       expect(screen.getByTestId("evaluator-e1")).toBeInTheDocument(),
     );
+  });
+
+  it("does not mention keys while every provider is available", async () => {
+    render(<SpeechToTextEvaluation initialDatasetId="ds-1" />);
+    expect(
+      screen.queryByText(/has no speech-to-text provider key/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("explains an empty provider list when only non-speech keys exist", async () => {
+    mockEnabledProviders = new Set(["openrouter"]);
+    render(<SpeechToTextEvaluation initialDatasetId="ds-1" />);
+    expect(
+      screen.getByText(/This workspace has no speech-to-text provider key/),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show select all as ticked when no provider is listed", async () => {
+    mockEnabledProviders = new Set(["openrouter"]);
+    const user = setupUser();
+    const { container } = render(<SpeechToTextEvaluation />);
+    await user.click(screen.getByText("Evaluators"));
+
+    const headerBox = container.querySelector("thead th div")!;
+    const mobileBox = screen.getByText("Select all").previousElementSibling!;
+    for (const box of [headerBox, mobileBox]) {
+      expect(box.className).not.toContain("bg-foreground border-foreground");
+      expect(box.querySelector("svg")).toBeNull();
+    }
+  });
+
+  it("says no key supports the chosen language when the keys cover other languages", async () => {
+    mockEnabledProviders = new Set(["deepgram"]);
+    const user = setupUser();
+    render(<SpeechToTextEvaluation />);
+    await user.click(screen.getByText("Evaluators"));
+    expect(screen.queryByText(/provider key/)).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox"), "odia");
+    expect(
+      screen.getByText(
+        "None of this workspace's speech-to-text provider keys support Odia. Add a key for a provider that does in Workspace settings, under Bring your own keys (BYOK).",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("selects and clears every provider from the table header and the mobile row", async () => {
+    const user = setupUser();
+    const { container } = render(<SpeechToTextEvaluation />);
+    await user.click(screen.getByText("Evaluators"));
+    const providerCount = () =>
+      screen
+        .getByText("Select providers to evaluate")
+        .parentElement!.querySelector("span")!.textContent;
+    const headerBox = container.querySelector("thead th div")!;
+    const mobileRow = screen.getByText("Select all").parentElement!;
+
+    for (const control of [headerBox, mobileRow]) {
+      await user.click(control);
+      await waitFor(() => expect(providerCount()).not.toBe("(0 selected)"));
+      await user.click(control);
+      await waitFor(() => expect(providerCount()).toBe("(0 selected)"));
+    }
   });
 
   it("lists STT evaluators (excluding other types) with none pre-selected", async () => {

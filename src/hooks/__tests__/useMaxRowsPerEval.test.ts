@@ -2,9 +2,13 @@ import { renderHook, waitFor } from "@testing-library/react";
 import {
   useMaxRowsPerEval,
   getMaxRowsPerEval,
+  getOrgLimits,
+  useUsesOwnProviderKeys,
+  clearOrgLimitsCache,
 } from "@/hooks/useMaxRowsPerEval";
 import { apiGet } from "@/lib/api";
 import { LIMITS } from "@/constants/limits";
+import { ACTIVE_ORG_UUID_KEY } from "@/lib/orgs";
 
 jest.mock("../../lib/api", () => ({
   __esModule: true,
@@ -43,19 +47,26 @@ describe("useMaxRowsPerEval", () => {
     const { result } = renderHook(() => useMaxRowsPerEval());
     await waitFor(() => expect(result.current).toBe(42));
     expect(mockApiGet).toHaveBeenCalledWith(
-      "/org-limits/me/max-rows-per-eval",
+      "/org-limits/me",
       "token-b",
     );
   });
 
-  it("falls back to the default when max_rows_per_eval is null", async () => {
+  it("reads a null max_rows_per_eval as no limit", async () => {
     mockApiGet.mockResolvedValue({ max_rows_per_eval: null });
     localStorage.setItem("access_token", "token-c");
 
     const { result } = renderHook(() => useMaxRowsPerEval());
-    await waitFor(() =>
-      expect(result.current).toBe(LIMITS.DEFAULT_MAX_ROWS_PER_EVAL),
-    );
+    await waitFor(() => expect(result.current).toBeNull());
+  });
+
+  it("falls back to the default when max_rows_per_eval is missing", async () => {
+    mockApiGet.mockResolvedValue({});
+    localStorage.setItem("access_token", "token-missing");
+
+    const { result } = renderHook(() => useMaxRowsPerEval());
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalled());
+    expect(result.current).toBe(LIMITS.DEFAULT_MAX_ROWS_PER_EVAL);
   });
 
   it("falls back to the default when the request rejects", async () => {
@@ -126,8 +137,65 @@ describe("getMaxRowsPerEval", () => {
     mockApiGet.mockResolvedValue({ max_rows_per_eval: 55 });
     await expect(getMaxRowsPerEval("token-direct")).resolves.toBe(55);
     expect(mockApiGet).toHaveBeenCalledWith(
-      "/org-limits/me/max-rows-per-eval",
+      "/org-limits/me",
       "token-direct",
     );
+  });
+});
+
+describe("useUsesOwnProviderKeys", () => {
+  beforeEach(() => {
+    mockApiGet.mockReset();
+    localStorage.clear();
+  });
+
+  it("is false until the backend says the workspace uses its own keys", async () => {
+    mockApiGet.mockResolvedValue({
+      max_rows_per_eval: null,
+      uses_own_provider_keys: true,
+    });
+    localStorage.setItem("access_token", "token-own-keys");
+
+    const { result } = renderHook(() => useUsesOwnProviderKeys());
+    expect(result.current).toBe(false);
+    await waitFor(() => expect(result.current).toBe(true));
+  });
+});
+
+describe("getOrgLimits", () => {
+  beforeEach(() => {
+    mockApiGet.mockReset();
+  });
+
+  it("asks again for a different workspace", async () => {
+    mockApiGet.mockResolvedValue({ max_rows_per_eval: 5 });
+    localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-a");
+    await getOrgLimits("token-orgs");
+    await getOrgLimits("token-orgs");
+    expect(mockApiGet).toHaveBeenCalledTimes(1);
+    localStorage.setItem(ACTIVE_ORG_UUID_KEY, "org-b");
+    await getOrgLimits("token-orgs");
+    expect(mockApiGet).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks again after the cache is cleared", async () => {
+    mockApiGet.mockResolvedValue({
+      max_rows_per_eval: 5,
+      uses_own_provider_keys: false,
+    });
+    await expect(getOrgLimits("token-clear")).resolves.toEqual({
+      max_rows_per_eval: 5,
+      uses_own_provider_keys: false,
+    });
+    clearOrgLimitsCache();
+    mockApiGet.mockResolvedValue({
+      max_rows_per_eval: null,
+      uses_own_provider_keys: true,
+    });
+    await expect(getOrgLimits("token-clear")).resolves.toEqual({
+      max_rows_per_eval: null,
+      uses_own_provider_keys: true,
+    });
+    expect(mockApiGet).toHaveBeenCalledTimes(2);
   });
 });

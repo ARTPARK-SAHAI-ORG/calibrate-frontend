@@ -28,6 +28,11 @@ describe("evaluatorRunLimitMessage", () => {
     );
   });
 
+  it("returns nothing for any size when the workspace has no limit", async () => {
+    getMax.mockResolvedValue(null);
+    expect(await evaluatorRunLimitMessage("token", 1000, 20)).toBeNull();
+  });
+
   it("reads the limit for the signed-in workspace", async () => {
     getMax.mockResolvedValue(5);
     await evaluatorRunLimitMessage("token-1", 1, 1);

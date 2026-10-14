@@ -26,6 +26,11 @@ describe("exceedsEvalLimit", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
+  it("never blocks a workspace with no limit", () => {
+    expect(exceedsEvalLimit(100000, null, "tests")).toBe(false);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
   it("lets a run exactly on the limit through", () => {
     expect(exceedsEvalLimit(20, 20, "tests")).toBe(false);
     expect(toast.error).not.toHaveBeenCalled();
