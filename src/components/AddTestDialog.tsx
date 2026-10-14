@@ -46,7 +46,8 @@ import {
   type InputRow,
   type InputFieldType,
 } from "@/components/CustomFieldsEditor";
-import { CheckIcon, CloseIcon, RobotIcon, ToolIcon, TrashIcon } from "@/components/icons";
+import { RobotIcon, ToolIcon } from "@/components/icons";
+import { CheckIcon, CloseIcon } from "@/components/icons";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { sampleTest } from "@/lib/testSamples";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
