@@ -665,4 +665,16 @@ describe("AddTestDialog labelling item headings and versions", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
+
+  it("asks before closing when a version name was typed but not confirmed", async () => {
+    const user = setupUser();
+    const onClose = jest.fn();
+    renderDialog(jest.fn(), { onClose });
+    await waitForHistory();
+
+    await user.type(screen.getAllByLabelText("Version name")[0], "X");
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByText("Discard changes?")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

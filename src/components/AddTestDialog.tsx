@@ -3489,7 +3489,8 @@ export function AddTestDialog({
     if (showCloseConfirmation) return;
     if (
       baselineRef.current !== null &&
-      serializeFormState() === baselineRef.current
+      serializeFormState() === baselineRef.current &&
+      Object.keys(drafts).length === 0
     ) {
       action();
       return;
