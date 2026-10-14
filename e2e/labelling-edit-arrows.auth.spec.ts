@@ -146,6 +146,7 @@ async function stepsBothWays(
   loadedWhen?: Locator,
 ): Promise<void> {
   await expect(page.getByText("1 of 2", { exact: true })).toBeVisible();
+  if (loadedWhen) await expect(loadedWhen).toBeVisible({ timeout: 15000 });
   await page.getByRole("button", { name: "Next item", exact: true }).click();
   if (loadedWhen) await expect(loadedWhen).toBeVisible({ timeout: 15000 });
   await expect(nameField).toHaveValue(other, { timeout: 15000 });
