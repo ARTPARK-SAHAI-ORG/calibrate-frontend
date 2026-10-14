@@ -27,6 +27,8 @@ import { TTSDatasetEditor, TTSDatasetEditorHandle } from "./TTSDatasetEditor";
 import { RunEvaluatorsPanel } from "./RunEvaluatorsPanel";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 import { Tooltip } from "../Tooltip";
+import { AddProviderKeys } from "@/components/workspace/AddProviderKeys";
+import type { ProviderKeyProvider } from "@/lib/orgs";
 import { pruneSelectionToAllowed } from "./providerSelection";
 
 type EvaluationResult = {
@@ -95,6 +97,15 @@ export function TextToSpeechEvaluation({
   const router = useRouter();
   const backendAccessToken = useAccessToken();
   const enabledProviders = useEnabledProviders();
+  // Stays open until every key typed into it has saved, even after the first
+  // one fills the provider list.
+  const [askForKeys, setAskForKeys] = useState(false);
+  const hasKindKey = ttsProviders.some((p) =>
+    isProviderEnabled(enabledProviders, p.value),
+  );
+  useEffect(() => {
+    if (enabledProviders && !hasKindKey) setAskForKeys(true);
+  }, [enabledProviders, hasKindKey]);
   const [activeTab, setActiveTab] = useState<TabType>(
     initialDatasetId ? "models" : "input",
   );
@@ -525,17 +536,28 @@ export function TextToSpeechEvaluation({
               ({selectedProviders.size} selected)
             </span>
           </div>
-          {enabledProviders && providerLabels.length === 0 && (
-            <p className="text-[13px] text-muted-foreground">
-              {ttsProviders.some((p) =>
-                isProviderEnabled(enabledProviders, p.value),
-              )
-                ? `None of this workspace's text-to-speech provider keys support ${languageDisplayName[language]}. Add a key for a provider that does in Workspace settings, under Bring your own keys (BYOK).`
-                : "This workspace has no text-to-speech provider key. Add one in Workspace settings, under Bring your own keys (BYOK)."}
-            </p>
+          {askForKeys ? (
+            <AddProviderKeys
+              message="To run a text-to-speech evaluation, add an API key for at least one of these providers"
+              providerIds={
+                [
+                  ...new Set(ttsProviders.map((p) => p.value)),
+                ] as ProviderKeyProvider[]
+              }
+              onDone={() => setAskForKeys(false)}
+            />
+          ) : (
+            enabledProviders &&
+            providerLabels.length === 0 && (
+              <p className="text-[13px] text-muted-foreground">
+                {`None of this workspace's text-to-speech provider keys support ${languageDisplayName[language]}. Add a key for a provider that does in Workspace settings, under Bring your own keys (BYOK)`}
+              </p>
+            )
           )}
           {/* Desktop: Table layout */}
-          <div className="hidden md:block border border-border rounded-lg overflow-hidden">
+          <div
+            className={`${askForKeys ? "hidden" : "hidden md:block"} border border-border rounded-lg overflow-hidden`}
+          >
             <table className="w-full">
               <thead className="bg-muted/50 border-b border-border">
                 <tr>
@@ -718,7 +740,7 @@ export function TextToSpeechEvaluation({
           </div>
 
           {/* Mobile: Card layout */}
-          <div className="md:hidden space-y-2">
+          <div className={`${askForKeys ? "hidden" : "md:hidden"} space-y-2`}>
             {/* Select All */}
             <div
               className="flex items-center gap-3 px-3 py-2.5 border border-border rounded-lg cursor-pointer hover:bg-muted/30 transition-colors"

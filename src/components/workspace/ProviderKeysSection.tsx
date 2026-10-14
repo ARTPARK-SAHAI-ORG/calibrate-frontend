@@ -15,7 +15,7 @@ import {
 import type { ProviderKey, ProviderKeyProvider } from "@/lib/orgs";
 import { sttProviders } from "@/components/agent-tabs/constants/providers";
 
-type ProviderEntry = {
+export type ProviderEntry = {
   id: ProviderKeyProvider;
   name: string;
   website: string;
@@ -59,7 +59,6 @@ export const PROVIDER_KEY_SECTIONS: {
       },
       { id: "sarvam", name: "Sarvam", website: websiteOf("sarvam") },
       { id: "cartesia", name: "Cartesia", website: websiteOf("cartesia") },
-      { id: "groq", name: "Groq", website: "https://groq.com" },
       { id: "gemini", name: "Gemini", website: websiteOf("gemini") },
       { id: "google", name: "Google Cloud", website: websiteOf("google") },
       { id: "smallest", name: "Smallest AI", website: websiteOf("smallest") },
@@ -84,6 +83,38 @@ export function providerKeyErrorMessage(err: unknown): string {
     }
   }
   return parseBackendErrorMessage(err, fallback);
+}
+
+/** The provider's name, as the label of its key field, with a link to its site. */
+export function ProviderName({
+  provider,
+  inputId,
+}: {
+  provider: ProviderEntry;
+  inputId: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <h3 className="text-sm font-medium text-foreground">
+        <label htmlFor={inputId}>{provider.name}</label>
+      </h3>
+      <Tooltip
+        content={`Visit ${provider.name} website`}
+        position="top"
+        className="inline-flex"
+      >
+        <a
+          href={provider.website}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Visit ${provider.name} website`}
+          className="flex text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ExternalLinkIcon className="w-4 h-4" />
+        </a>
+      </Tooltip>
+    </div>
+  );
 }
 
 function ProviderKeyRow({
@@ -140,26 +171,7 @@ function ProviderKeyRow({
   return (
     <section className="space-y-2">
       <div>
-        <div className="flex items-center gap-1.5">
-          <h3 className="text-sm font-medium text-foreground">
-            <label htmlFor={inputId}>{provider.name}</label>
-          </h3>
-          <Tooltip
-            content={`Visit ${provider.name} website`}
-            position="top"
-            className="inline-flex"
-          >
-            <a
-              href={provider.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Visit ${provider.name} website`}
-              className="flex text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ExternalLinkIcon className="w-4 h-4" />
-            </a>
-          </Tooltip>
-        </div>
+        <ProviderName provider={provider} inputId={inputId} />
         {provider.note && (
           <p className="text-[13px] text-muted-foreground">{provider.note}</p>
         )}

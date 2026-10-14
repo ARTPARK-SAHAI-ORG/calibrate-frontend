@@ -6,6 +6,11 @@ import { SpeechToTextEvaluation } from "../SpeechToTextEvaluation";
 // ─── Hooks ──────────────────────────────────────────────────────────────────
 let mockEnabledProviders: Set<string> | null = null;
 jest.mock("../../../hooks", () => ({
+  useProviderKeys: () => ({
+    keys: [],
+    usesOwnKeys: true,
+    saveProviderKey: jest.fn(),
+  }),
   useAccessToken: () => "test-token",
   useMaxRowsPerEval: () => 20,
   useEnabledProviders: () => mockEnabledProviders,
@@ -208,7 +213,7 @@ describe("SpeechToTextEvaluation", () => {
   it("does not mention keys while every provider is available", async () => {
     render(<SpeechToTextEvaluation initialDatasetId="ds-1" />);
     expect(
-      screen.queryByText(/has no speech-to-text provider key/),
+      screen.queryByText(/add an API key for at least one of these providers/),
     ).not.toBeInTheDocument();
   });
 
@@ -216,7 +221,9 @@ describe("SpeechToTextEvaluation", () => {
     mockEnabledProviders = new Set(["openrouter"]);
     render(<SpeechToTextEvaluation initialDatasetId="ds-1" />);
     expect(
-      screen.getByText(/This workspace has no speech-to-text provider key/),
+      screen.getByText(
+        /To run a speech-to-text evaluation, add an API key for at least one of these providers/,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -244,7 +251,7 @@ describe("SpeechToTextEvaluation", () => {
     await user.selectOptions(screen.getByRole("combobox"), "odia");
     expect(
       screen.getByText(
-        "None of this workspace's speech-to-text provider keys support Odia. Add a key for a provider that does in Workspace settings, under Bring your own keys (BYOK).",
+        "None of this workspace's speech-to-text provider keys support Odia. Add a key for a provider that does in Workspace settings, under Bring your own keys (BYOK)",
       ),
     ).toBeInTheDocument();
   });
@@ -298,7 +305,9 @@ describe("SpeechToTextEvaluation", () => {
     const { signOut } = require("next-auth/react");
     render(<SpeechToTextEvaluation />);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
   });
 
@@ -769,7 +778,9 @@ describe("SpeechToTextEvaluation", () => {
     });
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
   });
 

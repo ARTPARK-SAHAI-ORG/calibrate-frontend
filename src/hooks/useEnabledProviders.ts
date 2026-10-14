@@ -40,7 +40,12 @@ const cacheKey = (token: string) => `${token}:${getActiveOrgUuid() ?? ""}`;
 export function clearEnabledProvidersCache(): void {
   cache = null;
   inflight = null;
+  listeners.forEach((reload) => reload());
 }
+
+// Mounted hooks re-read the list when it is cleared, so a key saved on one
+// page shows up in a picker already on screen.
+const listeners = new Set<() => void>();
 
 async function fetchEnabledProviders(token: string): Promise<EnabledProviders> {
   const backendUrl = getBackendUrl();
@@ -55,8 +60,10 @@ async function fetchEnabledProviders(token: string): Promise<EnabledProviders> {
   const text = await response.text();
   const json: unknown = text ? JSON.parse(text) : null;
   const list =
-    json && typeof json === "object" && Array.isArray((json as { providers?: unknown }).providers)
-      ? ((json as { providers: unknown[] }).providers)
+    json &&
+    typeof json === "object" &&
+    Array.isArray((json as { providers?: unknown }).providers)
+      ? (json as { providers: unknown[] }).providers
       : [];
 
   const names = list
@@ -70,7 +77,11 @@ async function fetchEnabledProviders(token: string): Promise<EnabledProviders> {
 
 function getOrFetch(token: string): Promise<EnabledProviders> {
   const key = cacheKey(token);
-  if (cache && cache.key === key && Date.now() - cache.timestamp < CACHE_TTL_MS) {
+  if (
+    cache &&
+    cache.key === key &&
+    Date.now() - cache.timestamp < CACHE_TTL_MS
+  ) {
     return Promise.resolve(cache.providers);
   }
 
@@ -101,11 +112,20 @@ function getOrFetch(token: string): Promise<EnabledProviders> {
 export function useEnabledProviders(): EnabledProviders {
   const accessToken = useAccessToken();
   const orgUuid = useOrgUuid();
+  const [reloads, setReloads] = useState(0);
   const [enabled, setEnabled] = useState<EnabledProviders>(() =>
     cache && accessToken && cache.key === cacheKey(accessToken)
       ? cache.providers
       : null,
   );
+
+  useEffect(() => {
+    const reload = () => setReloads((n) => n + 1);
+    listeners.add(reload);
+    return () => {
+      listeners.delete(reload);
+    };
+  }, []);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -123,7 +143,7 @@ export function useEnabledProviders(): EnabledProviders {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, orgUuid]);
+  }, [accessToken, orgUuid, reloads]);
 
   return enabled;
 }

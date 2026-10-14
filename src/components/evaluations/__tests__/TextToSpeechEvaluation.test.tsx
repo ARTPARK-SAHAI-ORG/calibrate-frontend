@@ -6,6 +6,11 @@ import { TextToSpeechEvaluation } from "../TextToSpeechEvaluation";
 // ─── Hooks ──────────────────────────────────────────────────────────────────
 let mockEnabledProviders: Set<string> | null = null;
 jest.mock("../../../hooks", () => ({
+  useProviderKeys: () => ({
+    keys: [],
+    usesOwnKeys: true,
+    saveProviderKey: jest.fn(),
+  }),
   useAccessToken: () => "test-token",
   useMaxRowsPerEval: () => 20,
   useUsesOwnProviderKeys: () => false,
@@ -239,7 +244,9 @@ describe("TextToSpeechEvaluation", () => {
     const { signOut } = require("next-auth/react");
     render(<TextToSpeechEvaluation />);
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
   });
 
@@ -274,9 +281,9 @@ describe("TextToSpeechEvaluation", () => {
     expect(links[0]).not.toHaveAttribute("title");
     await user.hover(links[0]);
     await waitFor(() =>
-      expect(screen.getAllByText("Visit OpenAI website").length).toBeGreaterThan(
-        0,
-      ),
+      expect(
+        screen.getAllByText("Visit OpenAI website").length,
+      ).toBeGreaterThan(0),
     );
   });
 
@@ -287,7 +294,9 @@ describe("TextToSpeechEvaluation", () => {
     await user.click(screen.getByText("Evaluators"));
 
     expect(
-      screen.getByText(/This workspace has no text-to-speech provider key/),
+      screen.getByText(
+        /To run a text-to-speech evaluation, add an API key for at least one of these providers/,
+      ),
     ).toBeInTheDocument();
     const headerBox = container.querySelector("thead th div")!;
     const mobileBox = screen.getByText("Select all").previousElementSibling!;
@@ -314,7 +323,7 @@ describe("TextToSpeechEvaluation", () => {
     await user.selectOptions(screen.getByRole("combobox"), "odia");
     expect(
       screen.getByText(
-        "None of this workspace's text-to-speech provider keys support Odia. Add a key for a provider that does in Workspace settings, under Bring your own keys (BYOK).",
+        "None of this workspace's text-to-speech provider keys support Odia. Add a key for a provider that does in Workspace settings, under Bring your own keys (BYOK)",
       ),
     ).toBeInTheDocument();
   });
@@ -668,7 +677,9 @@ describe("TextToSpeechEvaluation", () => {
     });
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      }),
     );
   });
 
