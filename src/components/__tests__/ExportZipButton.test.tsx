@@ -111,6 +111,9 @@ describe("ExportZipButton", () => {
 
     await waitFor(() => expect(createObjectURL).toHaveBeenCalledTimes(1));
     expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith("https://example.com/a.mp3", {
+      cache: "no-store",
+    });
     await waitFor(() =>
       expect(screen.getByText("Export results")).toBeInTheDocument(),
     );

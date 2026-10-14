@@ -86,7 +86,10 @@ export function ExportZipButton({
       // 404 / network error doesn't kill the whole export.
       const fetched = await Promise.allSettled(
         files.map(async (f) => {
-          const res = await fetch(f.url);
+          // Skip the browser's stored copy: a clip already played on the page
+          // was stored from a request that did not ask for read permission,
+          // so reusing it makes this read fail with "Failed to fetch".
+          const res = await fetch(f.url, { cache: "no-store" });
           if (!res.ok) {
             throw new Error(`HTTP ${res.status} for ${f.url}`);
           }
