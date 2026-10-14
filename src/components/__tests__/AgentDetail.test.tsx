@@ -1111,11 +1111,16 @@ describe("AgentDetail", () => {
       expect(screen.getByText("Saved successfully")).toBeInTheDocument(),
     );
 
-    act(() => {
-      jest.advanceTimersByTime(3100);
-    });
-    await waitFor(() =>
-      expect(screen.queryByText("Saved successfully")).not.toBeInTheDocument(),
+    // The 3-second timer starts once the message has been drawn, which on a
+    // busy machine can be later than this line. Moving the clock once by hand
+    // then moves it before the timer exists. waitFor moves the fake clock
+    // forward as it checks, so give it room for the whole 3 seconds instead.
+    await waitFor(
+      () =>
+        expect(
+          screen.queryByText("Saved successfully"),
+        ).not.toBeInTheDocument(),
+      { timeout: 5000 },
     );
     jest.useRealTimers();
   });
