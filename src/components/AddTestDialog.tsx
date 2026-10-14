@@ -4275,7 +4275,7 @@ export function AddTestDialog({
               space above a 32px button), and the type header / info banner
               otherwise. */}
           <button
-            onClick={() => confirmDiscard(onClose)}
+            onClick={() => (isLabelItem ? confirmDiscard(onClose) : onClose())}
             disabled={isCreating || isLoading}
             className={`absolute ${
               stepsBetweenTests ? "top-2.5 md:top-2" : "top-2.5 md:top-3"

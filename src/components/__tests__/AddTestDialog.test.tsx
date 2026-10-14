@@ -427,6 +427,20 @@ describe("AddTestDialog", () => {
       expect(document.querySelectorAll("textarea[data-msg-id]").length).toBe(0);
     });
 
+    it("closes from the X at once after a name was typed", async () => {
+      const user = setupUser();
+      const onClose = jest.fn();
+      render(<ControlledDialog {...baseProps({ onClose })} />);
+      await pickTestType(user, "Does the agent give the right reply?");
+      await user.type(
+        await screen.findByPlaceholderText("Your test name"),
+        "My test",
+      );
+      await user.click(screen.getByLabelText("Close"));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("Discard changes?")).not.toBeInTheDocument();
+    });
+
     it("closes without asking to discard when nothing but the example is there", async () => {
       const user = setupUser();
       const onClose = jest.fn();
