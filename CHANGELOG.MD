@@ -1,5 +1,6 @@
 ## October 2026
 
+- The rating an annotator picks in the labelling job editor now shows green at the top of the scale, red at the bottom and amber in between, the same as the read-only view ([#688](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/688))
 - You can now read the Raising The Village case study on building a reliable AI coaching assistant as a blog post, opened from the Read the story link on its card ([#685](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/685))
 - A labelling item's extra details, such as its key-value notes, now show under its description in the labelling form, the item window on the task page, and the evaluator run detail including its shared link ([#682](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/682))
 - You can now duplicate an evaluator from any place you can view it, which opens the create form already filled in with a copy of its name, prompt, labels and judge model so you can change what you like before creating it ([#671](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/671))
