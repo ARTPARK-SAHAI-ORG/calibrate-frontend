@@ -1,6 +1,41 @@
 import { render, screen, setupUser } from "@/test-utils";
 import { ToolPicker, AvailableTool, getToolParams } from "../ToolPicker";
 
+// The real side panel fetches the tool; this stand-in shows what it was
+// opened with and lets a test act out a save or a close.
+jest.mock("../AddToolDialog", () => ({
+  AddToolDialog: (props: {
+    toolType: string;
+    editingToolUuid: string | null;
+    backendAccessToken?: string;
+    onClose: () => void;
+    onToolsUpdated: (tools: unknown[]) => void;
+  }) => (
+    <div data-testid="tool-panel">
+      <span>
+        {props.editingToolUuid}|{props.toolType}|{props.backendAccessToken}
+      </span>
+      <button
+        onClick={() =>
+          props.onToolsUpdated([
+            {
+              uuid: props.editingToolUuid,
+              name: "Renamed Tool",
+              config: {},
+              created_at: "",
+              updated_at: "",
+            },
+          ])
+        }
+      >
+        Save stub
+      </button>
+      <button onClick={() => props.onToolsUpdated([])}>Save missing</button>
+      <button onClick={props.onClose}>Close stub</button>
+    </div>
+  ),
+}));
+
 const CUSTOM_TOOLS: AvailableTool[] = [
   {
     uuid: "t1",
@@ -224,5 +259,134 @@ describe("getToolParams", () => {
       updated_at: "",
     };
     expect(getToolParams(tool)).toEqual([]);
+  });
+
+  it("reads a webhook tool's inputs from its query and body", () => {
+    // How a saved webhook tool stores them: nothing at the top level.
+    const tool: AvailableTool = {
+      uuid: "w",
+      name: "get_presigned_url",
+      config: {
+        type: "webhook",
+        parameters: [],
+        webhook: {
+          method: "POST",
+          headers: [{ name: "x-key", value: "1" }],
+          queryParameters: [{ id: "test" }],
+          body: { parameters: [{ id: "task_type" }, { name: "note" }] },
+        },
+      },
+      created_at: "",
+      updated_at: "",
+    };
+    expect(getToolParams(tool)).toEqual([
+      { name: "test", value: "", group: "query" },
+      { name: "task_type", value: "", group: "body" },
+      { name: "note", value: "", group: "body" },
+    ]);
+  });
+
+  describe("Open button", () => {
+    it("opens the tool side panel in edit mode without picking the tool", async () => {
+      const user = setupUser();
+      const onSelectCustomTool = jest.fn();
+      render(
+        <ToolPicker
+          availableTools={CUSTOM_TOOLS}
+          isLoading={false}
+          onSelectInbuiltTool={jest.fn()}
+          onSelectCustomTool={onSelectCustomTool}
+          accessToken="tok"
+        />,
+      );
+      expect(screen.queryByTestId("tool-panel")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Open End conversation" }),
+      ).not.toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole("button", { name: "Open Webhook Tool" }),
+      );
+      expect(screen.getByText("t1|webhook|tok")).toBeInTheDocument();
+      expect(onSelectCustomTool).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: "Close stub" }));
+      expect(screen.queryByTestId("tool-panel")).not.toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole("button", { name: "Open Structured Tool" }),
+      );
+      expect(screen.getByText("t2|structured_output|tok")).toBeInTheDocument();
+    });
+
+    it("reports the saved tool with its name before the edit", async () => {
+      const user = setupUser();
+      const onToolSaved = jest.fn();
+      render(
+        <ToolPicker
+          availableTools={CUSTOM_TOOLS}
+          isLoading={false}
+          onSelectInbuiltTool={jest.fn()}
+          onSelectCustomTool={jest.fn()}
+          onToolSaved={onToolSaved}
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Open Webhook Tool" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Save missing" }));
+      expect(onToolSaved).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: "Save stub" }));
+      expect(onToolSaved).toHaveBeenCalledWith(
+        expect.objectContaining({ uuid: "t1", name: "Renamed Tool" }),
+        "Webhook Tool",
+        [expect.objectContaining({ uuid: "t1" })],
+      );
+    });
+
+    it("keeps clicks inside the side panel from reaching what holds the picker", async () => {
+      const user = setupUser();
+      const onOuterClick = jest.fn();
+      render(
+        <div onClick={onOuterClick}>
+          <ToolPicker
+            availableTools={CUSTOM_TOOLS}
+            isLoading={false}
+            onSelectInbuiltTool={jest.fn()}
+            onSelectCustomTool={jest.fn()}
+          />
+        </div>,
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Open Webhook Tool" }),
+      );
+      onOuterClick.mockClear();
+      await user.click(screen.getByRole("button", { name: "Save missing" }));
+      expect(onOuterClick).not.toHaveBeenCalled();
+    });
+
+    it("keeps key presses after opening from reaching the page behind", async () => {
+      const user = setupUser();
+      const onWindowKey = jest.fn();
+      window.addEventListener("keydown", onWindowKey);
+      render(
+        <ToolPicker
+          availableTools={CUSTOM_TOOLS}
+          isLoading={false}
+          onSelectInbuiltTool={jest.fn()}
+          onSelectCustomTool={jest.fn()}
+        />,
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Open Webhook Tool" }),
+      );
+      // Right after opening, and after a click on an empty part of the panel.
+      await user.keyboard("{ArrowRight}");
+      await user.click(screen.getByTestId("tool-panel"));
+      await user.keyboard("{ArrowLeft}");
+      window.removeEventListener("keydown", onWindowKey);
+      expect(onWindowKey).not.toHaveBeenCalled();
+    });
   });
 });

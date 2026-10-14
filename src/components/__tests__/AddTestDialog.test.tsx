@@ -61,6 +61,7 @@ jest.mock("../evaluators/CreateEvaluatorFlow", () => ({
 
 jest.mock("../ToolPicker", () => ({
   __esModule: true,
+  getToolParams: jest.requireActual("../ToolPicker").getToolParams,
   ToolPicker: ({
     onSelectInbuiltTool,
     onSelectCustomTool,
@@ -1248,9 +1249,11 @@ describe("AddTestDialog", () => {
       await user.click(screen.getByText("Pick get_weather"));
       expect(screen.getByText("get_weather")).toBeInTheDocument();
 
-      // The tool-name display box and its trailing remove (trash) button.
+      // The tool-name display box and its trailing remove (trash) button,
+      // the last one in the row after the Open button.
       const toolNameBox = screen.getByText("get_weather");
-      const removeBtn = toolNameBox.parentElement?.querySelector("button");
+      const rowButtons = toolNameBox.parentElement?.querySelectorAll("button");
+      const removeBtn = rowButtons?.[rowButtons.length - 1];
       expect(removeBtn).toBeTruthy();
       await user.click(removeBtn as HTMLElement);
       expect(screen.queryByText("get_weather")).not.toBeInTheDocument();

@@ -38,19 +38,84 @@ jest.mock("../../../hooks/useAccessToken", () => ({
 
 jest.mock("../../ToolPicker", () => ({
   __esModule: true,
-  getToolParams: (tool: { name: string }) =>
-    tool.name === "book_flight" ? [{ name: "city", value: "" }] : [],
+  getToolParams: (tool: { name: string; config?: { type?: string } }) =>
+    tool.config?.type === "webhook"
+      ? [
+          { name: "id", value: "", group: "query" },
+          { name: "extra", value: "", group: "body" },
+        ]
+      : tool.name === "send_email"
+        ? [{ name: "body", value: "" }]
+        : tool.name === "book_flight"
+          ? [{ name: "city", value: "" }]
+          : tool.name === "renamed_tool"
+            ? [
+                { name: "success", value: "" },
+                { name: "reason", value: "" },
+              ]
+            : [],
   ToolPicker: ({
     onSelectCustomTool,
     onSelectInbuiltTool,
+    onToolSaved,
   }: {
     onSelectCustomTool: (
       tool: { name: string },
       params: { name: string; value: string }[],
     ) => void;
     onSelectInbuiltTool: (toolId: string, toolName: string) => void;
+    onToolSaved?: (
+      tool: { uuid: string; name: string },
+      previousName: string,
+      allTools: { uuid: string; name: string }[],
+    ) => void;
   }) => (
     <>
+      <button
+        type="button"
+        onClick={() =>
+          onToolSaved?.({ uuid: "t-dummy", name: "renamed_tool" }, "dummy", [
+            { uuid: "t-dummy", name: "renamed_tool" },
+          ])
+        }
+      >
+        Save dummy as renamed_tool
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onToolSaved?.(
+            {
+              uuid: "t-dummy",
+              name: "renamed_tool",
+              config: { type: "webhook" },
+            } as { uuid: string; name: string },
+            "dummy",
+            [{ uuid: "t-dummy", name: "renamed_tool" }],
+          )
+        }
+      >
+        Save dummy as a webhook named renamed_tool
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onToolSaved?.(
+            {
+              uuid: "t-dummy",
+              name: "send_email",
+              config: {},
+            } as { uuid: string; name: string },
+            "dummy",
+            [{ uuid: "t-dummy", name: "send_email" }],
+          )
+        }
+      >
+        Save dummy as send_email
+      </button>
+      <div data-tool-side-panel>
+        <input aria-label="Tool side panel field" />
+      </div>
       <button
         type="button"
         onClick={() => onSelectCustomTool({ name: "book_flight" }, [])}
@@ -75,6 +140,33 @@ type CreateToolFlowStubProps = {
   onCreated: (tool: unknown, allTools: unknown[]) => void;
 };
 let createToolFlowProps = {} as CreateToolFlowStubProps;
+// The tool side panel has its own tests. Here it only hands back the
+// workspace list after a save, with the tool renamed.
+jest.mock("../../AddToolDialog", () => ({
+  __esModule: true,
+  AddToolDialog: ({
+    editingToolUuid,
+    onToolsUpdated,
+    onClose,
+  }: {
+    editingToolUuid: string;
+    onToolsUpdated: (tools: unknown[]) => void;
+    onClose: () => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => {
+        onToolsUpdated([
+          { uuid: editingToolUuid, name: "renamed_tool", config: {} },
+        ]);
+        onClose();
+      }}
+    >
+      Save the opened tool as renamed_tool
+    </button>
+  ),
+}));
+
 jest.mock("../../tools/CreateToolFlow", () => ({
   __esModule: true,
   CreateToolFlow: (props: CreateToolFlowStubProps) => {
@@ -258,6 +350,22 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     ]);
   });
 
+  it("keeps the tool list open on Escape pressed inside the tool side panel", async () => {
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(screen.getByLabelText("Tool side panel field"));
+    await user.keyboard("{Escape}");
+    expect(
+      screen.getByRole("button", { name: "Pick book_flight" }),
+    ).toBeInTheDocument();
+  });
+
   it("closes the tool list on Escape and on the Add tool call button again", async () => {
     const user = setupUser();
     renderDialog({
@@ -394,6 +502,184 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
       { tool: "book_flight", arguments: { city: "Bengaluru" } },
+    ]);
+  });
+
+  it("renames the item's tool calls when their tool is renamed from the picker", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [
+            { tool: "dummy", arguments: { success: true } },
+            { tool: "other", arguments: {} },
+          ],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(
+      screen.getByRole("button", { name: "Save dummy as renamed_tool" }),
+    );
+
+    expect(screen.getByText("renamed_tool")).toBeInTheDocument();
+    expect(createToolFlowProps.knownTools).toEqual([
+      { uuid: "t-dummy", name: "renamed_tool" },
+    ]);
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    // The tool's current inputs: the typed value is kept and the new input
+    // is added empty.
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "renamed_tool", arguments: { success: true, reason: "" } },
+      { tool: "other", arguments: {} },
+    ]);
+  });
+
+  it("opens a tool call's tool from its card and carries a rename", async () => {
+    const user = setupUser();
+    accessTokenMock.mockReturnValue("tok-123");
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          uuid: "t-dummy",
+          name: "dummy",
+          config: {},
+          created_at: "",
+          updated_at: "",
+        },
+      ],
+    }) as unknown as typeof fetch;
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [
+            { tool: "dummy", arguments: {} },
+            { tool: "other", arguments: {} },
+          ],
+        },
+      ],
+    });
+    await user.click(await screen.findByRole("button", { name: "Open dummy" }));
+    // A tool call whose tool is not in the workspace has nothing to open.
+    expect(
+      screen.queryByRole("button", { name: "Open other" }),
+    ).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", {
+        name: "Save the opened tool as renamed_tool",
+      }),
+    );
+    expect(screen.getByText("renamed_tool")).toBeInTheDocument();
+    expect(screen.queryByText("dummy")).not.toBeInTheDocument();
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("shows a webhook tool call's inputs under Query and Body and saves them back in place", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [
+            {
+              tool: "dummy",
+              arguments: { query: { id: "7" }, body: { note: "hi" } },
+            },
+          ],
+        },
+      ],
+    });
+    expect(screen.getByText("Query")).toBeInTheDocument();
+    expect(screen.getByText("Body")).toBeInTheDocument();
+    expect(screen.getByLabelText("id")).toHaveValue("7");
+    await user.clear(screen.getByLabelText("note"));
+    await user.type(screen.getByLabelText("note"), "bye");
+
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      {
+        tool: "dummy",
+        arguments: { query: { id: "7" }, body: { note: "bye" } },
+      },
+    ]);
+  });
+
+  it("gives a webhook tool call the tool's new inputs when the tool is saved", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [
+            {
+              tool: "dummy",
+              arguments: { query: { id: "7" }, body: { note: "hi" } },
+            },
+          ],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "Save dummy as a webhook named renamed_tool",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    // The typed id is kept, the input the tool dropped is gone, and the one
+    // it gained is added empty.
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      {
+        tool: "renamed_tool",
+        arguments: { query: { id: "7" }, body: { extra: "" } },
+      },
+    ]);
+  });
+
+  it("keeps the values of a tool that only looked like a webhook when it is saved", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { body: { to: "a" } } }],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(
+      screen.getByRole("button", { name: "Save dummy as send_email" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "send_email", arguments: { body: '{"to":"a"}' } },
     ]);
   });
 
@@ -569,7 +855,9 @@ describe("AddLlmGeneralItemsDialog", () => {
     await user.click(screen.getByRole("button", { name: "Add field" }));
     await user.type(screen.getByLabelText("Metadata field name 1"), "source");
     await user.type(screen.getByLabelText("Metadata field name 2"), "source");
-    expect(screen.getByText(/is already used by another field/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/is already used by another field/),
+    ).toBeInTheDocument();
     expect(addButton).toBeDisabled();
     await user.click(addButton);
     expect(onSubmit).not.toHaveBeenCalled();
@@ -912,7 +1200,9 @@ describe("previous / next item in the edit window", () => {
     const onNext = jest.fn();
     renderDialog({
       mode: "edit",
-      initialRows: [{ uuid: "u1", name: "Item 1", input: "hi", output: "hello" }],
+      initialRows: [
+        { uuid: "u1", name: "Item 1", input: "hi", output: "hello" },
+      ],
       onPrev,
       onNext,
       ...step,
@@ -929,7 +1219,9 @@ describe("previous / next item in the edit window", () => {
     const onNext = jest.fn();
     const { onClose } = renderDialog({
       mode: "edit",
-      initialRows: [{ uuid: "u1", name: "Item 1", input: "hi", output: "hello" }],
+      initialRows: [
+        { uuid: "u1", name: "Item 1", input: "hi", output: "hello" },
+      ],
       onPrev: jest.fn(),
       onNext,
       ...step,
@@ -945,7 +1237,13 @@ describe("previous / next item in the edit window", () => {
   it("Preview opens the view window at once when nothing has been edited", async () => {
     const user = setupUser();
     const onView = jest.fn();
-    renderDialog({ mode: "edit", initialRows: [{ uuid: "u1", name: "Item 1", input: "hi", output: "hello" }], onView });
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "u1", name: "Item 1", input: "hi", output: "hello" },
+      ],
+      onView,
+    });
     await user.click(screen.getByRole("button", { name: "Preview" }));
     expect(onView).toHaveBeenCalledTimes(1);
   });
@@ -953,7 +1251,13 @@ describe("previous / next item in the edit window", () => {
   it("Preview asks before throwing away edits, and opens the view on Discard", async () => {
     const user = setupUser();
     const onView = jest.fn();
-    const { onClose } = renderDialog({ mode: "edit", initialRows: [{ uuid: "u1", name: "Item 1", input: "hi", output: "hello" }], onView });
+    const { onClose } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "u1", name: "Item 1", input: "hi", output: "hello" },
+      ],
+      onView,
+    });
     await user.type(screen.getByPlaceholderText("Your item name"), "x");
     await user.click(screen.getByRole("button", { name: "Preview" }));
     expect(onView).not.toHaveBeenCalled();
@@ -963,9 +1267,18 @@ describe("previous / next item in the edit window", () => {
   });
 
   it("draws no arrows when no steps are passed", () => {
-    renderDialog({ mode: "edit", initialRows: [{ uuid: "u1", name: "Item 1", input: "hi", output: "hello" }] });
-    expect(screen.queryByRole("button", { name: "Next item" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Preview" })).not.toBeInTheDocument();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "u1", name: "Item 1", input: "hi", output: "hello" },
+      ],
+    });
+    expect(
+      screen.queryByRole("button", { name: "Next item" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Preview" }),
+    ).not.toBeInTheDocument();
   });
 });
 

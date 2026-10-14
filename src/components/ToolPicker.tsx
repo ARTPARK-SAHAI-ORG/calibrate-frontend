@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { OpenToolButton, OnToolSaved } from "@/components/tools/OpenToolButton";
 import { INBUILT_TOOLS, getInbuiltToolIcon } from "@/constants/inbuilt-tools";
 import { ToolTypePill } from "@/components/tools/ToolTypePill";
 
@@ -17,17 +18,42 @@ type ToolPickerProps = {
   availableTools: AvailableTool[];
   isLoading: boolean;
   onSelectInbuiltTool: (toolId: string, toolName: string) => void;
-  onSelectCustomTool: (
-    tool: AvailableTool,
-    params: Array<{ name: string; value: string }>,
-  ) => void;
+  onSelectCustomTool: (tool: AvailableTool, params: ToolCallParam[]) => void;
   selectedToolIds?: string[];
+  /** Token the tool side panel uses to load and save a tool opened from a row. */
+  accessToken?: string;
+  /**
+   * A tool opened from a row was saved. `allTools` is the workspace's tool
+   * list after the save; `previousName` lets the caller rename tool calls in
+   * its open form that still carry the old name.
+   */
+  onToolSaved?: OnToolSaved;
 };
 
-// Helper function to get tool parameters
-export const getToolParams = (
-  tool: AvailableTool,
-): Array<{ name: string; value: string }> => {
+export type ToolCallParam = { name: string; value: string; group?: string };
+
+/**
+ * The inputs a call to this tool takes, each with an empty value. A webhook
+ * keeps its inputs in its request, so each one carries the part it belongs
+ * to as `group` ("query" or "body"); its headers are not inputs.
+ */
+export const getToolParams = (tool: AvailableTool): ToolCallParam[] => {
+  const webhook = tool.config?.type === "webhook" && tool.config?.webhook;
+  if (webhook) {
+    const grouped = (list: unknown, group: string): ToolCallParam[] =>
+      Array.isArray(list)
+        ? list.map((p: { id?: string; name?: string }) => ({
+            name: p.id || p.name || "",
+            value: "",
+            group,
+          }))
+        : [];
+    return [
+      ...grouped(webhook.queryParameters, "query"),
+      ...grouped(webhook.body?.parameters, "body"),
+    ];
+  }
+
   // Check for array format first (new format)
   const params = tool.config?.parameters;
   if (Array.isArray(params)) {
@@ -53,6 +79,8 @@ export function ToolPicker({
   onSelectInbuiltTool,
   onSelectCustomTool,
   selectedToolIds = [],
+  accessToken,
+  onToolSaved,
 }: ToolPickerProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -151,32 +179,42 @@ export function ToolPicker({
             {filteredTools.map((tool) => {
               const params = getToolParams(tool);
               return (
-                <button
+                <div
                   key={tool.uuid}
-                  onClick={() => onSelectCustomTool(tool, params)}
-                  className="w-full px-3 py-2.5 flex items-center gap-3 text-foreground hover:bg-muted transition-colors cursor-pointer border-b border-border last:border-b-0"
+                  className="flex items-center text-foreground hover:bg-muted transition-colors border-b border-border last:border-b-0"
                 >
-                  <svg
-                    className="w-4 h-4 text-muted-foreground flex-shrink-0"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
+                  <button
+                    onClick={() => onSelectCustomTool(tool, params)}
+                    className="flex-1 min-w-0 px-3 py-2.5 flex items-center gap-3 cursor-pointer"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
-                    />
-                  </svg>
-                  <div className="text-left">
-                    <p className="text-sm font-medium">{tool.name}</p>
-                    <ToolTypePill
-                      configType={tool.config?.type}
-                      className="mt-0.5"
-                    />
-                  </div>
-                </button>
+                    <svg
+                      className="w-4 h-4 text-muted-foreground flex-shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"
+                      />
+                    </svg>
+                    <div className="text-left">
+                      <p className="text-sm font-medium">{tool.name}</p>
+                      <ToolTypePill
+                        configType={tool.config?.type}
+                        className="mt-0.5"
+                      />
+                    </div>
+                  </button>
+                  <OpenToolButton
+                    tool={tool}
+                    accessToken={accessToken}
+                    onToolSaved={onToolSaved}
+                    className="mr-2 w-8 h-8"
+                  />
+                </div>
               );
             })}
 

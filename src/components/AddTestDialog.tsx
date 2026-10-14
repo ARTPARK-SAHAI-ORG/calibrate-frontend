@@ -30,7 +30,17 @@ import {
 } from "@/components/human-labelling/MetadataFieldsEditor";
 import { TestTypePicker, type TestTab } from "./TestTypePicker";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
-import { ToolPicker, AvailableTool } from "@/components/ToolPicker";
+import {
+  ToolPicker,
+  AvailableTool,
+  getToolParams,
+} from "@/components/ToolPicker";
+import { OpenToolButton } from "@/components/tools/OpenToolButton";
+import {
+  applyToolEditToMessages,
+  applyToolEditToSelectedTools,
+  mergeExpectedParams,
+} from "@/lib/toolEditsInForm";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
 import { attachToolsToAgent } from "@/lib/agentTools";
 import { toast } from "sonner";
@@ -1033,10 +1043,18 @@ export function AddTestDialog({
     );
   }, [isOpen, initialConfig]);
 
+  // The fill below reads the tool list through this, so saving or creating a
+  // tool (which replaces the list) does not refill the form and wipe edits.
+  const availableToolsRef = useRef(availableTools);
+  useEffect(() => {
+    availableToolsRef.current = availableTools;
+  }, [availableTools]);
+
   // Populate fields from initialConfig when editing an existing test
   // Wait for tools fetch to complete so we can properly determine tool types
   useEffect(() => {
     if (initialConfig && toolsFetched) {
+      const availableTools = availableToolsRef.current;
       // Parse history and convert to chatMessages format
       if (initialConfig.history && initialConfig.history.length > 0) {
         const messages: Array<{
@@ -1298,7 +1316,7 @@ export function AddTestDialog({
         }
       }
     }
-  }, [initialConfig, toolsFetched, availableTools]);
+  }, [initialConfig, toolsFetched]);
 
   const [selectedTools, setSelectedTools] = useState<SelectedToolConfig[]>([]);
 
@@ -1481,57 +1499,6 @@ export function AddTestDialog({
       },
     ]);
     setPendingFocusId(id);
-  };
-
-  // The parameter list for a tool_call message, read off a tool's stored
-  // config the same way picking an existing tool does — shared by
-  // onSelectCustomTool below and CreateToolFlow's onCreated, so a freshly
-  // made tool behaves identically to one already in the library.
-  const computeToolCallParams = (
-    tool: AvailableTool,
-  ): Array<{ name: string; value: string; group?: string }> => {
-    const isWebhook = tool.config?.type === "webhook";
-    let allParams: Array<{ name: string; value: string; group?: string }> = [];
-
-    if (isWebhook && tool.config?.webhook) {
-      const webhook = tool.config.webhook;
-      if (webhook.queryParameters && Array.isArray(webhook.queryParameters)) {
-        webhook.queryParameters.forEach((p: any) => {
-          allParams.push({
-            name: p.id || p.name || "",
-            value: "",
-            group: "query",
-          });
-        });
-      }
-      if (webhook.body?.parameters && Array.isArray(webhook.body.parameters)) {
-        webhook.body.parameters.forEach((p: any) => {
-          allParams.push({
-            name: p.id || p.name || "",
-            value: "",
-            group: "body",
-          });
-        });
-      }
-      // Note: Headers are not shown in conversation history UI
-    } else {
-      const params = tool.config?.parameters;
-      if (Array.isArray(params)) {
-        allParams = params.map((p: any) => ({
-          name: p.id || p.name || "",
-          value: "",
-        }));
-      } else {
-        const propsObj =
-          tool.config?.parameters?.properties ||
-          tool.config?.function?.parameters?.properties ||
-          tool.config?.properties ||
-          tool.config?.parameters ||
-          {};
-        allParams = Object.keys(propsObj).map((name) => ({ name, value: "" }));
-      }
-    }
-    return allParams;
   };
 
   const addToolCallMessage = (
@@ -2394,6 +2361,60 @@ export function AddTestDialog({
 
     setSelectedTools([...selectedTools, newTool]);
     setToolDropdownOpen(false);
+  };
+
+  // The workspace tool a tool call in this form refers to. A tool picked here
+  // carries its uuid; one loaded from a saved test carries only its name.
+  const findFormTool = (id?: string, name?: string) =>
+    availableTools.find((t) => t.uuid === id || t.name === name);
+
+  // A tool opened from a picker or a tool call card was saved: refresh the
+  // list, and carry its new name and inputs onto the copies of it this form
+  // already holds, keeping what was typed into inputs that still exist.
+  const handleToolSaved = (
+    tool: AvailableTool,
+    previousName: string,
+    allTools: AvailableTool[],
+  ) => {
+    setAvailableTools(allTools);
+    const edit = { uuid: tool.uuid, previousName, name: tool.name };
+    const schema = buildExpectedParamsFromToolConfig(tool.config);
+    const nextTools = applyToolEditToSelectedTools(selectedTools, edit, (t) => ({
+      ...t,
+      allowCustomParameters: schema.allowCustom,
+      // A tool that accepts any values has no expected inputs to update.
+      expectedParameters: t.acceptAnyParameterValues
+        ? t.expectedParameters
+        : mergeExpectedParams(
+            t.expectedParameters,
+            schema.params,
+            (param) => defaultSelectedParams([param])[0],
+          ),
+    }));
+    setSelectedTools(nextTools);
+    // A card open in its JSON view shows text written when the view opened,
+    // so rewrite it for the cards that changed or it would show old inputs.
+    const changedInJson = nextTools.filter(
+      (t, i) => t !== selectedTools[i] && jsonModeToolIds.has(t.id),
+    );
+    if (changedInJson.length > 0) {
+      setToolJsonText((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          changedInJson.map((t) => [
+            t.id,
+            JSON.stringify(
+              buildArgsFromExpectedParams(t.expectedParameters),
+              null,
+              2,
+            ),
+          ]),
+        ),
+      }));
+    }
+    setChatMessages((prev) =>
+      applyToolEditToMessages(prev, edit, getToolParams(tool)),
+    );
   };
 
   const selectInbuiltTool = (toolId: string, toolName: string) => {
@@ -4521,6 +4542,8 @@ export function AddTestDialog({
                                 addToolFromSelection(tool);
                               }}
                               selectedToolIds={selectedTools.map((t) => t.id)}
+                              accessToken={backendAccessToken ?? undefined}
+                              onToolSaved={handleToolSaved}
                             />
                           </div>
                         </>
@@ -4554,6 +4577,21 @@ export function AddTestDialog({
                                   <div className="flex-1 h-10 px-4 rounded-lg text-base bg-background text-foreground border border-border flex items-center">
                                     {tool.name}
                                   </div>
+                                  {(() => {
+                                    const saved = tool.isInbuilt
+                                      ? undefined
+                                      : findFormTool(tool.id, tool.name);
+                                    return saved ? (
+                                      <OpenToolButton
+                                        tool={saved}
+                                        accessToken={
+                                          backendAccessToken ?? undefined
+                                        }
+                                        onToolSaved={handleToolSaved}
+                                        className="w-10 h-10"
+                                      />
+                                    ) : null;
+                                  })()}
                                   <button
                                     onClick={() => removeTool(tool.id)}
                                     className="w-10 h-10 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
@@ -5171,6 +5209,25 @@ export function AddTestDialog({
                                         Webhook
                                       </span>
                                     )}
+                                    {(() => {
+                                      const tool = message.isInbuilt
+                                        ? undefined
+                                        : findFormTool(
+                                            message.toolId,
+                                            message.toolName,
+                                          );
+                                      return tool ? (
+                                        <span className="ml-auto">
+                                          <OpenToolButton
+                                            tool={tool}
+                                            accessToken={
+                                              backendAccessToken ?? undefined
+                                            }
+                                            onToolSaved={handleToolSaved}
+                                          />
+                                        </span>
+                                      ) : null;
+                                    })()}
                                   </div>
                                   {message.toolParams &&
                                     message.toolParams.length > 0 && (
@@ -5654,11 +5711,16 @@ export function AddTestDialog({
                                                   addToolCallMessage(
                                                     tool.uuid,
                                                     tool.name,
-                                                    computeToolCallParams(tool),
+                                                    getToolParams(tool),
                                                     tool.config?.type ===
                                                       "webhook",
                                                   );
                                                 }}
+                                                accessToken={
+                                                  backendAccessToken ??
+                                                  undefined
+                                                }
+                                                onToolSaved={handleToolSaved}
                                               />
                                             ) : (
                                               <div className="p-4">
@@ -5981,7 +6043,7 @@ export function AddTestDialog({
           addToolCallMessage(
             tool.uuid,
             tool.name,
-            computeToolCallParams(tool),
+            getToolParams(tool),
             tool.config?.type === "webhook",
           );
           if (!agentUuid) return;
