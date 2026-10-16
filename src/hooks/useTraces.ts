@@ -43,6 +43,8 @@ type UseTracesArgs = {
   sortByEvaluator?: string | null;
   /** Which way that order runs. Ignored without `sortByEvaluator`. */
   sortOrder?: TraceSortOrder;
+  /** Keep only the turns of this conversation. */
+  conversationId?: string | null;
   /** When false, skip polling open scoring runs (tab is off screen). */
   poll?: boolean;
 };
@@ -64,6 +66,7 @@ export function useTraces({
   sortByEvaluator = null,
   sortOrder = "desc",
   poll = true,
+  conversationId = null,
 }: UseTracesArgs) {
   // A new array on every render would restart the fetch forever, so the
   // effects and the fetch key on the labels' text rather than the array.
@@ -97,6 +100,9 @@ export function useTraces({
   // same way, so a caller can tell "this agent has no traces" from "no trace
   // scored like that".
   const [loadedScores, setLoadedScores] = useState<TraceScoreFilters>({});
+  const [loadedConversationId, setLoadedConversationId] = useState<
+    string | null
+  >(null);
   // Monotonic id so a slow, superseded response can never clobber the state
   // written by a newer request (filters change mid-flight, rapid paging).
   // Running averages over every matching trace, kept while paging through the
@@ -119,6 +125,7 @@ export function useTraces({
     scoreKey,
     sortByEvaluator,
     sortOrder,
+    conversationId,
   ]);
 
   const load = useCallback(
@@ -148,6 +155,7 @@ export function useTraces({
           outputType,
           labelKey,
           scoreKey,
+          conversationId,
         ]);
         const wantAverages =
           withAverages || averagesKeyRef.current !== filterKey;
@@ -161,6 +169,7 @@ export function useTraces({
           scores,
           sortByEvaluator,
           sortOrder,
+          conversationId,
           includeScoreAverages: wantAverages,
         });
         if (requestId !== requestIdRef.current) return 0;
@@ -175,6 +184,7 @@ export function useTraces({
         setLoadedOutputType(outputType);
         setLoadedLabels(labels);
         setLoadedScores(scores);
+        setLoadedConversationId(conversationId);
         setLoadedOffset(targetOffset);
         return nextTotal;
       } catch (err) {
@@ -204,6 +214,7 @@ export function useTraces({
       scoreKey,
       sortByEvaluator,
       sortOrder,
+      conversationId,
     ],
   );
 
@@ -268,6 +279,7 @@ export function useTraces({
     loadedOutputType,
     loadedLabels,
     loadedScores,
+    loadedConversationId,
     offset,
     setOffset,
     loadedOffset,

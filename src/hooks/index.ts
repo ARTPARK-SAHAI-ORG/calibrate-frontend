@@ -18,7 +18,7 @@ export {
 } from "./useMaxRowsPerEval";
 export { useTraces } from "./useTraces";
 export { useAgentTraceScoring } from "./useAgentTraceScoring";
-export { useTraceLabels } from "./useTraceLabels";
+export { useTraceConversationIds, useTraceLabels } from "./useTraceLabels";
 export { useAgentTests } from "./useAgentTests";
 export {
   useAgentRuns,

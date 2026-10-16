@@ -1,4 +1,5 @@
 "use client";
+import { InfoNote } from "@/components/ui";
 import { reportError } from "@/lib/reportError";
 import { unwrapList } from "@/lib/api";
 
@@ -475,20 +476,7 @@ export function SpeechToTextEvaluation({
                 {/* WER is a built-in STT metric computed on every run regardless of
                 the evaluators chosen here — make that explicit up front so users
                 know they always get it. */}
-                <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-[12px] md:text-[13px] text-muted-foreground">
-                  <svg
-                    className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.75}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-                    />
-                  </svg>
+                <InfoNote>
                   <span>
                     <span className="font-medium text-foreground">
                       WER (Word Error Rate)
@@ -500,7 +488,7 @@ export function SpeechToTextEvaluation({
                     are always computed for every STT run. Any evaluators you
                     select here run in addition to them.
                   </span>
-                </div>
+                </InfoNote>
                 {/* Built-in LLM-based metrics toggle — computes Sarvam's LLM-judged
                 LLM-WER / LLM-CER (plus intent & entity scores) on top of
                 WER/CER. One switch for the whole bundle; on by default. */}

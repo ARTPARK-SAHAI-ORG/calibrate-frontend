@@ -469,3 +469,132 @@ describe("narrowing by what the evaluators scored", () => {
     ).toEqual(["passed", "failed"]);
   });
 });
+
+it("names the output filter after the agent's output", async () => {
+  const { user } = setup();
+  await openPanel(user);
+  expect(
+    screen.getByText("Filter by type of agent's output"),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText(
+      "Conversations where any of the turns match the filters are shown",
+    ),
+  ).not.toBeInTheDocument();
+});
+
+it("says a conversation matches on any one of its turns", async () => {
+  const user = setupUser();
+  render(
+    <TracesFilter value={NONE} labels={[]} onApply={jest.fn()} forConversations />,
+  );
+  await openPanel(user);
+  expect(
+    screen.getByText("Filter by type of agent's output across turns"),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      "Conversations where any of the turns match the filters are shown",
+    ),
+  ).toBeInTheDocument();
+});
+
+function setupWithConversations(
+  conversationIds: string[],
+  value: TracesFilterValue = NONE,
+) {
+  const onApply = jest.fn();
+  const user = setupUser();
+  render(
+    <TracesFilter
+      value={value}
+      labels={[]}
+      conversationIds={conversationIds}
+      onApply={onApply}
+    />,
+  );
+  return { user, onApply };
+}
+
+/** Picks one choice from the conversation ID dropdown. */
+async function pickConversation(
+  user: ReturnType<typeof setupUser>,
+  name: string,
+) {
+  await user.click(screen.getByRole("button", { name: "Conversation ID" }));
+  await user.click(screen.getByRole("option", { name }));
+}
+
+it("narrows to one conversation picked from the dropdown, and removes just that filter", async () => {
+  const { user, onApply } = setupWithConversations(["conv-2", "conv-1"]);
+  await openPanel(user);
+  expect(
+    screen.getByRole("button", { name: "Conversation ID" }),
+  ).toHaveTextContent("Select a conversation ID");
+
+  await pickConversation(user, "conv-1");
+  // The panel stays open: a click inside the dropdown is not a click outside.
+  expect(applyButton()).toHaveTextContent("Apply (1)");
+  await user.click(applyButton());
+  expect(onApply).toHaveBeenLastCalledWith(
+    expect.objectContaining({ conversationId: "conv-1" }),
+  );
+
+  onApply.mockClear();
+  await openPanel(user);
+  await pickConversation(user, "conv-2");
+  await user.click(
+    screen.getByRole("button", { name: "Remove the conversation filter" }),
+  );
+  expect(
+    screen.queryByRole("button", { name: "Remove the conversation filter" }),
+  ).not.toBeInTheDocument();
+  await user.click(applyButton());
+  expect(onApply.mock.calls[0][0].conversationId).toBeUndefined();
+});
+
+it("searches the conversation IDs", async () => {
+  const { user } = setupWithConversations(["conv-1", "conv-11", "other"]);
+  await openPanel(user);
+  await user.click(screen.getByRole("button", { name: "Conversation ID" }));
+
+  await user.type(
+    screen.getByPlaceholderText("Search conversation IDs"),
+    "conv-11",
+  );
+  expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+    "conv-11",
+  ]);
+});
+
+it("keeps a conversation picked from the address on offer even when the list lacks it", async () => {
+  const { user } = setupWithConversations(["conv-2"], {
+    ...NONE,
+    conversationId: "conv-gone",
+  });
+  await openPanel(user);
+  expect(
+    screen.getByRole("button", { name: "Conversation ID" }),
+  ).toHaveTextContent("conv-gone");
+});
+
+it("leaves the conversation section out when there are no conversation IDs", async () => {
+  const { user } = setup();
+  await openPanel(user);
+  expect(screen.queryByText("Filter by conversation ID")).not.toBeInTheDocument();
+});
+
+it("has no conversation ID box on the conversations list", async () => {
+  const user = setupUser();
+  render(
+    <TracesFilter
+      value={NONE}
+      labels={[]}
+      conversationIds={["conv-1"]}
+      onApply={jest.fn()}
+      forConversations
+    />,
+  );
+  await openPanel(user);
+  expect(screen.queryByText("Filter by conversation ID")).not.toBeInTheDocument();
+});

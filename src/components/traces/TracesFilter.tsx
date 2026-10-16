@@ -1,8 +1,9 @@
 "use client";
 
 import React, { Fragment, useRef, useState } from "react";
-import { SegmentedFilter } from "@/components/ui";
+import { SegmentedFilter, InfoNote } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
+import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { useDismissOnOutside } from "@/hooks/useDismissOnOutside";
 import {
   ChevronDownIcon,
@@ -95,6 +96,8 @@ export type TracesFilterValue = {
   labels: string[];
   /** One condition per evaluator, all of which have to hold. */
   scores: TraceScoreFilters;
+  /** Keep only the turns of this conversation. */
+  conversationId?: string | null;
 };
 
 /** How many choices are on, so the button can say so without being opened.
@@ -104,7 +107,8 @@ function traceFilterCount(value: TracesFilterValue): number {
   return (
     (value.outputType === "all" ? 0 : 1) +
     value.labels.length +
-    Object.keys(value.scores).length
+    Object.keys(value.scores).length +
+    (value.conversationId ? 1 : 0)
   );
 }
 
@@ -119,6 +123,8 @@ export function TracesFilter({
   labels,
   scoreEvaluators = [],
   onApply,
+  forConversations = false,
+  conversationIds = [],
 }: {
   value: TracesFilterValue;
   /** Every label the agent's traces carry, not just the ones on this page. */
@@ -127,6 +133,12 @@ export function TracesFilter({
    *  section out, the way no labels leaves the labels section out. */
   scoreEvaluators?: TraceScoreFilterEvaluator[];
   onApply: (next: TracesFilterValue) => void;
+  /** The list is of conversations, each shown when any one of its turns
+   *  matches. */
+  forConversations?: boolean;
+  /** Every conversation ID on the agent's traces, newest first. None leaves
+   *  the conversation section out. */
+  conversationIds?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<TracesFilterValue>(value);
@@ -198,6 +210,12 @@ export function TracesFilter({
     (evaluator) => !(evaluator.evaluator_uuid in draft.scores),
   );
 
+  // The one picked from the address stays on offer even if the list no longer
+  // has it, so it can still be seen and turned off.
+  const allConversationIds =
+    draft.conversationId && !conversationIds.includes(draft.conversationId)
+      ? [draft.conversationId, ...conversationIds]
+      : conversationIds;
   const shownLabels = labelSearch.trim()
     ? labels.filter((l) =>
         l.toLowerCase().includes(labelSearch.trim().toLowerCase()),
@@ -230,16 +248,70 @@ export function TracesFilter({
         // downward from a toolbar at the top of the tab, so there is room.
         // Switch to a portal if it ever gets clipped.
         <div className="absolute left-0 top-full mt-2 z-30 w-max min-w-[min(30rem,calc(100vw-2rem))] max-w-[min(44rem,calc(100vw-2rem))] rounded-lg border border-border bg-background shadow-lg p-5">
+          {forConversations && (
+            <InfoNote className="mb-4">
+              <span>
+                Conversations where any of the turns match the filters are shown
+              </span>
+            </InfoNote>
+          )}
           <p className="text-sm font-medium text-foreground mb-2">
-            Filter by output type
+            {forConversations
+              ? "Filter by type of agent's output across turns"
+              : "Filter by type of agent's output"}
           </p>
           <SegmentedFilter
             value={draft.outputType}
             onChange={(outputType) => setDraft((d) => ({ ...d, outputType }))}
             options={OUTPUT_FILTER_OPTIONS}
             className="w-fit"
-            ariaLabel="Filter traces by output"
+            ariaLabel={
+              forConversations
+                ? "Filter conversations by output"
+                : "Filter traces by output"
+            }
           />
+
+          {!forConversations && allConversationIds.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="text-sm font-medium text-foreground mb-2">
+                Filter by conversation ID
+              </p>
+              <div className="flex items-center gap-2">
+                <SingleSelectPicker<string>
+                  className="flex-1 min-w-0"
+                  items={allConversationIds}
+                  selectedId={draft.conversationId}
+                  onSelect={(id) =>
+                    setDraft((d) => ({ ...d, conversationId: id }))
+                  }
+                  getId={(id) => id}
+                  compact
+                  ariaLabel="Conversation ID"
+                  placeholder="Select a conversation ID"
+                  searchPlaceholder="Search conversation IDs"
+                  emptyLabel="No conversation IDs match your search"
+                  matchesSearch={(id, q) =>
+                    id.toLowerCase().includes(q.trim().toLowerCase())
+                  }
+                  renderTrigger={(id) => id}
+                  renderOption={(id) => <span className="truncate">{id}</span>}
+                />
+                {draft.conversationId && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDraft((d) => ({ ...d, conversationId: null }))
+                    }
+                    aria-label="Remove the conversation filter"
+                    className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {scoreEvaluators.length > 0 && (
             <div className="mt-4 pt-4 border-t border-border">
@@ -380,7 +452,12 @@ export function TracesFilter({
             <button
               type="button"
               onClick={() =>
-                setDraft({ outputType: "all", labels: [], scores: {} })
+                setDraft({
+                  outputType: "all",
+                  labels: [],
+                  scores: {},
+                  conversationId: null,
+                })
               }
               disabled={draftCount === 0}
               className="text-sm font-medium text-foreground hover:opacity-70 transition-opacity cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
@@ -394,7 +471,10 @@ export function TracesFilter({
             <button
               type="button"
               onClick={() => {
-                onApply(draft);
+                onApply({
+                  ...draft,
+                  conversationId: draft.conversationId || undefined,
+                });
                 setOpen(false);
               }}
               className="h-8 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"

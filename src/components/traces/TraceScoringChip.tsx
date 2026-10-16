@@ -1,5 +1,6 @@
 "use client";
 
+import { InfoNote } from "@/components/ui";
 import React, { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { CheckIcon, XIcon } from "@/components/icons";
@@ -33,27 +34,13 @@ export function TraceScoringChip({ traceScoring }: TraceScoringChipProps) {
     <div className="space-y-6 text-left">
       {/* The blue note the trace setup steps use, so a point of information
           reads the same wherever it appears. */}
-      <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs leading-relaxed text-blue-900">
-        <svg
-          className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={1.75}
-          aria-hidden
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
+      <InfoNote>
         <span>
           {traceScoring.enabled
             ? "Click to turn off. New traces will no longer be scored automatically. Past traces with existing scores remain unaffected."
             : "Click to turn on. New traces will be scored using the evaluators below. Past traces with no scores remain unaffected."}
         </span>
-      </div>
+      </InfoNote>
 
       {eligible.length > 0 && (
         <div className="space-y-1.5">

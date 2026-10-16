@@ -56,8 +56,21 @@ describe("useTraces", () => {
       scores: {},
       sortByEvaluator: null,
       sortOrder: "desc",
+      conversationId: null,
       includeScoreAverages: true,
     });
+  });
+
+  it("asks for one conversation's turns", async () => {
+    renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1", conversationId: "conv-1" }),
+    );
+    await waitFor(() =>
+      expect(mockFetchTraces).toHaveBeenCalledWith(
+        "tok",
+        expect.objectContaining({ conversationId: "conv-1" }),
+      ),
+    );
   });
 
   it("sends the output filter and returns to the first page when it changes", async () => {
@@ -418,6 +431,7 @@ describe("useTraces", () => {
         scores: {},
         sortByEvaluator: null,
         sortOrder: "desc",
+        conversationId: null,
         includeScoreAverages: true,
       }),
     );

@@ -25,7 +25,22 @@ describe("readTraceView", () => {
       scores: { "ev-1": "failed", "ev-2": "<=2" },
       sortByEvaluator: "ev-2",
       sortOrder: "desc",
+      conversations: false,
+      conversationId: null,
     });
+  });
+
+  it("reads and writes the conversations view", () => {
+    setSearch("?tab=monitoring&view=conversations");
+    expect(readTraceView().conversations).toBe(true);
+
+    writeTraceView(EMPTY_TRACE_VIEW);
+    expect(window.location.search).toBe("?tab=monitoring");
+
+    writeTraceView({ ...EMPTY_TRACE_VIEW, conversations: true });
+    expect(new URLSearchParams(window.location.search).get("view")).toBe(
+      "conversations",
+    );
   });
 
   it("falls back to everything, newest first, when the address says nothing", () => {
@@ -111,6 +126,8 @@ describe("writeTraceView", () => {
       scores: { "ev-1": "passed", "ev-2": "<=3" },
       sortByEvaluator: "ev-1",
       sortOrder: "desc" as const,
+      conversations: true,
+      conversationId: "conv a/1",
     };
 
     writeTraceView(view);
@@ -133,6 +150,8 @@ describe("useTraceView", () => {
       scores: { "ev-1": "failed" },
       sortByEvaluator: "ev-1",
       sortOrder: "desc",
+      conversations: false,
+      conversationId: null,
     });
   });
 

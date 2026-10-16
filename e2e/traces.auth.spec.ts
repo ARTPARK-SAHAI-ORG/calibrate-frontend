@@ -199,6 +199,102 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     await deleteAgent(page, otherName);
   });
 
+  test("groups traces by conversation, shows a whole conversation, and opens its traces", async ({
+    page,
+  }) => {
+    const name = `E2E Conversations Agent ${Date.now()}`;
+    const agentUuid = await createAgent(page, name);
+    const headers = await ingestHeaders(page);
+    const stamp = Date.now();
+    const convA = `e2e-conv-a-${stamp}`;
+    const convB = `e2e-conv-b-${stamp}`;
+    const send = async (data: Record<string, unknown>) => {
+      const res = await page.request.post(`${BACKEND}/traces`, {
+        headers,
+        data: { agent_id: agentUuid, ...data },
+      });
+      expect(res.ok()).toBeTruthy();
+    };
+
+    // Conversation A has two traces, the second carrying the history so far,
+    // the way a customer's agent sends each turn.
+    const firstQuestion = `When is the next dose ${stamp}?`;
+    const firstReply = "At 14 weeks.";
+    const secondQuestion = `Can I book it for Friday ${stamp}?`;
+    const secondReply = "Booked for Friday at 10am.";
+    await send({
+      conversation_id: convA,
+      input: [{ role: "user", content: firstQuestion }],
+      output: { response: firstReply },
+    });
+    await send({
+      conversation_id: convA,
+      input: [
+        { role: "user", content: firstQuestion },
+        { role: "assistant", content: firstReply },
+        { role: "user", content: secondQuestion },
+      ],
+      output: { response: secondReply },
+    });
+    const otherQuestion = `What are your opening hours ${stamp}?`;
+    await send({
+      conversation_id: convB,
+      input: [{ role: "user", content: otherQuestion }],
+      output: { response: "9am to 5pm." },
+    });
+    // No conversation ID: listed under Traces only.
+    const looseQuestion = `Is parking free ${stamp}?`;
+    await send({
+      input: [{ role: "user", content: looseQuestion }],
+      output: { response: "Yes." },
+    });
+
+    await page.goto(`/agents/${agentUuid}`);
+    await waitForOrgReady(page);
+    await openTracesTab(page);
+    await expect(page.getByText(looseQuestion).first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    // One row per conversation; the trace without an ID is not one.
+    await page.getByRole("button", { name: "Conversations", exact: true }).click();
+    await expect(page).toHaveURL(/view=conversations/);
+    await expect(page.getByText(convA).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(convB).first()).toBeVisible();
+    await expect(page.getByText("2 conversations")).toBeVisible();
+    await expect(page.getByText(looseQuestion)).toHaveCount(0);
+
+    // The window shows the whole conversation: both questions, both replies.
+    await page.getByText(convA).first().click();
+    const dialog = page.locator(".fixed.inset-0.z-50");
+    await expect(
+      dialog.getByRole("heading", { name: convA, exact: true }),
+    ).toBeVisible();
+    await expect(dialog.getByText(firstQuestion)).toBeVisible();
+    await expect(dialog.getByText(firstReply)).toBeVisible();
+    await expect(dialog.getByText(secondQuestion)).toBeVisible();
+    await expect(dialog.getByText(secondReply)).toBeVisible();
+
+    // View traces opens a new tab listing only this conversation's traces.
+    const [tracesTab] = await Promise.all([
+      page.waitForEvent("popup"),
+      dialog.getByRole("link", { name: "View traces" }).click(),
+    ]);
+    await expect(tracesTab).toHaveURL(
+      new RegExp(`conversation=${encodeURIComponent(convA)}`),
+    );
+    await expect(tracesTab.getByText("2 traces")).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(tracesTab.getByText(secondQuestion).first()).toBeVisible();
+    await expect(tracesTab.getByText(otherQuestion)).toHaveCount(0);
+    await expect(tracesTab.getByText(looseQuestion)).toHaveCount(0);
+    await tracesTab.close();
+
+    await deleteAllTracesOfAgent(page, headers, agentUuid);
+    await deleteAgent(page, name);
+  });
+
   test("adds a selected trace to tests on the same agent", async ({ page }) => {
     const name = `E2E Traces Convert ${Date.now()}`;
     const agentUuid = await createAgent(page, name);
