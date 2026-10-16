@@ -146,7 +146,7 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
     />,
   );
   expect(
-    screen.getByText("No evaluators could score this trace."),
+    screen.getByText("No evaluators could score this trace"),
   ).toBeInTheDocument();
   expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
 
@@ -180,7 +180,7 @@ it("shows every reason a trace was not scored as a warning, not a note", () => {
   const box = container.querySelector(".border-amber-500\\/40");
   expect(box).not.toBeNull();
   expect(box).toHaveTextContent(
-    "Monitoring was turned off before this trace was scored.",
+    "Monitoring was turned off before this trace was scored",
   );
   expect(box?.querySelector("p")?.className).toContain("text-amber-700");
   // Only the limit has somewhere for the reader to go next.
@@ -210,7 +210,7 @@ it("does not offer the contact link once the workspace uses its own provider key
   const { container } = render(<TraceScorePanel run={prior} />);
 
   expect(container.querySelector(".border-amber-500\\/40")).toHaveTextContent(
-    "This trace was not scored because the workspace had reached its scoring limit at the time.",
+    /^This trace was not scored because the workspace had reached its scoring limit at the time$/,
   );
   expect(screen.queryByRole("link")).not.toBeInTheDocument();
 });
