@@ -1103,9 +1103,10 @@ describe("showing a whole conversation", () => {
       />,
     );
 
-    const link = screen.getByRole("link", {
+    const link = await screen.findByRole("link", {
       name: "Open this conversation's traces",
     });
+    expect(link).toHaveTextContent("View turns");
     expect(link.getAttribute("href")).toContain(
       "/agents/ag-1?tab=monitoring&conversation=conv%20a%2F1",
     );

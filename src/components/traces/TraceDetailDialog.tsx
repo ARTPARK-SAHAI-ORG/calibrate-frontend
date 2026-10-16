@@ -215,7 +215,23 @@ function ConversationMetaPanel({
   return (
     <div className="p-4 md:p-6 space-y-4">
       <MetaBlock label="Conversation" value={conversation.conversation_id} />
-      <MetaBlock label="Turns" value={String(conversation.turn_count)} />
+      <div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-foreground">Turns</span>
+          <Link
+            href={`/agents/${conversation.agent_id}?tab=monitoring&conversation=${encodeURIComponent(conversation.conversation_id)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open this conversation's traces"
+            className="text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline"
+          >
+            View turns ↗
+          </Link>
+        </div>
+        <span className="block text-xs text-foreground">
+          {conversation.turn_count}
+        </span>
+      </div>
       <MetaBlock
         label="Started"
         value={formatTraceDate(conversation.first_turn_at)}
@@ -444,20 +460,6 @@ export function TraceDetailDialog({
           {/* Kept together so both sit in the top right corner. Loose in the
               header they would be spread apart by the row's own spacing. */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            {conversation && (
-              <Link
-                href={`/agents/${conversation.agent_id}?tab=monitoring&conversation=${encodeURIComponent(conversation.conversation_id)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Open this conversation's traces"
-                className="inline-flex items-center h-8 px-3 rounded-md text-sm font-medium border border-blue-500/30 bg-blue-500/5 text-blue-900 dark:text-blue-300 hover:bg-blue-500/10 transition-colors whitespace-nowrap"
-              >
-                <span className="hidden sm:inline">
-                  Open this conversation&apos;s traces
-                </span>
-                <span className="sm:hidden">Open traces</span>
-              </Link>
-            )}
             {/* Only while this trace is in the selection: the count answers
                 "what did that press do", so it goes away with the trace it
                 was counting. */}
