@@ -448,7 +448,7 @@ export function TraceDetailDialog({
                 href={`/agents/${conversation.agent_id}?tab=monitoring&conversation=${encodeURIComponent(conversation.conversation_id)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-2.5 py-0.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-xs font-medium text-blue-700 dark:text-blue-300 transition-colors whitespace-nowrap"
+                className="h-8 px-3 rounded-md text-sm font-medium flex items-center justify-center gap-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 transition-colors whitespace-nowrap"
               >
                 View traces
               </Link>
