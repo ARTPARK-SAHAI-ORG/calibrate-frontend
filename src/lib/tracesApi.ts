@@ -209,6 +209,8 @@ export type TraceListParams = {
    *  output has tool calls and no reply ("tool_call"). "all" keeps everything
    *  and is left off here. */
   outputType?: TraceOutputFilter;
+  /** Keep only the turns of this conversation. */
+  conversationId?: string | null;
   /** Ask for `score_averages` beside the page. Costly, so only when the
    *  filters change rather than on every page or poll. */
   includeScoreAverages?: boolean;
@@ -245,12 +247,14 @@ export async function fetchTraces(
     sortByEvaluator,
     sortOrder,
     includeScoreAverages,
+    conversationId,
   }: TraceListParams,
 ): Promise<Paginated<TraceSummary> & { score_averages?: TraceScoreAverage[] }> {
   const params = new URLSearchParams();
   params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
   params.set("offset", String(offset));
   params.set("agent_id", agentId);
+  if (conversationId) params.set("conversation_id", conversationId);
   if (q?.trim()) params.set("q", q.trim());
   if (outputType && outputType !== "all") {
     params.set("output_type", outputType);
@@ -267,6 +271,53 @@ export async function fetchTraces(
   return apiGet<
     Paginated<TraceSummary> & { score_averages?: TraceScoreAverage[] }
   >(`/traces?${params.toString()}`, accessToken);
+}
+
+/** One row of `GET /traces/conversations`: the traces one agent stored under
+ *  one conversation ID. */
+export type TraceConversation = {
+  conversation_id: string;
+  agent_id: string;
+  first_turn_at: string;
+  last_turn_at: string;
+  /** The first user message in the conversation, shortened. */
+  first_message_preview?: string | null;
+  /** The newest trace. Its stored history plus its reply is the whole
+   *  conversation. */
+  last_turn: TraceSummary;
+};
+
+/** One page of an agent's conversations, newest activity first. Traces sent
+ *  without a conversation ID are not part of any. */
+export async function fetchTraceConversations(
+  accessToken: string,
+  {
+    limit,
+    offset,
+    agentId,
+    q,
+    outputType,
+    labels,
+    conversationId,
+  }: Pick<
+    TraceListParams,
+    "limit" | "offset" | "agentId" | "q" | "outputType" | "labels" | "conversationId"
+  >,
+): Promise<Paginated<TraceConversation>> {
+  const params = new URLSearchParams();
+  params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
+  params.set("offset", String(offset));
+  params.set("agent_id", agentId);
+  if (q?.trim()) params.set("q", q.trim());
+  if (outputType && outputType !== "all") {
+    params.set("output_type", outputType);
+  }
+  for (const label of labels ?? []) params.append("labels", label);
+  if (conversationId) params.set("conversation_id", conversationId);
+  return apiGet<Paginated<TraceConversation>>(
+    `/traces/conversations?${params.toString()}`,
+    accessToken,
+  );
 }
 
 /** Fetch one trace with its full conversation history, output, and metadata. */
@@ -358,6 +409,18 @@ export async function fetchTraceUsage(
   return apiGet<TraceUsage>("/traces/usage", accessToken);
 }
 
+/** Every conversation ID on this agent's traces, newest activity first. */
+export async function fetchTraceConversationIds(
+  accessToken: string,
+  agentId: string,
+): Promise<string[]> {
+  const data = await apiGet<{ conversation_ids?: string[] }>(
+    `/traces/conversation-ids?agent_id=${encodeURIComponent(agentId)}`,
+    accessToken,
+  );
+  return data.conversation_ids ?? [];
+}
+
 /**
  * The labels sent with this agent's traces, so the filter can offer them.
  * The list is server-paginated and holds one page, so the labels on screen
@@ -411,6 +474,8 @@ export type TraceFilters = {
   outputType?: TraceOutputFilter;
   labels?: string[];
   scores?: TraceScoreFilters;
+  /** Keep only the turns of this conversation. */
+  conversationId?: string | null;
 };
 
 /** Turn the filters into the fields both bulk endpoints read. */
@@ -424,6 +489,7 @@ export function selectAllBody(filters: TraceFilters): Record<string, unknown> {
     body.output_type = filters.outputType;
   }
   if (filters.labels?.length) body.labels = filters.labels;
+  if (filters.conversationId) body.conversation_id = filters.conversationId;
   const score = traceScoreParams(filters.scores);
   if (score.length) body.score = score;
   return body;

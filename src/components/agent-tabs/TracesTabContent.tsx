@@ -29,6 +29,7 @@ import {
   type TraceScoreFilterEvaluator,
 } from "@/components/traces/TracesFilter";
 import { TracesSort } from "@/components/traces/TracesSort";
+import { ConversationsView } from "@/components/traces/ConversationsView";
 import { useTraceView } from "@/components/traces/traceViewUrl";
 import { CodeIcon, SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
@@ -36,6 +37,7 @@ import {
   Button,
   LoadingState,
   SearchInput,
+  SegmentedFilter,
   ServerPaginatedListBar,
 } from "@/components/ui";
 import { useAgentDefaultsPrompt } from "@/hooks/useAgentDefaultsPrompt";
@@ -44,6 +46,7 @@ import {
   useDialogUrlParam,
   useItemPager,
   usePageSize,
+  useTraceConversationIds,
   useTraceDeletion,
   useTraceLabels,
   useTraces,
@@ -139,6 +142,8 @@ export function TracesTabContent({
     scores: scoreFilter,
     sortByEvaluator,
     sortOrder,
+    conversations: showConversations,
+    conversationId: conversationFilter,
   } = view;
 
   // The tags sent with the traces, and the ones picked to filter by. A trace
@@ -148,6 +153,8 @@ export function TracesTabContent({
     accessToken,
     agentUuid,
   );
+  const { conversationIds, refetch: refetchConversationIds } =
+    useTraceConversationIds(accessToken, agentUuid);
 
   // One condition per evaluator, all of which have to hold. They are picked
   // in the same panel as the output kind and the labels, and applied with
@@ -174,6 +181,7 @@ export function TracesTabContent({
     loadedOutputType,
     loadedLabels,
     loadedScores,
+    loadedConversationId,
     scoreAverages,
     offset,
     setOffset,
@@ -196,7 +204,8 @@ export function TracesTabContent({
     scores: scoreFilter,
     sortByEvaluator,
     sortOrder,
-    poll: isActive,
+    poll: isActive && !showConversations,
+    conversationId: conversationFilter,
   });
 
   // Every trace the list matches, not only the ticked ones. The two bulk
@@ -209,6 +218,7 @@ export function TracesTabContent({
     outputType: outputFilter,
     labels: labelFilter,
     scores: scoreFilter,
+    conversationId: conversationFilter,
   };
 
   const deletion = useTraceDeletion({
@@ -407,6 +417,7 @@ export function TracesTabContent({
             q: search,
             labels: labelFilter,
             scores: scoreFilter,
+            conversationId: conversationFilter,
             outputType,
           }),
         ),
@@ -451,7 +462,7 @@ export function TracesTabContent({
     // the reader, never which traces the list matches, so a tick survives it
     // the same way it survives a page turn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, outputFilter, labelFilter, scoreFilter]);
+  }, [search, outputFilter, labelFilter, scoreFilter, conversationFilter]);
   // Unticking a row is the reader narrowing what they want, so the whole list
   // is no longer what they asked for.
   useEffect(() => {
@@ -625,6 +636,7 @@ export function TracesTabContent({
       // New traces can carry labels nothing has seen yet, so the filter's
       // choices are read again with them.
       refetchLabels();
+      refetchConversationIds();
       await refetch();
     } finally {
       setIsRefreshing(false);
@@ -635,7 +647,10 @@ export function TracesTabContent({
   const { setParam: setTraceParam } = useDialogUrlParam({
     param: "traceId",
     onOpen: (value) => setOpenTraceUuid(value),
-    onClose: () => setOpenTraceUuid(null),
+    onClose: () => {
+      itemPager.cancel();
+      setOpenTraceUuid(null);
+    },
   });
   const openTrace = (uuid: string) => {
     setOpenTraceUuid(uuid);
@@ -686,6 +701,8 @@ export function TracesTabContent({
   // on screen are still the filtered ones until a cleared filter has loaded
   // back.
   const isFiltering =
+    conversationFilter != null ||
+    loadedConversationId != null ||
     isFilteringOutput ||
     labelFilter.length > 0 ||
     loadedLabels.length > 0 ||
@@ -724,6 +741,7 @@ export function TracesTabContent({
       onCheckForTraces={async () => {
         // The first trace is also the first chance to have labels.
         refetchLabels();
+        refetchConversationIds();
         return refetch();
       }}
     />
@@ -771,8 +789,37 @@ export function TracesTabContent({
     );
   }
 
+  const viewSwitch = hasLoaded && !showEmptyState && (
+    <SegmentedFilter
+      value={showConversations ? "conversations" : "traces"}
+      onChange={(next) => setView({ conversations: next === "conversations" })}
+      options={[
+        { value: "traces", label: "Traces" },
+        { value: "conversations", label: "Conversations" },
+      ]}
+      ariaLabel="Show traces or conversations"
+      className="self-start"
+    />
+  );
+
+  if (showConversations && viewSwitch) {
+    return (
+      <div className="flex flex-col space-y-4 md:space-y-6">
+        {viewSwitch}
+        <ConversationsView
+          agentUuid={agentUuid}
+          outputType={outputFilter}
+          labels={labelFilter}
+          allLabels={allLabels}
+          onFilterChange={(next) => setView(next)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
+      {viewSwitch}
       {/* Shown even over the setup steps: with storage full, the very thing
           those steps ask for cannot happen, and the reader would be left
           sending traces that are quietly turned away. */}
@@ -847,14 +894,17 @@ export function TracesTabContent({
               outputType: outputFilter,
               labels: labelFilter,
               scores: scoreFilter,
+              conversationId: conversationFilter,
             }}
             labels={allLabels}
             scoreEvaluators={scoreFilterEvaluators}
+            conversationIds={conversationIds}
             onApply={(next) =>
               setView({
                 outputType: next.outputType,
                 labels: next.labels,
                 scores: next.scores,
+                conversationId: next.conversationId ?? null,
               })
             }
           />

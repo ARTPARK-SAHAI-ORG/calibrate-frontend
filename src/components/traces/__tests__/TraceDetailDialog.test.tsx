@@ -6,7 +6,13 @@ import {
   toTestCaseOutput,
   turnsToHistory,
 } from "../TraceDetailDialog";
-import { fetchTrace, fetchTraceScores, TraceDetail } from "@/lib/tracesApi";
+import {
+  fetchTrace,
+  fetchTraceScores,
+  TraceConversation,
+  TraceDetail,
+} from "@/lib/tracesApi";
+import { formatTraceDate } from "../TracesTable";
 
 jest.mock("../../../lib/tracesApi", () => ({
   __esModule: true,
@@ -1024,5 +1030,108 @@ describe("adding the open trace to the selection", () => {
     expect(
       screen.queryByText("Add trace to selection"),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("showing a whole conversation", () => {
+  const conversation: TraceConversation = {
+    conversation_id: "conv-1",
+    agent_id: "ag-1",
+    first_turn_at: "2026-07-20T09:00:00Z",
+    last_turn_at: "2026-07-20T10:00:00Z",
+    last_turn: {
+      uuid: "t-last",
+      agent_id: "ag-1",
+      message_id: "msg-3",
+      conversation_id: "conv-1",
+      input_preview: null,
+      response_preview: null,
+      turn_count: 3,
+      tool_call_count: 0,
+      metadata_count: 0,
+      created_at: "2026-07-20T10:00:00Z",
+    },
+  };
+
+  it("draws the newest turn's trace under the conversation id, with no scores", async () => {
+    mockFetchTrace.mockResolvedValue({ ...detail, uuid: "t-last" });
+
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+        conversation={conversation}
+      />,
+    );
+
+    await screen.findByText("At 14 weeks, for OPV and DPT.");
+    expect(mockFetchTrace).toHaveBeenCalledWith("tok", "t-last");
+    expect(mockFetchTraceScores).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "conv-1" })).toBeInTheDocument();
+    expect(screen.queryByText("Traces")).not.toBeInTheDocument();
+    expect(screen.getByText("Started")).toBeInTheDocument();
+    expect(
+      screen.getByText(formatTraceDate("2026-07-20T09:00:00Z")),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Last activity")).toBeInTheDocument();
+    expect(
+      screen.getByText(formatTraceDate("2026-07-20T10:00:00Z")),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Created")).not.toBeInTheDocument();
+  });
+
+  it("links to the conversation's traces in a new browser tab", async () => {
+    mockFetchTrace.mockResolvedValue({ ...detail, uuid: "t-last" });
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+        conversation={{ ...conversation, conversation_id: "conv a/1" }}
+      />,
+    );
+
+    const link = await screen.findByRole("link", {
+      name: "View traces",
+    });
+    expect(link).toHaveTextContent("View traces");
+    expect(link.getAttribute("href")).toContain(
+      "/agents/ag-1?tab=monitoring&conversation=conv%20a%2F1",
+    );
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
+  it("has no conversation link on a single trace", async () => {
+    mockFetchTrace.mockResolvedValue(detail);
+    render(
+      <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+    );
+    await screen.findByText("At 14 weeks, for OPV and DPT.");
+    expect(
+      screen.queryByRole("link", { name: "View traces" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says the conversation failed to load", async () => {
+    mockFetchTrace.mockRejectedValue(new Error("boom"));
+
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid={null}
+        conversation={conversation}
+      />,
+    );
+
+    expect(
+      await screen.findByText(
+        "Failed to load this conversation. Please try again.",
+      ),
+    ).toBeInTheDocument();
   });
 });

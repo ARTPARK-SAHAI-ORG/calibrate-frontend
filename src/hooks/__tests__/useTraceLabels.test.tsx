@@ -1,11 +1,18 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { useTraceLabels } from "@/hooks/useTraceLabels";
-import { fetchTraceLabels } from "@/lib/tracesApi";
+import {
+  useTraceConversationIds,
+  useTraceLabels,
+} from "@/hooks/useTraceLabels";
+import {
+  fetchTraceConversationIds,
+  fetchTraceLabels,
+} from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 
 jest.mock("../../lib/tracesApi", () => ({
   __esModule: true,
   fetchTraceLabels: jest.fn(),
+  fetchTraceConversationIds: jest.fn(),
 }));
 jest.mock("../../lib/reportError", () => ({
   __esModule: true,
@@ -105,5 +112,22 @@ describe("useTraceLabels", () => {
     act(() => result.current.refetch());
 
     await waitFor(() => expect(result.current.labels).toEqual(["production"]));
+  });
+});
+
+describe("useTraceConversationIds", () => {
+  it("loads the agent's conversation IDs, and an empty list on failure", async () => {
+    const mockFetch = fetchTraceConversationIds as jest.Mock;
+    mockFetch.mockResolvedValue(["conv-2", "conv-1"]);
+    const { result } = renderHook(() => useTraceConversationIds("tok", "ag-1"));
+    await waitFor(() =>
+      expect(result.current.conversationIds).toEqual(["conv-2", "conv-1"]),
+    );
+    expect(mockFetch).toHaveBeenCalledWith("tok", "ag-1");
+
+    mockFetch.mockRejectedValue(new Error("down"));
+    act(() => result.current.refetch());
+    await waitFor(() => expect(result.current.conversationIds).toEqual([]));
+    expect(mockReportError).toHaveBeenCalled();
   });
 });

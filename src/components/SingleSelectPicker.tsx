@@ -173,7 +173,9 @@ export function SingleSelectPicker<T>({
         !disabled &&
         typeof window !== "undefined" &&
         createPortal(
-          <>
+          // Marked so a panel that closes on outside clicks can tell a click
+          // in this floating list from one outside both (useDismissOnOutside).
+          <div data-floating-picker="">
             <div
               className="fixed inset-0 z-[99]"
               onClick={() => setOpen(false)}
@@ -309,7 +311,7 @@ export function SingleSelectPicker<T>({
                 )}
               </div>
             </div>
-          </>,
+          </div>,
           document.body,
         )}
     </div>

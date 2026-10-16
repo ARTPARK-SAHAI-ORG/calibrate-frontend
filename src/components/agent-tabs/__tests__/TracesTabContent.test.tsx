@@ -18,6 +18,10 @@ jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
   useTraces: (args: unknown) => mockUseTraces(args),
   useTraceLabels: () => mockUseTraceLabels(),
+  useTraceConversationIds: () => ({
+    conversationIds: ["conv-9", "conv-1"],
+    refetch: jest.fn(),
+  }),
   // Selection is real: the convert/delete buttons only appear once a row is
   // ticked, which the selection tests exercise.
   useTraceDeletion: jest.requireActual("../../../hooks/useTraceDeletion")
@@ -54,6 +58,12 @@ jest.mock("../../../lib/evaluatorApi", () => ({
   fetchAgentEvaluators: () => fetchAgentEvaluators(),
   fetchAllEvaluators: async () => [],
   addEvaluatorsToAgent: (...args: unknown[]) => addEvaluatorsToAgent(...args),
+}));
+
+jest.mock("../../traces/ConversationsView", () => ({
+  ConversationsView: ({ labels }: { labels: string[] }) => (
+    <div data-testid="conversations-view">{labels.join(",")}</div>
+  ),
 }));
 
 const reportError = jest.fn();
@@ -507,13 +517,71 @@ describe("TracesTabContent", () => {
     // Nothing typed yet, so the whole list is asked for.
     expect(lastTracesArgs().q).toBe("");
     expect(lastTracesArgs().poll).toBe(true);
-    expect(lastTracesArgs()).not.toHaveProperty("conversationId");
+    expect(lastTracesArgs().conversationId).toBeNull();
     expect(mockUseDialogUrlParam).toHaveBeenCalledWith(
       expect.objectContaining({ param: "traceId" }),
     );
     expect(mockUseDialogUrlParam).not.toHaveBeenCalledWith(
       expect.objectContaining({ param: "conversation_id" }),
     );
+  });
+
+  it("switches between the traces and the conversations", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+    expect(screen.queryByTestId("conversations-view")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Conversations" }));
+
+    expect(screen.getByTestId("conversations-view")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Search traces")).not.toBeInTheDocument();
+    // The trace list is off screen, so it stops asking for new traces.
+    expect(lastTracesArgs().poll).toBe(false);
+    expect(new URLSearchParams(window.location.search).get("view")).toBe(
+      "conversations",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Traces" }));
+    expect(screen.queryByTestId("conversations-view")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search traces")).toBeInTheDocument();
+  });
+
+  it("lists one conversation's traces when the address names it, until the filter is cleared", async () => {
+    window.history.replaceState(null, "", "/?conversation=conv-1");
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    expect(lastTracesArgs().conversationId).toBe("conv-1");
+
+    await openTraceFilter(user);
+    expect(
+      screen.getByRole("button", { name: "Conversation ID" }),
+    ).toHaveTextContent("conv-1");
+    await user.click(screen.getByRole("button", { name: "Clear all filters" }));
+    await user.click(screen.getByRole("button", { name: /^Apply/ }));
+
+    expect(lastTracesArgs().conversationId).toBeNull();
+    expect(
+      new URLSearchParams(window.location.search).has("conversation"),
+    ).toBe(false);
+  });
+
+  it("lists one conversation's traces when it is picked in the filter", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await openTraceFilter(user);
+    await user.click(screen.getByRole("button", { name: "Conversation ID" }));
+    await user.click(screen.getByRole("option", { name: "conv-9" }));
+    await user.click(screen.getByRole("button", { name: /^Apply/ }));
+
+    expect(lastTracesArgs().conversationId).toBe("conv-9");
+  });
+
+  it("opens on the conversations when the address asks for them", () => {
+    window.history.replaceState(null, "", "/?view=conversations&label=vip");
+    render(<TracesTabContent {...tabProps} />);
+    expect(screen.getByTestId("conversations-view")).toHaveTextContent("vip");
   });
 
   it("pauses polling while the tab is hidden", () => {

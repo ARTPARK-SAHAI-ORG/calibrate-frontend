@@ -1,5 +1,6 @@
 "use client";
 
+import { InfoNote } from "@/components/ui";
 import React, { useState } from "react";
 import { Link } from "@/lib/nav";
 import { getBackendUrl } from "@/lib/api";
@@ -179,21 +180,7 @@ export function TraceIngestSnippet({
         }`}
       >
         {!apiKey && (
-          <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-muted-foreground">
-            <svg
-              className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-              />
-            </svg>
+          <InfoNote>
             <p>
               Replace{" "}
               <span className="font-mono text-foreground">
@@ -208,7 +195,7 @@ export function TraceIngestSnippet({
               </Link>{" "}
               page
             </p>
-          </div>
+          </InfoNote>
         )}
         <FieldList optional={false} agentNature={agentNature} />
         <div className="space-y-2">

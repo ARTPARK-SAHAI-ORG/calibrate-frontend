@@ -18,7 +18,11 @@ export function useDismissOnOutside(
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) onDismiss();
+      const target = e.target as Element;
+      if (ref.current?.contains(target)) return;
+      // A dropdown opened from inside the panel floats outside it.
+      if (target.closest?.("[data-floating-picker]")) return;
+      onDismiss();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onDismiss();
