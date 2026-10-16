@@ -469,3 +469,32 @@ describe("narrowing by what the evaluators scored", () => {
     ).toEqual(["passed", "failed"]);
   });
 });
+
+it("names the output filter after the agent's output", async () => {
+  const { user } = setup();
+  await openPanel(user);
+  expect(
+    screen.getByText("Filter by type of agent's output"),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText(
+      "Conversations where any of the turns match the filters are shown.",
+    ),
+  ).not.toBeInTheDocument();
+});
+
+it("says a conversation matches on any one of its turns", async () => {
+  const user = setupUser();
+  render(
+    <TracesFilter value={NONE} labels={[]} onApply={jest.fn()} forConversations />,
+  );
+  await openPanel(user);
+  expect(
+    screen.getByText("Filter by type of agent's output across turns"),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      "Conversations where any of the turns match the filters are shown.",
+    ),
+  ).toBeInTheDocument();
+});

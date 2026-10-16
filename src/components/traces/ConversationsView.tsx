@@ -152,6 +152,7 @@ export function ConversationsView({
           value={{ outputType, labels, scores: {} }}
           labels={allLabels}
           scoreEvaluators={[]}
+          forConversations
           onApply={(next) =>
             onFilterChange({ outputType: next.outputType, labels: next.labels })
           }

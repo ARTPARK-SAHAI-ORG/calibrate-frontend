@@ -119,6 +119,7 @@ export function TracesFilter({
   labels,
   scoreEvaluators = [],
   onApply,
+  forConversations = false,
 }: {
   value: TracesFilterValue;
   /** Every label the agent's traces carry, not just the ones on this page. */
@@ -127,6 +128,9 @@ export function TracesFilter({
    *  section out, the way no labels leaves the labels section out. */
   scoreEvaluators?: TraceScoreFilterEvaluator[];
   onApply: (next: TracesFilterValue) => void;
+  /** The list is of conversations, each shown when any one of its turns
+   *  matches. */
+  forConversations?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<TracesFilterValue>(value);
@@ -230,8 +234,15 @@ export function TracesFilter({
         // downward from a toolbar at the top of the tab, so there is room.
         // Switch to a portal if it ever gets clipped.
         <div className="absolute left-0 top-full mt-2 z-30 w-max min-w-[min(30rem,calc(100vw-2rem))] max-w-[min(44rem,calc(100vw-2rem))] rounded-lg border border-border bg-background shadow-lg p-5">
+          {forConversations && (
+            <p className="text-sm text-muted-foreground mb-4">
+              Conversations where any of the turns match the filters are shown.
+            </p>
+          )}
           <p className="text-sm font-medium text-foreground mb-2">
-            Filter by output type
+            {forConversations
+              ? "Filter by type of agent's output across turns"
+              : "Filter by type of agent's output"}
           </p>
           <SegmentedFilter
             value={draft.outputType}
