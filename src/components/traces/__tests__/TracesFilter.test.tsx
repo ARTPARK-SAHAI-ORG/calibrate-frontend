@@ -478,7 +478,7 @@ it("names the output filter after the agent's output", async () => {
   ).toBeInTheDocument();
   expect(
     screen.queryByText(
-      "Conversations where any of the turns match the filters are shown.",
+      "Conversations where any of the turns match the filters are shown",
     ),
   ).not.toBeInTheDocument();
 });
@@ -494,7 +494,7 @@ it("says a conversation matches on any one of its turns", async () => {
   ).toBeInTheDocument();
   expect(
     screen.getByText(
-      "Conversations where any of the turns match the filters are shown.",
+      "Conversations where any of the turns match the filters are shown",
     ),
   ).toBeInTheDocument();
 });

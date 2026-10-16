@@ -43,8 +43,8 @@ export function ConversationsTable({
           className={`${ROW_CLASS} py-2 border-b border-border bg-muted/30 items-center`}
         >
           <div className={heading}>Conversation</div>
-          <div className={heading}>Last message</div>
-          <div className={heading}>Last reply</div>
+          <div className={heading}>First user message</div>
+          <div className={heading}>Last agent reply</div>
           <div className={heading}>Turns</div>
           <div className={heading}>Last activity</div>
         </div>
@@ -65,7 +65,7 @@ export function ConversationsTable({
             </Link>
             <Link {...linkProps(c.conversation_id)} className={cell}>
               <div className="text-sm text-foreground truncate">
-                {c.last_turn.input_preview}
+                {c.first_message_preview}
               </div>
             </Link>
             <Link {...linkProps(c.conversation_id)} className={cell}>
@@ -101,9 +101,9 @@ export function ConversationsTable({
               <p className="text-sm font-medium font-mono text-foreground truncate">
                 {c.conversation_id}
               </p>
-              {c.last_turn.input_preview && (
+              {c.first_message_preview && (
                 <p className="text-sm text-foreground line-clamp-2 mt-1">
-                  {c.last_turn.input_preview}
+                  {c.first_message_preview}
                 </p>
               )}
               <p className="text-xs text-muted-foreground mt-2">

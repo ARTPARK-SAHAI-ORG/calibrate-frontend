@@ -13,6 +13,7 @@ function conversation(
     turn_count: 4,
     first_turn_at: "2026-07-20T09:00:00Z",
     last_turn_at: "2026-07-20T10:00:00Z",
+    first_message_preview: `First question in ${id}`,
     last_turn: {
       uuid: `t-${id}`,
       agent_id: "ag-1",
@@ -50,7 +51,12 @@ describe("ConversationsTable", () => {
     ]);
     expect(screen.getAllByText("conv-a").length).toBeGreaterThan(0);
     expect(screen.getAllByText("conv-b").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Question in conv-a").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("First question in conv-a").length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("Question in conv-a")).not.toBeInTheDocument();
+    expect(screen.getByText("First user message")).toBeInTheDocument();
+    expect(screen.getByText("Last agent reply")).toBeInTheDocument();
     expect(screen.getByText("Answer in conv-a")).toBeInTheDocument();
     expect(screen.getByText("4")).toBeInTheDocument();
     expect(screen.getByText(/1 turn ·/)).toBeInTheDocument();

@@ -235,9 +235,25 @@ export function TracesFilter({
         // Switch to a portal if it ever gets clipped.
         <div className="absolute left-0 top-full mt-2 z-30 w-max min-w-[min(30rem,calc(100vw-2rem))] max-w-[min(44rem,calc(100vw-2rem))] rounded-lg border border-border bg-background shadow-lg p-5">
           {forConversations && (
-            <p className="text-sm text-muted-foreground mb-4">
-              Conversations where any of the turns match the filters are shown.
-            </p>
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs leading-relaxed text-blue-900">
+              <svg
+                className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span>
+                Conversations where any of the turns match the filters are shown
+              </span>
+            </div>
           )}
           <p className="text-sm font-medium text-foreground mb-2">
             {forConversations

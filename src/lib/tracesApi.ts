@@ -277,6 +277,8 @@ export type TraceConversation = {
   turn_count: number;
   first_turn_at: string;
   last_turn_at: string;
+  /** The first user message in the conversation, shortened. */
+  first_message_preview?: string | null;
   /** The newest trace. Its stored history plus its reply is the whole
    *  conversation. */
   last_turn: TraceSummary;
