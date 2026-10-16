@@ -525,12 +525,12 @@ async function pickConversation(
   await user.click(screen.getByRole("option", { name }));
 }
 
-it("narrows to one conversation picked from the dropdown, and back to any", async () => {
+it("narrows to one conversation picked from the dropdown, and clears it", async () => {
   const { user, onApply } = setupWithConversations(["conv-2", "conv-1"]);
   await openPanel(user);
   expect(
     screen.getByRole("button", { name: "Conversation ID" }),
-  ).toHaveTextContent("Any conversation");
+  ).toHaveTextContent("Select a conversation ID");
 
   await pickConversation(user, "conv-1");
   // The panel stays open: a click inside the dropdown is not a click outside.
@@ -542,12 +542,12 @@ it("narrows to one conversation picked from the dropdown, and back to any", asyn
 
   onApply.mockClear();
   await openPanel(user);
-  await pickConversation(user, "Any conversation");
+  await user.click(screen.getByRole("button", { name: "Clear all filters" }));
   await user.click(applyButton());
   expect(onApply.mock.calls[0][0].conversationId).toBeUndefined();
 });
 
-it("searches the conversation IDs, keeping the any choice", async () => {
+it("searches the conversation IDs", async () => {
   const { user } = setupWithConversations(["conv-1", "conv-11", "other"]);
   await openPanel(user);
   await user.click(screen.getByRole("button", { name: "Conversation ID" }));
@@ -557,7 +557,6 @@ it("searches the conversation IDs, keeping the any choice", async () => {
     "conv-11",
   );
   expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
-    "Any conversation",
     "conv-11",
   ]);
 });

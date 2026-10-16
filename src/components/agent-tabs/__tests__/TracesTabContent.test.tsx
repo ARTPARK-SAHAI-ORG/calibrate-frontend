@@ -546,7 +546,7 @@ describe("TracesTabContent", () => {
     expect(screen.getByPlaceholderText("Search traces")).toBeInTheDocument();
   });
 
-  it("lists one conversation's traces when the address names it, until it is cleared in the filter", async () => {
+  it("lists one conversation's traces when the address names it, until the filter is cleared", async () => {
     window.history.replaceState(null, "", "/?conversation=conv-1");
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
@@ -557,8 +557,7 @@ describe("TracesTabContent", () => {
     expect(
       screen.getByRole("button", { name: "Conversation ID" }),
     ).toHaveTextContent("conv-1");
-    await user.click(screen.getByRole("button", { name: "Conversation ID" }));
-    await user.click(screen.getByRole("option", { name: "Any conversation" }));
+    await user.click(screen.getByRole("button", { name: "Clear all filters" }));
     await user.click(screen.getByRole("button", { name: /^Apply/ }));
 
     expect(lastTracesArgs().conversationId).toBeNull();

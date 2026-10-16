@@ -292,24 +292,22 @@ export function TracesFilter({
                 Filter by conversation ID
               </p>
               <SingleSelectPicker<string>
-                items={["", ...allConversationIds]}
-                selectedId={draft.conversationId ?? ""}
+                items={allConversationIds}
+                selectedId={draft.conversationId}
                 onSelect={(id) =>
-                  setDraft((d) => ({ ...d, conversationId: id || null }))
+                  setDraft((d) => ({ ...d, conversationId: id }))
                 }
                 getId={(id) => id}
                 compact
                 ariaLabel="Conversation ID"
-                placeholder="Any conversation"
+                placeholder="Select a conversation ID"
                 searchPlaceholder="Search conversation IDs"
                 emptyLabel="No conversation IDs match your search"
                 matchesSearch={(id, q) =>
-                  !id || id.toLowerCase().includes(q.trim().toLowerCase())
+                  id.toLowerCase().includes(q.trim().toLowerCase())
                 }
-                renderTrigger={(id) => id || "Any conversation"}
-                renderOption={(id) => (
-                  <span className="truncate">{id || "Any conversation"}</span>
-                )}
+                renderTrigger={(id) => id}
+                renderOption={(id) => <span className="truncate">{id}</span>}
               />
             </div>
           )}
