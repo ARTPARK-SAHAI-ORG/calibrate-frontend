@@ -27,6 +27,7 @@ import {
   traceInputTurns,
   TraceDetail,
   TraceOutput,
+  TraceConversation,
   TraceScoringRun,
   TraceTurn,
 } from "@/lib/tracesApi";
@@ -59,6 +60,9 @@ type TraceDetailDialogProps = {
    *  the button so the reader can see the pile growing without closing the
    *  window to look at the count. */
   selectedCount?: number;
+  /** Show this conversation instead of a single trace. Its newest trace's
+   *  stored history plus its reply is the whole conversation. */
+  conversation?: TraceConversation | null;
 };
 
 /** Last user turn, else a generic heading when the history has no user text. */
@@ -202,6 +206,27 @@ function PlainTraceView({
   );
 }
 
+function ConversationMetaPanel({
+  conversation,
+}: {
+  conversation: TraceConversation;
+}) {
+  return (
+    <div className="p-4 md:p-6 space-y-4">
+      <MetaBlock label="Conversation" value={conversation.conversation_id} />
+      <MetaBlock label="Turns" value={String(conversation.turn_count)} />
+      <MetaBlock
+        label="Started"
+        value={formatTraceDate(conversation.first_turn_at)}
+      />
+      <MetaBlock
+        label="Last activity"
+        value={formatTraceDate(conversation.last_turn_at)}
+      />
+    </div>
+  );
+}
+
 function MetaBlock({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -267,7 +292,7 @@ export function TraceDetailDialog({
   isOpen,
   onClose,
   accessToken,
-  traceUuid,
+  traceUuid: traceUuidProp,
   onPrev,
   onNext,
   hasPrev = false,
@@ -277,8 +302,12 @@ export function TraceDetailDialog({
   isSelected = false,
   onToggleSelected,
   selectedCount = 0,
+  conversation = null,
 }: TraceDetailDialogProps) {
   useHideFloatingButton(isOpen);
+  // Scores belong to one turn, not the conversation, so none are loaded for it.
+  const isConversation = conversation !== null;
+  const traceUuid = conversation ? conversation.last_turn.uuid : traceUuidProp;
 
   // The trace is held with the id it was fetched for, so content is only ever
   // drawn under its own trace: asking for another one shows nothing until the
@@ -311,13 +340,15 @@ export function TraceDetailDialog({
       try {
         const [data, scores] = await Promise.all([
           fetchTrace(accessToken, traceUuid),
-          fetchTraceScores(accessToken, traceUuid).catch((err) => {
-            reportError("Error fetching trace scores:", err);
-            if (!cancelled) {
-              setScoresError("Could not load scores for this trace.");
-            }
-            return { runs: [] as TraceScoringRun[] };
-          }),
+          isConversation
+            ? { runs: [] as TraceScoringRun[] }
+            : fetchTraceScores(accessToken, traceUuid).catch((err) => {
+                reportError("Error fetching trace scores:", err);
+                if (!cancelled) {
+                  setScoresError("Could not load scores for this trace.");
+                }
+                return { runs: [] as TraceScoringRun[] };
+              }),
         ]);
         if (!cancelled) {
           setLoaded({ uuid: traceUuid, trace: data });
@@ -326,7 +357,11 @@ export function TraceDetailDialog({
       } catch (err) {
         reportError("Error fetching trace:", err);
         if (!cancelled)
-          setError("Failed to load this trace. Please try again.");
+          setError(
+            isConversation
+              ? "Failed to load this conversation. Please try again."
+              : "Failed to load this trace. Please try again.",
+          );
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -335,7 +370,7 @@ export function TraceDetailDialog({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, traceUuid, accessToken]);
+  }, [isOpen, traceUuid, accessToken, isConversation]);
 
   useEffect(() => {
     if (!isOpen || !traceUuid || !accessToken || !hasOpenScoreRun) return;
@@ -369,7 +404,9 @@ export function TraceDetailDialog({
   );
   // The heading shortens a long trace id with an ellipsis, so the whole id goes
   // in hover text only when it has been cut short.
-  const headingText = traceUuid ?? "Trace";
+  const headingText = conversation
+    ? conversation.conversation_id
+    : (traceUuid ?? "Trace");
   const { ref: headingRef, clipped: headingClipped } =
     useIsNameClipped(headingText);
 
@@ -396,7 +433,7 @@ export function TraceDetailDialog({
             heading
           )}
           <DialogNavHeader
-            noun="trace"
+            noun={isConversation ? "conversation" : "trace"}
             onPrev={onPrev}
             onNext={onNext}
             hasPrev={hasPrev}
@@ -409,12 +446,15 @@ export function TraceDetailDialog({
             {/* Only while this trace is in the selection: the count answers
                 "what did that press do", so it goes away with the trace it
                 was counting. */}
-            {onToggleSelected && isSelected && selectedCount > 0 && (
-              <span className="inline-flex items-center h-8 px-2.5 rounded-md border border-border bg-muted/40 text-xs font-medium text-foreground whitespace-nowrap">
-                {selectedCount} selected
-              </span>
-            )}
-            {onToggleSelected && (
+            {!isConversation &&
+              onToggleSelected &&
+              isSelected &&
+              selectedCount > 0 && (
+                <span className="inline-flex items-center h-8 px-2.5 rounded-md border border-border bg-muted/40 text-xs font-medium text-foreground whitespace-nowrap">
+                  {selectedCount} selected
+                </span>
+              )}
+            {!isConversation && onToggleSelected && (
               // Both states are filled so neither reads as switched off, and
               // they are different colours so a glance says which one it is.
               <Button
@@ -454,13 +494,17 @@ export function TraceDetailDialog({
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0">
           {trace && (
             <div className="order-last md:order-none md:w-80 border-t md:border-t-0 md:border-r border-border overflow-y-auto shrink-0">
-              <TraceMetaPanel
-                messageId={trace.message_id}
-                conversationId={trace.conversation_id}
-                createdAt={trace.created_at}
-                labels={trace.labels ?? null}
-                metadata={trace.metadata}
-              />
+              {conversation ? (
+                <ConversationMetaPanel conversation={conversation} />
+              ) : (
+                <TraceMetaPanel
+                  messageId={trace.message_id}
+                  conversationId={trace.conversation_id}
+                  createdAt={trace.created_at}
+                  labels={trace.labels ?? null}
+                  metadata={trace.metadata}
+                />
+              )}
             </div>
           )}
           <div className="flex-1 overflow-y-auto min-w-0">

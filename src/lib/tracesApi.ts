@@ -269,6 +269,50 @@ export async function fetchTraces(
   >(`/traces?${params.toString()}`, accessToken);
 }
 
+/** One row of `GET /traces/conversations`: the traces one agent stored under
+ *  one conversation ID. */
+export type TraceConversation = {
+  conversation_id: string;
+  agent_id: string;
+  turn_count: number;
+  first_turn_at: string;
+  last_turn_at: string;
+  /** The newest trace. Its stored history plus its reply is the whole
+   *  conversation. */
+  last_turn: TraceSummary;
+};
+
+/** One page of an agent's conversations, newest activity first. Traces sent
+ *  without a conversation ID are not part of any. */
+export async function fetchTraceConversations(
+  accessToken: string,
+  {
+    limit,
+    offset,
+    agentId,
+    q,
+    outputType,
+    labels,
+  }: Pick<
+    TraceListParams,
+    "limit" | "offset" | "agentId" | "q" | "outputType" | "labels"
+  >,
+): Promise<Paginated<TraceConversation>> {
+  const params = new URLSearchParams();
+  params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
+  params.set("offset", String(offset));
+  params.set("agent_id", agentId);
+  if (q?.trim()) params.set("q", q.trim());
+  if (outputType && outputType !== "all") {
+    params.set("output_type", outputType);
+  }
+  for (const label of labels ?? []) params.append("labels", label);
+  return apiGet<Paginated<TraceConversation>>(
+    `/traces/conversations?${params.toString()}`,
+    accessToken,
+  );
+}
+
 /** Fetch one trace with its full conversation history, output, and metadata. */
 export async function fetchTrace(
   accessToken: string,

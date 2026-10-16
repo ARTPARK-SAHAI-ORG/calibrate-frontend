@@ -1,5 +1,6 @@
 import {
   fetchTraces,
+  fetchTraceConversations,
   fetchTrace,
   fetchTraceLabels,
   fetchTraceScores,
@@ -36,6 +37,49 @@ beforeEach(() => {
   mockApiGet.mockReset();
   mockApiPost.mockReset();
   mockApiPut.mockReset();
+});
+
+describe("fetchTraceConversations", () => {
+  it("asks for one page of the agent's conversations with the filters", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
+
+    await fetchTraceConversations("tok", {
+      limit: 999,
+      offset: 20,
+      agentId: "agent-1",
+      q: "  refund ",
+      outputType: "tool_call",
+      labels: ["vip", "a,b"],
+    });
+
+    const [url, token] = mockApiGet.mock.calls[0];
+    expect(token).toBe("tok");
+    expect(url.split("?")[0]).toBe("/traces/conversations");
+    const query = new URLSearchParams(url.split("?")[1]);
+    expect(query.get("limit")).toBe(String(MAX_TRACES_PAGE_SIZE));
+    expect(query.get("offset")).toBe("20");
+    expect(query.get("agent_id")).toBe("agent-1");
+    expect(query.get("q")).toBe("refund");
+    expect(query.get("output_type")).toBe("tool_call");
+    expect(query.getAll("labels")).toEqual(["vip", "a,b"]);
+  });
+
+  it("leaves off a blank search and an output filter of everything", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
+
+    await fetchTraceConversations("tok", {
+      limit: 10,
+      offset: 0,
+      agentId: "agent-1",
+      q: " ",
+      outputType: "all",
+    });
+
+    const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
+    expect(query.has("q")).toBe(false);
+    expect(query.has("output_type")).toBe(false);
+    expect(query.has("labels")).toBe(false);
+  });
 });
 
 describe("fetchTraces", () => {

@@ -6,7 +6,13 @@ import {
   toTestCaseOutput,
   turnsToHistory,
 } from "../TraceDetailDialog";
-import { fetchTrace, fetchTraceScores, TraceDetail } from "@/lib/tracesApi";
+import {
+  fetchTrace,
+  fetchTraceScores,
+  TraceConversation,
+  TraceDetail,
+} from "@/lib/tracesApi";
+import { formatTraceDate } from "../TracesTable";
 
 jest.mock("../../../lib/tracesApi", () => ({
   __esModule: true,
@@ -1024,5 +1030,84 @@ describe("adding the open trace to the selection", () => {
     expect(
       screen.queryByText("Add trace to selection"),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("showing a whole conversation", () => {
+  const conversation: TraceConversation = {
+    conversation_id: "conv-1",
+    agent_id: "ag-1",
+    turn_count: 3,
+    first_turn_at: "2026-07-20T09:00:00Z",
+    last_turn_at: "2026-07-20T10:00:00Z",
+    last_turn: {
+      uuid: "t-last",
+      agent_id: "ag-1",
+      message_id: "msg-3",
+      conversation_id: "conv-1",
+      input_preview: null,
+      response_preview: null,
+      turn_count: 3,
+      tool_call_count: 0,
+      metadata_count: 0,
+      created_at: "2026-07-20T10:00:00Z",
+    },
+  };
+
+  it("draws the newest turn's trace under the conversation id, with no scores and no selection button", async () => {
+    mockFetchTrace.mockResolvedValue({ ...detail, uuid: "t-last" });
+
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+        conversation={conversation}
+        isSelected
+        onToggleSelected={jest.fn()}
+        selectedCount={2}
+      />,
+    );
+
+    await screen.findByText("At 14 weeks, for OPV and DPT.");
+    expect(mockFetchTrace).toHaveBeenCalledWith("tok", "t-last");
+    expect(mockFetchTraceScores).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "conv-1" })).toBeInTheDocument();
+    expect(screen.getByText("Turns")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("Started")).toBeInTheDocument();
+    expect(
+      screen.getByText(formatTraceDate("2026-07-20T09:00:00Z")),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Last activity")).toBeInTheDocument();
+    expect(
+      screen.getByText(formatTraceDate("2026-07-20T10:00:00Z")),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Created")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Remove trace from selection"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("2 selected")).not.toBeInTheDocument();
+  });
+
+  it("says the conversation failed to load", async () => {
+    mockFetchTrace.mockRejectedValue(new Error("boom"));
+
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid={null}
+        conversation={conversation}
+      />,
+    );
+
+    expect(
+      await screen.findByText(
+        "Failed to load this conversation. Please try again.",
+      ),
+    ).toBeInTheDocument();
   });
 });

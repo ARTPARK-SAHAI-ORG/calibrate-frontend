@@ -56,6 +56,12 @@ jest.mock("../../../lib/evaluatorApi", () => ({
   addEvaluatorsToAgent: (...args: unknown[]) => addEvaluatorsToAgent(...args),
 }));
 
+jest.mock("../../traces/ConversationsView", () => ({
+  ConversationsView: ({ labels }: { labels: string[] }) => (
+    <div data-testid="conversations-view">{labels.join(",")}</div>
+  ),
+}));
+
 const reportError = jest.fn();
 jest.mock("../../../lib/reportError", () => ({
   reportError: (...args: unknown[]) => reportError(...args),
@@ -514,6 +520,32 @@ describe("TracesTabContent", () => {
     expect(mockUseDialogUrlParam).not.toHaveBeenCalledWith(
       expect.objectContaining({ param: "conversation_id" }),
     );
+  });
+
+  it("switches between the traces and the conversations", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+    expect(screen.queryByTestId("conversations-view")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Conversations" }));
+
+    expect(screen.getByTestId("conversations-view")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Search traces")).not.toBeInTheDocument();
+    // The trace list is off screen, so it stops asking for new traces.
+    expect(lastTracesArgs().poll).toBe(false);
+    expect(new URLSearchParams(window.location.search).get("view")).toBe(
+      "conversations",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Traces" }));
+    expect(screen.queryByTestId("conversations-view")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search traces")).toBeInTheDocument();
+  });
+
+  it("opens on the conversations when the address asks for them", () => {
+    window.history.replaceState(null, "", "/?view=conversations&label=vip");
+    render(<TracesTabContent {...tabProps} />);
+    expect(screen.getByTestId("conversations-view")).toHaveTextContent("vip");
   });
 
   it("pauses polling while the tab is hidden", () => {

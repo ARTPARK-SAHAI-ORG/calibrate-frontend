@@ -29,6 +29,7 @@ import {
   type TraceScoreFilterEvaluator,
 } from "@/components/traces/TracesFilter";
 import { TracesSort } from "@/components/traces/TracesSort";
+import { ConversationsView } from "@/components/traces/ConversationsView";
 import { useTraceView } from "@/components/traces/traceViewUrl";
 import { CodeIcon, SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
@@ -36,6 +37,7 @@ import {
   Button,
   LoadingState,
   SearchInput,
+  SegmentedFilter,
   ServerPaginatedListBar,
 } from "@/components/ui";
 import { useAgentDefaultsPrompt } from "@/hooks/useAgentDefaultsPrompt";
@@ -139,6 +141,7 @@ export function TracesTabContent({
     scores: scoreFilter,
     sortByEvaluator,
     sortOrder,
+    conversations: showConversations,
   } = view;
 
   // The tags sent with the traces, and the ones picked to filter by. A trace
@@ -196,7 +199,7 @@ export function TracesTabContent({
     scores: scoreFilter,
     sortByEvaluator,
     sortOrder,
-    poll: isActive,
+    poll: isActive && !showConversations,
   });
 
   // Every trace the list matches, not only the ticked ones. The two bulk
@@ -771,8 +774,37 @@ export function TracesTabContent({
     );
   }
 
+  const viewSwitch = hasLoaded && !showEmptyState && (
+    <SegmentedFilter
+      value={showConversations ? "conversations" : "traces"}
+      onChange={(next) => setView({ conversations: next === "conversations" })}
+      options={[
+        { value: "traces", label: "Traces" },
+        { value: "conversations", label: "Conversations" },
+      ]}
+      ariaLabel="Show traces or conversations"
+      className="self-start"
+    />
+  );
+
+  if (showConversations && viewSwitch) {
+    return (
+      <div className="flex flex-col space-y-4 md:space-y-6">
+        {viewSwitch}
+        <ConversationsView
+          agentUuid={agentUuid}
+          outputType={outputFilter}
+          labels={labelFilter}
+          allLabels={allLabels}
+          onFilterChange={(next) => setView(next)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
+      {viewSwitch}
       {/* Shown even over the setup steps: with storage full, the very thing
           those steps ask for cannot happen, and the reader would be left
           sending traces that are quietly turned away. */}

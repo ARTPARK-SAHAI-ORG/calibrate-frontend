@@ -29,6 +29,8 @@ const SCORE_PARAM = "score";
 /** The evaluator the list is sorted by, and which way its scores run. */
 const SORT_PARAM = "sort";
 const DIRECTION_PARAM = "dir";
+/** "conversations" when the tab lists conversations instead of traces. */
+const VIEW_PARAM = "view";
 
 export type TraceView = {
   outputType: TraceOutputFilter;
@@ -36,6 +38,7 @@ export type TraceView = {
   scores: TraceScoreFilters;
   sortByEvaluator: string | null;
   sortOrder: TraceSortOrder;
+  conversations: boolean;
 };
 
 export const EMPTY_TRACE_VIEW: TraceView = {
@@ -44,6 +47,7 @@ export const EMPTY_TRACE_VIEW: TraceView = {
   scores: {},
   sortByEvaluator: null,
   sortOrder: "asc",
+  conversations: false,
 };
 
 export function readTraceView(): TraceView {
@@ -64,6 +68,7 @@ export function readTraceView(): TraceView {
     scores,
     sortByEvaluator: params.get(SORT_PARAM) || null,
     sortOrder: params.get(DIRECTION_PARAM) === "desc" ? "desc" : "asc",
+    conversations: params.get(VIEW_PARAM) === "conversations",
   };
 }
 
@@ -76,6 +81,7 @@ export function writeTraceView(view: TraceView): void {
     SCORE_PARAM,
     SORT_PARAM,
     DIRECTION_PARAM,
+    VIEW_PARAM,
   ]) {
     params.delete(name);
   }
@@ -88,6 +94,7 @@ export function writeTraceView(view: TraceView): void {
     params.set(SORT_PARAM, view.sortByEvaluator);
     params.set(DIRECTION_PARAM, view.sortOrder);
   }
+  if (view.conversations) params.set(VIEW_PARAM, "conversations");
   const query = params.toString();
   const { pathname, hash } = window.location;
   window.history.replaceState(
