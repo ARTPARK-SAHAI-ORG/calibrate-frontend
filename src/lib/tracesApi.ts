@@ -413,6 +413,18 @@ export async function fetchTraceUsage(
  * The list is server-paginated and holds one page, so the labels on screen
  * are never the whole set: they have to come from the backend.
  */
+/** Every conversation ID on this agent's traces, newest activity first. */
+export async function fetchTraceConversationIds(
+  accessToken: string,
+  agentId: string,
+): Promise<string[]> {
+  const data = await apiGet<{ conversation_ids?: string[] }>(
+    `/traces/conversation-ids?agent_id=${encodeURIComponent(agentId)}`,
+    accessToken,
+  );
+  return data.conversation_ids ?? [];
+}
+
 export async function fetchTraceLabels(
   accessToken: string,
   agentId: string,

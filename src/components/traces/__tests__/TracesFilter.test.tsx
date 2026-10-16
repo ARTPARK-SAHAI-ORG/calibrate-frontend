@@ -499,10 +499,29 @@ it("says a conversation matches on any one of its turns", async () => {
   ).toBeInTheDocument();
 });
 
-it("narrows to one conversation by its ID, trimmed, and clears it", async () => {
-  const { user, onApply } = setup();
+function setupWithConversations(
+  conversationIds: string[],
+  value: TracesFilterValue = NONE,
+) {
+  const onApply = jest.fn();
+  const user = setupUser();
+  render(
+    <TracesFilter
+      value={value}
+      labels={[]}
+      conversationIds={conversationIds}
+      onApply={onApply}
+    />,
+  );
+  return { user, onApply };
+}
+
+it("narrows to one picked conversation, and back to any", async () => {
+  const { user, onApply } = setupWithConversations(["conv-2", "conv-1"]);
   await openPanel(user);
-  await user.type(screen.getByLabelText("Conversation ID"), "  conv-1 ");
+  expect(screen.getByRole("radio", { name: "Any conversation" })).toBeChecked();
+
+  await user.click(screen.getByRole("radio", { name: "conv-1" }));
   expect(applyButton()).toHaveTextContent("Apply (1)");
   await user.click(applyButton());
   expect(onApply).toHaveBeenLastCalledWith(
@@ -511,16 +530,54 @@ it("narrows to one conversation by its ID, trimmed, and clears it", async () => 
 
   onApply.mockClear();
   await openPanel(user);
-  await user.click(screen.getByRole("button", { name: "Clear all filters" }));
+  await user.click(screen.getByRole("radio", { name: "Any conversation" }));
   await user.click(applyButton());
   expect(onApply.mock.calls[0][0].conversationId).toBeUndefined();
+});
+
+it("searches a long list of conversation IDs", async () => {
+  const ids = Array.from({ length: 12 }, (_, i) => `conv-${i}`);
+  const { user } = setupWithConversations(ids);
+  await openPanel(user);
+
+  await user.type(screen.getByLabelText("Search conversation IDs"), "conv-11");
+  expect(
+    screen.getAllByRole("radio").map((r) => r.closest("label")?.textContent),
+  ).toEqual(["conv-11"]);
+
+  await user.clear(screen.getByLabelText("Search conversation IDs"));
+  await user.type(screen.getByLabelText("Search conversation IDs"), "nothing");
+  expect(
+    screen.getByText("No conversation IDs match your search"),
+  ).toBeInTheDocument();
+});
+
+it("keeps a conversation picked from the address on offer even when the list lacks it", async () => {
+  const { user } = setupWithConversations(["conv-2"], {
+    ...NONE,
+    conversationId: "conv-gone",
+  });
+  await openPanel(user);
+  expect(screen.getByRole("radio", { name: "conv-gone" })).toBeChecked();
+});
+
+it("leaves the conversation section out when there are no conversation IDs", async () => {
+  const { user } = setup();
+  await openPanel(user);
+  expect(screen.queryByText("Filter by conversation ID")).not.toBeInTheDocument();
 });
 
 it("has no conversation ID box on the conversations list", async () => {
   const user = setupUser();
   render(
-    <TracesFilter value={NONE} labels={[]} onApply={jest.fn()} forConversations />,
+    <TracesFilter
+      value={NONE}
+      labels={[]}
+      conversationIds={["conv-1"]}
+      onApply={jest.fn()}
+      forConversations
+    />,
   );
   await openPanel(user);
-  expect(screen.queryByLabelText("Conversation ID")).not.toBeInTheDocument();
+  expect(screen.queryByText("Filter by conversation ID")).not.toBeInTheDocument();
 });

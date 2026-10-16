@@ -18,6 +18,10 @@ jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
   useTraces: (args: unknown) => mockUseTraces(args),
   useTraceLabels: () => mockUseTraceLabels(),
+  useTraceConversationIds: () => ({
+    conversationIds: ["conv-9", "conv-1"],
+    refetch: jest.fn(),
+  }),
   // Selection is real: the convert/delete buttons only appear once a row is
   // ticked, which the selection tests exercise.
   useTraceDeletion: jest.requireActual("../../../hooks/useTraceDeletion")
@@ -542,35 +546,33 @@ describe("TracesTabContent", () => {
     expect(screen.getByPlaceholderText("Search traces")).toBeInTheDocument();
   });
 
-  it("lists one conversation's traces when the address names it, until it is removed", async () => {
+  it("lists one conversation's traces when the address names it, until it is cleared in the filter", async () => {
     window.history.replaceState(null, "", "/?conversation=conv-1");
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
 
     expect(lastTracesArgs().conversationId).toBe("conv-1");
-    expect(screen.getByText("Conversation conv-1")).toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole("button", { name: "Show traces from every conversation" }),
-    );
+    await openTraceFilter(user);
+    expect(screen.getByRole("radio", { name: "conv-1" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "Any conversation" }));
+    await user.click(screen.getByRole("button", { name: /^Apply/ }));
 
     expect(lastTracesArgs().conversationId).toBeNull();
-    expect(screen.queryByText("Conversation conv-1")).not.toBeInTheDocument();
     expect(
       new URLSearchParams(window.location.search).has("conversation"),
     ).toBe(false);
   });
 
-  it("lists one conversation's traces when its ID is typed in the filter", async () => {
+  it("lists one conversation's traces when it is picked in the filter", async () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
 
     await openTraceFilter(user);
-    await user.type(screen.getByLabelText("Conversation ID"), "conv-9");
+    await user.click(screen.getByRole("radio", { name: "conv-9" }));
     await user.click(screen.getByRole("button", { name: /^Apply/ }));
 
     expect(lastTracesArgs().conversationId).toBe("conv-9");
-    expect(screen.getByText("Conversation conv-9")).toBeInTheDocument();
   });
 
   it("opens on the conversations when the address asks for them", () => {

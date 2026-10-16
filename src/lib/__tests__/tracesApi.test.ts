@@ -1,6 +1,7 @@
 import {
   fetchTraces,
   fetchTraceConversations,
+  fetchTraceConversationIds,
   fetchTrace,
   fetchTraceLabels,
   fetchTraceScores,
@@ -61,6 +62,19 @@ describe("the conversation filter on the traces list", () => {
     expect(selectAllBody({ agentId: "agent-1" })).not.toHaveProperty(
       "conversation_id",
     );
+  });
+});
+
+describe("fetchTraceConversationIds", () => {
+  it("asks for the agent's conversation IDs", async () => {
+    mockApiGet.mockResolvedValueOnce({ conversation_ids: ["conv a/1"] });
+    mockApiGet.mockResolvedValueOnce({});
+    expect(await fetchTraceConversationIds("tok", "agent 1")).toEqual(["conv a/1"]);
+    expect(mockApiGet).toHaveBeenCalledWith(
+      "/traces/conversation-ids?agent_id=agent%201",
+      "tok",
+    );
+    expect(await fetchTraceConversationIds("tok", "agent-1")).toEqual([]);
   });
 });
 

@@ -46,6 +46,7 @@ import {
   useDialogUrlParam,
   useItemPager,
   usePageSize,
+  useTraceConversationIds,
   useTraceDeletion,
   useTraceLabels,
   useTraces,
@@ -152,6 +153,8 @@ export function TracesTabContent({
     accessToken,
     agentUuid,
   );
+  const { conversationIds, refetch: refetchConversationIds } =
+    useTraceConversationIds(accessToken, agentUuid);
 
   // One condition per evaluator, all of which have to hold. They are picked
   // in the same panel as the output kind and the labels, and applied with
@@ -632,6 +635,7 @@ export function TracesTabContent({
       // New traces can carry labels nothing has seen yet, so the filter's
       // choices are read again with them.
       refetchLabels();
+      refetchConversationIds();
       await refetch();
     } finally {
       setIsRefreshing(false);
@@ -732,6 +736,7 @@ export function TracesTabContent({
       onCheckForTraces={async () => {
         // The first trace is also the first chance to have labels.
         refetchLabels();
+        refetchConversationIds();
         return refetch();
       }}
     />
@@ -888,6 +893,7 @@ export function TracesTabContent({
             }}
             labels={allLabels}
             scoreEvaluators={scoreFilterEvaluators}
+            conversationIds={conversationIds}
             onApply={(next) =>
               setView({
                 outputType: next.outputType,
@@ -909,32 +915,6 @@ export function TracesTabContent({
               })
             }
           />
-          {conversationFilter && (
-            <span className="inline-flex items-center gap-1.5 h-8 pl-2.5 pr-1.5 rounded-md border border-blue-500/20 bg-blue-500/5 text-sm text-blue-900 dark:text-blue-300">
-              Conversation {conversationFilter}
-              <button
-                type="button"
-                onClick={() => setView({ conversationId: null })}
-                aria-label="Show traces from every conversation"
-                className="p-0.5 rounded hover:bg-blue-500/10 cursor-pointer"
-              >
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  aria-hidden
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </span>
-          )}
           {/* Not a filter, so it sits apart from the two that are, at the
               far end of the row. */}
           <div className="sm:ml-auto">{integrationGuideButton}</div>
