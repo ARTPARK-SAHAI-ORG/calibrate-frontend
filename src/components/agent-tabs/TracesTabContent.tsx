@@ -884,6 +884,7 @@ export function TracesTabContent({
               outputType: outputFilter,
               labels: labelFilter,
               scores: scoreFilter,
+              conversationId: conversationFilter,
             }}
             labels={allLabels}
             scoreEvaluators={scoreFilterEvaluators}
@@ -892,6 +893,7 @@ export function TracesTabContent({
                 outputType: next.outputType,
                 labels: next.labels,
                 scores: next.scores,
+                conversationId: next.conversationId ?? null,
               })
             }
           />

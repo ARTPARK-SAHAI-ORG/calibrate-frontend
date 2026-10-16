@@ -561,6 +561,18 @@ describe("TracesTabContent", () => {
     ).toBe(false);
   });
 
+  it("lists one conversation's traces when its ID is typed in the filter", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await openTraceFilter(user);
+    await user.type(screen.getByLabelText("Conversation ID"), "conv-9");
+    await user.click(screen.getByRole("button", { name: /^Apply/ }));
+
+    expect(lastTracesArgs().conversationId).toBe("conv-9");
+    expect(screen.getByText("Conversation conv-9")).toBeInTheDocument();
+  });
+
   it("opens on the conversations when the address asks for them", () => {
     window.history.replaceState(null, "", "/?view=conversations&label=vip");
     render(<TracesTabContent {...tabProps} />);

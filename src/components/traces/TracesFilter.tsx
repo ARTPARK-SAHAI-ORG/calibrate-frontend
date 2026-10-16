@@ -95,6 +95,8 @@ export type TracesFilterValue = {
   labels: string[];
   /** One condition per evaluator, all of which have to hold. */
   scores: TraceScoreFilters;
+  /** Keep only the turns of this conversation. */
+  conversationId?: string | null;
 };
 
 /** How many choices are on, so the button can say so without being opened.
@@ -104,7 +106,8 @@ function traceFilterCount(value: TracesFilterValue): number {
   return (
     (value.outputType === "all" ? 0 : 1) +
     value.labels.length +
-    Object.keys(value.scores).length
+    Object.keys(value.scores).length +
+    (value.conversationId ? 1 : 0)
   );
 }
 
@@ -268,6 +271,24 @@ export function TracesFilter({
             ariaLabel="Filter traces by output"
           />
 
+          {!forConversations && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="text-sm font-medium text-foreground mb-2">
+                Filter by conversation ID
+              </p>
+              <input
+                type="text"
+                value={draft.conversationId ?? ""}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, conversationId: e.target.value }))
+                }
+                placeholder="conv-1"
+                aria-label="Conversation ID"
+                className="w-full h-8 px-2 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              />
+            </div>
+          )}
+
           {scoreEvaluators.length > 0 && (
             <div className="mt-4 pt-4 border-t border-border">
               <p className="text-sm font-medium text-foreground mb-2">
@@ -407,7 +428,12 @@ export function TracesFilter({
             <button
               type="button"
               onClick={() =>
-                setDraft({ outputType: "all", labels: [], scores: {} })
+                setDraft({
+                  outputType: "all",
+                  labels: [],
+                  scores: {},
+                  conversationId: null,
+                })
               }
               disabled={draftCount === 0}
               className="text-sm font-medium text-foreground hover:opacity-70 transition-opacity cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
@@ -421,7 +447,10 @@ export function TracesFilter({
             <button
               type="button"
               onClick={() => {
-                onApply(draft);
+                onApply({
+                  ...draft,
+                  conversationId: draft.conversationId?.trim() || undefined,
+                });
                 setOpen(false);
               }}
               className="h-8 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"

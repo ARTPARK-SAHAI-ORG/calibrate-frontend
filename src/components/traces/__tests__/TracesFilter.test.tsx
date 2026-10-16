@@ -498,3 +498,29 @@ it("says a conversation matches on any one of its turns", async () => {
     ),
   ).toBeInTheDocument();
 });
+
+it("narrows to one conversation by its ID, trimmed, and clears it", async () => {
+  const { user, onApply } = setup();
+  await openPanel(user);
+  await user.type(screen.getByLabelText("Conversation ID"), "  conv-1 ");
+  expect(applyButton()).toHaveTextContent("Apply (1)");
+  await user.click(applyButton());
+  expect(onApply).toHaveBeenLastCalledWith(
+    expect.objectContaining({ conversationId: "conv-1" }),
+  );
+
+  onApply.mockClear();
+  await openPanel(user);
+  await user.click(screen.getByRole("button", { name: "Clear all filters" }));
+  await user.click(applyButton());
+  expect(onApply.mock.calls[0][0].conversationId).toBeUndefined();
+});
+
+it("has no conversation ID box on the conversations list", async () => {
+  const user = setupUser();
+  render(
+    <TracesFilter value={NONE} labels={[]} onApply={jest.fn()} forConversations />,
+  );
+  await openPanel(user);
+  expect(screen.queryByLabelText("Conversation ID")).not.toBeInTheDocument();
+});
