@@ -1,4 +1,5 @@
 import type { MetadataEntry } from "@/components/ui";
+import { MAX_METADATA_ENTRIES } from "@/components/human-labelling/MetadataFieldsEditor";
 import { apiGet, apiPost, apiPut, getBackendUrl, Paginated } from "./api";
 
 /** One turn of stored conversation history, OpenAI chat format. Extra keys
@@ -114,6 +115,23 @@ export type TraceDetail = {
   created_at: string;
   updated_at: string;
 };
+
+/** What a trace adds to a labelling item's metadata: its own entries, then its
+ * conversation id, message id and labels. A labelling item holds as many
+ * entries as a trace, so the last three are dropped when the trace is full. */
+export function traceLabellingMetadata(trace: TraceDetail): MetadataEntry[] {
+  const entries = [...(trace.metadata ?? [])];
+  if (trace.conversation_id) {
+    entries.push({ key: "conversation_id", value: trace.conversation_id });
+  }
+  if (trace.message_id) {
+    entries.push({ key: "message_id", value: trace.message_id });
+  }
+  if (trace.labels?.length) {
+    entries.push({ key: "labels", value: trace.labels.join(", ") });
+  }
+  return entries.slice(0, MAX_METADATA_ENTRIES);
+}
 
 /**
  * The stored input as turns, whichever shape it arrived in. A general agent's

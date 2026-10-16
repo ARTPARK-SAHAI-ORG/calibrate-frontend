@@ -40,6 +40,8 @@ jest.mock("../../../lib/tracesApi", () => ({
   fetchTraces: (...args: unknown[]) => fetchTraces(...args),
   fetchTraceUsage: (...args: unknown[]) => fetchTraceUsage(...args),
   MAX_TRACES_PAGE_SIZE: 200,
+  traceLabellingMetadata: jest.requireActual("../../../lib/tracesApi")
+    .traceLabellingMetadata,
 }));
 
 // The agent's own evaluators decide whether the attach prompt has anything to
@@ -1962,7 +1964,16 @@ describe("TracesTabContent", () => {
 
     beforeEach(() => {
       fetchTrace.mockImplementation(async (_token: string, uuid: string) =>
-        detail({ uuid, message_id: uuid === "trace-2" ? null : "msg-001" }),
+        detail(
+          uuid === "trace-2"
+            ? { uuid, message_id: null }
+            : {
+                uuid,
+                conversation_id: "conv-1",
+                labels: ["prod", "hindi"],
+                metadata: [{ key: "locale", value: "hi-IN" }],
+              },
+        ),
       );
     });
 
@@ -2130,11 +2141,18 @@ describe("TracesTabContent", () => {
           name: "trace-1",
           input: [{ role: "user", content: "When is the next vaccination?" }],
           output: { response: "At 14 weeks.", tool_calls: null },
+          metadata: [
+            { key: "locale", value: "hi-IN" },
+            { key: "conversation_id", value: "conv-1" },
+            { key: "message_id", value: "msg-001" },
+            { key: "labels", value: "prod, hindi" },
+          ],
         },
         {
           name: "trace-2",
           input: [{ role: "user", content: "When is the next vaccination?" }],
           output: { response: "At 14 weeks.", tool_calls: null },
+          metadata: [],
         },
       ]);
     });
@@ -2228,6 +2246,7 @@ describe("TracesTabContent", () => {
           name: "trace-1",
           input: [{ role: "user", content: "When is the next vaccination?" }],
           output: { response: "At 14 weeks.", tool_calls: null },
+          metadata: [{ key: "message_id", value: "msg-001" }],
         },
       ]);
     });

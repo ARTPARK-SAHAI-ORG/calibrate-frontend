@@ -13,8 +13,10 @@ import {
   validateApiKeyForAgent,
   traceInputTurns,
   traceScoreParams,
+  traceLabellingMetadata,
   MAX_TRACES_PAGE_SIZE,
   type TraceScoreAverage,
+  type TraceDetail,
 } from "../tracesApi";
 import { apiGet, apiPost, apiPut } from "../api";
 
@@ -790,5 +792,55 @@ describe("fetchTraces sorted by an evaluator", () => {
     );
     expect(second.has("sort_by_evaluator")).toBe(false);
     expect(second.has("sort_order")).toBe(false);
+  });
+});
+
+describe("traceLabellingMetadata", () => {
+  const trace = (over: Partial<TraceDetail> = {}): TraceDetail => ({
+    uuid: "t-1",
+    agent_id: "a-1",
+    message_id: null,
+    conversation_id: null,
+    input: "hi",
+    output: { response: "hello" },
+    metadata: null,
+    labels: null,
+    created_at: "",
+    updated_at: "",
+    ...over,
+  });
+
+  it("is empty for a trace with nothing to carry", () => {
+    expect(traceLabellingMetadata(trace())).toEqual([]);
+  });
+
+  it("puts the trace's own entries first, then its ids and labels", () => {
+    expect(
+      traceLabellingMetadata(
+        trace({
+          metadata: [{ key: "locale", value: "hi-IN" }],
+          conversation_id: "conv-1",
+          message_id: "msg-1",
+          labels: ["prod", "hindi"],
+        }),
+      ),
+    ).toEqual([
+      { key: "locale", value: "hi-IN" },
+      { key: "conversation_id", value: "conv-1" },
+      { key: "message_id", value: "msg-1" },
+      { key: "labels", value: "prod, hindi" },
+    ]);
+  });
+
+  it("drops the ids and labels when the trace's own entries fill the item", () => {
+    const full = Array.from({ length: 100 }, (_, i) => ({
+      key: `k${i}`,
+      value: "v",
+    }));
+    expect(
+      traceLabellingMetadata(
+        trace({ metadata: full, conversation_id: "c", labels: ["x"] }),
+      ),
+    ).toEqual(full);
   });
 });

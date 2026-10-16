@@ -723,6 +723,36 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     },
   );
 
+  it.each(["conversation", "general"] as const)(
+    "carries each trace's metadata onto its item for a %s agent",
+    (agentNature) => {
+      const metadata = [{ key: "conversation_id", value: "conv-1" }];
+      const input =
+        agentNature === "general"
+          ? "book me in"
+          : [{ role: "user", content: "book me in" }];
+      const result = buildItemsFromSource({
+        type: "traces",
+        agentUuid: "agent-uuid-1",
+        agentNature,
+        traces: [
+          { name: "Replied", input, output: { response: "Done." }, metadata },
+          {
+            name: "Called a tool",
+            input,
+            output: {
+              response: "",
+              tool_calls: [{ tool: "book_appointment", arguments: {} }],
+            },
+            metadata,
+          },
+        ],
+      });
+
+      expect(result.items.map((i) => i.metadata)).toEqual([metadata, metadata]);
+    },
+  );
+
   it("builds a general trace that only called a tool as a tool-call item", () => {
     const source: AddRunToLabellingTaskSource = {
       type: "traces",
@@ -1370,6 +1400,7 @@ describe("AddRunToLabellingTaskDialog", () => {
           name: "Refund question",
           input: [{ role: "user", content: "where is my refund?" }],
           output: { response: "Let me check that." },
+          metadata: [{ key: "conversation_id", value: "conv-1" }],
         },
       ],
       evaluators: [
@@ -1447,6 +1478,7 @@ describe("AddRunToLabellingTaskDialog", () => {
               agent_response: "Let me check that.",
               evaluator_variables: {},
             },
+            metadata: [{ key: "conversation_id", value: "conv-1" }],
           },
         ],
       },

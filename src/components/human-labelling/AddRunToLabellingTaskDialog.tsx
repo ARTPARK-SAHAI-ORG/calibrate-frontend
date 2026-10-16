@@ -85,6 +85,7 @@ export type TraceLabellingItem = {
   /** Turns for a conversational agent, plain text for a general one. */
   input: unknown[] | string;
   output: { response?: string | null; tool_calls?: unknown[] | null };
+  metadata?: { key: string; value: string }[];
 };
 
 export type AddRunToLabellingTaskSource =
@@ -270,6 +271,7 @@ type BuiltItem = {
     description?: string;
     [key: string]: unknown;
   };
+  metadata?: { key: string; value: string }[];
   /** The verdicts the run's evaluators already gave this result, keyed by
    * evaluator uuid. Sent alongside the item so the task holds the scores the
    * moment the items land, with no second call to the models. Absent when the
@@ -746,8 +748,8 @@ export function buildItemsFromSource(
           // holding the call beside the input that produced it. There is no
           // expected call to compare against, so a person judges it on its own.
           if (isToolCallTrace(t)) {
-            items.push(
-              buildToolCallItem({
+            items.push({
+              ...buildToolCallItem({
                 test_case: {
                   name: t.name,
                   input,
@@ -755,7 +757,8 @@ export function buildItemsFromSource(
                 },
                 output: t.output as { tool_calls?: ToolCallOutput[] },
               }),
-            );
+              metadata: t.metadata,
+            });
             continue;
           }
           items.push({
@@ -765,6 +768,7 @@ export function buildItemsFromSource(
               output: t.output?.response ?? "",
               evaluator_variables: {},
             },
+            metadata: t.metadata,
           });
         }
         for (const ev of source.evaluators ?? []) {
@@ -787,8 +791,8 @@ export function buildItemsFromSource(
           continue;
         }
         if (isToolCallTrace(t)) {
-          items.push(
-            buildToolCallItem({
+          items.push({
+            ...buildToolCallItem({
               test_case: {
                 name: t.name,
                 history: t.input as TestCaseHistory[],
@@ -796,7 +800,8 @@ export function buildItemsFromSource(
               },
               output: t.output as { tool_calls?: ToolCallOutput[] },
             }),
-          );
+            metadata: t.metadata,
+          });
           continue;
         }
         const built = buildOneItem({
@@ -816,7 +821,7 @@ export function buildItemsFromSource(
           skippedCount += 1;
           continue;
         }
-        items.push(built.item);
+        items.push({ ...built.item, metadata: t.metadata });
       }
       // A trace has no run and therefore no judge results, so its items carry
       // no evaluator variables. The evaluators come wholesale from the source
