@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { Link } from "@/lib/nav";
 import {
   Button,
   DialogNavHeader,
@@ -443,6 +444,16 @@ export function TraceDetailDialog({
           {/* Kept together so both sit in the top right corner. Loose in the
               header they would be spread apart by the row's own spacing. */}
           <div className="flex items-center gap-3 flex-shrink-0">
+            {conversation && (
+              <Link
+                href={`/agents/${conversation.agent_id}?tab=monitoring&conversation=${encodeURIComponent(conversation.conversation_id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center h-8 px-3 rounded-md text-sm font-medium border border-blue-500/30 bg-blue-500/5 text-blue-900 hover:bg-blue-500/10 transition-colors whitespace-nowrap"
+              >
+                Open this conversation&apos;s traces
+              </Link>
+            )}
             {/* Only while this trace is in the selection: the count answers
                 "what did that press do", so it goes away with the trace it
                 was counting. */}

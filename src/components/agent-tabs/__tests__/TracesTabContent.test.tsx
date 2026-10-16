@@ -513,7 +513,7 @@ describe("TracesTabContent", () => {
     // Nothing typed yet, so the whole list is asked for.
     expect(lastTracesArgs().q).toBe("");
     expect(lastTracesArgs().poll).toBe(true);
-    expect(lastTracesArgs()).not.toHaveProperty("conversationId");
+    expect(lastTracesArgs().conversationId).toBeNull();
     expect(mockUseDialogUrlParam).toHaveBeenCalledWith(
       expect.objectContaining({ param: "traceId" }),
     );
@@ -540,6 +540,25 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByRole("button", { name: "Traces" }));
     expect(screen.queryByTestId("conversations-view")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Search traces")).toBeInTheDocument();
+  });
+
+  it("lists one conversation's traces when the address names it, until it is removed", async () => {
+    window.history.replaceState(null, "", "/?conversation=conv-1");
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    expect(lastTracesArgs().conversationId).toBe("conv-1");
+    expect(screen.getByText("Conversation conv-1")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Show traces from every conversation" }),
+    );
+
+    expect(lastTracesArgs().conversationId).toBeNull();
+    expect(screen.queryByText("Conversation conv-1")).not.toBeInTheDocument();
+    expect(
+      new URLSearchParams(window.location.search).has("conversation"),
+    ).toBe(false);
   });
 
   it("opens on the conversations when the address asks for them", () => {

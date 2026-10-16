@@ -142,6 +142,7 @@ export function TracesTabContent({
     sortByEvaluator,
     sortOrder,
     conversations: showConversations,
+    conversationId: conversationFilter,
   } = view;
 
   // The tags sent with the traces, and the ones picked to filter by. A trace
@@ -200,6 +201,7 @@ export function TracesTabContent({
     sortByEvaluator,
     sortOrder,
     poll: isActive && !showConversations,
+    conversationId: conversationFilter,
   });
 
   // Every trace the list matches, not only the ticked ones. The two bulk
@@ -212,6 +214,7 @@ export function TracesTabContent({
     outputType: outputFilter,
     labels: labelFilter,
     scores: scoreFilter,
+    conversationId: conversationFilter,
   };
 
   const deletion = useTraceDeletion({
@@ -410,6 +413,7 @@ export function TracesTabContent({
             q: search,
             labels: labelFilter,
             scores: scoreFilter,
+            conversationId: conversationFilter,
             outputType,
           }),
         ),
@@ -454,7 +458,7 @@ export function TracesTabContent({
     // the reader, never which traces the list matches, so a tick survives it
     // the same way it survives a page turn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, outputFilter, labelFilter, scoreFilter]);
+  }, [search, outputFilter, labelFilter, scoreFilter, conversationFilter]);
   // Unticking a row is the reader narrowing what they want, so the whole list
   // is no longer what they asked for.
   useEffect(() => {
@@ -689,6 +693,7 @@ export function TracesTabContent({
   // on screen are still the filtered ones until a cleared filter has loaded
   // back.
   const isFiltering =
+    conversationFilter != null ||
     isFilteringOutput ||
     labelFilter.length > 0 ||
     loadedLabels.length > 0 ||
@@ -902,6 +907,32 @@ export function TracesTabContent({
               })
             }
           />
+          {conversationFilter && (
+            <span className="inline-flex items-center gap-1.5 h-8 pl-2.5 pr-1.5 rounded-md border border-blue-500/20 bg-blue-500/5 text-sm text-blue-900">
+              Conversation {conversationFilter}
+              <button
+                type="button"
+                onClick={() => setView({ conversationId: null })}
+                aria-label="Show traces from every conversation"
+                className="p-0.5 rounded hover:bg-blue-500/10 cursor-pointer"
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </span>
+          )}
           {/* Not a filter, so it sits apart from the two that are, at the
               far end of the row. */}
           <div className="sm:ml-auto">{integrationGuideButton}</div>

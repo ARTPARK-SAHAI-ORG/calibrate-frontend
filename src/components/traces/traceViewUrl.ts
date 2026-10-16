@@ -31,6 +31,8 @@ const SORT_PARAM = "sort";
 const DIRECTION_PARAM = "dir";
 /** "conversations" when the tab lists conversations instead of traces. */
 const VIEW_PARAM = "view";
+/** The one conversation the traces list is narrowed to. */
+const CONVERSATION_PARAM = "conversation";
 
 export type TraceView = {
   outputType: TraceOutputFilter;
@@ -39,6 +41,7 @@ export type TraceView = {
   sortByEvaluator: string | null;
   sortOrder: TraceSortOrder;
   conversations: boolean;
+  conversationId: string | null;
 };
 
 export const EMPTY_TRACE_VIEW: TraceView = {
@@ -48,6 +51,7 @@ export const EMPTY_TRACE_VIEW: TraceView = {
   sortByEvaluator: null,
   sortOrder: "asc",
   conversations: false,
+  conversationId: null,
 };
 
 export function readTraceView(): TraceView {
@@ -69,6 +73,7 @@ export function readTraceView(): TraceView {
     sortByEvaluator: params.get(SORT_PARAM) || null,
     sortOrder: params.get(DIRECTION_PARAM) === "desc" ? "desc" : "asc",
     conversations: params.get(VIEW_PARAM) === "conversations",
+    conversationId: params.get(CONVERSATION_PARAM) || null,
   };
 }
 
@@ -82,6 +87,7 @@ export function writeTraceView(view: TraceView): void {
     SORT_PARAM,
     DIRECTION_PARAM,
     VIEW_PARAM,
+    CONVERSATION_PARAM,
   ]) {
     params.delete(name);
   }
@@ -95,6 +101,7 @@ export function writeTraceView(view: TraceView): void {
     params.set(DIRECTION_PARAM, view.sortOrder);
   }
   if (view.conversations) params.set(VIEW_PARAM, "conversations");
+  if (view.conversationId) params.set(CONVERSATION_PARAM, view.conversationId);
   const query = params.toString();
   const { pathname, hash } = window.location;
   window.history.replaceState(

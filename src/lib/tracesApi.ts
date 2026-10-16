@@ -209,6 +209,8 @@ export type TraceListParams = {
    *  output has tool calls and no reply ("tool_call"). "all" keeps everything
    *  and is left off here. */
   outputType?: TraceOutputFilter;
+  /** Keep only the turns of this conversation. */
+  conversationId?: string | null;
   /** Ask for `score_averages` beside the page. Costly, so only when the
    *  filters change rather than on every page or poll. */
   includeScoreAverages?: boolean;
@@ -245,12 +247,14 @@ export async function fetchTraces(
     sortByEvaluator,
     sortOrder,
     includeScoreAverages,
+    conversationId,
   }: TraceListParams,
 ): Promise<Paginated<TraceSummary> & { score_averages?: TraceScoreAverage[] }> {
   const params = new URLSearchParams();
   params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
   params.set("offset", String(offset));
   params.set("agent_id", agentId);
+  if (conversationId) params.set("conversation_id", conversationId);
   if (q?.trim()) params.set("q", q.trim());
   if (outputType && outputType !== "all") {
     params.set("output_type", outputType);
@@ -457,6 +461,8 @@ export type TraceFilters = {
   outputType?: TraceOutputFilter;
   labels?: string[];
   scores?: TraceScoreFilters;
+  /** Keep only the turns of this conversation. */
+  conversationId?: string | null;
 };
 
 /** Turn the filters into the fields both bulk endpoints read. */
@@ -470,6 +476,7 @@ export function selectAllBody(filters: TraceFilters): Record<string, unknown> {
     body.output_type = filters.outputType;
   }
   if (filters.labels?.length) body.labels = filters.labels;
+  if (filters.conversationId) body.conversation_id = filters.conversationId;
   const score = traceScoreParams(filters.scores);
   if (score.length) body.score = score;
   return body;

@@ -39,6 +39,31 @@ beforeEach(() => {
   mockApiPut.mockReset();
 });
 
+describe("the conversation filter on the traces list", () => {
+  it("is sent on the list and on a select-all body, and left off when unset", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
+
+    await fetchTraces("tok", {
+      limit: 10,
+      offset: 0,
+      agentId: "agent-1",
+      conversationId: "conv-1",
+    });
+    await fetchTraces("tok", { limit: 10, offset: 0, agentId: "agent-1" });
+
+    const query = (i: number) =>
+      new URLSearchParams(mockApiGet.mock.calls[i][0].split("?")[1]);
+    expect(query(0).get("conversation_id")).toBe("conv-1");
+    expect(query(1).has("conversation_id")).toBe(false);
+    expect(
+      selectAllBody({ agentId: "agent-1", conversationId: "conv-1" }),
+    ).toEqual({ select_all: true, agent_id: "agent-1", conversation_id: "conv-1" });
+    expect(selectAllBody({ agentId: "agent-1" })).not.toHaveProperty(
+      "conversation_id",
+    );
+  });
+});
+
 describe("fetchTraceConversations", () => {
   it("asks for one page of the agent's conversations with the filters", async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });

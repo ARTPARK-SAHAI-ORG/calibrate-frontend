@@ -26,6 +26,7 @@ describe("readTraceView", () => {
       sortByEvaluator: "ev-2",
       sortOrder: "desc",
       conversations: false,
+      conversationId: null,
     });
   });
 
@@ -126,6 +127,7 @@ describe("writeTraceView", () => {
       sortByEvaluator: "ev-1",
       sortOrder: "desc" as const,
       conversations: true,
+      conversationId: "conv a/1",
     };
 
     writeTraceView(view);
@@ -149,6 +151,7 @@ describe("useTraceView", () => {
       sortByEvaluator: "ev-1",
       sortOrder: "desc",
       conversations: false,
+      conversationId: null,
     });
   });
 

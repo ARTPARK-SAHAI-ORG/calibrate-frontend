@@ -43,6 +43,8 @@ type UseTracesArgs = {
   sortByEvaluator?: string | null;
   /** Which way that order runs. Ignored without `sortByEvaluator`. */
   sortOrder?: TraceSortOrder;
+  /** Keep only the turns of this conversation. */
+  conversationId?: string | null;
   /** When false, skip polling open scoring runs (tab is off screen). */
   poll?: boolean;
 };
@@ -64,6 +66,7 @@ export function useTraces({
   sortByEvaluator = null,
   sortOrder = "desc",
   poll = true,
+  conversationId = null,
 }: UseTracesArgs) {
   // A new array on every render would restart the fetch forever, so the
   // effects and the fetch key on the labels' text rather than the array.
@@ -119,6 +122,7 @@ export function useTraces({
     scoreKey,
     sortByEvaluator,
     sortOrder,
+    conversationId,
   ]);
 
   const load = useCallback(
@@ -148,6 +152,7 @@ export function useTraces({
           outputType,
           labelKey,
           scoreKey,
+          conversationId,
         ]);
         const wantAverages =
           withAverages || averagesKeyRef.current !== filterKey;
@@ -161,6 +166,7 @@ export function useTraces({
           scores,
           sortByEvaluator,
           sortOrder,
+          conversationId,
           includeScoreAverages: wantAverages,
         });
         if (requestId !== requestIdRef.current) return 0;
@@ -204,6 +210,7 @@ export function useTraces({
       scoreKey,
       sortByEvaluator,
       sortOrder,
+      conversationId,
     ],
   );
 

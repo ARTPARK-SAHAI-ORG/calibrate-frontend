@@ -1091,6 +1091,38 @@ describe("showing a whole conversation", () => {
     expect(screen.queryByText("2 selected")).not.toBeInTheDocument();
   });
 
+  it("links to the conversation's traces in a new browser tab", async () => {
+    mockFetchTrace.mockResolvedValue({ ...detail, uuid: "t-last" });
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+        conversation={{ ...conversation, conversation_id: "conv a/1" }}
+      />,
+    );
+
+    const link = screen.getByRole("link", {
+      name: "Open this conversation's traces",
+    });
+    expect(link.getAttribute("href")).toContain(
+      "/agents/ag-1?tab=monitoring&conversation=conv%20a%2F1",
+    );
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
+  it("has no conversation link on a single trace", async () => {
+    mockFetchTrace.mockResolvedValue(detail);
+    render(
+      <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+    );
+    await screen.findByText("At 14 weeks, for OPV and DPT.");
+    expect(
+      screen.queryByRole("link", { name: "Open this conversation's traces" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("says the conversation failed to load", async () => {
     mockFetchTrace.mockRejectedValue(new Error("boom"));
 
