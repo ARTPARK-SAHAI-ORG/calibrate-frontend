@@ -3,6 +3,7 @@
 import React, { Fragment, useRef, useState } from "react";
 import { SegmentedFilter } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
+import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { useDismissOnOutside } from "@/hooks/useDismissOnOutside";
 import {
   ChevronDownIcon,
@@ -142,7 +143,6 @@ export function TracesFilter({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<TracesFilterValue>(value);
   const [labelSearch, setLabelSearch] = useState("");
-  const [conversationSearch, setConversationSearch] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
 
   useDismissOnOutside(open, rootRef, () => setOpen(false));
@@ -164,7 +164,6 @@ export function TracesFilter({
       ),
     });
     setLabelSearch("");
-    setConversationSearch("");
     setOpen(true);
   };
 
@@ -217,11 +216,6 @@ export function TracesFilter({
     draft.conversationId && !conversationIds.includes(draft.conversationId)
       ? [draft.conversationId, ...conversationIds]
       : conversationIds;
-  const shownConversationIds = conversationSearch.trim()
-    ? allConversationIds.filter((id) =>
-        id.toLowerCase().includes(conversationSearch.trim().toLowerCase()),
-      )
-    : allConversationIds;
   const shownLabels = labelSearch.trim()
     ? labels.filter((l) =>
         l.toLowerCase().includes(labelSearch.trim().toLowerCase()),
@@ -285,7 +279,11 @@ export function TracesFilter({
             onChange={(outputType) => setDraft((d) => ({ ...d, outputType }))}
             options={OUTPUT_FILTER_OPTIONS}
             className="w-fit"
-            ariaLabel="Filter traces by output"
+            ariaLabel={
+              forConversations
+                ? "Filter conversations by output"
+                : "Filter traces by output"
+            }
           />
 
           {!forConversations && allConversationIds.length > 0 && (
@@ -293,57 +291,26 @@ export function TracesFilter({
               <p className="text-sm font-medium text-foreground mb-2">
                 Filter by conversation ID
               </p>
-              {allConversationIds.length > SEARCH_LABELS_FROM && (
-                <input
-                  type="text"
-                  value={conversationSearch}
-                  onChange={(e) => setConversationSearch(e.target.value)}
-                  placeholder="Search conversation IDs"
-                  aria-label="Search conversation IDs"
-                  className="w-full h-8 px-2 mb-1 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                />
-              )}
-              <div className="w-0 min-w-full max-h-48 overflow-y-auto">
-                {!conversationSearch.trim() && (
-                  <label
-                    className="w-full flex items-center gap-2 px-1 py-1.5 rounded text-sm cursor-pointer hover:bg-muted/50 transition-colors"
-                  >
-                    <input
-                      type="radio"
-                      name="trace-conversation"
-                      checked={!draft.conversationId}
-                      onChange={() =>
-                        setDraft((d) => ({ ...d, conversationId: null }))
-                      }
-                      className="w-4 h-4 flex-shrink-0 cursor-pointer accent-foreground"
-                    />
-                    <span>Any conversation</span>
-                  </label>
+              <SingleSelectPicker<string>
+                items={["", ...allConversationIds]}
+                selectedId={draft.conversationId ?? ""}
+                onSelect={(id) =>
+                  setDraft((d) => ({ ...d, conversationId: id || null }))
+                }
+                getId={(id) => id}
+                compact
+                ariaLabel="Conversation ID"
+                placeholder="Any conversation"
+                searchPlaceholder="Search conversation IDs"
+                emptyLabel="No conversation IDs match your search"
+                matchesSearch={(id, q) =>
+                  !id || id.toLowerCase().includes(q.trim().toLowerCase())
+                }
+                renderTrigger={(id) => id || "Any conversation"}
+                renderOption={(id) => (
+                  <span className="truncate">{id || "Any conversation"}</span>
                 )}
-                {shownConversationIds.length === 0 ? (
-                  <p className="text-sm text-muted-foreground px-1 py-2">
-                    No conversation IDs match your search
-                  </p>
-                ) : (
-                  shownConversationIds.map((id) => (
-                    <label
-                      key={id}
-                      className="w-full flex items-center gap-2 px-1 py-1.5 rounded text-sm cursor-pointer hover:bg-muted/50 transition-colors"
-                    >
-                      <input
-                        type="radio"
-                        name="trace-conversation"
-                        checked={draft.conversationId === id}
-                        onChange={() =>
-                          setDraft((d) => ({ ...d, conversationId: id }))
-                        }
-                        className="w-4 h-4 flex-shrink-0 cursor-pointer accent-foreground"
-                      />
-                      <span className="truncate">{id}</span>
-                    </label>
-                  ))
-                )}
-              </div>
+              />
             </div>
           )}
 

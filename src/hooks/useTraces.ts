@@ -100,6 +100,9 @@ export function useTraces({
   // same way, so a caller can tell "this agent has no traces" from "no trace
   // scored like that".
   const [loadedScores, setLoadedScores] = useState<TraceScoreFilters>({});
+  const [loadedConversationId, setLoadedConversationId] = useState<
+    string | null
+  >(null);
   // Monotonic id so a slow, superseded response can never clobber the state
   // written by a newer request (filters change mid-flight, rapid paging).
   // Running averages over every matching trace, kept while paging through the
@@ -181,6 +184,7 @@ export function useTraces({
         setLoadedOutputType(outputType);
         setLoadedLabels(labels);
         setLoadedScores(scores);
+        setLoadedConversationId(conversationId);
         setLoadedOffset(targetOffset);
         return nextTotal;
       } catch (err) {
@@ -275,6 +279,7 @@ export function useTraces({
     loadedOutputType,
     loadedLabels,
     loadedScores,
+    loadedConversationId,
     offset,
     setOffset,
     loadedOffset,

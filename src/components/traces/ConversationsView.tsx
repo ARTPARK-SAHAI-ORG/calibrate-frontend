@@ -82,7 +82,7 @@ export function ConversationsView({
         agentId: agentUuid,
         q: search,
         outputType,
-        labels: labelsKey ? labelsKey.split("\n") : [],
+        labels,
       });
       if (request !== latestRequest.current) return;
       setPage({ items: res.items, total: res.total, offset });
@@ -90,10 +90,13 @@ export function ConversationsView({
     } catch (err) {
       if (request !== latestRequest.current) return;
       reportError("Error fetching conversations:", err);
-      setError("Failed to load conversations. Please try again.");
+      setError("Failed to load conversations");
     } finally {
       if (request === latestRequest.current) setIsLoading(false);
     }
+    // Keyed on the labels' text, so a new array of the same labels does not
+    // load the page again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, agentUuid, pageSize, offset, search, outputType, labelsKey]);
 
   useEffect(() => {
@@ -112,7 +115,12 @@ export function ConversationsView({
   const { setParam } = useDialogUrlParam({
     param: "conversationId",
     onOpen: (value) => setOpenId(value),
-    onClose: () => setOpenId(null),
+    // Back can close the window while a step to the next page is still
+    // loading; that step must not reopen it when the page arrives.
+    onClose: () => {
+      itemPager.cancel();
+      setOpenId(null);
+    },
   });
   const open = (id: string) => {
     setOpenId(id);
@@ -132,7 +140,35 @@ export function ConversationsView({
     setOpenId(null);
     setParam(null);
   };
-  const openConversation = items.find((c) => c.conversation_id === openId);
+  // Held apart from the page, so stepping onto the next page keeps the window
+  // up, and a link to a conversation on another page still opens it.
+  const [held, setHeld] = useState<TraceConversation | null>(null);
+  useEffect(() => {
+    if (!openId) return;
+    const found = items.find((c) => c.conversation_id === openId);
+    if (found) {
+      setHeld(found);
+      return;
+    }
+    if (!accessToken || held?.conversation_id === openId) return;
+    let current = true;
+    fetchTraceConversations(accessToken, {
+      limit: 1,
+      offset: 0,
+      agentId: agentUuid,
+      conversationId: openId,
+    })
+      .then((res) => {
+        if (current) setHeld(res.items[0] ?? null);
+      })
+      .catch((err) => reportError("Error fetching conversation:", err));
+    return () => {
+      current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId, items, accessToken, agentUuid]);
+  const openConversation =
+    openId && held?.conversation_id === openId ? held : null;
 
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
@@ -160,7 +196,30 @@ export function ConversationsView({
       </div>
 
       {error ? (
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <div className="flex flex-wrap items-center justify-between gap-3 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={isLoading}
+            className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium border border-red-300 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"
+              />
+            </svg>
+            {isLoading ? "Trying again" : "Try again"}
+          </button>
+        </div>
       ) : !page ? (
         <LoadingState />
       ) : total === 0 ? (
@@ -208,8 +267,8 @@ export function ConversationsView({
         isOpen={openConversation != null}
         onClose={close}
         accessToken={accessToken}
-        traceUuid={openConversation?.last_turn.uuid ?? null}
-        conversation={openConversation ?? null}
+        traceUuid={null}
+        conversation={openConversation}
         hasPrev={itemPager.hasPrev}
         hasNext={itemPager.hasNext}
         onPrev={itemPager.prev}

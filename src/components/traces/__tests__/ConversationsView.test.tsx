@@ -202,15 +202,17 @@ describe("ConversationsView", () => {
   });
 
   it("shows an error when the list cannot be loaded", async () => {
-    fetchTraceConversations.mockRejectedValue(new Error("boom"));
+    fetchTraceConversations.mockRejectedValueOnce(new Error("boom"));
+    const user = setupUser();
     render(<ConversationsView {...props} />);
 
     expect(
-      await screen.findByText(
-        "Failed to load conversations. Please try again.",
-      ),
+      await screen.findByText("Failed to load conversations"),
     ).toBeInTheDocument();
     expect(reportError).toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect((await screen.findAllByText("conv-a")).length).toBeGreaterThan(0);
   });
 
   it("pages through the conversations", async () => {

@@ -222,7 +222,6 @@ function ConversationMetaPanel({
             href={`/agents/${conversation.agent_id}?tab=monitoring&conversation=${encodeURIComponent(conversation.conversation_id)}`}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Open this conversation's traces"
             className="px-2.5 py-0.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-xs font-medium text-blue-700 dark:text-blue-300 transition-colors"
           >
             View turns
@@ -463,15 +462,12 @@ export function TraceDetailDialog({
             {/* Only while this trace is in the selection: the count answers
                 "what did that press do", so it goes away with the trace it
                 was counting. */}
-            {!isConversation &&
-              onToggleSelected &&
-              isSelected &&
-              selectedCount > 0 && (
+            {onToggleSelected && isSelected && selectedCount > 0 && (
                 <span className="inline-flex items-center h-8 px-2.5 rounded-md border border-border bg-muted/40 text-xs font-medium text-foreground whitespace-nowrap">
                   {selectedCount} selected
                 </span>
               )}
-            {!isConversation && onToggleSelected && (
+            {onToggleSelected && (
               // Both states are filled so neither reads as switched off, and
               // they are different colours so a glance says which one it is.
               <Button

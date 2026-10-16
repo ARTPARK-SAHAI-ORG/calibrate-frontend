@@ -181,6 +181,7 @@ export function TracesTabContent({
     loadedOutputType,
     loadedLabels,
     loadedScores,
+    loadedConversationId,
     scoreAverages,
     offset,
     setOffset,
@@ -646,7 +647,10 @@ export function TracesTabContent({
   const { setParam: setTraceParam } = useDialogUrlParam({
     param: "traceId",
     onOpen: (value) => setOpenTraceUuid(value),
-    onClose: () => setOpenTraceUuid(null),
+    onClose: () => {
+      itemPager.cancel();
+      setOpenTraceUuid(null);
+    },
   });
   const openTrace = (uuid: string) => {
     setOpenTraceUuid(uuid);
@@ -698,6 +702,7 @@ export function TracesTabContent({
   // back.
   const isFiltering =
     conversationFilter != null ||
+    loadedConversationId != null ||
     isFilteringOutput ||
     labelFilter.length > 0 ||
     loadedLabels.length > 0 ||

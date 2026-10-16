@@ -516,12 +516,24 @@ function setupWithConversations(
   return { user, onApply };
 }
 
-it("narrows to one picked conversation, and back to any", async () => {
+/** Picks one choice from the conversation ID dropdown. */
+async function pickConversation(
+  user: ReturnType<typeof setupUser>,
+  name: string,
+) {
+  await user.click(screen.getByRole("button", { name: "Conversation ID" }));
+  await user.click(screen.getByRole("option", { name }));
+}
+
+it("narrows to one conversation picked from the dropdown, and back to any", async () => {
   const { user, onApply } = setupWithConversations(["conv-2", "conv-1"]);
   await openPanel(user);
-  expect(screen.getByRole("radio", { name: "Any conversation" })).toBeChecked();
+  expect(
+    screen.getByRole("button", { name: "Conversation ID" }),
+  ).toHaveTextContent("Any conversation");
 
-  await user.click(screen.getByRole("radio", { name: "conv-1" }));
+  await pickConversation(user, "conv-1");
+  // The panel stays open: a click inside the dropdown is not a click outside.
   expect(applyButton()).toHaveTextContent("Apply (1)");
   await user.click(applyButton());
   expect(onApply).toHaveBeenLastCalledWith(
@@ -530,26 +542,24 @@ it("narrows to one picked conversation, and back to any", async () => {
 
   onApply.mockClear();
   await openPanel(user);
-  await user.click(screen.getByRole("radio", { name: "Any conversation" }));
+  await pickConversation(user, "Any conversation");
   await user.click(applyButton());
   expect(onApply.mock.calls[0][0].conversationId).toBeUndefined();
 });
 
-it("searches a long list of conversation IDs", async () => {
-  const ids = Array.from({ length: 12 }, (_, i) => `conv-${i}`);
-  const { user } = setupWithConversations(ids);
+it("searches the conversation IDs, keeping the any choice", async () => {
+  const { user } = setupWithConversations(["conv-1", "conv-11", "other"]);
   await openPanel(user);
+  await user.click(screen.getByRole("button", { name: "Conversation ID" }));
 
-  await user.type(screen.getByLabelText("Search conversation IDs"), "conv-11");
-  expect(
-    screen.getAllByRole("radio").map((r) => r.closest("label")?.textContent),
-  ).toEqual(["conv-11"]);
-
-  await user.clear(screen.getByLabelText("Search conversation IDs"));
-  await user.type(screen.getByLabelText("Search conversation IDs"), "nothing");
-  expect(
-    screen.getByText("No conversation IDs match your search"),
-  ).toBeInTheDocument();
+  await user.type(
+    screen.getByPlaceholderText("Search conversation IDs"),
+    "conv-11",
+  );
+  expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+    "Any conversation",
+    "conv-11",
+  ]);
 });
 
 it("keeps a conversation picked from the address on offer even when the list lacks it", async () => {
@@ -558,7 +568,9 @@ it("keeps a conversation picked from the address on offer even when the list lac
     conversationId: "conv-gone",
   });
   await openPanel(user);
-  expect(screen.getByRole("radio", { name: "conv-gone" })).toBeChecked();
+  expect(
+    screen.getByRole("button", { name: "Conversation ID" }),
+  ).toHaveTextContent("conv-gone");
 });
 
 it("leaves the conversation section out when there are no conversation IDs", async () => {

@@ -554,8 +554,11 @@ describe("TracesTabContent", () => {
     expect(lastTracesArgs().conversationId).toBe("conv-1");
 
     await openTraceFilter(user);
-    expect(screen.getByRole("radio", { name: "conv-1" })).toBeChecked();
-    await user.click(screen.getByRole("radio", { name: "Any conversation" }));
+    expect(
+      screen.getByRole("button", { name: "Conversation ID" }),
+    ).toHaveTextContent("conv-1");
+    await user.click(screen.getByRole("button", { name: "Conversation ID" }));
+    await user.click(screen.getByRole("option", { name: "Any conversation" }));
     await user.click(screen.getByRole("button", { name: /^Apply/ }));
 
     expect(lastTracesArgs().conversationId).toBeNull();
@@ -569,7 +572,8 @@ describe("TracesTabContent", () => {
     render(<TracesTabContent {...tabProps} />);
 
     await openTraceFilter(user);
-    await user.click(screen.getByRole("radio", { name: "conv-9" }));
+    await user.click(screen.getByRole("button", { name: "Conversation ID" }));
+    await user.click(screen.getByRole("option", { name: "conv-9" }));
     await user.click(screen.getByRole("button", { name: /^Apply/ }));
 
     expect(lastTracesArgs().conversationId).toBe("conv-9");

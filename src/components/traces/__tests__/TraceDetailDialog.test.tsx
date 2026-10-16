@@ -1054,7 +1054,7 @@ describe("showing a whole conversation", () => {
     },
   };
 
-  it("draws the newest turn's trace under the conversation id, with no scores and no selection button", async () => {
+  it("draws the newest turn's trace under the conversation id, with no scores", async () => {
     mockFetchTrace.mockResolvedValue({ ...detail, uuid: "t-last" });
 
     render(
@@ -1064,9 +1064,6 @@ describe("showing a whole conversation", () => {
         accessToken="tok"
         traceUuid="t1"
         conversation={conversation}
-        isSelected
-        onToggleSelected={jest.fn()}
-        selectedCount={2}
       />,
     );
 
@@ -1085,10 +1082,6 @@ describe("showing a whole conversation", () => {
       screen.getByText(formatTraceDate("2026-07-20T10:00:00Z")),
     ).toBeInTheDocument();
     expect(screen.queryByText("Created")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Remove trace from selection"),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText("2 selected")).not.toBeInTheDocument();
   });
 
   it("links to the conversation's traces in a new browser tab", async () => {
@@ -1104,7 +1097,7 @@ describe("showing a whole conversation", () => {
     );
 
     const link = await screen.findByRole("link", {
-      name: "Open this conversation's traces",
+      name: "View turns",
     });
     expect(link).toHaveTextContent("View turns");
     expect(link.getAttribute("href")).toContain(
@@ -1120,7 +1113,7 @@ describe("showing a whole conversation", () => {
     );
     await screen.findByText("At 14 weeks, for OPV and DPT.");
     expect(
-      screen.queryByRole("link", { name: "Open this conversation's traces" }),
+      screen.queryByRole("link", { name: "View turns" }),
     ).not.toBeInTheDocument();
   });
 

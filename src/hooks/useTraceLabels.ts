@@ -41,8 +41,7 @@ function useTraceFilterOptions(
     return () => {
       current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, agentId, reloads]);
+  }, [accessToken, agentId, reloads, fetchOptions, what]);
 
   const refetch = useCallback(() => setReloads((n) => n + 1), []);
 

@@ -299,9 +299,10 @@ export async function fetchTraceConversations(
     q,
     outputType,
     labels,
+    conversationId,
   }: Pick<
     TraceListParams,
-    "limit" | "offset" | "agentId" | "q" | "outputType" | "labels"
+    "limit" | "offset" | "agentId" | "q" | "outputType" | "labels" | "conversationId"
   >,
 ): Promise<Paginated<TraceConversation>> {
   const params = new URLSearchParams();
@@ -313,6 +314,7 @@ export async function fetchTraceConversations(
     params.set("output_type", outputType);
   }
   for (const label of labels ?? []) params.append("labels", label);
+  if (conversationId) params.set("conversation_id", conversationId);
   return apiGet<Paginated<TraceConversation>>(
     `/traces/conversations?${params.toString()}`,
     accessToken,
@@ -408,11 +410,6 @@ export async function fetchTraceUsage(
   return apiGet<TraceUsage>("/traces/usage", accessToken);
 }
 
-/**
- * The labels sent with this agent's traces, so the filter can offer them.
- * The list is server-paginated and holds one page, so the labels on screen
- * are never the whole set: they have to come from the backend.
- */
 /** Every conversation ID on this agent's traces, newest activity first. */
 export async function fetchTraceConversationIds(
   accessToken: string,
@@ -425,6 +422,11 @@ export async function fetchTraceConversationIds(
   return data.conversation_ids ?? [];
 }
 
+/**
+ * The labels sent with this agent's traces, so the filter can offer them.
+ * The list is server-paginated and holds one page, so the labels on screen
+ * are never the whole set: they have to come from the backend.
+ */
 export async function fetchTraceLabels(
   accessToken: string,
   agentId: string,
