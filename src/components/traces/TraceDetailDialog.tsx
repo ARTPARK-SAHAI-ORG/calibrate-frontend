@@ -223,9 +223,9 @@ function ConversationMetaPanel({
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Open this conversation's traces"
-            className="text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline"
+            className="px-2.5 py-0.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-xs font-medium text-blue-700 dark:text-blue-300 transition-colors"
           >
-            View turns ↗
+            View turns
           </Link>
         </div>
         <span className="block text-xs text-foreground">
