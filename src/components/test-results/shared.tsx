@@ -952,6 +952,7 @@ export function TestDetailView({
   highlightEvalTarget = false,
   showVerdict = true,
   showVersions = true,
+  markOutput = true,
 }: {
   history: TestCaseHistory[];
   /** `test_case.input` — set only for a test written as one input rather
@@ -985,6 +986,9 @@ export function TestDetailView({
   /** When false, a turn's other forms (`versions`) are not drawn under its
    * bubble. Labels still show. */
   showVersions?: boolean;
+  /** When false, the final reply gets no left border: nothing on screen is
+   * being judged, as in a whole conversation read back. */
+  markOutput?: boolean;
 }) {
   // Precompute tool_call_id → response content map so the inline tool-call
   // card lookup is O(1) instead of scanning the entire history once per
@@ -1030,7 +1034,9 @@ export function TestDetailView({
   const hasJudgeResults =
     Array.isArray(effectiveJudgeResults) && effectiveJudgeResults.length > 0;
   const [historyView, setHistoryView] = useState<"ui" | "json">("ui");
-  const outputAccent = showVerdict
+  const outputAccent = !markOutput
+    ? ""
+    : showVerdict
     ? passed
       ? "border-l-4 border-l-green-500 pl-2 md:pl-3"
       : "border-l-4 border-l-red-500 pl-2 md:pl-3"

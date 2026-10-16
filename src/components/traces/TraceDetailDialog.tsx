@@ -534,6 +534,7 @@ export function TraceDetailDialog({
                   output={output}
                   passed={true}
                   showVerdict={false}
+                  markOutput={!isConversation}
                 />
               ))}
             {/* Scores under the conversation on mobile only; on desktop
