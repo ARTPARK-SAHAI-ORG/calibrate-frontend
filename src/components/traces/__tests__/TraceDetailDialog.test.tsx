@@ -1104,6 +1104,28 @@ describe("showing a whole conversation", () => {
     expect(link).toHaveAttribute("target", "_blank");
   });
 
+  it("marks the final reply on a single trace but not in a whole conversation", async () => {
+    mockFetchTrace.mockResolvedValue({ ...detail, uuid: "t-last" });
+    const { unmount } = render(
+      <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t-last" />,
+    );
+    await screen.findByText("At 14 weeks, for OPV and DPT.");
+    expect(document.querySelector(".border-l-4")).not.toBeNull();
+    unmount();
+
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid={null}
+        conversation={conversation}
+      />,
+    );
+    await screen.findByText("At 14 weeks, for OPV and DPT.");
+    expect(document.querySelector(".border-l-4")).toBeNull();
+  });
+
   it("has no conversation link on a single trace", async () => {
     mockFetchTrace.mockResolvedValue(detail);
     render(
