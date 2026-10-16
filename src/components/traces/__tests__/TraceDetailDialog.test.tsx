@@ -1037,7 +1037,6 @@ describe("showing a whole conversation", () => {
   const conversation: TraceConversation = {
     conversation_id: "conv-1",
     agent_id: "ag-1",
-    trace_count: 3,
     first_turn_at: "2026-07-20T09:00:00Z",
     last_turn_at: "2026-07-20T10:00:00Z",
     last_turn: {
@@ -1071,8 +1070,7 @@ describe("showing a whole conversation", () => {
     expect(mockFetchTrace).toHaveBeenCalledWith("tok", "t-last");
     expect(mockFetchTraceScores).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "conv-1" })).toBeInTheDocument();
-    expect(screen.getByText("Traces")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.queryByText("Traces")).not.toBeInTheDocument();
     expect(screen.getByText("Started")).toBeInTheDocument();
     expect(
       screen.getByText(formatTraceDate("2026-07-20T09:00:00Z")),

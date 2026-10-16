@@ -58,7 +58,6 @@ function conversation(id: string, turns = 2): TraceConversation {
   return {
     conversation_id: id,
     agent_id: "agent-1",
-    trace_count: turns,
     first_turn_at: "2026-01-01T10:00:00Z",
     last_turn_at: "2026-01-01T10:05:00Z",
     first_message_preview: `question in ${id}`,

@@ -215,22 +215,6 @@ function ConversationMetaPanel({
   return (
     <div className="p-4 md:p-6 space-y-4">
       <MetaBlock label="Conversation" value={conversation.conversation_id} />
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-foreground">Traces</span>
-          <Link
-            href={`/agents/${conversation.agent_id}?tab=monitoring&conversation=${encodeURIComponent(conversation.conversation_id)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2.5 py-0.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-xs font-medium text-blue-700 dark:text-blue-300 transition-colors"
-          >
-            View traces
-          </Link>
-        </div>
-        <span className="block text-xs text-foreground">
-          {conversation.trace_count}
-        </span>
-      </div>
       <MetaBlock
         label="Started"
         value={formatTraceDate(conversation.first_turn_at)}
@@ -459,6 +443,16 @@ export function TraceDetailDialog({
           {/* Kept together so both sit in the top right corner. Loose in the
               header they would be spread apart by the row's own spacing. */}
           <div className="flex items-center gap-3 flex-shrink-0">
+            {conversation && (
+              <Link
+                href={`/agents/${conversation.agent_id}?tab=monitoring&conversation=${encodeURIComponent(conversation.conversation_id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2.5 py-0.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-xs font-medium text-blue-700 dark:text-blue-300 transition-colors whitespace-nowrap"
+              >
+                View traces
+              </Link>
+            )}
             {/* Only while this trace is in the selection: the count answers
                 "what did that press do", so it goes away with the trace it
                 was counting. */}

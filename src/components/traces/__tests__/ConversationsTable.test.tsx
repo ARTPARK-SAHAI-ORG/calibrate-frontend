@@ -10,7 +10,6 @@ function conversation(
   return {
     conversation_id: id,
     agent_id: "ag-1",
-    trace_count: 4,
     first_turn_at: "2026-07-20T09:00:00Z",
     last_turn_at: "2026-07-20T10:00:00Z",
     first_message_preview: `First question in ${id}`,
@@ -47,7 +46,7 @@ describe("ConversationsTable", () => {
   it("renders a row per conversation with its id and previews, and no count", () => {
     renderTable([
       conversation("conv-a"),
-      conversation("conv-b", {}, { trace_count: 1 }),
+      conversation("conv-b"),
     ]);
     expect(screen.getAllByText("conv-a").length).toBeGreaterThan(0);
     expect(screen.getAllByText("conv-b").length).toBeGreaterThan(0);
