@@ -10,7 +10,7 @@ function conversation(
   return {
     conversation_id: id,
     agent_id: "ag-1",
-    turn_count: 4,
+    trace_count: 4,
     first_turn_at: "2026-07-20T09:00:00Z",
     last_turn_at: "2026-07-20T10:00:00Z",
     first_message_preview: `First question in ${id}`,
@@ -44,10 +44,10 @@ function renderTable(conversations: TraceConversation[]) {
 }
 
 describe("ConversationsTable", () => {
-  it("renders a row per conversation with its id, previews and turn count", () => {
+  it("renders a row per conversation with its id and previews, and no count", () => {
     renderTable([
       conversation("conv-a"),
-      conversation("conv-b", {}, { turn_count: 1 }),
+      conversation("conv-b", {}, { trace_count: 1 }),
     ]);
     expect(screen.getAllByText("conv-a").length).toBeGreaterThan(0);
     expect(screen.getAllByText("conv-b").length).toBeGreaterThan(0);
@@ -58,9 +58,9 @@ describe("ConversationsTable", () => {
     expect(screen.getByText("First user message")).toBeInTheDocument();
     expect(screen.getByText("Last agent reply")).toBeInTheDocument();
     expect(screen.getByText("Answer in conv-a")).toBeInTheDocument();
-    expect(screen.getByText("4")).toBeInTheDocument();
-    expect(screen.getByText(/1 turn ·/)).toBeInTheDocument();
-    expect(screen.getByText(/4 turns ·/)).toBeInTheDocument();
+    expect(screen.queryByText("Turns")).not.toBeInTheDocument();
+    expect(screen.queryByText("4")).not.toBeInTheDocument();
+    expect(screen.queryByText(/turns? ·/)).not.toBeInTheDocument();
   });
 
   it("opens the conversation when its row is clicked", async () => {

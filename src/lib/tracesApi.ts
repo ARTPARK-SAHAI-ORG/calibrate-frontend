@@ -278,7 +278,7 @@ export async function fetchTraces(
 export type TraceConversation = {
   conversation_id: string;
   agent_id: string;
-  turn_count: number;
+  trace_count: number;
   first_turn_at: string;
   last_turn_at: string;
   /** The first user message in the conversation, shortened. */

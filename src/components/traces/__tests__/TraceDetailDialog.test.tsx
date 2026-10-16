@@ -1037,7 +1037,7 @@ describe("showing a whole conversation", () => {
   const conversation: TraceConversation = {
     conversation_id: "conv-1",
     agent_id: "ag-1",
-    turn_count: 3,
+    trace_count: 3,
     first_turn_at: "2026-07-20T09:00:00Z",
     last_turn_at: "2026-07-20T10:00:00Z",
     last_turn: {
@@ -1071,7 +1071,7 @@ describe("showing a whole conversation", () => {
     expect(mockFetchTrace).toHaveBeenCalledWith("tok", "t-last");
     expect(mockFetchTraceScores).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "conv-1" })).toBeInTheDocument();
-    expect(screen.getByText("Turns")).toBeInTheDocument();
+    expect(screen.getByText("Traces")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("Started")).toBeInTheDocument();
     expect(
@@ -1097,9 +1097,9 @@ describe("showing a whole conversation", () => {
     );
 
     const link = await screen.findByRole("link", {
-      name: "View turns",
+      name: "View traces",
     });
-    expect(link).toHaveTextContent("View turns");
+    expect(link).toHaveTextContent("View traces");
     expect(link.getAttribute("href")).toContain(
       "/agents/ag-1?tab=monitoring&conversation=conv%20a%2F1",
     );
@@ -1113,7 +1113,7 @@ describe("showing a whole conversation", () => {
     );
     await screen.findByText("At 14 weeks, for OPV and DPT.");
     expect(
-      screen.queryByRole("link", { name: "View turns" }),
+      screen.queryByRole("link", { name: "View traces" }),
     ).not.toBeInTheDocument();
   });
 

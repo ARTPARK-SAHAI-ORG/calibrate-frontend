@@ -525,7 +525,7 @@ async function pickConversation(
   await user.click(screen.getByRole("option", { name }));
 }
 
-it("narrows to one conversation picked from the dropdown, and clears it", async () => {
+it("narrows to one conversation picked from the dropdown, and removes just that filter", async () => {
   const { user, onApply } = setupWithConversations(["conv-2", "conv-1"]);
   await openPanel(user);
   expect(
@@ -542,7 +542,13 @@ it("narrows to one conversation picked from the dropdown, and clears it", async 
 
   onApply.mockClear();
   await openPanel(user);
-  await user.click(screen.getByRole("button", { name: "Clear all filters" }));
+  await pickConversation(user, "conv-2");
+  await user.click(
+    screen.getByRole("button", { name: "Remove the conversation filter" }),
+  );
+  expect(
+    screen.queryByRole("button", { name: "Remove the conversation filter" }),
+  ).not.toBeInTheDocument();
   await user.click(applyButton());
   expect(onApply.mock.calls[0][0].conversationId).toBeUndefined();
 });

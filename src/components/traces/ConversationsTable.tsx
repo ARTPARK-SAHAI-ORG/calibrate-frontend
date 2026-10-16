@@ -16,7 +16,7 @@ type ConversationsTableProps = {
 
 const ROW_CLASS = "grid gap-4 px-4 min-w-max";
 // Fixed tracks, because each row is its own grid; see TracesTable.
-const ROW_STYLE = { gridTemplateColumns: "240px 400px 400px 80px 160px" };
+const ROW_STYLE = { gridTemplateColumns: "240px 400px 400px 160px" };
 
 /** The conversations list: a table on desktop and cards on mobile. Rows open
  *  the conversation window. */
@@ -45,7 +45,6 @@ export function ConversationsTable({
           <div className={heading}>Conversation</div>
           <div className={heading}>First user message</div>
           <div className={heading}>Last agent reply</div>
-          <div className={heading}>Turns</div>
           <div className={heading}>Last activity</div>
         </div>
         {conversations.map((c) => (
@@ -75,12 +74,6 @@ export function ConversationsTable({
             </Link>
             <Link
               {...linkProps(c.conversation_id)}
-              className={`${cell} text-sm text-foreground`}
-            >
-              {c.turn_count}
-            </Link>
-            <Link
-              {...linkProps(c.conversation_id)}
               className={`${cell} text-sm text-muted-foreground whitespace-nowrap`}
             >
               {formatTraceDate(c.last_turn_at)}
@@ -107,8 +100,7 @@ export function ConversationsTable({
                 </p>
               )}
               <p className="text-xs text-muted-foreground mt-2">
-                {c.turn_count} {c.turn_count === 1 ? "turn" : "turns"} · Last
-                activity {formatTraceDate(c.last_turn_at)}
+                Last activity {formatTraceDate(c.last_turn_at)}
               </p>
             </Link>
           </div>

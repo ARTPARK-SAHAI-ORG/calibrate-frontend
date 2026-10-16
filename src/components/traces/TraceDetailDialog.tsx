@@ -217,18 +217,18 @@ function ConversationMetaPanel({
       <MetaBlock label="Conversation" value={conversation.conversation_id} />
       <div>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-foreground">Turns</span>
+          <span className="text-sm font-semibold text-foreground">Traces</span>
           <Link
             href={`/agents/${conversation.agent_id}?tab=monitoring&conversation=${encodeURIComponent(conversation.conversation_id)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="px-2.5 py-0.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-xs font-medium text-blue-700 dark:text-blue-300 transition-colors"
           >
-            View turns
+            View traces
           </Link>
         </div>
         <span className="block text-xs text-foreground">
-          {conversation.turn_count}
+          {conversation.trace_count}
         </span>
       </div>
       <MetaBlock
