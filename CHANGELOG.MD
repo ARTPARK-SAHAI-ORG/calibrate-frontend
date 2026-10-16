@@ -1,5 +1,6 @@
 ## October 2026
 
+- A short message in a trace's Scores box, such as "No evaluators could score this trace", no longer ends with a full stop ([#725](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/725))
 - Labelling items made from traces now keep the trace's metadata, conversation and message ids, and labels, so annotators can see where each item came from ([#715](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/715))
 - Annotators can now remove an answer they picked by clicking it again, and a completed labelling job goes back to in progress when it loses an answer ([#719](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/719))
 - Exporting the results of a speech-to-text run, or its shared link, now downloads a zip with the results file and the audio clips, and the results file has a new column naming each row's clip ([#723](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/723))
