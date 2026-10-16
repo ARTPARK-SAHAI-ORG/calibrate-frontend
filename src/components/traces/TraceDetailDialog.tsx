@@ -449,9 +449,13 @@ export function TraceDetailDialog({
                 href={`/agents/${conversation.agent_id}?tab=monitoring&conversation=${encodeURIComponent(conversation.conversation_id)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center h-8 px-3 rounded-md text-sm font-medium border border-blue-500/30 bg-blue-500/5 text-blue-900 hover:bg-blue-500/10 transition-colors whitespace-nowrap"
+                aria-label="Open this conversation's traces"
+                className="inline-flex items-center h-8 px-3 rounded-md text-sm font-medium border border-blue-500/30 bg-blue-500/5 text-blue-900 dark:text-blue-300 hover:bg-blue-500/10 transition-colors whitespace-nowrap"
               >
-                Open this conversation&apos;s traces
+                <span className="hidden sm:inline">
+                  Open this conversation&apos;s traces
+                </span>
+                <span className="sm:hidden">Open traces</span>
               </Link>
             )}
             {/* Only while this trace is in the selection: the count answers

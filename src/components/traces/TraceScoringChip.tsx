@@ -33,7 +33,7 @@ export function TraceScoringChip({ traceScoring }: TraceScoringChipProps) {
     <div className="space-y-6 text-left">
       {/* The blue note the trace setup steps use, so a point of information
           reads the same wherever it appears. */}
-      <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs leading-relaxed text-blue-900">
+      <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs leading-relaxed text-blue-900 dark:text-blue-300">
         <svg
           className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600"
           fill="none"

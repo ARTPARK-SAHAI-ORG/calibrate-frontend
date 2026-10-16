@@ -235,7 +235,7 @@ export function TracesFilter({
         // Switch to a portal if it ever gets clipped.
         <div className="absolute left-0 top-full mt-2 z-30 w-max min-w-[min(30rem,calc(100vw-2rem))] max-w-[min(44rem,calc(100vw-2rem))] rounded-lg border border-border bg-background shadow-lg p-5">
           {forConversations && (
-            <div className="mb-4 flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs leading-relaxed text-blue-900">
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs leading-relaxed text-blue-900 dark:text-blue-300">
               <svg
                 className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600"
                 fill="none"

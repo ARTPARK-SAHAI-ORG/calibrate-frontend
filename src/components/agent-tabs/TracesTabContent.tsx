@@ -908,7 +908,7 @@ export function TracesTabContent({
             }
           />
           {conversationFilter && (
-            <span className="inline-flex items-center gap-1.5 h-8 pl-2.5 pr-1.5 rounded-md border border-blue-500/20 bg-blue-500/5 text-sm text-blue-900">
+            <span className="inline-flex items-center gap-1.5 h-8 pl-2.5 pr-1.5 rounded-md border border-blue-500/20 bg-blue-500/5 text-sm text-blue-900 dark:text-blue-300">
               Conversation {conversationFilter}
               <button
                 type="button"
