@@ -14,6 +14,17 @@ import {
   useOrganizations,
 } from "@/hooks";
 import { workspaceRunModelsInParallel } from "@/lib/orgs";
+import {
+  benchmarkModelsPayload,
+  benchmarkVariantId,
+  describeSettings,
+  duplicateModelRows,
+  hasModelSettings,
+  modelSettingsExtra,
+  rowsFromModelIds,
+  type BenchmarkModelSettings,
+} from "@/lib/benchmarkModelSettings";
+import { BenchmarkModelSettingsPanel } from "./BenchmarkModelSettingsPanel";
 import { overEvalLimit } from "@/lib/evalLimit";
 import { reportError } from "@/lib/reportError";
 import { getDefaultHeaders } from "@/lib/api";
@@ -81,6 +92,45 @@ type ModelVerifications = Record<
   { verified: boolean; verified_at: string; error: string | null }
 >;
 
+/** One row of the picker: the model, and the settings it is being compared
+ *  under. The same model can fill two rows as long as the settings differ,
+ *  which is the point of a thinking level. */
+type ModelRow = { model: LLMModel; settings: BenchmarkModelSettings };
+
+/** What this row is called in the results, and what its own badge and failure
+ *  panel are keyed by in this window. Two rows of one model must not share
+ *  either. A row with no settings keys on the plain model id. */
+function rowKey(row: ModelRow): string {
+  return benchmarkVariantId(row.model.id, row.settings);
+}
+
+/** What a passed check is SAVED against, which is the model, never the row.
+ *  The backend keeps `benchmark_models_verified` keyed by model name and
+ *  refuses a comparison naming a model it has no passing check for, so saving
+ *  a check under a row's own id would leave the model looking unchecked and
+ *  the comparison refused. */
+function savedCheckKey(row: ModelRow): string {
+  return row.model.id;
+}
+
+/**
+ * Whether this row still has to be checked before the comparison starts.
+ *
+ * A row carrying settings is always checked, even when the model itself passed
+ * before: what is unproven is whether the agent's server accepts these extra
+ * fields, and a check of the bare model says nothing about that.
+ */
+function rowNeedsCheck(
+  row: ModelRow,
+  saved: ModelVerifications,
+  statusThisTime: Record<string, ModelVerificationStatus>,
+): boolean {
+  if (hasModelSettings(row.settings)) {
+    return statusThisTime[rowKey(row)] !== "verified";
+  }
+  return !saved[savedCheckKey(row)]?.verified;
+}
+
 const maxModels = 5;
 
 /** The saved model checks worth showing on a fresh open: the ones that passed.
@@ -129,8 +179,11 @@ export function BenchmarkDialog({
   // did before there was a setting.
   const openingRunOrder = initialParallelModels ?? workspaceDefault;
 
-  const [selectedModels, setSelectedModels] = useState<LLMModel[]>([]);
+  const [selectedModels, setSelectedModels] = useState<ModelRow[]>([]);
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
+  /** Which row's settings panel is open, by position. Only one at a time, so
+   *  the rows never move more than once. */
+  const [settingsRowIndex, setSettingsRowIndex] = useState<number | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
   // Null until the reader picks, so a workspace choice that arrives after the
@@ -150,6 +203,12 @@ export function BenchmarkDialog({
   );
   const [modelSampleResponses, setModelSampleResponses] = useState<
     Record<string, Record<string, unknown>>
+  >({});
+  // Why this row's check failed, keyed by the row. The saved map below is keyed
+  // by model, so reading an error out of it would paint both rows of one model
+  // with a failure only one of them had.
+  const [rowCheckError, setRowCheckError] = useState<
+    Record<string, string | null>
   >({});
   const [benchmarkModelsVerified, setBenchmarkModelsVerified] = useState<
     Record<
@@ -177,13 +236,21 @@ export function BenchmarkDialog({
     const byId = new Map(
       llmProviders.flatMap((p) => p.models).map((m) => [m.id, m] as const),
     );
+    // The ids carry the settings the earlier comparison ran under, so a rerun
+    // opens with the same thinking levels and hosts already chosen. The whole
+    // id is what is deduplicated, not the model: one model twice under
+    // different settings is a comparison in its own right, while the very same
+    // id twice would only draw the same column twice.
     setSelectedModels(
-      Array.from(new Set(initialModels))
+      rowsFromModelIds(Array.from(new Set(initialModels)))
         .slice(0, maxModels)
         // A model that has since been retired is no longer in the list. It
         // still gets a row, named by its id, so the reader can see what the
         // earlier comparison used and swap it for one that still exists.
-        .map((id) => byId.get(id) ?? { id, name: id }),
+        .map(({ model, settings }) => ({
+          model: byId.get(model) ?? { id: model, name: model },
+          settings,
+        })),
     );
   }, [isOpen, initialModels, llmProviders]);
 
@@ -198,23 +265,35 @@ export function BenchmarkDialog({
     setPickedRunOrder(null);
     setSaveAsWorkspaceDefault(false);
     setSettingsOpen(false);
+    setSettingsRowIndex(null);
     setModelVerifyStatus({});
     // A check that failed belongs to the models that were picked this time, so
     // it goes with them. Without this the next open still shows the failure
     // beside a model nobody has picked yet.
     setBenchmarkModelsVerified(keepVerified(initialBenchmarkModelsVerified));
     setModelSampleResponses({});
+    setRowCheckError({});
     setExpandedModelError(null);
     setConfirmOpen(false);
     setVerifyDialogOpen(false);
     onClose();
   };
 
+  /** Checks the agent's server accepts one row: the model, and the extra fields
+   *  its settings add. A server that rejects an unknown field fails here, on
+   *  that row, before the comparison starts. A server that quietly ignores one
+   *  passes, which is why the panel says the settings only do something if the
+   *  agent reads them. */
   const verifyModel = async (
-    modelId: string,
+    row: ModelRow,
     messages?: MessageRow[],
   ): Promise<{ verified: boolean; error?: string }> => {
-    setModelVerifyStatus((prev) => ({ ...prev, [modelId]: "verifying" }));
+    // Two keys on purpose: what this row shows is its own, what is saved
+    // belongs to the model, because that is what the backend checks against.
+    const rowId = rowKey(row);
+    const savedId = savedCheckKey(row);
+    const extra = modelSettingsExtra(row.settings);
+    setModelVerifyStatus((prev) => ({ ...prev, [rowId]: "verifying" }));
 
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -229,8 +308,9 @@ export function BenchmarkDialog({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: modelId,
+            model: row.model.id,
             ...(messages && messages.length > 0 && { messages }),
+            ...(extra && { extra }),
           }),
         },
       );
@@ -247,38 +327,40 @@ export function BenchmarkDialog({
       const error: string | null = result.error ?? null;
 
       const entry = { verified, verified_at: new Date().toISOString(), error };
-      setBenchmarkModelsVerified((prev) => ({ ...prev, [modelId]: entry }));
-      if (verified) onModelVerified?.(modelId, entry);
+      setRowCheckError((prev) => ({ ...prev, [rowId]: verified ? null : error }));
+      setBenchmarkModelsVerified((prev) => ({ ...prev, [savedId]: entry }));
+      if (verified) onModelVerified?.(savedId, entry);
       if (result.sample_response) {
         setModelSampleResponses((prev) => ({
           ...prev,
-          [modelId]: result.sample_response,
+          [rowId]: result.sample_response,
         }));
       }
       if (verified) {
-        setExpandedModelError((prev) => (prev === modelId ? null : prev));
+        setExpandedModelError((prev) => (prev === rowId ? null : prev));
         setModelSampleResponses((prev) => {
           const next = { ...prev };
-          delete next[modelId];
+          delete next[rowId];
           return next;
         });
       }
       setModelVerifyStatus((prev) => ({
         ...prev,
-        [modelId]: verified ? "verified" : "failed",
+        [rowId]: verified ? "verified" : "failed",
       }));
       return { verified, error: error || undefined };
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Verification failed";
+      setRowCheckError((prev) => ({ ...prev, [rowId]: errMsg }));
       setBenchmarkModelsVerified((prev) => ({
         ...prev,
-        [modelId]: {
+        [savedId]: {
           verified: false,
           verified_at: new Date().toISOString(),
           error: errMsg,
         },
       }));
-      setModelVerifyStatus((prev) => ({ ...prev, [modelId]: "failed" }));
+      setModelVerifyStatus((prev) => ({ ...prev, [rowId]: "failed" }));
       return { verified: false, error: errMsg };
     }
   };
@@ -307,12 +389,9 @@ export function BenchmarkDialog({
   const handleRunBenchmark = async () => {
     setConfirmOpen(false);
     if (agentType === "connection") {
-      const modelsToVerify = selectedModels
-        .filter((m): m is LLMModel => m !== null)
-        .filter((m) => {
-          const existing = benchmarkModelsVerified[m.id];
-          return !existing || !existing.verified;
-        });
+      const modelsToVerify = selectedModels.filter((row) =>
+        rowNeedsCheck(row, benchmarkModelsVerified, modelVerifyStatus),
+      );
 
       if (modelsToVerify.length > 0) {
         setVerifyDialogOpen(true);
@@ -325,15 +404,12 @@ export function BenchmarkDialog({
   };
 
   const runVerificationWithMessages = async (messages: MessageRow[]) => {
-    const modelsToVerify = selectedModels
-      .filter((m): m is LLMModel => m !== null)
-      .filter((m) => {
-        const existing = benchmarkModelsVerified[m.id];
-        return !existing || !existing.verified;
-      });
+    const modelsToVerify = selectedModels.filter((row) =>
+      rowNeedsCheck(row, benchmarkModelsVerified, modelVerifyStatus),
+    );
 
     const results = await Promise.all(
-      modelsToVerify.map((m) => verifyModel(m.id, messages)),
+      modelsToVerify.map((row) => verifyModel(row, messages)),
     );
     const anyFailed = results.some((r) => !r.verified);
     setVerifyDialogOpen(false);
@@ -355,13 +431,26 @@ export function BenchmarkDialog({
   const handleSelectModel = (index: number, model: LLMModel) => {
     setSelectedModels((prev) => {
       const newModels = [...prev];
-      newModels[index] = model;
+      // Swapping the model on an existing row keeps that row's settings, since
+      // the reader chose them for the comparison, not for the model.
+      newModels[index] = { model, settings: prev[index]?.settings ?? {} };
       return newModels;
     });
   };
 
+  const handleRowSettingsChange = (
+    index: number,
+    settings: BenchmarkModelSettings,
+  ) => {
+    setSelectedModels((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, settings } : row)),
+    );
+  };
+
   const handleRemoveModel = (index: number) => {
     setSelectedModels((prev) => prev.filter((_, i) => i !== index));
+    // The panel is open by position, so the row it belonged to is gone.
+    setSettingsRowIndex(null);
   };
 
   const openModelSelector = (index: number) => {
@@ -377,15 +466,12 @@ export function BenchmarkDialog({
     setEditingIndex(null);
   };
 
-  // Get IDs of already selected models
-  const selectedModelIds = new Set(
-    selectedModels.filter((m) => m !== null).map((m) => m!.id),
-  );
-
-  // Filter providers by benchmark_provider setting, then exclude already-selected models
-  const getAvailableProviders = (currentIndex: number) => {
-    const currentModel = selectedModels[currentIndex];
-
+  // Filter the model list by the agent's `benchmark_provider`. A model already
+  // on another row is deliberately still offered: picking one model twice and
+  // giving each row its own thinking level is the comparison this exists for.
+  // Two rows asking for exactly the same thing are caught before the run
+  // instead, where the reader can see why.
+  const getAvailableProviders = () => {
     // When provider is not "openrouter", filter to only that provider's models
     const baseProviders =
       benchmarkProvider && benchmarkProvider !== "openrouter"
@@ -400,48 +486,62 @@ export function BenchmarkDialog({
       ...provider,
       models: provider.models.filter(
         (model) =>
-          (!selectedModelIds.has(model.id) ||
-            (currentModel && model.id === currentModel.id)) &&
-          (benchmarkProvider === "openrouter" ||
-            !benchmarkProvider ||
-            model.id.startsWith(benchmarkProvider + "/")),
+          benchmarkProvider === "openrouter" ||
+          !benchmarkProvider ||
+          model.id.startsWith(benchmarkProvider + "/"),
       ),
     }));
   };
 
-  const chosenModels = selectedModels.filter((m): m is LLMModel => m !== null);
+  const chosenModels = selectedModels;
   // The same rule `handleRunBenchmark` runs on: a connection agent has to pass
   // a check with each model it has not been verified with yet, so the question
   // says so before the reader agrees to it.
   const needsVerification =
     agentType === "connection" &&
-    chosenModels.some((m) => !benchmarkModelsVerified[m.id]?.verified);
+    chosenModels.some((row) =>
+      rowNeedsCheck(row, benchmarkModelsVerified, modelVerifyStatus),
+    );
+  // Two rows asking for the same model under the same settings would draw two
+  // identical columns, which says nothing.
+  const hasDuplicateRows = duplicateModelRows(
+    selectedModels.map((row) => ({
+      model: row.model.id,
+      settings: row.settings,
+    })),
+  );
   // Empty `tests` means every linked test; `totalTests` is how many that is.
   const benchmarkTestCount = tests.length > 0 ? tests.length : totalTests;
-  const canRunBenchmark = chosenModels.length > 0;
+  const canRunBenchmark = chosenModels.length > 0 && !hasDuplicateRows;
   const isVerifying = Object.values(modelVerifyStatus).some(
     (s) => s === "verifying",
   );
-  const hasFailedModels = selectedModels
-    .filter((m): m is LLMModel => m !== null)
-    .some((m) => {
-      const existing = benchmarkModelsVerified[m.id];
-      return existing && !existing.verified;
-    });
+  // A failure belongs to the row that produced it, so a second row of the same
+  // model under different settings is not painted as failed too.
+  const hasFailedModels = selectedModels.some(
+    (row) => modelVerifyStatus[rowKey(row)] === "failed",
+  );
   // The checks only have something to say once a model is picked, so a window
   // that is still empty gives the whole width to the picker.
   const showStatusColumn =
-    agentType === "connection" && selectedModels.some((m) => m !== null);
+    agentType === "connection" && selectedModels.length > 0;
   // The chosen models, then one blank row to pick the next in, until five
   // are chosen. Picking a model fills the blank and a new blank appears.
-  const rows: (LLMModel | null)[] =
+  const rows: (ModelRow | null)[] =
     selectedModels.length < maxModels
       ? [...selectedModels, null]
       : selectedModels;
 
-  const getModelVerificationBadge = (modelId: string) => {
+  /**
+   * How this row's check stands. It reads two maps on purpose: what happened
+   * this time is the row's own, and a check that passed earlier belongs to the
+   * model. A row carrying settings never claims an earlier pass, because that
+   * pass says nothing about whether the agent accepts these extra fields.
+   */
+  const getModelVerificationBadge = (row: ModelRow) => {
     if (agentType !== "connection") return null;
 
+    const modelId = rowKey(row);
     const liveStatus = modelVerifyStatus[modelId];
     if (liveStatus === "verifying") {
       return (
@@ -466,7 +566,11 @@ export function BenchmarkDialog({
       );
     }
 
-    const existing = benchmarkModelsVerified[modelId];
+    const existing = hasModelSettings(row.settings)
+      ? liveStatus === "failed"
+        ? { verified: false, error: rowCheckError[modelId] ?? null }
+        : undefined
+      : benchmarkModelsVerified[savedCheckKey(row)];
     if (!existing) {
       return (
         <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
@@ -496,7 +600,7 @@ export function BenchmarkDialog({
       );
     }
     const isExpanded = expandedModelError === modelId;
-    const hasDetails = existing.error || modelSampleResponses[modelId];
+    const hasDetails = rowCheckError[modelId] || modelSampleResponses[modelId];
     return (
       <span className="text-xs text-red-500 flex items-center gap-1 shrink-0">
         <svg
@@ -520,8 +624,12 @@ export function BenchmarkDialog({
             onClick={(e) => {
               e.stopPropagation();
               setExpandedModelError(isExpanded ? null : modelId);
-              // Both panels open beside the box, so only one is open at a time.
-              if (!isExpanded) setSettingsOpen(false);
+              // Three panels open in the same place beside the rows, so
+              // opening one closes the other two.
+              if (!isExpanded) {
+                setSettingsOpen(false);
+                setSettingsRowIndex(null);
+              }
             }}
             aria-expanded={isExpanded}
             className={`rounded-md border border-red-500/40 px-1.5 py-0.5 text-xs font-medium transition-colors cursor-pointer ${
@@ -583,7 +691,12 @@ export function BenchmarkDialog({
                       type="button"
                       onClick={() => {
                         setSettingsOpen((open) => !open);
-                        if (!settingsOpen) setExpandedModelError(null);
+                        // Three panels open in the same place beside the rows,
+                        // so opening one closes the other two.
+                        if (!settingsOpen) {
+                          setExpandedModelError(null);
+                          setSettingsRowIndex(null);
+                        }
                       }}
                       aria-expanded={settingsOpen}
                       aria-label="How to run the models"
@@ -638,42 +751,76 @@ export function BenchmarkDialog({
             </div>
 
             {/* Model Rows */}
-            {rows.map((selectedModel, index) => (
+            {rows.map((selectedRow, index) => (
               <div key={index} className="relative space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 flex items-center gap-2">
                     <button
                       onClick={() => openModelSelector(index)}
                       className={`flex-1 h-10 px-4 rounded-md text-sm border border-border flex items-center cursor-pointer transition-colors ${
-                        selectedModel
+                        selectedRow
                           ? "bg-muted font-medium hover:bg-muted/70"
                           : "border-dashed bg-background hover:bg-muted/50"
                       }`}
                     >
                       <span
                         className={
-                          selectedModel
+                          selectedRow
                             ? "text-foreground"
                             : "text-muted-foreground"
                         }
                       >
-                        {selectedModel ? selectedModel.name : "Select a model"}
+                        {selectedRow ? selectedRow.model.name : "Select a model"}
                       </span>
+                      {/* What this row is being compared under, so two rows of
+                          one model read apart at a glance. */}
+                      {selectedRow && describeSettings(selectedRow.settings) && (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground truncate">
+                          {describeSettings(selectedRow.settings)}
+                        </span>
+                      )}
                     </button>
                     {/* Verification badge for connections, once a model is
                         picked. It sits right after the picker, and is as wide
                         as the longest wording so every chosen row's picker is
                         the same size. The blank row has no badge and no
                         remove button, so its picker runs the full width. */}
-                    {showStatusColumn && selectedModel && (
+                    {showStatusColumn && selectedRow && (
                       <div className="min-w-20 shrink-0 flex items-center">
-                        {getModelVerificationBadge(selectedModel.id)}
+                        {getModelVerificationBadge(selectedRow)}
                       </div>
                     )}
                   </div>
 
+                  {/* How this model should be called. Only for a connection
+                      agent: a build agent's models are called by the platform,
+                      so there is no server of the reader's to pass them on. */}
+                  {selectedRow && agentType === "connection" && (
+                    <Tooltip content="Model settings" position="top">
+                      <button
+                        onClick={() => {
+                          setSettingsRowIndex(
+                            settingsRowIndex === index ? null : index,
+                          );
+                          // Only one panel sits beside the rows at a time.
+                          setExpandedModelError(null);
+                          setSettingsOpen(false);
+                        }}
+                        aria-label="Model settings"
+                        aria-expanded={settingsRowIndex === index}
+                        className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors cursor-pointer ${
+                          settingsRowIndex === index
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <GearIcon className="w-4 h-4" />
+                      </button>
+                    </Tooltip>
+                  )}
+
                   {/* Remove Button */}
-                  {selectedModel && (
+                  {selectedRow && (
                     <Tooltip content="Remove model" position="top">
                       <button
                         onClick={() => handleRemoveModel(index)}
@@ -685,27 +832,38 @@ export function BenchmarkDialog({
                     </Tooltip>
                   )}
                 </div>
+
+                {selectedRow && settingsRowIndex === index && (
+                  <BenchmarkModelSettingsPanel
+                    settings={selectedRow.settings}
+                    onChange={(settings) =>
+                      handleRowSettingsChange(index, settings)
+                    }
+                    canChooseHost={
+                      !benchmarkProvider || benchmarkProvider === "openrouter"
+                    }
+                  />
+                )}
                 {/* Why the check failed. Beside the box on a wide screen, so
                     the rows never move.
                     On a narrow screen it sits under the row instead. */}
-                {selectedModel &&
-                  expandedModelError === selectedModel.id &&
-                  benchmarkModelsVerified[selectedModel.id] &&
-                  !benchmarkModelsVerified[selectedModel.id].verified && (
+                {selectedRow &&
+                  expandedModelError === rowKey(selectedRow) &&
+                  modelVerifyStatus[rowKey(selectedRow)] === "failed" && (
                     <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-2 space-y-1 md:absolute md:left-full md:top-0 md:ml-9 md:w-80 md:max-h-80 md:overflow-y-auto md:rounded-xl md:border-0 md:bg-background md:p-4 md:shadow-2xl">
-                      {benchmarkModelsVerified[selectedModel.id]?.error && (
+                      {rowCheckError[rowKey(selectedRow)] && (
                         <p className="text-xs text-red-400 break-words">
-                          {benchmarkModelsVerified[selectedModel.id].error}
+                          {rowCheckError[rowKey(selectedRow)]}
                         </p>
                       )}
-                      {modelSampleResponses[selectedModel.id] && (
+                      {modelSampleResponses[rowKey(selectedRow)] && (
                         <div className="space-y-1">
                           <p className="text-xs font-medium text-muted-foreground">
                             Your agent responded with:
                           </p>
                           <pre className="text-xs bg-muted rounded-lg p-2 overflow-x-auto text-foreground max-h-32 overflow-y-auto">
                             {JSON.stringify(
-                              modelSampleResponses[selectedModel.id],
+                              modelSampleResponses[rowKey(selectedRow)],
                               null,
                               2,
                             )}
@@ -718,6 +876,15 @@ export function BenchmarkDialog({
             ))}
           </div>
         </div>
+
+        {/* Two rows asking for the same model under the same settings would
+            draw two identical columns, so the run is held until one changes. */}
+        {hasDuplicateRows && (
+          <p className="px-6 text-sm text-amber-600 dark:text-amber-500">
+            Two models are set up the same way. Give one of them a different
+            thinking level or host, or remove it
+          </p>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 flex items-center justify-end gap-3">
@@ -782,9 +949,9 @@ export function BenchmarkDialog({
             setModelSelectorOpen(false);
             setEditingIndex(null);
           }}
-          selectedLLM={rows[editingIndex] ?? null}
+          selectedLLM={rows[editingIndex]?.model ?? null}
           onSelect={handleModelSelected}
-          availableProviders={getAvailableProviders(editingIndex)}
+          availableProviders={getAvailableProviders()}
         />
       )}
 
@@ -798,7 +965,12 @@ export function BenchmarkDialog({
         testUuids={tests.map((t) => t.uuid)}
         testNames={tests.map((t) => t.name)}
         totalTests={tests.length > 0 ? tests.length : totalTests}
-        models={selectedModels.filter((m) => m !== null).map((m) => m!.id)}
+        models={benchmarkModelsPayload(
+          selectedModels.map((row) => ({
+            model: row.model.id,
+            settings: row.settings,
+          })),
+        )}
         parallelModels={
           agentType === "connection" ? runModelsTogether : undefined
         }
@@ -820,7 +992,12 @@ export function BenchmarkDialog({
           benchmarkTestCount === undefined
             ? "every test linked to this agent"
             : `${benchmarkTestCount} ${benchmarkTestCount === 1 ? "test" : "tests"}`
-        } with ${chosenModels.map((m) => m.name).join(", ")}. Each test calls your agent once per model, evaluates its response against the evaluation criteria and reports the metrics.`}
+        } with ${chosenModels
+          .map((row) => {
+            const settings = describeSettings(row.settings);
+            return settings ? `${row.model.name} (${settings})` : row.model.name;
+          })
+          .join(", ")}. Each test calls your agent once per model, evaluates its response against the evaluation criteria and reports the metrics.`}
         confirmText="Start the comparison"
       />
 

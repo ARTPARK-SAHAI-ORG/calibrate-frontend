@@ -64,6 +64,19 @@ import {
   type DefaultEvaluatorSummary,
 } from "@/lib/defaultEvaluators";
 import { type BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
+import { type BenchmarkModelVariant } from "@/lib/benchmarkModelSettings";
+
+/**
+ * The strings a comparison keys its results by. The same model can be run twice
+ * under different settings, and such a row arrives as a variant carrying its own
+ * id (`openai/gpt-5::thinking-high`). A model with no settings is a plain string
+ * and is its own id.
+ */
+function modelIdsOf(models: string[] | BenchmarkModelVariant[]): string[] {
+  return (models as (string | BenchmarkModelVariant)[]).map((m) =>
+    typeof m === "string" ? m : m.id,
+  );
+}
 
 type BenchmarkStatusResponse = {
   task_id: string;
@@ -94,6 +107,8 @@ type BenchmarkStatusResponse = {
 
 /** What a rerun of a finished comparison needs to start the same run again. */
 export type BenchmarkRerunRequest = {
+  /** Identity strings, so a model that ran under its own settings comes back as
+   * its variant id and the picker reopens with those settings chosen. */
   models: string[];
   testUuids: string[];
   testNames: string[];
@@ -139,7 +154,10 @@ type BenchmarkResultsDialogProps = {
    *  result arrives. Needed when `testNames` is empty because the run covers
    *  every linked test. Defaults to the number of names. */
   totalTests?: number;
-  models: string[];
+  /** The models to compare. A row with extra settings on it (a thinking level,
+   * a host) arrives as a variant; the plain strings are what an ordinary
+   * comparison has always sent. Passed to the backend exactly as given. */
+  models: string[] | BenchmarkModelVariant[];
   /** False runs the models one after another instead of at the same time.
    * Sent as `parallel_models`; left out means the backend default (together). */
   parallelModels?: boolean;
@@ -194,6 +212,10 @@ export function BenchmarkResultsDialog({
 }: BenchmarkResultsDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
   useHideFloatingButton(isOpen);
+
+  // Everything on screen is keyed by these, never by `models` itself, since a
+  // model run under its own settings arrives as an object.
+  const modelIds = modelIdsOf(models);
 
   const [activeTab, setActiveTab] = useState<BenchmarkTabId>("tests");
   const [nav, setNav] = useState<PagerNav | null>(null);
@@ -588,7 +610,8 @@ export function BenchmarkResultsDialog({
       return;
     }
 
-    // Every test is run once per model, so the work is tests times models.
+    // Every test is run once per model row, so the work is tests times rows.
+    // The same model under two thinking levels is two rows and twice the work.
     // Over the limit, the toast says so and we hand the user back to the model
     // picker (or close, when there is no picker to go back to).
     // No uuids means every linked test, so count those through `totalTests`.
@@ -597,7 +620,7 @@ export function BenchmarkResultsDialog({
     if (
       await overEvalLimit(
         backendAccessToken,
-        testCount * models.length,
+        testCount * modelIds.length,
         "tests",
       )
     ) {
@@ -616,6 +639,9 @@ export function BenchmarkResultsDialog({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            // Sent exactly as the caller gave it. Rebuilding the list here
+            // would drop the settings a variant carries, and would change the
+            // request a comparison of plain models has always sent.
             models: models,
             test_uuids: testUuids,
             ...(parallelModels !== undefined && {
@@ -666,8 +692,8 @@ export function BenchmarkResultsDialog({
   // Get providers to display (includes placeholders for models without results yet)
   const getProvidersToDisplay = (): BenchmarkModelRows[] => {
     // When in progress and no results yet, show all models as placeholders
-    if (!isDone && modelResults.length === 0 && models.length > 0) {
-      return models.map((model) => ({
+    if (!isDone && modelResults.length === 0 && modelIds.length > 0) {
+      return modelIds.map((model) => ({
         model,
         success: null,
         message: "",
@@ -679,9 +705,9 @@ export function BenchmarkResultsDialog({
     }
 
     // When in progress with some results, merge with missing models
-    if (!isDone && models.length > 0) {
+    if (!isDone && modelIds.length > 0) {
       const existingModels = new Set(modelResults.map((m) => m.model));
-      const missingModels = models.filter((m) => !existingModels.has(m));
+      const missingModels = modelIds.filter((m) => !existingModels.has(m));
       if (missingModels.length > 0) {
         const placeholders: BenchmarkModelRows[] = missingModels.map(
           (model) => ({
@@ -741,9 +767,11 @@ export function BenchmarkResultsDialog({
   // Config for a rerun. When viewing a past benchmark the props are empty, so
   // fall back to what the loaded results carry: models from the model rows, the
   // executed test uuids from the run, and test names from the first model row.
+  // Ids, not variants: the picker reads each id back into the model and the
+  // settings that made it, so a rerun opens with the same thinking levels.
   const rerunModels =
-    models.length > 0
-      ? models
+    modelIds.length > 0
+      ? modelIds
       : modelResults.map((m) => m.model).filter(Boolean);
   const rerunTestUuids = testUuids.length > 0 ? testUuids : runTestUuids;
   const rerunTestNames =
