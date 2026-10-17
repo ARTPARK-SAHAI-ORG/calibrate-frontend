@@ -153,6 +153,23 @@ describe("Blog", () => {
     ]);
   });
 
+  it("shows the recording and slides from the IndiaFOSS talk", async () => {
+    render(
+      await BlogPostPage({
+        params: Promise.resolve({ slug: "calibrate-at-indiafoss" }),
+      }),
+    );
+    const frames = document.querySelectorAll("iframe");
+    expect([...frames].map((frame) => frame.getAttribute("src"))).toEqual([
+      "https://www.youtube-nocookie.com/embed/dBmuwQRixjk",
+      "https://www.amandalmia.com/IndiaFOSS-talk/",
+    ]);
+    expect(screen.getByRole("link", { name: "slides" })).toHaveAttribute(
+      "href",
+      "https://www.amandalmia.com/IndiaFOSS-talk/",
+    );
+  });
+
   it("shows the not-found page for an address nobody wrote", async () => {
     await BlogPostPage({ params: Promise.resolve({ slug: "no-such-post" }) });
     expect(notFound).toHaveBeenCalled();

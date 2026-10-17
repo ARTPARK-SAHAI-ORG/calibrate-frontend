@@ -237,6 +237,21 @@ function PostVideo({ id, title }: { id: string; title: string }) {
   );
 }
 
+/** A slide deck shown inside the post. */
+function PostSlides({ src, title }: { src: string; title: string }) {
+  return (
+    <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200">
+      <iframe
+        src={src}
+        title={title}
+        allowFullScreen
+        loading="lazy"
+        className="h-full w-full"
+      />
+    </div>
+  );
+}
+
 /** A note set to one side of the post. */
 function Aside({ children }: { children: ReactNode }) {
   return (
@@ -249,6 +264,9 @@ function Aside({ children }: { children: ReactNode }) {
 /** The two screen recordings in the case study below, as YouTube video ids. */
 const WEIGHTS_VIDEO_ID = "9j8Y142PWe4";
 const REPLY_WEIGHTS_VIDEO_ID = "gMhKkaRJn10";
+
+/** The recording of the IndiaFOSS 2026 talk, as a YouTube video id. */
+const INDIAFOSS_TALK_VIDEO_ID = "dBmuwQRixjk";
 
 export function findPost(slug: string): BlogPost | undefined {
   return POSTS.find((post) => post.slug === slug);
@@ -1932,6 +1950,25 @@ export const POSTS: BlogPost[] = [
           </Link>
           .
         </p>
+
+        <H3>The talk</H3>
+        <p>
+          Here is the recording of the talk at IndiaFOSS and the{" "}
+          <PostLink href="https://www.amandalmia.com/IndiaFOSS-talk/">
+            slides
+          </PostLink>
+          :
+        </p>
+        <div className="grid gap-5 md:grid-cols-2">
+          <PostVideo
+            id={INDIAFOSS_TALK_VIDEO_ID}
+            title="Calibrate at IndiaFOSS 2026"
+          />
+          <PostSlides
+            src="https://www.amandalmia.com/IndiaFOSS-talk/"
+            title="Slides from the Calibrate talk at IndiaFOSS 2026"
+          />
+        </div>
       </>
     ),
   },
