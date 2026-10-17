@@ -65,7 +65,7 @@ const ENTRIES: LearnItem[] = [
     id: "indiafoss-2026",
     title: "Evaluating AI systems so they can be trusted",
     summary:
-      "A talk at IndiaFOSS 2026 on evaluating AI for healthcare, education and agriculture, where a wrong answer can hurt a family with no other expert to turn to. Using a voice agent that fills public health forms as a case study, it covers writing tests for each situation the agent has to handle, using LLMs to judge open-ended answers, comparing models on quality, cost and speed, catching regressions before they reach users, aligning LLM judges with human experts, and monitoring the agent in production.",
+      "Our talk at IndiaFOSS 2026 on evaluating AI agents for non-profits, using a voice agent that fills public health forms as the case study",
     recordingEmbedUrl: "https://www.youtube.com/embed/dBmuwQRixjk",
     recordingUrl: "https://youtu.be/dBmuwQRixjk",
     slidesEmbedUrl: "https://www.amandalmia.com/IndiaFOSS-talk/",
