@@ -42,6 +42,10 @@ type LearnItem = {
    */
   slidesEmbedUrl?: string;
   slidesUrl?: string;
+  /** More talks on the same subject, drawn inside this entry under its own
+   * recording and slides, each with its own line on what it covered. They get
+   * no place in the list down the left. */
+  more?: Omit<LearnItem, "id" | "more">[];
 };
 
 /**
@@ -60,16 +64,17 @@ const ENTRIES: LearnItem[] = [
       "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/embed?start=false&loop=false&delayms=3000",
     slidesUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/pub?start=false&loop=false&delayms=3000",
-  },
-  {
-    id: "indiafoss-2026",
-    title: "Evaluating AI systems so they can be trusted",
-    summary:
-      "Our talk at IndiaFOSS 2026 on evaluating AI agents for non-profits, using a voice agent that fills public health forms as the case study",
-    recordingEmbedUrl: "https://www.youtube.com/embed/dBmuwQRixjk",
-    recordingUrl: "https://youtu.be/dBmuwQRixjk",
-    slidesEmbedUrl: "https://www.amandalmia.com/IndiaFOSS-talk/",
-    slidesUrl: "https://www.amandalmia.com/IndiaFOSS-talk/#1",
+    more: [
+      {
+        title: "Evaluating AI systems so they can be trusted",
+        summary:
+          "Our talk at IndiaFOSS 2026 on evaluating AI agents for non-profits, using a voice agent that fills public health forms as the case study.",
+        recordingEmbedUrl: "https://www.youtube.com/embed/dBmuwQRixjk",
+        recordingUrl: "https://youtu.be/dBmuwQRixjk",
+        slidesEmbedUrl: "https://www.amandalmia.com/IndiaFOSS-talk/",
+        slidesUrl: "https://www.amandalmia.com/IndiaFOSS-talk/#1",
+      },
+    ],
   },
   {
     id: "connect-ai-tool-with-calibrate",
@@ -256,6 +261,64 @@ function OpensInNewTabIcon() {
   );
 }
 
+/** The recording and the slides of one talk, side by side when it has both. */
+function TalkMedia({ talk }: { talk: Omit<LearnItem, "id" | "more"> }) {
+  return (
+    <div
+      className={`grid grid-cols-1 gap-10 lg:gap-6 ${
+        talk.recordingEmbedUrl && talk.slidesEmbedUrl
+          ? "lg:grid-cols-2"
+          : "lg:max-w-3xl"
+      }`}
+    >
+      {talk.recordingEmbedUrl && talk.recordingUrl && (
+        <div className="min-w-0">
+          <p className={partLabelClass}>Recording</p>
+          <iframe
+            src={talk.recordingEmbedUrl}
+            title={`Recording of ${talk.title}`}
+            className={frameClass}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+          <a
+            href={talk.recordingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Open the recording of ${talk.title} in a new tab`}
+            className={openLinkClass}
+          >
+            Open the recording in a new tab
+            <OpensInNewTabIcon />
+          </a>
+        </div>
+      )}
+
+      {talk.slidesEmbedUrl && talk.slidesUrl && (
+        <div className="min-w-0">
+          <p className={partLabelClass}>Slides</p>
+          <iframe
+            src={talk.slidesEmbedUrl}
+            title={`Slides from ${talk.title}`}
+            className={frameClass}
+            allowFullScreen
+          />
+          <a
+            href={talk.slidesUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Open the slides from ${talk.title} in a new tab`}
+            className={openLinkClass}
+          >
+            Open the slides in a new tab
+            <OpensInNewTabIcon />
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LearnPage() {
   return (
     <div className="min-h-screen bg-white landing-page">
@@ -323,58 +386,15 @@ export default function LearnPage() {
                     {talk.summary}
                   </div>
 
-                  <div
-                    className={`grid grid-cols-1 gap-10 lg:gap-6 ${
-                      talk.recordingEmbedUrl && talk.slidesEmbedUrl
-                        ? "lg:grid-cols-2"
-                        : "lg:max-w-3xl"
-                    }`}
-                  >
-                    {talk.recordingEmbedUrl && talk.recordingUrl && (
-                      <div className="min-w-0">
-                        <p className={partLabelClass}>Recording</p>
-                        <iframe
-                          src={talk.recordingEmbedUrl}
-                          title={`Recording of ${talk.title}`}
-                          className={frameClass}
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                        <a
-                          href={talk.recordingUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`Open the recording of ${talk.title} in a new tab`}
-                          className={openLinkClass}
-                        >
-                          Open the recording in a new tab
-                          <OpensInNewTabIcon />
-                        </a>
+                  <TalkMedia talk={talk} />
+                  {talk.more?.map((more) => (
+                    <div key={more.title} className="mt-12 md:mt-16">
+                      <div className="mb-6 text-base md:text-lg font-light text-gray-500 leading-relaxed text-pretty">
+                        {more.summary}
                       </div>
-                    )}
-
-                    {talk.slidesEmbedUrl && talk.slidesUrl && (
-                      <div className="min-w-0">
-                        <p className={partLabelClass}>Slides</p>
-                        <iframe
-                          src={talk.slidesEmbedUrl}
-                          title={`Slides from ${talk.title}`}
-                          className={frameClass}
-                          allowFullScreen
-                        />
-                        <a
-                          href={talk.slidesUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`Open the slides from ${talk.title} in a new tab`}
-                          className={openLinkClass}
-                        >
-                          Open the slides in a new tab
-                          <OpensInNewTabIcon />
-                        </a>
-                      </div>
-                    )}
-                  </div>
+                      <TalkMedia talk={more} />
+                    </div>
+                  ))}
                 </section>
               ))}
             </div>

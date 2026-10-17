@@ -237,30 +237,17 @@ function PostVideo({ id, title }: { id: string; title: string }) {
   );
 }
 
-/** A slide deck shown inside the post, with a link to open it on its own. */
-function PostSlides({
-  src,
-  href,
-  title,
-}: {
-  src: string;
-  href: string;
-  title: string;
-}) {
+/** A slide deck shown inside the post. */
+function PostSlides({ src, title }: { src: string; title: string }) {
   return (
-    <div>
-      <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200">
-        <iframe
-          src={src}
-          title={title}
-          allowFullScreen
-          loading="lazy"
-          className="h-full w-full"
-        />
-      </div>
-      <p className="mt-3 text-sm md:text-base text-gray-500">
-        <PostLink href={href}>Open the slides in a new tab</PostLink>
-      </p>
+    <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200">
+      <iframe
+        src={src}
+        title={title}
+        allowFullScreen
+        loading="lazy"
+        className="h-full w-full"
+      />
     </div>
   );
 }
@@ -1952,17 +1939,6 @@ export const POSTS: BlogPost[] = [
           .
         </p>
 
-        <H2>The talk</H2>
-        <PostVideo
-          id={INDIAFOSS_TALK_VIDEO_ID}
-          title="Calibrate at IndiaFOSS 2026"
-        />
-        <PostSlides
-          src="https://www.amandalmia.com/IndiaFOSS-talk/"
-          href="https://www.amandalmia.com/IndiaFOSS-talk/#1"
-          title="Slides from the Calibrate talk at IndiaFOSS 2026"
-        />
-
         <p>
           To learn more about Calibrate, you can see our past talks and
           tutorials{" "}
@@ -1974,6 +1950,25 @@ export const POSTS: BlogPost[] = [
           </Link>
           .
         </p>
+
+        <H3>The talk</H3>
+        <p>
+          Here is the recording of the talk at IndiaFOSS and the{" "}
+          <PostLink href="https://www.amandalmia.com/IndiaFOSS-talk/">
+            slides
+          </PostLink>
+          :
+        </p>
+        <div className="grid gap-5 md:grid-cols-2">
+          <PostVideo
+            id={INDIAFOSS_TALK_VIDEO_ID}
+            title="Calibrate at IndiaFOSS 2026"
+          />
+          <PostSlides
+            src="https://www.amandalmia.com/IndiaFOSS-talk/"
+            title="Slides from the Calibrate talk at IndiaFOSS 2026"
+          />
+        </div>
       </>
     ),
   },

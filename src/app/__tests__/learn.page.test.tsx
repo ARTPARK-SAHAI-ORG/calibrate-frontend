@@ -32,13 +32,6 @@ const EXPECTED_TALKS: ExpectedTalk[] = [
       "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/pub?start=false&loop=false&delayms=3000",
   },
   {
-    id: "indiafoss-2026",
-    recordingEmbedUrl: "https://www.youtube.com/embed/dBmuwQRixjk",
-    recordingUrl: "https://youtu.be/dBmuwQRixjk",
-    slidesEmbedUrl: "https://www.amandalmia.com/IndiaFOSS-talk/",
-    slidesUrl: "https://www.amandalmia.com/IndiaFOSS-talk/#1",
-  },
-  {
     id: "connect-ai-tool-with-calibrate",
     recordingEmbedUrl: "https://www.youtube.com/embed/Vx3oxYKbLVw",
     recordingUrl: "https://youtu.be/Vx3oxYKbLVw",
@@ -174,6 +167,35 @@ describe("LearnPage", () => {
       }
     },
   );
+
+  it("shows the IndiaFOSS talk inside the Calibrate tutorial, with its own line", () => {
+    render(<LearnPage />);
+    const { block } = sessionOnPage("calibrate-demo");
+    const title = "Evaluating AI systems so they can be trusted";
+    expect(
+      within(block).getByText(/Our talk at IndiaFOSS 2026/),
+    ).toBeInTheDocument();
+    expect(within(block).getByTitle(`Recording of ${title}`)).toHaveAttribute(
+      "src",
+      "https://www.youtube.com/embed/dBmuwQRixjk",
+    );
+    expect(within(block).getByTitle(`Slides from ${title}`)).toHaveAttribute(
+      "src",
+      "https://www.amandalmia.com/IndiaFOSS-talk/",
+    );
+    expect(
+      within(block).getByRole("link", {
+        name: `Open the recording of ${title} in a new tab`,
+      }),
+    ).toHaveAttribute("href", "https://youtu.be/dBmuwQRixjk");
+    expect(
+      within(block).getByRole("link", {
+        name: `Open the slides from ${title} in a new tab`,
+      }),
+    ).toHaveAttribute("href", "https://www.amandalmia.com/IndiaFOSS-talk/#1");
+    // It is part of the tutorial, so it has no place in the list on the left.
+    expect(document.getElementById("indiafoss-2026")).toBeNull();
+  });
 
   it("links to the insights from workshop-for-leaders in that session's summary", () => {
     render(<LearnPage />);

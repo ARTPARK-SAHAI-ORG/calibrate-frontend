@@ -164,9 +164,10 @@ describe("Blog", () => {
       "https://www.youtube-nocookie.com/embed/dBmuwQRixjk",
       "https://www.amandalmia.com/IndiaFOSS-talk/",
     ]);
-    expect(
-      screen.getByRole("link", { name: "Open the slides in a new tab" }),
-    ).toHaveAttribute("href", "https://www.amandalmia.com/IndiaFOSS-talk/#1");
+    expect(screen.getByRole("link", { name: "slides" })).toHaveAttribute(
+      "href",
+      "https://www.amandalmia.com/IndiaFOSS-talk/",
+    );
   });
 
   it("shows the not-found page for an address nobody wrote", async () => {
