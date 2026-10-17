@@ -32,6 +32,13 @@ const EXPECTED_TALKS: ExpectedTalk[] = [
       "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/pub?start=false&loop=false&delayms=3000",
   },
   {
+    id: "indiafoss-2026",
+    recordingEmbedUrl: "https://www.youtube.com/embed/PLACEHOLDER",
+    recordingUrl: "https://youtu.be/PLACEHOLDER",
+    slidesEmbedUrl: "https://www.amandalmia.com/IndiaFOSS-talk/",
+    slidesUrl: "https://www.amandalmia.com/IndiaFOSS-talk/#1",
+  },
+  {
     id: "connect-ai-tool-with-calibrate",
     recordingEmbedUrl: "https://www.youtube.com/embed/Vx3oxYKbLVw",
     recordingUrl: "https://youtu.be/Vx3oxYKbLVw",

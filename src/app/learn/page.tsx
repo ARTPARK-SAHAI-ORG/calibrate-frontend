@@ -36,7 +36,8 @@ type LearnItem = {
   recordingEmbedUrl?: string;
   recordingUrl?: string;
   /**
-   * Published Google Slides address, `/embed` rather than `/pub`. Left out for
+   * Published Google Slides address, `/embed` rather than `/pub`, or any other
+   * page that allows being shown inside another one. Left out for
    * a recording with no slides, and then the recording runs the full width.
    */
   slidesEmbedUrl?: string;
@@ -59,6 +60,17 @@ const ENTRIES: LearnItem[] = [
       "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/embed?start=false&loop=false&delayms=3000",
     slidesUrl:
       "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/pub?start=false&loop=false&delayms=3000",
+  },
+  {
+    id: "indiafoss-2026",
+    title: "Evaluating AI systems so they can be trusted",
+    summary:
+      "A talk at IndiaFOSS 2026 on evaluating AI for healthcare, education and agriculture, where a wrong answer can hurt a family with no other expert to turn to. Using a voice agent that fills public health forms as a case study, it covers writing tests for each situation the agent has to handle, using LLMs to judge open-ended answers, comparing models on quality, cost and speed, catching regressions before they reach users, aligning LLM judges with human experts, and monitoring the agent in production.",
+    // TODO: swap in the IndiaFOSS recording once it is published.
+    recordingEmbedUrl: "https://www.youtube.com/embed/PLACEHOLDER",
+    recordingUrl: "https://youtu.be/PLACEHOLDER",
+    slidesEmbedUrl: "https://www.amandalmia.com/IndiaFOSS-talk/",
+    slidesUrl: "https://www.amandalmia.com/IndiaFOSS-talk/#1",
   },
   {
     id: "connect-ai-tool-with-calibrate",
