@@ -5,6 +5,8 @@ export {
   findModelInProviders,
 } from "./useOpenRouterModels";
 export { useEnabledProviders, isProviderEnabled } from "./useEnabledProviders";
+export { useModelServingProviders } from "./useModelServingProviders";
+export type { ServingProvider } from "./useModelServingProviders";
 export { useDatasetManagement } from "./useDatasetManagement";
 export { useBulkDeletion } from "./useBulkDeletion";
 export { useJobDeletion } from "./useJobDeletion";

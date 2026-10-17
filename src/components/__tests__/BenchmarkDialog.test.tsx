@@ -10,12 +10,22 @@ const mockUseOpenRouterModels = jest.fn();
 const mockUseAccessToken = jest.fn();
 const mockUseBenchmarkParallelDefault = jest.fn();
 const mockUpdateOrganization = jest.fn();
+// The companies OpenRouter can serve a model from. Two by default, so the
+// choice is offered on every build-agent row.
+const mockServingProviders = jest.fn(() => [
+  { slug: "deepinfra", name: "DeepInfra", pricePerMillionInput: 0.25 },
+  { slug: "novita", name: "Novita", pricePerMillionInput: 0.27 },
+]);
 
 jest.mock("../../hooks", () => ({
   __esModule: true,
   useOpenRouterModels: (...args: unknown[]) => mockUseOpenRouterModels(...args),
   useAccessToken: (...args: unknown[]) => mockUseAccessToken(...args),
   useActiveOrgUuid: () => ["org-1", jest.fn()],
+  useModelServingProviders: () => ({
+    providers: mockServingProviders(),
+    isLoading: false,
+  }),
   // The dialog reads the workspace's own choice off this list. Undefined
   // stands for a workspace whose choice has not been read yet.
   useOrganizations: () => ({
@@ -339,9 +349,9 @@ describe("BenchmarkDialog", () => {
     ).toHaveLength(1);
   });
 
-  it("excludes already-selected models from other rows but keeps the current row's own selection available", async () => {
+  it("connection agent: excludes already-selected models from other rows but keeps the current row's own selection available", async () => {
     const user = setupUser();
-    render(<BenchmarkDialog {...baseProps()} />);
+    render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
 
     await user.click(screen.getByText("Select a model"));
     await user.click(screen.getByText("select-openai/gpt-4o"));
@@ -354,6 +364,17 @@ describe("BenchmarkDialog", () => {
 
     // Re-open row 0's selector (which has gpt-4o selected) - gpt-4o should still be selectable
     await user.click(screen.getByText("GPT-4o"));
+    expect(screen.getByText("select-openai/gpt-4o")).toBeInTheDocument();
+  });
+
+  it("build agent: offers a model that is already picked, so it can be compared on two companies", async () => {
+    const user = setupUser();
+    render(<BenchmarkDialog {...baseProps()} />);
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+
+    await user.click(screen.getByText("Select a model"));
     expect(screen.getByText("select-openai/gpt-4o")).toBeInTheDocument();
   });
 
@@ -1508,6 +1529,181 @@ describe("BenchmarkDialog", () => {
           "The workspace default was not saved.",
         ),
       );
+    });
+  });
+
+  describe("which company serves each model", () => {
+    const servingSelect = () =>
+      screen.getByRole("combobox", { name: "Who serves this model" });
+
+    it("sends the company chosen for a model with it", async () => {
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.selectOptions(servingSelect(), "deepinfra");
+
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      const payload = JSON.parse(
+        (
+          await screen.findByTestId("benchmark-results-dialog")
+        ).textContent!.split("results-close")[0],
+      );
+      expect(payload.models).toEqual(["openai/gpt-4o@deepinfra"]);
+    });
+
+    it("names the company in the question asked before it starts", async () => {
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.selectOptions(servingSelect(), "deepinfra");
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+
+      expect(
+        screen.getByText(/with GPT-4o \(deepinfra\)/),
+      ).toBeInTheDocument();
+    });
+
+    it("goes back to letting OpenRouter choose", async () => {
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.selectOptions(servingSelect(), "deepinfra");
+      await user.selectOptions(servingSelect(), "");
+
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      const payload = JSON.parse(
+        (
+          await screen.findByTestId("benchmark-results-dialog")
+        ).textContent!.split("results-close")[0],
+      );
+      expect(payload.models).toEqual(["openai/gpt-4o"]);
+    });
+
+    it("starts the row again when its model is changed", async () => {
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.selectOptions(servingSelect(), "deepinfra");
+
+      await user.click(screen.getByText("GPT-4o"));
+      await user.click(screen.getByText("select-anthropic/claude-3-haiku"));
+      expect(servingSelect()).toHaveValue("");
+    });
+
+    it("connection agent: cannot choose a company", async () => {
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+
+      expect(
+        screen.queryByRole("combobox", { name: "Who serves this model" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("will not start two rows that are the same model on the same company", async () => {
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
+
+      await user.click(screen.getAllByText("Select a model")[0]);
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+
+      expect(
+        screen.getByText(/Two rows are the same model served by the same/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Run comparison/i }),
+      ).toBeDisabled();
+
+      // Putting one of them on a company of its own makes them two different
+      // rows again.
+      await user.selectOptions(
+        screen.getAllByRole("combobox", {
+          name: "Who serves this model",
+        })[1],
+        "novita",
+      );
+      expect(
+        screen.queryByText(/Two rows are the same model served by the same/),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Run comparison/i }),
+      ).not.toBeDisabled();
+    });
+
+    it("keeps the company a past comparison ran on", async () => {
+      const user = setupUser();
+      render(
+        <BenchmarkDialog
+          {...baseProps({
+            agentType: "agent",
+            initialModels: ["openai/gpt-4o@deepinfra"],
+          })}
+        />,
+      );
+      await screen.findByText("GPT-4o");
+      expect(servingSelect()).toHaveValue("deepinfra");
+
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      const payload = JSON.parse(
+        (
+          await screen.findByTestId("benchmark-results-dialog")
+        ).textContent!.split("results-close")[0],
+      );
+      expect(payload.models).toEqual(["openai/gpt-4o@deepinfra"]);
+    });
+
+    it("removing a row takes its company with it", async () => {
+      const user = setupUser();
+      render(<BenchmarkDialog {...baseProps({ agentType: "agent" })} />);
+
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-openai/gpt-4o"));
+      await user.selectOptions(servingSelect(), "deepinfra");
+      await user.click(screen.getByText("Select a model"));
+      await user.click(screen.getByText("select-anthropic/claude-3-haiku"));
+
+      await user.click(
+        screen.getAllByRole("button", { name: "Remove model" })[0],
+      );
+
+      expect(screen.getByText("Claude 3 Haiku")).toBeInTheDocument();
+      expect(servingSelect()).toHaveValue("");
+
+      await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+      await user.click(
+        screen.getByRole("button", { name: "Start the comparison" }),
+      );
+
+      const payload = JSON.parse(
+        (
+          await screen.findByTestId("benchmark-results-dialog")
+        ).textContent!.split("results-close")[0],
+      );
+      expect(payload.models).toEqual(["anthropic/claude-3-haiku"]);
     });
   });
 });
