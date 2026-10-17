@@ -33,8 +33,8 @@ const EXPECTED_TALKS: ExpectedTalk[] = [
   },
   {
     id: "indiafoss-2026",
-    recordingEmbedUrl: "https://www.youtube.com/embed/PLACEHOLDER",
-    recordingUrl: "https://youtu.be/PLACEHOLDER",
+    recordingEmbedUrl: "https://www.youtube.com/embed/dBmuwQRixjk",
+    recordingUrl: "https://youtu.be/dBmuwQRixjk",
     slidesEmbedUrl: "https://www.amandalmia.com/IndiaFOSS-talk/",
     slidesUrl: "https://www.amandalmia.com/IndiaFOSS-talk/#1",
   },

@@ -278,9 +278,8 @@ function Aside({ children }: { children: ReactNode }) {
 const WEIGHTS_VIDEO_ID = "9j8Y142PWe4";
 const REPLY_WEIGHTS_VIDEO_ID = "gMhKkaRJn10";
 
-/** The IndiaFOSS 2026 talk. Empty until the recording is on YouTube, and the
- * post shows no video box until it is filled in. */
-const INDIAFOSS_TALK_VIDEO_ID = "";
+/** The recording of the IndiaFOSS 2026 talk, as a YouTube video id. */
+const INDIAFOSS_TALK_VIDEO_ID = "dBmuwQRixjk";
 
 export function findPost(slug: string): BlogPost | undefined {
   return POSTS.find((post) => post.slug === slug);

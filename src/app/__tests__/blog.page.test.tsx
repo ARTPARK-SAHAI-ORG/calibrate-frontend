@@ -153,16 +153,15 @@ describe("Blog", () => {
     ]);
   });
 
-  it("shows the slides from the IndiaFOSS talk, with a link to open them", async () => {
+  it("shows the recording and slides from the IndiaFOSS talk", async () => {
     render(
       await BlogPostPage({
         params: Promise.resolve({ slug: "calibrate-at-indiafoss" }),
       }),
     );
-    // Only the slides for now: the recording is not on YouTube yet, and a
-    // video with no id draws nothing.
     const frames = document.querySelectorAll("iframe");
     expect([...frames].map((frame) => frame.getAttribute("src"))).toEqual([
+      "https://www.youtube-nocookie.com/embed/dBmuwQRixjk",
       "https://www.amandalmia.com/IndiaFOSS-talk/",
     ]);
     expect(
