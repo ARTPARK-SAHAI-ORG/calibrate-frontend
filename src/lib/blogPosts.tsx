@@ -237,6 +237,34 @@ function PostVideo({ id, title }: { id: string; title: string }) {
   );
 }
 
+/** A slide deck shown inside the post, with a link to open it on its own. */
+function PostSlides({
+  src,
+  href,
+  title,
+}: {
+  src: string;
+  href: string;
+  title: string;
+}) {
+  return (
+    <div>
+      <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200">
+        <iframe
+          src={src}
+          title={title}
+          allowFullScreen
+          loading="lazy"
+          className="h-full w-full"
+        />
+      </div>
+      <p className="mt-3 text-sm md:text-base text-gray-500">
+        <PostLink href={href}>Open the slides in a new tab</PostLink>
+      </p>
+    </div>
+  );
+}
+
 /** A note set to one side of the post. */
 function Aside({ children }: { children: ReactNode }) {
   return (
@@ -249,6 +277,10 @@ function Aside({ children }: { children: ReactNode }) {
 /** The two screen recordings in the case study below, as YouTube video ids. */
 const WEIGHTS_VIDEO_ID = "9j8Y142PWe4";
 const REPLY_WEIGHTS_VIDEO_ID = "gMhKkaRJn10";
+
+/** The IndiaFOSS 2026 talk. Empty until the recording is on YouTube, and the
+ * post shows no video box until it is filled in. */
+const INDIAFOSS_TALK_VIDEO_ID = "";
 
 export function findPost(slug: string): BlogPost | undefined {
   return POSTS.find((post) => post.slug === slug);
@@ -1920,6 +1952,17 @@ export const POSTS: BlogPost[] = [
           </a>{" "}
           .
         </p>
+
+        <H2>The talk</H2>
+        <PostVideo
+          id={INDIAFOSS_TALK_VIDEO_ID}
+          title="Calibrate at IndiaFOSS 2026"
+        />
+        <PostSlides
+          src="https://www.amandalmia.com/IndiaFOSS-talk/"
+          href="https://www.amandalmia.com/IndiaFOSS-talk/#1"
+          title="Slides from the Calibrate talk at IndiaFOSS 2026"
+        />
 
         <p>
           To learn more about Calibrate, you can see our past talks and

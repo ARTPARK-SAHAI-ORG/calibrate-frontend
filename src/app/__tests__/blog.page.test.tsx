@@ -153,6 +153,23 @@ describe("Blog", () => {
     ]);
   });
 
+  it("shows the slides from the IndiaFOSS talk, with a link to open them", async () => {
+    render(
+      await BlogPostPage({
+        params: Promise.resolve({ slug: "calibrate-at-indiafoss" }),
+      }),
+    );
+    // Only the slides for now: the recording is not on YouTube yet, and a
+    // video with no id draws nothing.
+    const frames = document.querySelectorAll("iframe");
+    expect([...frames].map((frame) => frame.getAttribute("src"))).toEqual([
+      "https://www.amandalmia.com/IndiaFOSS-talk/",
+    ]);
+    expect(
+      screen.getByRole("link", { name: "Open the slides in a new tab" }),
+    ).toHaveAttribute("href", "https://www.amandalmia.com/IndiaFOSS-talk/#1");
+  });
+
   it("shows the not-found page for an address nobody wrote", async () => {
     await BlogPostPage({ params: Promise.resolve({ slug: "no-such-post" }) });
     expect(notFound).toHaveBeenCalled();
