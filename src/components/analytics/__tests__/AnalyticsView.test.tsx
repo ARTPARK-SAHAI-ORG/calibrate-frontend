@@ -2,7 +2,8 @@ import React from "react";
 import { render, screen, fireEvent, setupUser, waitFor, within } from "@/test-utils";
 import { AnalyticsView, resolveRange } from "../AnalyticsView";
 import { daysAgoStart, formatWhen, toDateInput } from "../format";
-import { shortDay } from "../ActivityChart";
+import { shortDay, useIsDarkTheme } from "../ActivityChart";
+import { act, renderHook } from "@testing-library/react";
 import { fetchAnalytics, type AnalyticsActivity, type AnalyticsResponse } from "@/lib/analyticsApi";
 
 jest.mock("../../../lib/analyticsApi", () => ({
@@ -374,7 +375,7 @@ describe("AnalyticsView edge cases", () => {
     mockFetch.mockResolvedValue(response({ activity: activity({ failed_evaluations: 0 }) }));
     render(<AnalyticsView accessToken="t" />);
     await screen.findByText("214");
-    expect(within(card("Failed evaluations")).getByText("0")).not.toHaveClass("text-red-500");
+    expect(within(card("Failed evaluations")).getByText("0")).not.toHaveClass("text-red-600");
   });
 
   it("does not open or close a failure when its text is being selected", async () => {
@@ -392,6 +393,15 @@ describe("AnalyticsView edge cases", () => {
 });
 
 describe("helpers", () => {
+  it("useIsDarkTheme follows the dark theme as it is switched on and off", async () => {
+    const { result } = renderHook(() => useIsDarkTheme());
+    expect(result.current).toBe(false);
+    await act(async () => document.documentElement.classList.add("dark"));
+    await waitFor(() => expect(result.current).toBe(true));
+    await act(async () => document.documentElement.classList.remove("dark"));
+    await waitFor(() => expect(result.current).toBe(false));
+  });
+
   it("shortDay reads the date as a local day", () => {
     expect(shortDay("2026-10-01")).toBe(
       new Date(2026, 9, 1).toLocaleDateString(undefined, { month: "short", day: "numeric" }),

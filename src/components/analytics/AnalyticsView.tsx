@@ -293,7 +293,7 @@ function ActivityCard({
       <p className="text-[12px] text-muted-foreground mb-1">{spec.label}</p>
       <p
         className={`text-[18px] font-semibold ${
-          spec.key === "failed_evaluations" && current ? "text-red-500" : "text-foreground"
+          spec.key === "failed_evaluations" && current ? "text-red-600 dark:text-red-400" : "text-foreground"
         }`}
       >
         {value}
@@ -302,7 +302,7 @@ function ActivityCard({
       {change !== null && (
         <p
           className={`text-[12px] mt-1 ${
-            change === 0 ? "text-muted-foreground" : good ? "text-green-600" : "text-red-600"
+            change === 0 ? "text-muted-foreground" : good ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
           }`}
         >
           {change === 0 ? "No change" : `${change > 0 ? "+" : ""}${change}%`} {changeLabel}

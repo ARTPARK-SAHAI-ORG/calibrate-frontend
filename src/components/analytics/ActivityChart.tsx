@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -12,7 +12,6 @@ import {
   YAxis,
 } from "recharts";
 import type { AnalyticsDay } from "@/lib/analyticsApi";
-import { pastelColors } from "@/components/charts/LeaderboardBarChart";
 
 type View = "evaluations" | "traces" | "labelling" | "users";
 
@@ -62,6 +61,39 @@ const VIEWS: Record<
   },
 };
 
+// Series colours in order, one set per theme. Checked to stay apart for
+// colour-blind readers in both.
+// The chart is drawn in SVG, whose colour attributes cannot read the app's
+// CSS colour names, so the axis and grid colours repeat them here.
+const THEMES = {
+  light: {
+    series: ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"],
+    axis: "#737373",
+    grid: "#e5e5e5",
+    hover: "#f5f5f5",
+  },
+  dark: {
+    series: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300"],
+    axis: "#a3a3a3",
+    grid: "#262626",
+    hover: "#1a1a1a",
+  },
+};
+
+/** True while the app is in dark mode, following theme changes. */
+export function useIsDarkTheme(): boolean {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const root = document.documentElement;
+    const read = () => setDark(root.classList.contains("dark"));
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+  return dark;
+}
+
 /** "2026-10-01" as "Oct 1", read as a local calendar day. */
 export function shortDay(date: string): string {
   const [y, m, d] = date.split("-").map(Number);
@@ -74,6 +106,7 @@ export function shortDay(date: string): string {
 export function ActivityChart({ days }: { days: AnalyticsDay[] }) {
   const [view, setView] = useState<View>("evaluations");
   const spec = VIEWS[view];
+  const theme = THEMES[useIsDarkTheme() ? "dark" : "light"];
   const empty = !days.some((day) =>
     spec.series.some(([key]) => Number(day[key]) > 0),
   );
@@ -107,18 +140,44 @@ export function ActivityChart({ days }: { days: AnalyticsDay[] }) {
       ) : (
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={days} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" tickFormatter={shortDay} tick={{ fontSize: 12 }} />
-            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-            <Tooltip labelFormatter={(label) => shortDay(String(label))} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} vertical={false} />
+            <XAxis
+              dataKey="date"
+              tickFormatter={shortDay}
+              tick={{ fontSize: 12, fill: theme.axis }}
+              stroke={theme.grid}
+            />
+            <YAxis
+              allowDecimals={false}
+              tick={{ fontSize: 12, fill: theme.axis }}
+              stroke={theme.grid}
+            />
+            <Tooltip
+              labelFormatter={(label) => shortDay(String(label))}
+              cursor={{ fill: theme.hover }}
+              contentStyle={{
+                background: "var(--popover)",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                fontSize: 13,
+              }}
+              labelStyle={{ color: "var(--foreground)", fontWeight: 600 }}
+              itemStyle={{ color: "var(--foreground)" }}
+            />
+            {/* The swatch carries the colour; the words stay in the text colour. */}
+            <Legend
+              wrapperStyle={{ fontSize: 13 }}
+              formatter={(value) => (
+                <span style={{ color: "var(--foreground)" }}>{value}</span>
+              )}
+            />
             {spec.series.map(([key, label], i) => (
               <Bar
                 key={key}
                 dataKey={key}
                 name={label}
                 stackId={spec.stacked ? "all" : undefined}
-                fill={pastelColors[i % pastelColors.length]}
+                fill={theme.series[i]}
               />
             ))}
           </BarChart>
