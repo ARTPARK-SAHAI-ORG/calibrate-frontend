@@ -87,7 +87,7 @@ function response(over: Partial<AnalyticsResponse> = {}): AnalyticsResponse {
         created_at: "2026-10-03T08:00:00Z",
         org_uuid: "org-Beta",
         org_name: "Beta",
-        kind: "trace_scoring",
+        kind: "stt",
         error: null,
       },
     ],

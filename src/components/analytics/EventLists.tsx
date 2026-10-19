@@ -16,7 +16,6 @@ const FAILURE_KINDS: AnalyticsKind[] = [
   "stt",
   "tts",
   "labelling_evaluator_run",
-  "trace_scoring",
 ];
 
 // One grid for both lists: a table on wide screens, stacked lines on a phone.
