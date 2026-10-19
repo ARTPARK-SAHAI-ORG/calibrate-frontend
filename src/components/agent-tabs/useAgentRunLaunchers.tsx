@@ -184,7 +184,14 @@ export function useAgentRunLaunchers({
     allLinked = false,
     runKey = "all",
   ): Promise<void> => {
-    if (await overEvalLimit(accessToken, countOf(tests, allLinked), "tests")) {
+    if (
+      await overEvalLimit(
+        accessToken,
+        countOf(tests, allLinked),
+        "tests",
+        "test_run",
+      )
+    ) {
       return;
     }
     setRunToConfirm({ tests, allLinked, runKey });
@@ -223,7 +230,14 @@ export function useAgentRunLaunchers({
       toast.error("Turn benchmarking on in the Connection tab first.");
       return false;
     }
-    if (await overEvalLimit(accessToken, countOf(tests, allLinked), "tests")) {
+    if (
+      await overEvalLimit(
+        accessToken,
+        countOf(tests, allLinked),
+        "tests",
+        "model_comparison",
+      )
+    ) {
       return false;
     }
     setBenchmarkTests(allLinked ? [] : tests);

@@ -169,7 +169,9 @@ export async function startTestRunOrNotify(
   testUuids: string[] | null,
   testCount: number = testUuids?.length ?? 0,
 ): Promise<string | null> {
-  if (await overEvalLimit(accessToken, testCount, "tests")) return null;
+  if (await overEvalLimit(accessToken, testCount, "tests", "test_run")) {
+    return null;
+  }
   try {
     return await startTestRun(backendUrl, accessToken, agentUuid, testUuids);
   } catch (error) {

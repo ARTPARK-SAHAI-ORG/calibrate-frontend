@@ -2046,7 +2046,16 @@ function LabellingTaskPageInner() {
     const itemCountForLimit = isSelectAll
       ? itemsTotal
       : (Array.isArray(target) ? target.length : target ? 1 : itemsTotal);
-    if (await overEvalLimit(accessToken, itemCountForLimit, "items")) return;
+    if (
+      await overEvalLimit(
+        accessToken,
+        itemCountForLimit,
+        "items",
+        "labelling_evaluator_run",
+      )
+    ) {
+      return;
+    }
     // Tool call correctness is answered by people, so it is not something a
     // run can start. A task holding nothing else has no run to offer.
     const linked = evaluatorsThatCanBeRun(task?.evaluators ?? []);

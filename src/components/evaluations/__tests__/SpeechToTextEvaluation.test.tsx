@@ -23,6 +23,11 @@ jest.mock("../../../hooks", () => ({
   findModelInProviders: () => null,
 }));
 
+// The run checks the same limit of 20 outside React.
+jest.mock("../../../hooks/useMaxRowsPerEval", () => ({
+  getMaxRowsPerEval: async () => 20,
+}));
+
 // ─── Missing provider keys ─────────────────────────────────────────────────
 let mockUsesOwnKeys = false;
 let mockMissingKeys = new Set<string>();

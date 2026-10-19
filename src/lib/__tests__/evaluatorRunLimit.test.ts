@@ -1,10 +1,13 @@
 import { evaluatorRunLimitMessage } from "../evaluatorRunLimit";
 import { getMaxRowsPerEval } from "@/hooks/useMaxRowsPerEval";
+import { apiPost } from "@/lib/api";
 
 // Relative specifier: jest.mock() does not resolve the "@/" alias.
 jest.mock("../../hooks/useMaxRowsPerEval", () => ({
   getMaxRowsPerEval: jest.fn(),
 }));
+
+jest.mock("../api", () => ({ apiPost: jest.fn(async () => ({})) }));
 
 jest.mock("sonner", () => ({
   toast: { error: jest.fn() },
@@ -26,6 +29,11 @@ describe("evaluatorRunLimitMessage", () => {
     expect(await evaluatorRunLimitMessage("token", 11, 2)).toBe(
       "This run would score 22 items, which is over your limit of 20. Pick fewer items or fewer evaluators.",
     );
+    expect(apiPost).toHaveBeenCalledWith("/org-limits/hits", "token", {
+      limit_name: "max_rows_per_eval",
+      kind: "labelling_evaluator_run",
+      requested: 22,
+    });
   });
 
   it("returns nothing for any size when the workspace has no limit", async () => {

@@ -158,6 +158,7 @@ jest.mock("../ui", () => ({
 jest.mock("../../lib/api", () => ({
   __esModule: true,
   getDefaultHeaders: jest.fn(() => ({})),
+  apiPost: jest.fn(async () => ({})),
 }));
 
 jest.mock("../AppLayout", () => ({
