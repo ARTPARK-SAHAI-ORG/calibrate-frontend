@@ -1,4 +1,4 @@
-import { apiGet } from "@/lib/api";
+import { apiDelete, apiGet, apiPost } from "@/lib/api";
 
 /** Every kind of work the analytics page counts or lists. */
 export type AnalyticsKind =
@@ -114,4 +114,25 @@ export async function fetchAnalytics(
   if (end) params.set("end", end);
   params.set("tz_offset_minutes", String(tzOffsetMinutes));
   return apiGet<AnalyticsResponse>(`/admin/analytics?${params}`, accessToken);
+}
+
+export type Superadmin = {
+  uuid: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  /** False for the superadmin set by the server, who can never be removed. */
+  can_remove: boolean;
+};
+
+export function fetchSuperadmins(accessToken: string): Promise<Superadmin[]> {
+  return apiGet<Superadmin[]>("/admin/superadmins", accessToken);
+}
+
+export function addSuperadmin(accessToken: string, email: string): Promise<Superadmin> {
+  return apiPost<Superadmin>("/admin/superadmins", accessToken, { email });
+}
+
+export function removeSuperadmin(accessToken: string, userUuid: string): Promise<unknown> {
+  return apiDelete(`/admin/superadmins/${userUuid}`, accessToken);
 }

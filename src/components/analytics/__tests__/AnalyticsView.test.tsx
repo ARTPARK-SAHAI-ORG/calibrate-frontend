@@ -9,6 +9,7 @@ import { fetchAnalytics, type AnalyticsActivity, type AnalyticsResponse } from "
 jest.mock("../../../lib/analyticsApi", () => ({
   ...jest.requireActual("../../../lib/analyticsApi"),
   fetchAnalytics: jest.fn(),
+  fetchSuperadmins: jest.fn(() => Promise.resolve([])),
 }));
 jest.mock("../../../lib/reportError", () => ({ reportError: jest.fn() }));
 

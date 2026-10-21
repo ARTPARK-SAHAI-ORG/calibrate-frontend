@@ -26,6 +26,7 @@ import {
 import { ActivityChart } from "./ActivityChart";
 import { WorkspacesTable } from "./WorkspacesTable";
 import { FailuresList, LimitHitsList } from "./EventLists";
+import { SuperadminsSection } from "./SuperadminsSection";
 
 const CARD = "border rounded-xl p-4 bg-muted/10";
 const DATE_INPUT =
@@ -216,6 +217,13 @@ export function AnalyticsView({ accessToken }: { accessToken: string | null }) {
               </div>
             )}
           </section>
+
+          {accessToken && (
+            <>
+              <hr className="border-border" />
+              <SuperadminsSection accessToken={accessToken} />
+            </>
+          )}
         </>
       ) : null}
     </div>
