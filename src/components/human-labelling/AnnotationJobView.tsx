@@ -1154,8 +1154,19 @@ function AnnotateView({
                     statusByItem.get(it.uuid) === "completed" ? n : n + 1,
                   0,
                 );
+                // Finished before this edit: changing an answer on it
+                // updates it, it does not finish the job.
+                const wasFinished =
+                  !!currentItem &&
+                  currentHasSaved &&
+                  requiredEvaluatorsFor(currentItem.uuid).every((ev) =>
+                    isSaved(currentItem.uuid, ev),
+                  );
                 const isLastUnsaved =
-                  !!currentItem && !currentItemSaved && unsavedCount === 1;
+                  !!currentItem &&
+                  !currentItemSaved &&
+                  !wasFinished &&
+                  unsavedCount === 1;
                 const allEvaluatorsAnswered =
                   !!currentItem &&
                   evaluatorsFor(currentItem.uuid).length > 0 &&
