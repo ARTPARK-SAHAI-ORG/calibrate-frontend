@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Link } from "@/lib/nav";
+import { useRouter } from "@/lib/nav";
 import { HOME_PATH } from "@/lib/routes";
 import { reportError } from "@/lib/reportError";
 import { getErrorStatusCode } from "@/lib/parseBackendError";
@@ -57,6 +57,7 @@ export function resolveRange(
 }
 
 export function AnalyticsView({ accessToken }: { accessToken: string | null }) {
+  const router = useRouter();
   const today = toDateInput(new Date());
   const [preset, setPreset] = useState<RangePreset>("30");
   const [customStart, setCustomStart] = useState(() =>
@@ -96,8 +97,10 @@ export function AnalyticsView({ accessToken }: { accessToken: string | null }) {
       })
       .catch((err) => {
         if (cancelled) return;
+        // Anyone who is not a superadmin is sent home without a word.
         if (getErrorStatusCode(err) === 403) {
           setForbidden(true);
+          router.replace(HOME_PATH);
           return;
         }
         reportError("Failed to load analytics", err);
@@ -106,25 +109,11 @@ export function AnalyticsView({ accessToken }: { accessToken: string | null }) {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, start, end, rangeError, requestKey]);
+  }, [accessToken, start, end, rangeError, requestKey, router]);
 
   const changeLabel = data?.previous ? previousPeriodLabel(preset) : null;
 
-  if (forbidden) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-        <h1 className="text-xl md:text-2xl font-semibold text-foreground">
-          This page is only for Calibrate superadmins
-        </h1>
-        <Link
-          href={HOME_PATH}
-          className="mt-6 h-10 px-4 rounded-md text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer inline-flex items-center"
-        >
-          Go to home
-        </Link>
-      </div>
-    );
-  }
+  if (forbidden) return null;
 
   return (
     <div className="space-y-6">

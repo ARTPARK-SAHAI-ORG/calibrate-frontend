@@ -5,6 +5,8 @@ import { daysAgoStart, formatWhen, toDateInput } from "../format";
 import { shortDay, useChartTheme } from "../ActivityChart";
 import { act, renderHook } from "@testing-library/react";
 import { fetchAnalytics, type AnalyticsActivity, type AnalyticsResponse } from "@/lib/analyticsApi";
+import { useRouter } from "next/navigation";
+import { HOME_PATH } from "@/lib/routes";
 
 jest.mock("../../../lib/analyticsApi", () => ({
   ...jest.requireActual("../../../lib/analyticsApi"),
@@ -221,10 +223,11 @@ describe("AnalyticsView", () => {
     expect(screen.getByText("214")).toBeInTheDocument();
   });
 
-  it("tells someone who is not the admin that the page is not for them", async () => {
+  it("sends someone who is not a superadmin home and shows nothing", async () => {
+    const { replace } = useRouter();
     mockFetch.mockRejectedValue(new Error("Request failed: 403 - forbidden"));
     render(<AnalyticsView accessToken="t" />);
-    expect(await screen.findByText("This page is only for Calibrate superadmins")).toBeInTheDocument();
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(HOME_PATH));
     expect(screen.queryByText("Analytics")).toBeNull();
   });
 

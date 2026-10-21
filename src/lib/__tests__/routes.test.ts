@@ -73,6 +73,10 @@ describe("isPublicPath", () => {
     expect(isPublicPath(path)).toBe(true);
   });
 
+  it("never puts a workspace on analytics, which covers every workspace", () => {
+    expect(withWorkspace("/analytics", "abc")).toBe("/analytics");
+  });
+
   it("leaves a link to a spot on the home page alone", () => {
     expect(withWorkspace("/#open-source", "abc")).toBe("/#open-source");
   });
@@ -139,8 +143,8 @@ describe("landingPathAfterSwitch", () => {
     expect(landingPathAfterSwitch("/tools")).toBe("/tools");
   });
 
-  it("stays on analytics, which covers every workspace", () => {
-    expect(landingPathAfterSwitch("/analytics")).toBe("/analytics");
+  it("leaves analytics for the new workspace's home, since analytics names no workspace", () => {
+    expect(landingPathAfterSwitch("/analytics")).toBe(HOME_PATH);
   });
 
   it("stays on workspace settings", () => {

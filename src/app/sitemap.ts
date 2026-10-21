@@ -14,7 +14,7 @@ export const PAGES = ["/", "/learn", "/changelog", "/blog"];
  * src/app/__tests__/seo.test.ts fails and names it. That is the only thing
  * stopping a page from being quietly invisible to search.
  */
-export const BEHIND_SIGN_IN = ["[org]"];
+export const BEHIND_SIGN_IN = ["[org]", "analytics"];
 
 /**
  * Every page we want in search results.
