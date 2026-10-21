@@ -1,5 +1,6 @@
 ## October 2026
 
+- The Analytics page now opens at its own address that covers every workspace, no longer repeats its title in the top bar, and sends anyone who is not an admin to Agents ([#745](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/745))
 - The button now says Update instead of Mark as complete when an annotator changes an answer on an item that was already finished ([#743](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/743))
 - Add and remove superadmins from the Analytics page ([#739](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/739))
 - The Calibrate admin can now open an Analytics page from the profile menu to see usage across every workspace, failed evaluations and the runs that were refused for being over the limit ([#737](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/737))
