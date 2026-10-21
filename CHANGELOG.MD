@@ -1,5 +1,6 @@
 ## October 2026
 
+- The button now says Update instead of Mark as complete when an annotator changes an answer on an item that was already finished ([#743](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/743))
 - Add and remove superadmins from the Analytics page ([#739](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/739))
 - The Calibrate admin can now open an Analytics page from the profile menu to see usage across every workspace, failed evaluations and the runs that were refused for being over the limit ([#737](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/737))
 - The Learn page now shows the recording and slides of the IndiaFOSS 2026 talk under the Calibrate tutorial, and the Calibrate at IndiaFOSS blog post ends with the same recording and slides ([#730](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/730))
