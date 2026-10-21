@@ -1,0 +1,352 @@
+{
+  "src/app/[org]/datasets/[id]/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/[org]/evaluators/[uuid]/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "src/app/[org]/personas/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "src/app/[org]/scenarios/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "src/app/[org]/sentry-example-page/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/[org]/simulations/[uuid]/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "src/app/[org]/simulations/[uuid]/runs/[runId]/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/app/[org]/simulations/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/[org]/stt/[uuid]/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/app/[org]/stt/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/[org]/tests/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "src/app/[org]/tools/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/app/[org]/tts/[uuid]/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/app/[org]/tts/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/[org]/workspace-settings/page.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/app/debug-client/page.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/app/login/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/public/annotation-eval/[token]/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/public/benchmark/[token]/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/public/simulation-run/[token]/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/public/stt/[token]/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/public/test-run/[token]/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/app/public/tts/[token]/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/app/signup/page.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/auth.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/AddTestDialog.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/AddToolDialog.tsx": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/components/AgentDetail.tsx": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "src/components/AgentPicker.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/Agents.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/AppLayout.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "src/components/BenchmarkDialog.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/BenchmarkResultsDialog.tsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/components/BulkUploadTestsModal.tsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/components/DuplicateAgentDialog.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/ExportZipButton.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/NewSimulationDialog.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/ShareButton.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/agent-tabs/AddToolDialog.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/agent-tabs/DeleteToolDialog.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/agent-tabs/TestsTabContent.tsx": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "src/components/evaluations/SpeechToTextEvaluation.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/evaluations/TextToSpeechEvaluation.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/evaluations/audioZip.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/evaluators/CreateEvaluatorFlow.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/evaluators/DuplicateEvaluatorDialog.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/human-labelling/AddLlmGeneralItemsDialog.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/human-labelling/AnnotationJobView.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/simulation-tabs/SimulationRunsTab.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/traces/ConversationsTable.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/ui/LoadingState.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/hooks/useAgentHasRuns.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/hooks/useAgentRuns.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/hooks/useBulkDeletion.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/hooks/useCrudResource.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/hooks/useEnabledProviders.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/hooks/useOpenRouterModels.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/hooks/useVerifyConnection.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/lib/agentTools.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/audioExport.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/defaultEvaluators.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/evaluatorApi.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "src/lib/invites.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/onboarding/tours/firstEval.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/lib/publicEvaluators.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/retryEvaluation.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/testRunApi.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "src/lib/testsApi.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/toolsApi.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lib/tracesApi.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  }
+}

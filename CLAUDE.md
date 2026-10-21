@@ -23,6 +23,8 @@ npm run dev            # start Next dev server on :3000
 npm run build          # production build
 npm run start          # run production build
 npm run lint           # eslint (flat config, eslint.config.mjs)
+npm run lint:reuse -- src   # the rules below that send code to the shared helper
+npm run check:duplication   # fails on code copied, or an address repeated, by lines changed against main
 npm test               # jest (jsdom)
 npm test -- path/to/file.test.ts    # single test file
 npm test -- -t "test name"          # single test by name
@@ -208,6 +210,11 @@ Where it lives today, and what counts as one unit of work:
 - **Simulations** are picker-only: `LIMITS.SIMULATION_MAX_PERSONAS` / `SIMULATION_MAX_SCENARIOS` are enforced when a persona or scenario is ticked, and launch does not recheck them.
 
 ## Conventions worth knowing
+
+- **Two checks stop new copies, before every commit (`.husky/pre-commit`) and in the CI job "Reuse and copied code".**
+  - `npm run lint:reuse` runs `eslint.reuse.config.mjs`, which holds only these rules, because the full `npm run lint` already fails on hundreds of older errors. A hand-written `fetch` instead of `apiClient`, a browser `title=` instead of `Tooltip` (an iframe's is allowed), `router.push` in an `onClick` instead of `Link`, `useSession` instead of `useAuth`, and `console.*` instead of `reportError`.
+  - Places that broke a rule before it existed are counted per file in `eslint-reuse-suppressions.json`. Only a new one fails, and when it does ESLint lists every match in that file, old ones included. Moving an old one to the helper never fails the check. To lower a file's count after fixing old ones, run `npx eslint -c eslint.reuse.config.mjs --suppressions-location eslint-reuse-suppressions.json --prune-suppressions src`.
+  - `npm run check:duplication` (`scripts/check-duplication.mjs`, tests in `scripts/check-duplication.test.mjs`, run with `node --test`) runs jscpd over `src/` and fails only when a copy of 100 tokens or more touches a line changed against `main`, or a changed line types a web address another file already has. Copies already on `main` are left alone. It needs `main` to compare against and stops with a message when it cannot find it.
 
 - An explaining note on a page is `InfoNote` from `@/components/ui`: the blue box with the "i" icon. Use it rather than copying its classes.
 - Tailwind v4 with semantic tokens (`foreground`, `background`, `muted`, `accent`, `border`). Avoid hardcoded colors outside the validation/status patterns documented in `.cursor/rules/design.md`.
