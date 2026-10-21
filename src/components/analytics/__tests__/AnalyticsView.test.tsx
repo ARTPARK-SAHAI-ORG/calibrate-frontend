@@ -210,7 +210,7 @@ describe("AnalyticsView", () => {
   it("tells someone who is not the admin that the page is not for them", async () => {
     mockFetch.mockRejectedValue(new Error("Request failed: 403 - forbidden"));
     render(<AnalyticsView accessToken="t" />);
-    expect(await screen.findByText("This page is only for the Calibrate admin")).toBeInTheDocument();
+    expect(await screen.findByText("This page is only for Calibrate superadmins")).toBeInTheDocument();
     expect(screen.queryByText("Analytics")).toBeNull();
   });
 

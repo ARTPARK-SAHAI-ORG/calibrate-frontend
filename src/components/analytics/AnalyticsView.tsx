@@ -108,7 +108,7 @@ export function AnalyticsView({ accessToken }: { accessToken: string | null }) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center px-4">
         <h1 className="text-xl md:text-2xl font-semibold text-foreground">
-          This page is only for the Calibrate admin
+          This page is only for Calibrate superadmins
         </h1>
         <Link
           href={HOME_PATH}
