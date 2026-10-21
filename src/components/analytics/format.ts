@@ -1,3 +1,4 @@
+import { parseBackendTime } from "@/lib/relativeTime";
 import type { AnalyticsActivity, AnalyticsKind, AnalyticsLimitName } from "@/lib/analyticsApi";
 
 export const KIND_LABELS: Record<AnalyticsKind, string> = {
@@ -21,9 +22,8 @@ export const LIMIT_LABELS: Record<AnalyticsLimitName, string> = {
   max_scored_traces: "Trace scoring limit reached",
 };
 
-export function formatCount(value: number): string {
-  return value.toLocaleString("en-US");
-}
+/** A count with thousands commas (1,234). */
+export { formatTokens as formatCount } from "@/lib/llmMetrics";
 
 export function formatCost(value: number | null): string {
   if (value === null) return "None";
@@ -43,8 +43,7 @@ export function formatCost(value: number | null): string {
  */
 export function formatWhen(value: string | null): string {
   if (!value) return "Never";
-  const hasZone = /(Z|[+-]\d{2}:?\d{2})$/.test(value);
-  const date = new Date(hasZone ? value : `${value.replace(" ", "T")}Z`);
+  const date = parseBackendTime(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString(undefined, {
     year: "numeric",

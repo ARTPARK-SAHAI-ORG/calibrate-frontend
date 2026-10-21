@@ -109,6 +109,7 @@ import {
   llmGeneralDialogRow,
   readEvaluatorVariables,
 } from "@/lib/labellingItem";
+import { parseBackendTime } from "@/lib/relativeTime";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
 
@@ -823,7 +824,7 @@ function EvaluatorRunsList({
               href={href}
               className="flex items-center py-3 text-sm text-muted-foreground cursor-pointer"
             >
-              {new Date(lastUpdated.replace(" ", "T") + "Z").toLocaleString()}
+              {parseBackendTime(lastUpdated).toLocaleString()}
             </Link>
             <div className="flex items-center justify-end">
               {(run.status === "completed" || run.status === "failed") && (
@@ -889,7 +890,7 @@ function formatItemUpdatedAt(item: {
 }): string {
   const raw = item.updated_at ?? item.created_at;
   if (!raw) return "—";
-  const d = new Date(raw.replace(" ", "T") + "Z");
+  const d = parseBackendTime(raw);
   if (isNaN(d.getTime())) return "—";
   return d.toLocaleString();
 }

@@ -63,35 +63,48 @@ const VIEWS: Record<
 
 // Series colours in order, one set per theme. Checked to stay apart for
 // colour-blind readers in both.
-// The chart is drawn in SVG, whose colour attributes cannot read the app's
-// CSS colour names, so the axis and grid colours repeat them here.
-const THEMES = {
-  light: {
-    series: ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"],
-    axis: "#737373",
-    grid: "#e5e5e5",
-    hover: "#f5f5f5",
-  },
-  dark: {
-    series: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300"],
-    axis: "#a3a3a3",
-    grid: "#262626",
-    hover: "#1a1a1a",
-  },
+const SERIES_COLORS = {
+  light: ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"],
+  dark: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300"],
 };
 
-/** True while the app is in dark mode, following theme changes. */
-export function useIsDarkTheme(): boolean {
-  const [dark, setDark] = useState(false);
+type ChartTheme = {
+  dark: boolean;
+  axis?: string;
+  grid?: string;
+  hover?: string;
+};
+
+function readChartTheme(): ChartTheme {
+  const root = document.documentElement;
+  const css = getComputedStyle(root);
+  const color = (name: string) => css.getPropertyValue(name).trim() || undefined;
+  return {
+    dark: root.classList.contains("dark"),
+    axis: color("--muted-foreground"),
+    grid: color("--border"),
+    hover: color("--muted"),
+  };
+}
+
+/**
+ * Whether the app is in dark mode, and its grey text, line and hover colours,
+ * following theme changes. The chart is drawn in SVG, whose colour attributes
+ * cannot read the app's colour names, so they are read out here instead.
+ */
+export function useChartTheme(): ChartTheme {
+  const [theme, setTheme] = useState<ChartTheme>({ dark: false });
   useEffect(() => {
-    const root = document.documentElement;
-    const read = () => setDark(root.classList.contains("dark"));
+    const read = () => setTheme(readChartTheme());
     read();
     const observer = new MutationObserver(read);
-    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
     return () => observer.disconnect();
   }, []);
-  return dark;
+  return theme;
 }
 
 /** "2026-10-01" as "Oct 1", read as a local calendar day. */
@@ -106,7 +119,8 @@ export function shortDay(date: string): string {
 export function ActivityChart({ days }: { days: AnalyticsDay[] }) {
   const [view, setView] = useState<View>("evaluations");
   const spec = VIEWS[view];
-  const theme = THEMES[useIsDarkTheme() ? "dark" : "light"];
+  const theme = useChartTheme();
+  const series = SERIES_COLORS[theme.dark ? "dark" : "light"];
   const empty = !days.some((day) =>
     spec.series.some(([key]) => Number(day[key]) > 0),
   );
@@ -177,7 +191,7 @@ export function ActivityChart({ days }: { days: AnalyticsDay[] }) {
                 dataKey={key}
                 name={label}
                 stackId={spec.stacked ? "all" : undefined}
-                fill={theme.series[i]}
+                fill={series[i]}
               />
             ))}
           </BarChart>

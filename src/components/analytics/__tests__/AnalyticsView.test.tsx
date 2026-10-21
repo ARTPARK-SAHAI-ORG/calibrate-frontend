@@ -2,7 +2,7 @@ import React from "react";
 import { render, screen, fireEvent, setupUser, waitFor, within } from "@/test-utils";
 import { AnalyticsView, resolveRange } from "../AnalyticsView";
 import { daysAgoStart, formatWhen, toDateInput } from "../format";
-import { shortDay, useIsDarkTheme } from "../ActivityChart";
+import { shortDay, useChartTheme } from "../ActivityChart";
 import { act, renderHook } from "@testing-library/react";
 import { fetchAnalytics, type AnalyticsActivity, type AnalyticsResponse } from "@/lib/analyticsApi";
 
@@ -393,13 +393,20 @@ describe("AnalyticsView edge cases", () => {
 });
 
 describe("helpers", () => {
-  it("useIsDarkTheme follows the dark theme as it is switched on and off", async () => {
-    const { result } = renderHook(() => useIsDarkTheme());
-    expect(result.current).toBe(false);
-    await act(async () => document.documentElement.classList.add("dark"));
-    await waitFor(() => expect(result.current).toBe(true));
-    await act(async () => document.documentElement.classList.remove("dark"));
-    await waitFor(() => expect(result.current).toBe(false));
+  it("useChartTheme reads the app's colours and follows the dark theme", async () => {
+    const root = document.documentElement;
+    root.style.setProperty("--muted-foreground", "#737373");
+    const { result } = renderHook(() => useChartTheme());
+    await waitFor(() => expect(result.current.axis).toBe("#737373"));
+    expect(result.current.dark).toBe(false);
+    await act(async () => {
+      root.style.setProperty("--muted-foreground", "#a3a3a3");
+      root.classList.add("dark");
+    });
+    await waitFor(() => expect(result.current).toMatchObject({ dark: true, axis: "#a3a3a3" }));
+    await act(async () => root.classList.remove("dark"));
+    await waitFor(() => expect(result.current.dark).toBe(false));
+    root.style.removeProperty("--muted-foreground");
   });
 
   it("shortDay reads the date as a local day", () => {
