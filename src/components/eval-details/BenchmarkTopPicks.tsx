@@ -7,10 +7,7 @@ import {
   type ParetoModelPoint,
 } from "@/components/charts/ParetoFrontierChart";
 import { getColorMap } from "@/components/charts/LeaderboardBarChart";
-import {
-  hasBenchmarkTopPicks,
-  type BenchmarkCombinedLeaderboardPayload,
-} from "@/lib/benchmarkEvaluatorSummary";
+import type { BenchmarkCombinedLeaderboardPayload } from "@/lib/benchmarkEvaluatorSummary";
 
 type BenchmarkTopPicksProps = {
   /** The leaderboard rows, built once by the caller from the run. */
@@ -44,11 +41,6 @@ export function BenchmarkTopPicks({
     () => getColorMap(paretoPoints.map((p) => p.model)),
     [paretoPoints],
   );
-
-  // Nothing to plot without both a cost and an overall pass rate. The parent
-  // gates the Top picks tab on the same check (hasBenchmarkTopPicks), so this is
-  // a safety net rather than a visible empty state.
-  if (!hasBenchmarkTopPicks(payload)) return null;
 
   return (
     <ParetoFrontierChart

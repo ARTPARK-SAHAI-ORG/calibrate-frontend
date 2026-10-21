@@ -87,28 +87,6 @@ export type BenchmarkModelLike = {
   pass_rate_ci?: LikelyRange | null;
 };
 
-/**
- * How many of a model's tests produced no answer, and how many it was given.
- * The backend's leaderboard row counts a test that never answered as a
- * failure, so the pass rate on screen is worked out from these instead.
- *
- * `runOver` says the run has ended, whichever way it ended. A row left with no
- * verdict then produced no answer either, rather than still being on its way,
- * which is the rule the marks and the test rows read.
- */
-export function benchmarkAnsweredPassFail(
-  model: BenchmarkModelLike,
-  runOver = false,
-): {
-  passed: number;
-  answered: number;
-  unanswered: number;
-} | null {
-  return model.test_results?.length
-    ? answeredCounts(model.test_results, runOver)
-    : null;
-}
-
 export type BenchmarkLeaderboardSummaryRow = {
   model: string;
   passed?: string;
@@ -288,8 +266,8 @@ export function buildBenchmarkCombinedLeaderboardPayload(
   // finish, the same numbers the table works out anyway.
   if (runOver && !leaderboardSummary?.length) {
     leaderboardSummary = modelResults.flatMap((m) => {
-      const c = benchmarkAnsweredPassFail(m, runOver);
-      if (!c || c.answered === 0) return [];
+      const c = answeredCounts(m.test_results ?? [], runOver);
+      if (c.answered === 0) return [];
       return [
         {
           model: m.model,
@@ -358,8 +336,8 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       // pass rate out from the cases instead, so it covers only the tests the
       // model actually answered, and matches the single-run summary. Once the
       // run is over, a row with no verdict never answered either.
-      const answered = mr ? benchmarkAnsweredPassFail(mr, runOver) : null;
-      if (answered && answered.unanswered > 0) {
+      const answered = answeredCounts(mr?.test_results ?? [], runOver);
+      if (answered.unanswered > 0) {
         row.passed = String(answered.passed);
         row.total = String(answered.answered);
         row.pass_rate =

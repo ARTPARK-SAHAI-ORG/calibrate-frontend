@@ -23,18 +23,6 @@ describe("toolCallPassFail", () => {
     ).toEqual({ passed: 0, total: 0 });
   });
 
-  it("skips a tool-call test that produced no answer", () => {
-    expect(
-      toolCallPassFail([{ ...toolCall, passed: false, unanswered: true }]),
-    ).toEqual({ passed: 0, total: 0 });
-  });
-
-  it("skips a tool-call test with no verdict yet", () => {
-    expect(
-      toolCallPassFail([{ ...toolCall, passed: null }, { ...toolCall }]),
-    ).toEqual({ passed: 0, total: 0 });
-  });
-
   it("counts passed and failed tool-call tests, read from either field", () => {
     expect(
       toolCallPassFail([

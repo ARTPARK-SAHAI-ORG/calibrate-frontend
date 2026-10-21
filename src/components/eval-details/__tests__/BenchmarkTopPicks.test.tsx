@@ -75,29 +75,4 @@ describe("BenchmarkTopPicks", () => {
       screen.getByText("Quality vs cost vs latency tradeoff"),
     ).toBeInTheDocument();
   });
-
-  it("renders nothing when rows lack cost", () => {
-    const leaderboardSummary: BenchmarkLeaderboardSummaryRow[] = [
-      { model: "gpt-4.1", pass_rate: "80" },
-    ];
-    const modelResults: BenchmarkModelLike[] = [{ model: "gpt-4.1" }];
-
-    const { container } = render(
-      <BenchmarkTopPicks
-        leaderboardSummary={leaderboardSummary}
-        modelResults={modelResults}
-        filename="bench"
-      />,
-    );
-
-    expect(
-      screen.queryByText("Quality vs cost vs latency tradeoff"),
-    ).not.toBeInTheDocument();
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("renders nothing when there is no leaderboard data", () => {
-    const { container } = render(<BenchmarkTopPicks modelResults={[]} filename="bench" />);
-    expect(container).toBeEmptyDOMElement();
-  });
 });

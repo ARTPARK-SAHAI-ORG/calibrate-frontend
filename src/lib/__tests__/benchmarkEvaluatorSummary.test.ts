@@ -1,5 +1,4 @@
 import {
-  benchmarkAnsweredPassFail,
   likelyRangeText,
   benchmarkRatingEvaluatorCaption,
   benchmarkEvaluatorColumnKey,
@@ -706,39 +705,5 @@ describe("buildBenchmarkCombinedLeaderboardPayload with likely ranges", () => {
       pass_rate: 93.75,
     });
     expect(build(false)).toMatchObject({ passed: "15", total: "20" });
-  });
-});
-
-describe("benchmarkAnsweredPassFail", () => {
-  it("returns null when the model carries no cases", () => {
-    expect(benchmarkAnsweredPassFail({ model: "m" })).toBeNull();
-    expect(
-      benchmarkAnsweredPassFail({ model: "m", test_results: [] }),
-    ).toBeNull();
-  });
-
-  it("counts the tests that answered apart from the ones that did not", () => {
-    // Every row here is `passed: false` except the first, so only the flag
-    // separates a wrong answer from a test that never answered.
-    expect(
-      benchmarkAnsweredPassFail({
-        model: "m",
-        test_results: [
-          { passed: true },
-          { passed: false },
-          { passed: false, unanswered: true },
-          { passed: false, unanswered: true },
-        ],
-      }),
-    ).toEqual({ passed: 1, answered: 2, unanswered: 2 });
-  });
-
-  it("leaves a test that has not finished out of every count", () => {
-    expect(
-      benchmarkAnsweredPassFail({
-        model: "m",
-        test_results: [{ passed: true }, { passed: null }],
-      }),
-    ).toEqual({ passed: 1, answered: 1, unanswered: 0 });
   });
 });

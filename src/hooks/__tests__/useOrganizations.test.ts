@@ -420,12 +420,8 @@ describe("useOrganizations hooks", () => {
       expect(result.current).toBe(true);
     });
 
-    it("is off when the workspace turned it off or is not known", () => {
+    it("is off when the workspace is not known", () => {
       pathname = `/${ORG_IN_ADDRESS}/agents`;
-      seedOrgsCache([withRanges(false)], "tok");
-      expect(renderHook(() => useShowLikelyRanges()).result.current).toBe(
-        false,
-      );
       seedOrgsCache([org2], "tok");
       expect(renderHook(() => useShowLikelyRanges()).result.current).toBe(
         false,

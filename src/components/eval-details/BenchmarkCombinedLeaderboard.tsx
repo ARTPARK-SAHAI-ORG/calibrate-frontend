@@ -4,10 +4,9 @@ import React, { useMemo } from "react";
 import { LikelyRangesNote } from "./LikelyRangesNote";
 import { LeaderboardTab, type LeaderboardColumn } from "./LeaderboardTab";
 import { RunNote } from "./RunNote";
-import { STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
+import { STOPPED_EARLY_SENTENCE, answeredCounts } from "@/lib/testTypes";
 import { RunFailureBox, runFailureSentence } from "@/components/RunFailureBox";
 import {
-  benchmarkAnsweredPassFail,
   benchmarkRangeKey,
   benchmarkRatingEvaluatorCaption,
   likelyRangeText,
@@ -87,9 +86,9 @@ function RunNotes({
   /** True when someone stopped the run before it finished. */
   runStopped?: boolean;
 }) {
-  const perModel = modelResults
-    .map((m) => benchmarkAnsweredPassFail(m, runOver))
-    .filter((c) => c !== null);
+  const perModel = modelResults.map((m) =>
+    answeredCounts(m.test_results ?? [], runOver),
+  );
   const failed = failureReason !== null;
   const couldNotRun = couldNotRunCount(modelResults);
   const totalUnanswered = perModel.reduce((n, c) => n + c.unanswered, 0);
@@ -99,8 +98,8 @@ function RunNotes({
   // that ran, which is the whole point of the stopped sentence, so this one
   // count is read without `runOver`.
   const ranAnyTest = modelResults.some((m) => {
-    const c = benchmarkAnsweredPassFail(m);
-    return !!c && c.answered + c.unanswered > 0;
+    const c = answeredCounts(m.test_results ?? []);
+    return c.answered + c.unanswered > 0;
   });
 
   // Someone stopped the run and it answered nothing: saying it was stopped
@@ -308,7 +307,7 @@ function columnsFromPayload(
       pushRanged(
         ev.dataKey,
         benchmarkRatingEvaluatorCaption(ev.label, ev.scale_min, ev.scale_max),
-        (v) => formatRating(v),
+        formatRating,
         "rating",
       );
     }
@@ -352,13 +351,13 @@ export function BenchmarkCombinedLeaderboard({
   // things: whether the bare "no data" line is the only thing left to show,
   // and whether the table can be left out.
   const counted = modelResults.map((m) =>
-    benchmarkAnsweredPassFail(m, runOver),
+    answeredCounts(m.test_results ?? [], runOver),
   );
   const noteExplainsIt =
     runStopped ||
     failureReason !== null ||
     couldNotRunCount(modelResults) > 0 ||
-    counted.some((c) => (c?.unanswered ?? 0) > 0);
+    counted.some((c) => c.unanswered > 0);
 
   // No table to draw, so the notes are the whole story. A run can have been
   // stopped and have broken, so both are said, and the note about the tests
