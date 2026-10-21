@@ -13,6 +13,8 @@
  * `conversion_rate` (native units per USD) used for that conversion.
  */
 
+import { parseBackendTime } from "@/lib/relativeTime";
+
 export type AudioCostBreakdown = {
   provider?: string;
   pricing_model?: string;
@@ -134,7 +136,7 @@ export function costTiles(source: unknown): CostTile[] {
 /** Date-only format for the caveat (e.g. "15 Jul 2026"). Null on bad/empty input. */
 export function formatCaveatDate(dateString?: string | null): string | null {
   if (!dateString) return null;
-  const d = new Date(dateString.replace(" ", "T"));
+  const d = parseBackendTime(dateString);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString("en-US", {
     day: "numeric",
