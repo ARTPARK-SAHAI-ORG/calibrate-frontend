@@ -41,6 +41,7 @@ jest.mock("../../lib/reportError", () => ({
 jest.mock("../../lib/api", () => ({
   __esModule: true,
   getDefaultHeaders: jest.fn(() => ({})),
+  apiPost: jest.fn(async () => ({})),
 }));
 
 // The run size limit. High by default so existing runs are never blocked;

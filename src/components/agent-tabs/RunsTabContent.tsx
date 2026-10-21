@@ -46,6 +46,7 @@ import {
 import { displayModelName } from "@/lib/modelName";
 import { Link } from "@/lib/nav";
 import { openInPlace } from "@/lib/openInPlace";
+import { parseBackendTime } from "@/lib/relativeTime";
 
 // Which page of results is open, so a reload reopens on the same one instead
 // of resetting to the first. Written with `replaceState` like the other
@@ -650,11 +651,7 @@ export function RunsTabContent({
   const whenText = (run: AgentRun) => {
     const raw = run.created_at;
     if (!raw) return "—";
-    const date = new Date(
-      raw.endsWith("Z") || raw.includes("+")
-        ? raw
-        : raw.replace(" ", "T") + "Z",
-    );
+    const date = parseBackendTime(raw);
     if (Number.isNaN(date.getTime())) return raw;
     return date.toLocaleString(undefined, {
       day: "2-digit",

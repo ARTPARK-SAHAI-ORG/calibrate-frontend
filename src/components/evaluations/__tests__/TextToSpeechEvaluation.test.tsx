@@ -21,6 +21,11 @@ jest.mock("../../../hooks", () => ({
 }));
 
 // ─── MissingProviderKeys ────────────────────────────────────────────────────
+// The run checks the same limit of 20 outside React.
+jest.mock("../../../hooks/useMaxRowsPerEval", () => ({
+  getMaxRowsPerEval: async () => 20,
+}));
+
 let mockUsesOwnKeys = false;
 let mockMissingKeys = new Set<string>();
 const mockSaveMissingKeys = jest.fn();

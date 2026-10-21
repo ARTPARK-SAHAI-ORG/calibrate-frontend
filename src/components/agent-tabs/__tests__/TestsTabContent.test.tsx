@@ -876,7 +876,14 @@ describe("TestsTabContent — paging", () => {
     );
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
-    expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
+    // The only request after the click is the record of the limit being hit.
+    await waitFor(() =>
+      expect(
+        (global.fetch as jest.Mock).mock.calls
+          .slice(callsBefore)
+          .map(([url]) => String(url)),
+      ).toEqual([expect.stringMatching(/\/org-limits\/hits$/)]),
+    );
   });
 
   it("offers every test once the whole page is ticked, and counts them all", async () => {

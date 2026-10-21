@@ -759,6 +759,7 @@ export function BenchmarkDialog({
                   backendAccessToken,
                   (benchmarkTestCount ?? 0) * chosenModels.length,
                   "tests",
+                  "model_comparison",
                 )
               ) {
                 return;

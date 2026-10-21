@@ -599,6 +599,7 @@ export function BenchmarkResultsDialog({
         backendAccessToken,
         testCount * models.length,
         "tests",
+        "model_comparison",
       )
     ) {
       setIsInitialLoading(false);

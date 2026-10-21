@@ -19,7 +19,8 @@ import {
   TTSProvider,
   getTtsApiType,
 } from "../agent-tabs/constants/providers";
-import { LIMITS, showLimitToast, exceedsEvalLimit } from "@/constants/limits";
+import { LIMITS, showLimitToast } from "@/constants/limits";
+import { overEvalLimit } from "@/lib/evalLimit";
 import { listDatasets, Dataset } from "@/lib/datasets";
 import { DatasetPicker } from "./DatasetPicker";
 import { TTSDatasetEditor, TTSDatasetEditorHandle } from "./TTSDatasetEditor";
@@ -388,7 +389,7 @@ export function TextToSpeechEvaluation({
           ? (availableDatasets.find((d) => d.uuid === selectedDatasetId)
               ?.item_count ?? 0)
           : (requestBody.texts as string[]).length;
-      if (exceedsEvalLimit(rowCount, maxRowsPerEval, "rows")) {
+      if (await overEvalLimit(backendAccessToken, rowCount, "rows", "tts")) {
         setIsEvaluating(false);
         return;
       }

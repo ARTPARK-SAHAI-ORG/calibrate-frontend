@@ -139,6 +139,10 @@ describe("landingPathAfterSwitch", () => {
     expect(landingPathAfterSwitch("/tools")).toBe("/tools");
   });
 
+  it("stays on analytics, which covers every workspace", () => {
+    expect(landingPathAfterSwitch("/analytics")).toBe("/analytics");
+  });
+
   it("stays on workspace settings", () => {
     expect(landingPathAfterSwitch("/workspace-settings")).toBe(
       "/workspace-settings",

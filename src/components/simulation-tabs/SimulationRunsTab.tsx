@@ -7,6 +7,7 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { formatStatus, getStatusBadgeClass } from "@/lib/status";
+import { parseBackendTime } from "@/lib/relativeTime";
 
 type Run = {
   uuid: string;
@@ -151,7 +152,7 @@ export function SimulationRunsTab({ simulationUuid }: SimulationRunsTabProps) {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "-";
-    const date = new Date(dateString.replace(" ", "T"));
+    const date = parseBackendTime(dateString);
     if (isNaN(date.getTime())) return "-";
     return date.toLocaleString("en-US", {
       month: "short",
@@ -172,8 +173,8 @@ export function SimulationRunsTab({ simulationUuid }: SimulationRunsTabProps) {
   const sortedRuns = [...runs].sort((a, b) => {
     const dateStrA = a.created_at || a.updated_at || "";
     const dateStrB = b.created_at || b.updated_at || "";
-    const dateA = dateStrA ? new Date(dateStrA.replace(" ", "T")).getTime() : 0;
-    const dateB = dateStrB ? new Date(dateStrB.replace(" ", "T")).getTime() : 0;
+    const dateA = dateStrA ? parseBackendTime(dateStrA).getTime() : 0;
+    const dateB = dateStrB ? parseBackendTime(dateStrB).getTime() : 0;
     // Handle invalid dates by falling back to string comparison
     if (isNaN(dateA) || isNaN(dateB)) {
       return sortOrder === "asc"

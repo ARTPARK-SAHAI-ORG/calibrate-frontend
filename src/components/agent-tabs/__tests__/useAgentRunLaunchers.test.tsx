@@ -146,7 +146,7 @@ describe("useAgentRunLaunchers", () => {
       await hook.result.current.openCompare(tests, false);
     });
     redraw();
-    expect(overEvalLimitMock).toHaveBeenCalledWith("token-1", 2, "tests");
+    expect(overEvalLimitMock).toHaveBeenCalledWith("token-1", 2, "tests", "model_comparison");
     expect(screen.queryByTestId("benchmark-dialog")).toBeNull();
   });
 
@@ -225,7 +225,7 @@ describe("useAgentRunLaunchers", () => {
       await hook.result.current.openCompare(tests, true);
     });
     redraw();
-    expect(overEvalLimitMock).toHaveBeenCalledWith("token-1", 7, "tests");
+    expect(overEvalLimitMock).toHaveBeenCalledWith("token-1", 7, "tests", "model_comparison");
     expect(benchmarkProps?.tests).toEqual([]);
   });
 
@@ -280,7 +280,7 @@ describe("useAgentRunLaunchers", () => {
         await hook.result.current.confirmTestRun(tests, true, "all");
       });
       redraw();
-      expect(overEvalLimitMock).toHaveBeenCalledWith("token-1", 7, "tests");
+      expect(overEvalLimitMock).toHaveBeenCalledWith("token-1", 7, "tests", "test_run");
       expect(screen.getByText("Run every test on this agent")).toBeInTheDocument();
       expect(screen.getByText(/start the evaluation on 7 tests/)).toBeInTheDocument();
       expect(startTestRunOrNotifyMock).not.toHaveBeenCalled();
@@ -306,7 +306,7 @@ describe("useAgentRunLaunchers", () => {
         await hook.result.current.confirmTestRun(tests, false, "bulk");
       });
       redraw();
-      expect(overEvalLimitMock).toHaveBeenCalledWith("token-1", 2, "tests");
+      expect(overEvalLimitMock).toHaveBeenCalledWith("token-1", 2, "tests", "test_run");
       expect(screen.getByText("Run the selected tests")).toBeInTheDocument();
 
       await act(async () => {

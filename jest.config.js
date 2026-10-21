@@ -1,5 +1,10 @@
 const nextJest = require("next/jest");
 
+// Run every test in a zone away from UTC. In UTC, reading a backend time as
+// local time looks the same as reading it as UTC, so that mistake could not
+// be caught. Workers start after this line and inherit it.
+process.env.TZ = "Asia/Kolkata";
+
 const createJestConfig = nextJest({
   // Path to your Next.js app, used to load next.config.ts and .env files
   dir: "./",
