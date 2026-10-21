@@ -16,6 +16,7 @@ export {
   getMaxRowsPerEval,
   useUsesOwnProviderKeys,
 } from "./useMaxRowsPerEval";
+export { useIsSuperadmin } from "./useIsSuperadmin";
 export { useTraces } from "./useTraces";
 export { useAgentTraceScoring } from "./useAgentTraceScoring";
 export { useTraceConversationIds, useTraceLabels } from "./useTraceLabels";

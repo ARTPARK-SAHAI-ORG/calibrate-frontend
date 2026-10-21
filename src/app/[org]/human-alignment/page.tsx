@@ -37,6 +37,7 @@ import { createAnnotator, renameAnnotator } from "@/lib/annotatorApi";
 import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { taskOptionsWithAgreement } from "./taskOptions";
+import { parseBackendTime } from "@/lib/relativeTime";
 
 type Tab = "overview" | "tasks" | "annotators";
 
@@ -141,8 +142,7 @@ function agreementColor(fraction: number | null | undefined): string {
 }
 
 function formatBucketLabel(iso: string, bucket: Bucket): string {
-  // Backend returns "YYYY-MM-DD HH:MM:SS" UTC, no offset suffix.
-  const d = new Date(iso.replace(" ", "T") + "Z");
+  const d = parseBackendTime(iso);
   if (Number.isNaN(d.getTime())) return iso;
   if (bucket === "year") return d.getUTCFullYear().toString();
   return d.toLocaleString("en-US", {

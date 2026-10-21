@@ -17,6 +17,7 @@ let mockWorkspaces: { uuid: string }[] = [{ uuid: "org-1" }];
 let mockWorkspacesLoading = false;
 let mockAccessToken: string | null = "token-1";
 let mockAuthLoading = false;
+let mockIsSuperadmin = false;
 
 jest.mock("../../hooks", () => ({
   __esModule: true,
@@ -26,6 +27,7 @@ jest.mock("../../hooks", () => ({
     isLoading: mockWorkspacesLoading,
   }),
   clearOrgsCache: jest.fn(),
+  useIsSuperadmin: () => mockIsSuperadmin,
 }));
 
 beforeEach(() => {
@@ -33,6 +35,7 @@ beforeEach(() => {
   mockWorkspacesLoading = false;
   mockAccessToken = "token-1";
   mockAuthLoading = false;
+  mockIsSuperadmin = false;
 });
 
 // jsdom has no matchMedia; AppLayout reads it when applying the "device" theme.
@@ -201,6 +204,28 @@ describe("AppLayout", () => {
       "href",
       "/workspace-settings?tab=api-keys",
     );
+  });
+
+  it("offers Analytics in the profile dropdown only to a superadmin", async () => {
+    const user = setupUser();
+    renderLayout();
+    await user.click(screen.getByRole("button", { name: "Open profile menu" }));
+    expect(
+      screen.queryByRole("link", { name: "Analytics" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("links a superadmin to Analytics and closes the menu on click", async () => {
+    mockIsSuperadmin = true;
+    const user = setupUser();
+    renderLayout();
+    await user.click(screen.getByRole("button", { name: "Open profile menu" }));
+    const link = screen.getByRole("link", { name: "Analytics" });
+    expect(link).toHaveAttribute("href", "/analytics");
+    await user.click(link);
+    expect(
+      screen.queryByRole("link", { name: "Analytics" }),
+    ).not.toBeInTheDocument();
   });
 
   it.each(["LLM Tests", "Tools"])(

@@ -1,5 +1,5 @@
 import { getMaxRowsPerEval } from "@/hooks/useMaxRowsPerEval";
-import { exceedsEvalLimit } from "@/constants/limits";
+import { overEvalLimit } from "@/lib/evalLimit";
 
 /**
  * The size check both ways of running evaluators over labelling items go
@@ -14,8 +14,16 @@ export async function evaluatorRunLimitMessage(
   itemCount: number,
   evaluatorCount: number,
 ): Promise<string | null> {
-  const maxRows = await getMaxRowsPerEval(accessToken);
   const total = itemCount * evaluatorCount;
-  if (!exceedsEvalLimit(total, maxRows, "items")) return null;
+  if (
+    !(await overEvalLimit(
+      accessToken,
+      total,
+      "items",
+      "labelling_evaluator_run",
+    ))
+  )
+    return null;
+  const maxRows = await getMaxRowsPerEval(accessToken);
   return `This run would score ${total} items, which is over your limit of ${maxRows}. Pick fewer items or fewer evaluators.`;
 }

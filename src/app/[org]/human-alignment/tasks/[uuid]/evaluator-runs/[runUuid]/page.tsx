@@ -598,7 +598,12 @@ export default function EvaluatorRunDetailPage() {
                           task?.items?.length ||
                           0;
                         if (
-                          await overEvalLimit(accessToken, itemCount, "items")
+                          await overEvalLimit(
+                            accessToken,
+                            itemCount,
+                            "items",
+                            "labelling_evaluator_run",
+                          )
                         ) {
                           return;
                         }

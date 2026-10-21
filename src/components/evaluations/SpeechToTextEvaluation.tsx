@@ -13,7 +13,7 @@ import {
   useEnabledProviders,
   isProviderEnabled,
 } from "@/hooks";
-import { exceedsEvalLimit } from "@/constants/limits";
+import { overEvalLimit } from "@/lib/evalLimit";
 import { toast } from "sonner";
 import {
   sttProviders,
@@ -387,7 +387,7 @@ export function SpeechToTextEvaluation({
           ? (availableDatasets.find((d) => d.uuid === selectedDatasetId)
               ?.item_count ?? 0)
           : (requestBody.texts as string[]).length;
-      if (exceedsEvalLimit(rowCount, maxRowsPerEval, "rows")) {
+      if (await overEvalLimit(backendAccessToken, rowCount, "rows", "stt")) {
         setIsEvaluating(false);
         return;
       }

@@ -10,7 +10,12 @@ import {
 } from "@/components/providers/FloatingButtonProvider";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { requestTour, TOUR_IDS } from "@/lib/onboarding";
-import { clearOrgsCache, useAuth, useOrganizations } from "@/hooks";
+import {
+  clearOrgsCache,
+  useAuth,
+  useIsSuperadmin,
+  useOrganizations,
+} from "@/hooks";
 import { clearActiveOrgUuid } from "@/lib/orgs";
 // Imported straight from the file, not the ui barrel: the barrel pulls in
 // SlidePanel, which imports back from here.
@@ -328,6 +333,7 @@ export function AppLayout({
   // Every page is scoped to the active workspace, so hold the page until the
   // workspace list is in.
   const { accessToken, isLoading: authLoading } = useAuth();
+  const isSuperadmin = useIsSuperadmin();
   const { organizations, isLoading: workspacesLoading } =
     useOrganizations(accessToken);
 
@@ -987,6 +993,31 @@ export function AppLayout({
                       API keys
                     </Link>
                   </div>
+
+                  {isSuperadmin && (
+                    <div className="p-2 border-b border-border">
+                      <Link
+                        href="/analytics"
+                        onClick={() => setProfileOpen(false)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"
+                          />
+                        </svg>
+                        Analytics
+                      </Link>
+                    </div>
+                  )}
 
                   {/* Take a tour — desktop-only, so hidden on phones. */}
                   <div className="p-2 border-b border-border hidden md:block">

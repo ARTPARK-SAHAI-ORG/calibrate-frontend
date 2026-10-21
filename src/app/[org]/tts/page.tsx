@@ -23,6 +23,7 @@ import {
 } from "@/components/eval-jobs/JobDeleteControls";
 import { useDatasetManagement, useJobDeletion } from "@/hooks";
 import { EvaluatorLibraryPanel } from "@/components/evaluations/EvaluatorLibraryPanel";
+import { parseBackendTime } from "@/lib/relativeTime";
 
 type TTSJob = {
   uuid: string;
@@ -147,7 +148,7 @@ function TTSPageInner() {
 
   const formatDate = (dateString: string): string => {
     try {
-      const date = new Date(dateString.replace(" ", "T"));
+      const date = parseBackendTime(dateString);
       return date.toLocaleString("en-US", {
         month: "short",
         day: "numeric",
@@ -185,8 +186,8 @@ function TTSPageInner() {
 
   // Sort jobs by created_at
   const sortedJobs = [...validatedJobs].sort((a, b) => {
-    const dateA = new Date((a.created_at || "").replace(" ", "T")).getTime();
-    const dateB = new Date((b.created_at || "").replace(" ", "T")).getTime();
+    const dateA = parseBackendTime(a.created_at || "").getTime();
+    const dateB = parseBackendTime(b.created_at || "").getTime();
     if (isNaN(dateA) || isNaN(dateB)) {
       return sortOrder === "asc"
         ? (a.created_at || "").localeCompare(b.created_at || "")

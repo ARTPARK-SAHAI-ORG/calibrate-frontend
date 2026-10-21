@@ -1714,7 +1714,14 @@ export function TestsTabContent({
   const runSelected = async () => {
     // `selectedTestCount` is already known: check it before resolving the
     // selection.
-    if (await overEvalLimit(backendAccessToken, selectedTestCount, "tests")) {
+    if (
+      await overEvalLimit(
+        backendAccessToken,
+        selectedTestCount,
+        "tests",
+        "test_run",
+      )
+    ) {
       return;
     }
     const { tests, allLinked } = await selectedTestsForAction();
@@ -1723,7 +1730,14 @@ export function TestsTabContent({
     await confirmTestRun(tests, allLinked, "bulk");
   };
   const compareSelected = async () => {
-    if (await overEvalLimit(backendAccessToken, selectedTestCount, "tests")) {
+    if (
+      await overEvalLimit(
+        backendAccessToken,
+        selectedTestCount,
+        "tests",
+        "model_comparison",
+      )
+    ) {
       return;
     }
     const { tests, allLinked } = await selectedTestsForAction();

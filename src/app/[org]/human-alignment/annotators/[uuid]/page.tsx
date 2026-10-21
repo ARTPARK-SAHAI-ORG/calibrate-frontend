@@ -34,6 +34,7 @@ import { useAccessToken, usePageErrorState } from "@/hooks";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
+import { parseBackendTime } from "@/lib/relativeTime";
 
 type Tab = "overview" | "jobs";
 
@@ -94,7 +95,7 @@ const DEFAULT_BUCKET: Bucket = "month";
 const DEFAULT_DAYS = 365;
 
 function formatBucketLabel(iso: string, bucket: Bucket): string {
-  const d = new Date(iso.replace(" ", "T") + "Z");
+  const d = parseBackendTime(iso);
   if (Number.isNaN(d.getTime())) return iso;
   if (bucket === "year") return d.getUTCFullYear().toString();
   return d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
