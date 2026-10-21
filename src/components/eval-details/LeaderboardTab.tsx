@@ -1,12 +1,11 @@
 import React from "react";
 import { LeaderboardBarChart, getColorMap } from "@/components/charts/LeaderboardBarChart";
-import { DownloadableTable } from "@/components/DownloadableTable";
+import {
+  DownloadableTable,
+  type TableColumn,
+} from "@/components/DownloadableTable";
 
-export type LeaderboardColumn = {
-  key: string;
-  header: string;
-  render?: (value: any, row: Record<string, unknown>) => React.ReactNode;
-};
+export type LeaderboardColumn = TableColumn;
 
 export type ChartConfig = {
   title: string;

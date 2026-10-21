@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent, setupUser } from "@/test-utils";
+import { render, screen, fireEvent, setupUser, waitFor } from "@/test-utils";
 import {
   LeaderboardBarChart,
   pastelColors,
@@ -160,6 +160,37 @@ describe("LeaderboardBarChart", () => {
 
     const plain = render(<LeaderboardBarChart title="Plain" data={sampleData} />);
     expect(plain.container.querySelector(".recharts-errorBar")).toBeNull();
+  });
+
+  it("moves the value labels off the range line only when ranges are drawn", async () => {
+    // The labels are drawn once the bars finish growing.
+    const anchors = async (container: HTMLElement) => {
+      await waitFor(() =>
+        expect(
+          container.querySelector(".recharts-label-list text"),
+        ).not.toBeNull(),
+      );
+      return Array.from(
+        container.querySelectorAll(".recharts-label-list text"),
+      ).map((t) => [t.getAttribute("text-anchor"), Number(t.getAttribute("x"))]);
+    };
+
+    const ranged = render(
+      <LeaderboardBarChart
+        title="Ranged"
+        data={[{ label: "Alpha", value: 50, range: { low: 40, high: 70 } }]}
+      />,
+    );
+    const [[rangedAnchor, rangedX]] = await anchors(ranged.container);
+    ranged.unmount();
+
+    const plain = render(
+      <LeaderboardBarChart title="Plain" data={[{ label: "Alpha", value: 50 }]} />,
+    );
+    const [[plainAnchor, plainX]] = await anchors(plain.container);
+    expect(plainAnchor).toBe("middle");
+    expect(rangedAnchor).toBe("start");
+    expect(rangedX).toBe((plainX as number) + 5);
   });
 
   it("renders with empty data without crashing", () => {

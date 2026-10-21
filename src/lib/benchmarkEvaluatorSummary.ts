@@ -187,9 +187,10 @@ export function benchmarkEvaluatorColumnKey(metric_key: string): string {
   return `ev_${safe}`;
 }
 
-/** The row key holding the likely range for the value under `dataKey`. */
+/** The row key holding the likely range for the value under `dataKey`. The
+ * colon keeps it apart from every evaluator column, which never has one. */
 export function benchmarkRangeKey(dataKey: string): string {
-  return `${dataKey}_ci`;
+  return `range:${dataKey}`;
 }
 
 /** Collect ordered metric keys from first-seen order across models. */
@@ -279,15 +280,15 @@ export function buildBenchmarkCombinedLeaderboardPayload(
   leaderboardSummary: BenchmarkLeaderboardSummaryRow[] | undefined,
   modelResults: BenchmarkModelLike[],
   benchmarkScoreLabel: string,
-  countFromRows = false,
+  runOver = false,
 ): BenchmarkCombinedLeaderboardPayload | null {
   const keys = benchmarkMetricKeyOrder(modelResults);
   // A run that did not finish normally, because it broke or someone stopped
   // it, has no summary from the backend, so count the tests each model did
   // finish, the same numbers the table works out anyway.
-  if (countFromRows && !leaderboardSummary?.length) {
+  if (runOver && !leaderboardSummary?.length) {
     leaderboardSummary = modelResults.flatMap((m) => {
-      const c = benchmarkAnsweredPassFail(m);
+      const c = benchmarkAnsweredPassFail(m, runOver);
       if (!c || c.answered === 0) return [];
       return [
         {
@@ -355,8 +356,9 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     if (lbRow) {
       // The backend counts a test that never answered as a failure. Work the
       // pass rate out from the cases instead, so it covers only the tests the
-      // model actually answered, and matches the single-run summary.
-      const answered = mr ? benchmarkAnsweredPassFail(mr) : null;
+      // model actually answered, and matches the single-run summary. Once the
+      // run is over, a row with no verdict never answered either.
+      const answered = mr ? benchmarkAnsweredPassFail(mr, runOver) : null;
       if (answered && answered.unanswered > 0) {
         row.passed = String(answered.passed);
         row.total = String(answered.answered);

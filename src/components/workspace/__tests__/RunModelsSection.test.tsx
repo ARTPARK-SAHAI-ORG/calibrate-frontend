@@ -34,7 +34,7 @@ describe("RunModelsSection", () => {
     expect(rangesSwitch()).toHaveAttribute("aria-checked", "false");
     expect(
       screen.getByText(
-        "Under each pass rate and score, show the range the true value is likely to fall in 95% of the time",
+        "Show a likely range under each pass rate and score, on single test runs and comparisons. The real pass rate falls inside this range 95% of the time.",
       ),
     ).toBeInTheDocument();
   });

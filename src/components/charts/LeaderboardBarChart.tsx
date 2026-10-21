@@ -202,6 +202,10 @@ export function LeaderboardBarChart({
                 position="top"
                 formatter={formatBarLabel}
                 style={{ fontSize: 11, fill: "currentColor" }}
+                // The range line runs up the middle of the bar, so the label
+                // starts just past its end caps instead of across it.
+                textAnchor={hasRanges ? "start" : undefined}
+                dx={hasRanges ? 5 : undefined}
               />
               {hasRanges && (
                 <ErrorBar

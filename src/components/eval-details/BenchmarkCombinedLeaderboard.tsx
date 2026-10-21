@@ -11,6 +11,7 @@ import {
   benchmarkRangeKey,
   benchmarkRatingEvaluatorCaption,
   likelyRangeText,
+  type LikelyRange,
   type BenchmarkCombinedLeaderboardPayload,
   type BenchmarkModelLike,
 } from "@/lib/benchmarkEvaluatorSummary";
@@ -220,8 +221,6 @@ function columnsFromPayload(
   benchmarkScoreLabel: string,
   showRanges: boolean,
 ): LeaderboardColumn[] {
-  const rangeOf = (dataKey: string, scale: "percent" | "rating") =>
-    showRanges ? { key: benchmarkRangeKey(dataKey), scale } : undefined;
   const cols: LeaderboardColumn[] = [
     {
       key: "model",
@@ -229,6 +228,33 @@ function columnsFromPayload(
       render: (v) => formatModelName(String(v)),
     },
   ];
+  // A column with a likely range under each value. With ranges shown, the CSV
+  // also gets the range as two columns of its own.
+  const pushRanged = (
+    key: string,
+    header: string,
+    format: (v: number) => string,
+    scale: "percent" | "rating",
+  ) => {
+    const rangeKey = benchmarkRangeKey(key);
+    cols.push({
+      key,
+      header,
+      render: numberCell(
+        format,
+        showRanges ? { key: rangeKey, scale } : undefined,
+      ),
+    });
+    if (!showRanges) return;
+    for (const end of ["low", "high"] as const) {
+      cols.push({
+        key: `${rangeKey}:${end}`,
+        header: `${header} likely range ${end}`,
+        csvOnlyValue: (row) =>
+          (row[rangeKey] as Partial<LikelyRange> | null | undefined)?.[end],
+      });
+    }
+  };
 
   if (payload.plan.showPassedTotal) {
     cols.push(
@@ -238,11 +264,7 @@ function columnsFromPayload(
   }
 
   if (payload.plan.showOverallPassRate) {
-    cols.push({
-      key: "pass_rate",
-      header: benchmarkScoreLabel,
-      render: numberCell(formatPercent, rangeOf("pass_rate", "percent")),
-    });
+    pushRanged("pass_rate", benchmarkScoreLabel, formatPercent, "percent");
   }
 
   if (payload.plan.showLatency) {
@@ -280,16 +302,16 @@ function columnsFromPayload(
   }
 
   for (const ev of payload.plan.evaluators) {
-    const binary = ev.type === "binary";
-    cols.push({
-      key: ev.dataKey,
-      header: binary
-        ? ev.label
-        : benchmarkRatingEvaluatorCaption(ev.label, ev.scale_min, ev.scale_max),
-      render: binary
-        ? numberCell(formatPercent, rangeOf(ev.dataKey, "percent"))
-        : numberCell((v) => formatRating(v), rangeOf(ev.dataKey, "rating")),
-    });
+    if (ev.type === "binary") {
+      pushRanged(ev.dataKey, ev.label, formatPercent, "percent");
+    } else {
+      pushRanged(
+        ev.dataKey,
+        benchmarkRatingEvaluatorCaption(ev.label, ev.scale_min, ev.scale_max),
+        (v) => formatRating(v),
+        "rating",
+      );
+    }
   }
 
   return cols;

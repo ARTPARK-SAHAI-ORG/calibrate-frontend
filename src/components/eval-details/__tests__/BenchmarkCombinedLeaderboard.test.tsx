@@ -921,6 +921,76 @@ describe("likely ranges on the leaderboard", () => {
     ).toBeInTheDocument();
   });
 
+  async function downloadedCsv(): Promise<string[]> {
+    URL.createObjectURL ??= () => "";
+    URL.revokeObjectURL ??= () => {};
+    const create = jest
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:mock-url");
+    jest.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    jest
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+    await setupUser().click(
+      screen.getByRole("button", { name: "Download CSV" }),
+    );
+    const blob = create.mock.calls[0][0] as Blob;
+    jest.restoreAllMocks();
+    const text = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsText(blob);
+    });
+    return text.split("\n");
+  }
+
+  it("adds each likely range to the CSV as two columns when ranges are shown", async () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={leaderboardSummary}
+        modelResults={modelResults}
+        filename="bench"
+        likelyRanges
+      />,
+    );
+    expect(
+      screen.queryByText("Test pass rate (%) likely range low"),
+    ).not.toBeInTheDocument();
+    expect(await downloadedCsv()).toEqual([
+      [
+        "Model",
+        "Passed",
+        "Total",
+        "Test pass rate (%)",
+        "Test pass rate (%) likely range low",
+        "Test pass rate (%) likely range high",
+        "Correctness",
+        "Correctness likely range low",
+        "Correctness likely range high",
+        "Helpfulness (1\u20135)",
+        "Helpfulness (1\u20135) likely range low",
+        "Helpfulness (1\u20135) likely range high",
+      ].join(","),
+      // The rating has no range, so its two cells are blank.
+      "m1,19,20,95,76.4,99.1,75,53.1,88.8,4,,",
+    ]);
+  });
+
+  it("leaves the CSV without ranges when they are hidden", async () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={leaderboardSummary}
+        modelResults={modelResults}
+        filename="bench"
+        likelyRanges={false}
+      />,
+    );
+    expect(await downloadedCsv()).toEqual([
+      "Model,Passed,Total,Test pass rate (%),Correctness,Helpfulness (1\u20135)",
+      "m1,19,20,95,75,4",
+    ]);
+  });
+
   it("shows neither the ranges nor the line on the shared page", () => {
     render(
       <BenchmarkCombinedLeaderboard

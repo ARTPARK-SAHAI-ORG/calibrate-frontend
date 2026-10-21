@@ -638,18 +638,41 @@ describe("buildBenchmarkCombinedLeaderboardPayload with likely ranges", () => {
     )!;
     expect(result.rows[0]).toMatchObject({
       pass_rate: 80,
-      pass_rate_ci: { low: 50, high: 95 },
+      "range:pass_rate": { low: 50, high: 95 },
       ev_c: 75,
-      ev_c_ci: { low: 30, high: 95 },
+      "range:ev_c": { low: 30, high: 95 },
       ev_r: 4,
-      ev_r_ci: undefined,
+      "range:ev_r": undefined,
     });
     const charts = result.chartRows.flat();
     expect(charts.find((c) => c.dataKey === "pass_rate")?.rangeKey).toBe(
-      "pass_rate_ci",
+      "range:pass_rate",
     );
-    expect(charts.find((c) => c.dataKey === "ev_c")?.rangeKey).toBe("ev_c_ci");
-    expect(charts.find((c) => c.dataKey === "ev_r")?.rangeKey).toBe("ev_r_ci");
+    expect(charts.find((c) => c.dataKey === "ev_c")?.rangeKey).toBe(
+      "range:ev_c",
+    );
+    expect(charts.find((c) => c.dataKey === "ev_r")?.rangeKey).toBe(
+      "range:ev_r",
+    );
+  });
+
+  it("keeps an evaluator named like another's range apart from that range", () => {
+    const entry = (metric_key: string, pass_rate: number) => ({
+      metric_key,
+      type: "binary" as const,
+      passed: 1,
+      total: 2,
+      pass_rate,
+      ci: { low: 10, high: 90 },
+    });
+    const row = buildBenchmarkCombinedLeaderboardPayload(
+      summary,
+      [{ model: "m1", evaluator_summary: [entry("x", 50), entry("x ci", 60)] }],
+      "Score",
+    )!.rows[0];
+    expect(row.ev_x).toBe(50);
+    expect(row.ev_x_ci).toBe(60);
+    expect(row["range:ev_x"]).toEqual({ low: 10, high: 90 });
   });
 
   it("keeps the summary's pass rate when the backend sends none", () => {
@@ -659,7 +682,30 @@ describe("buildBenchmarkCombinedLeaderboardPayload with likely ranges", () => {
       "Score",
     )!;
     expect(result.rows[0].pass_rate).toBe(75);
-    expect(result.rows[0].pass_rate_ci).toBeUndefined();
+    expect(result.rows[0]["range:pass_rate"]).toBeUndefined();
+  });
+
+  // Before calibrate 0.0.74 a test that timed out came back with no verdict
+  // and no `unanswered` mark, and its leaderboard row counted it as a failure.
+  it("shows the counts the backend's pass rate covers on an older finished run", () => {
+    const test_results = [
+      ...Array.from({ length: 15 }, () => ({ passed: true })),
+      { passed: false },
+      ...Array.from({ length: 4 }, () => ({ passed: null })),
+    ];
+    const build = (runOver: boolean) =>
+      buildBenchmarkCombinedLeaderboardPayload(
+        [{ model: "m1", passed: "15", total: "20", pass_rate: "75" }],
+        [{ model: "m1", pass_rate: 93.75, test_results }],
+        "Score",
+        runOver,
+      )!.rows[0];
+    expect(build(true)).toMatchObject({
+      passed: "15",
+      total: "16",
+      pass_rate: 93.75,
+    });
+    expect(build(false)).toMatchObject({ passed: "15", total: "20" });
   });
 });
 

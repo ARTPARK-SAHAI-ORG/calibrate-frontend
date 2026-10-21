@@ -111,8 +111,9 @@ export function RunModelsSection({ org }: { org: Organization }) {
             Show likely ranges
           </p>
           <p className="text-sm text-muted-foreground">
-            Under each pass rate and score, show the range the true value is
-            likely to fall in 95% of the time
+            Show a likely range under each pass rate and score, on single test
+            runs and comparisons. The real pass rate falls inside this range
+            95% of the time.
           </p>
         </div>
       </div>
