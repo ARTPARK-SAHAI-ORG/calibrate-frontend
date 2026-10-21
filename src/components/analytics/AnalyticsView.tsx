@@ -26,10 +26,16 @@ import {
 import { ActivityChart } from "./ActivityChart";
 import { WorkspacesTable } from "./WorkspacesTable";
 import { FailuresList, LimitHitsList } from "./EventLists";
+import { SuperadminsSection } from "./SuperadminsSection";
 
 const CARD = "border rounded-xl p-4 bg-muted/10";
 const DATE_INPUT =
   "h-10 px-3 rounded-md text-[13px] border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer";
+
+const TABS = [
+  { id: "usage", label: "Usage" },
+  { id: "superadmins", label: "Superadmins" },
+] as const;
 
 type Range = { start?: string; end?: string } | { error: string };
 
@@ -65,6 +71,7 @@ export function AnalyticsView({ accessToken }: { accessToken: string | null }) {
   );
   const [forbidden, setForbidden] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("usage");
 
   const range = resolveRange(preset, customStart, customEnd, today);
   const rangeError = "error" in range ? range.error : null;
@@ -107,7 +114,7 @@ export function AnalyticsView({ accessToken }: { accessToken: string | null }) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center px-4">
         <h1 className="text-xl md:text-2xl font-semibold text-foreground">
-          This page is only for the Calibrate admin
+          This page is only for Calibrate superadmins
         </h1>
         <Link
           href={HOME_PATH}
@@ -123,7 +130,30 @@ export function AnalyticsView({ accessToken }: { accessToken: string | null }) {
     <div className="space-y-6">
       <h1 className="text-xl md:text-2xl font-semibold">Analytics</h1>
 
-      {!data && loading ? (
+      <div className="flex items-center gap-4 md:gap-6 border-b border-border overflow-x-auto hide-scrollbar">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`pb-2 text-sm md:text-base font-medium transition-colors cursor-pointer whitespace-nowrap ${
+              tab === t.id
+                ? "text-foreground border-b-2 border-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "superadmins" ? (
+        accessToken && (
+          <div className="max-w-2xl">
+            <SuperadminsSection accessToken={accessToken} />
+          </div>
+        )
+      ) : !data && loading ? (
         <LoadingState />
       ) : !data && error ? (
         <ErrorState message={error} onRetry={() => setReloadKey((k) => k + 1)} />
