@@ -467,6 +467,49 @@ describe("AnnotationJobView", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 
+  it("shows 'Update', not 'Mark as complete', when an answer on the last finished item changes", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        jobResponse({
+          items: [items[0]],
+          annotations: [
+            {
+              uuid: "a1",
+              job_id: "job-1",
+              item_id: "item-1",
+              evaluator_id: "ev-1",
+              value: { value: true },
+              created_at: "",
+              updated_at: "",
+            },
+            {
+              uuid: "a2",
+              job_id: "job-1",
+              item_id: "item-1",
+              evaluator_id: "ev-2",
+              value: { value: 4 },
+              created_at: "",
+              updated_at: "",
+            },
+          ],
+        }),
+      ),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Update" }),
+      ).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "3" }));
+    expect(screen.getByRole("button", { name: "Update" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Mark as complete" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("only sends a changed item comment, not an unchanged one", async () => {
     const user = setupUser();
     fetchMock.mockResolvedValueOnce(
