@@ -2,28 +2,17 @@
 
 import { useState } from "react";
 import type { AnalyticsWorkspaceRow } from "@/lib/analyticsApi";
-import { formatCost, formatCount, formatWhen } from "./format";
+import { CARD_GROUPS, formatCost, formatCount, formatWhen } from "./format";
 
 type Key = keyof AnalyticsWorkspaceRow;
 
+// The same counts, labels and order as the cards above the table.
 const COLUMNS: { key: Key; label: string }[] = [
   { key: "name", label: "Workspace" },
   { key: "members", label: "Members" },
-  { key: "evaluations", label: "All evaluations" },
-  { key: "failed_evaluations", label: "Failed evaluations" },
-  { key: "test_runs", label: "Test runs" },
-  { key: "model_comparisons", label: "Model comparisons" },
-  { key: "simulations", label: "Simulations" },
-  { key: "stt", label: "Speech to text" },
-  { key: "tts", label: "Text to speech" },
-  { key: "labelling_evaluator_runs", label: "Evaluator runs on labelling items" },
-  { key: "cost", label: "Cost" },
-  { key: "traces_received", label: "Traces received" },
-  { key: "traces_scored", label: "Traces scored" },
-  { key: "labelling_jobs_finished", label: "Labelling jobs finished" },
-  { key: "labels_collected", label: "Labels collected" },
-  { key: "items_labelled", label: "Items labelled" },
-  { key: "limit_hits", label: "Limit hits" },
+  // Every group after the first (new users, active workspaces) is a count
+  // each workspace row carries too.
+  ...(CARD_GROUPS.slice(1).flatMap((group) => group.cards) as { key: Key; label: string }[]),
   { key: "last_active_at", label: "Last active" },
 ];
 

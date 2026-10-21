@@ -1,5 +1,5 @@
 import { apiGet } from "../../../lib/api";
-import { fetchAnalytics, isForbiddenError } from "../../../lib/analyticsApi";
+import { fetchAnalytics } from "../../../lib/analyticsApi";
 
 jest.mock("../../../lib/api", () => ({ apiGet: jest.fn() }));
 
@@ -13,8 +13,3 @@ it("asks for the dates and the time zone, leaving out a missing start", async ()
   expect(apiGet).toHaveBeenLastCalledWith("/admin/analytics?end=2026-10-19&tz_offset_minutes=0", "tok");
 });
 
-it("recognises a refusal", () => {
-  expect(isForbiddenError(new Error("Request failed: 403 - no"))).toBe(true);
-  expect(isForbiddenError(new Error("Request failed: 500 - no"))).toBe(false);
-  expect(isForbiddenError("Request failed: 403")).toBe(false);
-});

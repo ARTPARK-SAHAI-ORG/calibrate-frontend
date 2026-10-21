@@ -1,4 +1,4 @@
-import type { AnalyticsKind, AnalyticsLimitName } from "@/lib/analyticsApi";
+import type { AnalyticsActivity, AnalyticsKind, AnalyticsLimitName } from "@/lib/analyticsApi";
 
 export const KIND_LABELS: Record<AnalyticsKind, string> = {
   test_run: "Test run",
@@ -98,3 +98,46 @@ export function percentChange(current: number, previous: number): number | null 
   if (!previous) return null;
   return Math.round(((current - previous) / previous) * 100);
 }
+
+export type CardSpec = {
+  key: keyof AnalyticsActivity;
+  label: string;
+  /** More of this is bad news, so a rise reads red. */
+  higherIsWorse?: boolean;
+  note?: string;
+};
+
+export const CARD_GROUPS: { label: string; cards: CardSpec[] }[] = [
+  {
+    label: "Users",
+    cards: [
+      { key: "new_users", label: "New users" },
+      { key: "active_workspaces", label: "Active workspaces" },
+    ],
+  },
+  {
+    label: "Evaluations",
+    cards: [
+      { key: "evaluations", label: "All evaluations" },
+      { key: "failed_evaluations", label: "Failed evaluations", higherIsWorse: true },
+      { key: "test_runs", label: "Test runs" },
+      { key: "model_comparisons", label: "Model comparisons" },
+      { key: "simulations", label: "Simulations" },
+      { key: "stt", label: "Speech to text" },
+      { key: "tts", label: "Text to speech" },
+      { key: "labelling_evaluator_runs", label: "Evaluator runs on labelling items" },
+      { key: "cost", label: "Cost", note: "Test runs and model comparisons only" },
+    ],
+  },
+  {
+    label: "Traces and labelling",
+    cards: [
+      { key: "traces_received", label: "Traces received" },
+      { key: "traces_scored", label: "Traces scored" },
+      { key: "labelling_jobs_finished", label: "Labelling jobs finished" },
+      { key: "labels_collected", label: "Labels collected" },
+      { key: "items_labelled", label: "Items labelled" },
+    ],
+  },
+  { label: "Limits", cards: [{ key: "limit_hits", label: "Limit hits", higherIsWorse: true }] },
+];

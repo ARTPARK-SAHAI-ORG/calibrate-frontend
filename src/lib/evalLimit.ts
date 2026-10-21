@@ -2,14 +2,10 @@ import { getMaxRowsPerEval } from "@/hooks/useMaxRowsPerEval";
 import { exceedsEvalLimit } from "@/constants/limits";
 import { apiPost } from "@/lib/api";
 import { reportError } from "@/lib/reportError";
+import type { AnalyticsKind } from "@/lib/analyticsApi";
 
 /** What kind of run hit the limit, as `POST /org-limits/hits` names it. */
-export type EvalKind =
-  | "test_run"
-  | "model_comparison"
-  | "stt"
-  | "tts"
-  | "labelling_evaluator_run";
+export type EvalKind = Exclude<AnalyticsKind, "simulation" | "trace_scoring" | "trace">;
 
 /**
  * The one way to ask "is this run too big to start?".

@@ -47,6 +47,7 @@ const PUBLIC_PREFIXES = [
 export const SECTION_LIST_PAGES = new Set([
   "agent-evaluators",
   "agents",
+  "analytics",
   "evaluators",
   "human-alignment",
   "personas",
@@ -124,7 +125,5 @@ export function withWorkspace(path: string, org: string | null): string {
 export function landingPathAfterSwitch(path: string): string {
   const section = path.split("/")[1] ?? "";
   if (section === "workspace-settings") return "/workspace-settings";
-  // Analytics covers every workspace, so switching does not change the page.
-  if (section === "analytics") return "/analytics";
   return SECTION_LIST_PAGES.has(section) ? `/${section}` : HOME_PATH;
 }

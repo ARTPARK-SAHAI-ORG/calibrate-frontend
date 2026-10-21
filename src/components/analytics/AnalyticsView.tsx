@@ -4,16 +4,17 @@ import { useEffect, useState } from "react";
 import { Link } from "@/lib/nav";
 import { HOME_PATH } from "@/lib/routes";
 import { reportError } from "@/lib/reportError";
+import { getErrorStatusCode } from "@/lib/parseBackendError";
 import { ErrorState, LoadingState } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 import {
   fetchAnalytics,
-  isForbiddenError,
-  type AnalyticsActivity,
   type AnalyticsResponse,
 } from "@/lib/analyticsApi";
 import {
+  CARD_GROUPS,
   RANGE_OPTIONS,
+  type CardSpec,
   daysAgoStart,
   formatCost,
   formatCount,
@@ -25,49 +26,6 @@ import {
 import { ActivityChart } from "./ActivityChart";
 import { WorkspacesTable } from "./WorkspacesTable";
 import { FailuresList, LimitHitsList } from "./EventLists";
-
-type CardSpec = {
-  key: keyof AnalyticsActivity;
-  label: string;
-  /** More of this is bad news, so a rise reads red. */
-  higherIsWorse?: boolean;
-  note?: string;
-};
-
-const CARD_GROUPS: { label: string; cards: CardSpec[] }[] = [
-  {
-    label: "Users",
-    cards: [
-      { key: "new_users", label: "New users" },
-      { key: "active_workspaces", label: "Active workspaces" },
-    ],
-  },
-  {
-    label: "Evaluations",
-    cards: [
-      { key: "evaluations", label: "All evaluations" },
-      { key: "failed_evaluations", label: "Failed evaluations", higherIsWorse: true },
-      { key: "test_runs", label: "Test runs" },
-      { key: "model_comparisons", label: "Model comparisons" },
-      { key: "simulations", label: "Simulations" },
-      { key: "stt", label: "Speech to text" },
-      { key: "tts", label: "Text to speech" },
-      { key: "labelling_evaluator_runs", label: "Evaluator runs on labelling items" },
-      { key: "cost", label: "Cost", note: "Test runs and model comparisons only" },
-    ],
-  },
-  {
-    label: "Traces and labelling",
-    cards: [
-      { key: "traces_received", label: "Traces received" },
-      { key: "traces_scored", label: "Traces scored" },
-      { key: "labelling_jobs_finished", label: "Labelling jobs finished" },
-      { key: "labels_collected", label: "Labels collected" },
-      { key: "items_labelled", label: "Items labelled" },
-    ],
-  },
-  { label: "Limits", cards: [{ key: "limit_hits", label: "Limit hits", higherIsWorse: true }] },
-];
 
 const CARD = "border rounded-xl p-4 bg-muted/10";
 const DATE_INPUT =
@@ -131,7 +89,7 @@ export function AnalyticsView({ accessToken }: { accessToken: string | null }) {
       })
       .catch((err) => {
         if (cancelled) return;
-        if (isForbiddenError(err)) {
+        if (getErrorStatusCode(err) === 403) {
           setForbidden(true);
           return;
         }

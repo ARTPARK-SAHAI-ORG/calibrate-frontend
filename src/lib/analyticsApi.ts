@@ -115,8 +115,3 @@ export async function fetchAnalytics(
   params.set("tz_offset_minutes", String(tzOffsetMinutes));
   return apiGet<AnalyticsResponse>(`/admin/analytics?${params}`, accessToken);
 }
-
-/** True when the request was refused because the reader is not the admin. */
-export function isForbiddenError(error: unknown): boolean {
-  return error instanceof Error && error.message.startsWith("Request failed: 403");
-}
