@@ -1,5 +1,6 @@
 ## October 2026
 
+- Add and remove superadmins from the Analytics page ([#739](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/739))
 - The Calibrate admin can now open an Analytics page from the profile menu to see usage across every workspace, failed evaluations and the runs that were refused for being over the limit ([#737](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/737))
 - The Learn page now shows the recording and slides of the IndiaFOSS 2026 talk under the Calibrate tutorial, and the Calibrate at IndiaFOSS blog post ends with the same recording and slides ([#730](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/730))
 - A short message in a trace's Scores box, such as "No evaluators could score this trace", no longer ends with a full stop ([#725](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/725))
