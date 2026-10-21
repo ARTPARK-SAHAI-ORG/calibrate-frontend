@@ -11,7 +11,7 @@ const message = {
   title:
     "Use Tooltip from src/components/Tooltip.tsx for hover text, not the browser's title attribute.",
   routerPush:
-    "Use Link from @/lib/nav so the page can be opened in a new tab, not router.push in onClick.",
+    "Use Link from @/lib/nav so the page can be opened in a new tab, not router.push or router.replace in onClick.",
   fetch:
     "Use apiClient from src/lib/api.ts for backend requests, not a hand-written fetch.",
   useSession:
@@ -30,15 +30,25 @@ const restrictedSyntax = [
   },
   {
     selector:
-      "JSXAttribute[name.name='onClick'] CallExpression[callee.object.name='router'][callee.property.name='push']",
+      "JSXAttribute[name.name='onClick'] CallExpression[callee.object.name='router'][callee.property.name=/^(push|replace)$/]",
     message: message.routerPush,
   },
-  {
-    selector:
-      "CallExpression[callee.name='fetch'], CallExpression[callee.object.name='window'][callee.property.name='fetch']",
-    message: message.fetch,
-  },
 ];
+
+// fetch has rules of its own, so the counts of old breaks in
+// eslint-reuse-suppressions.json cannot let a new fetch stand in for an old
+// title, or the other way round.
+const fetchRules = {
+  "no-restricted-globals": ["error", { name: "fetch", message: message.fetch }],
+  "no-restricted-properties": [
+    "error",
+    ...["window", "globalThis", "self"].map((object) => ({
+      object,
+      property: "fetch",
+      message: message.fetch,
+    })),
+  ],
+};
 
 export default [
   // Only the parser and plugins from Next's config, none of its rules. The
@@ -50,6 +60,7 @@ export default [
     ignores: ["**/__tests__/**", "**/*.test.*", "**/*.spec.*"],
     rules: {
       "no-restricted-syntax": restrictedSyntax,
+      ...fetchRules,
       "no-console": ["error"],
       "no-restricted-imports": [
         "error",
@@ -73,10 +84,6 @@ export default [
   },
   {
     files: ["src/lib/api.ts"],
-    rules: {
-      "no-restricted-syntax": restrictedSyntax.filter(
-        (r) => r === "error" || r.message !== message.fetch,
-      ),
-    },
+    rules: { "no-restricted-globals": "off", "no-restricted-properties": "off" },
   },
 ];

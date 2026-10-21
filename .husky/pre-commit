@@ -23,7 +23,7 @@ fi
 staged_src=$(git diff --cached --name-only --diff-filter=ACMR -- 'src/*.ts' 'src/*.tsx')
 if [ -n "$staged_src" ]; then
   printf '%s\n' "$staged_src" | xargs npm run lint:reuse --silent --
-  npm run check:duplication --silent
+  npm run check:duplication --silent -- --staged
 fi
 
 npm run build

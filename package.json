@@ -19,7 +19,7 @@
     "test:e2e:integration:coverage": "scripts/e2e-fake-backend.sh npm run test:e2e:authenticated:coverage",
     "test:e2e:authenticated": "playwright test --project=authenticated --workers=1",
     "test:e2e:authenticated:coverage": "E2E_COVERAGE=1 playwright test --project=authenticated --workers=1 && node scripts/clean-e2e-lcov.mjs",
-    "lint:reuse": "eslint -c eslint.reuse.config.mjs --suppressions-location eslint-reuse-suppressions.json --pass-on-unpruned-suppressions",
+    "lint:reuse": "eslint -c eslint.reuse.config.mjs --suppressions-location eslint-reuse-suppressions.json",
     "check:duplication": "node scripts/check-duplication.mjs"
   },
   "dependencies": {
