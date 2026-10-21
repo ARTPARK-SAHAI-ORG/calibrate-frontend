@@ -36,6 +36,8 @@ const PUBLIC_PREFIXES = [
   "/docs",
   "/debug",
   "/about",
+  // Signed in, but covers every workspace, so it names none.
+  "/analytics",
 ];
 
 /**
@@ -47,7 +49,6 @@ const PUBLIC_PREFIXES = [
 export const SECTION_LIST_PAGES = new Set([
   "agent-evaluators",
   "agents",
-  "analytics",
   "evaluators",
   "human-alignment",
   "personas",
