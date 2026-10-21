@@ -145,6 +145,23 @@ describe("LeaderboardBarChart", () => {
     expect(axisLeftEdge(container)).toBeGreaterThan(20);
   });
 
+  it("draws error bars only for a chart given ranges", () => {
+    const { container, unmount } = render(
+      <LeaderboardBarChart
+        title="Ranged"
+        data={[
+          { label: "Alpha", value: 50, range: { low: 40, high: 70 } },
+          { label: "Beta", value: 20, range: null },
+        ]}
+      />,
+    );
+    expect(container.querySelector(".recharts-errorBar")).not.toBeNull();
+    unmount();
+
+    const plain = render(<LeaderboardBarChart title="Plain" data={sampleData} />);
+    expect(plain.container.querySelector(".recharts-errorBar")).toBeNull();
+  });
+
   it("renders with empty data without crashing", () => {
     render(<LeaderboardBarChart title="Empty Chart" data={[]} />);
     expect(screen.getByText("Empty Chart")).toBeInTheDocument();

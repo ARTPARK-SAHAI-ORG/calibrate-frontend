@@ -1,16 +1,17 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { LikelyRangesNote } from "./LikelyRangesNote";
 import { LeaderboardTab, type LeaderboardColumn } from "./LeaderboardTab";
 import { RunNote } from "./RunNote";
 import { STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
 import { RunFailureBox, runFailureSentence } from "@/components/RunFailureBox";
 import {
   benchmarkAnsweredPassFail,
+  benchmarkRangeKey,
   benchmarkRatingEvaluatorCaption,
-  buildBenchmarkCombinedLeaderboardPayload,
+  likelyRangeText,
   type BenchmarkCombinedLeaderboardPayload,
-  type BenchmarkLeaderboardSummaryRow,
   type BenchmarkModelLike,
 } from "@/lib/benchmarkEvaluatorSummary";
 import {
@@ -37,7 +38,8 @@ function couldNotRunCount(modelResults: LeaderboardModel[]): number {
 }
 
 type BenchmarkCombinedLeaderboardProps = {
-  leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
+  /** The table and charts, built once by the caller from the run. */
+  payload: BenchmarkCombinedLeaderboardPayload | null;
   modelResults: LeaderboardModel[];
   /** Table/chart labels for `model`; defaults to the model without its company. */
   formatModelName?: (model: string) => string;
@@ -55,6 +57,9 @@ type BenchmarkCombinedLeaderboardProps = {
   failureReason?: string | null;
   /** True once the run has ended, whichever way it ended. */
   runOver?: boolean;
+  /** Whether the workspace shows likely ranges. Left out on the shared page,
+   * which shows neither the ranges nor the line pointing to the setting. */
+  likelyRanges?: boolean;
 };
 
 /**
@@ -189,11 +194,34 @@ function RunNotes({
   );
 }
 
+/** A cell showing a number, or a dash when there is none. With `range`
+ * the likely range sits under the number. */
+function numberCell(
+  format: (v: number) => string,
+  range?: { key: string; scale: "percent" | "rating" },
+) {
+  return function renderCell(v: unknown, row: Record<string, unknown>) {
+    if (typeof v !== "number" || !Number.isFinite(v))
+      return <span className="text-muted-foreground">—</span>;
+    const text = range ? likelyRangeText(row[range.key], range.scale) : null;
+    if (!text) return format(v);
+    return (
+      <>
+        {format(v)}
+        <div className="text-[11px] text-muted-foreground mt-0.5">{text}</div>
+      </>
+    );
+  };
+}
+
 function columnsFromPayload(
   payload: BenchmarkCombinedLeaderboardPayload,
   formatModelName: (model: string) => string,
   benchmarkScoreLabel: string,
+  showRanges: boolean,
 ): LeaderboardColumn[] {
+  const rangeOf = (dataKey: string, scale: "percent" | "rating") =>
+    showRanges ? { key: benchmarkRangeKey(dataKey), scale } : undefined;
   const cols: LeaderboardColumn[] = [
     {
       key: "model",
@@ -213,12 +241,7 @@ function columnsFromPayload(
     cols.push({
       key: "pass_rate",
       header: benchmarkScoreLabel,
-      render: (v) =>
-        typeof v === "number" && Number.isFinite(v) ? (
-          formatPercent(v)
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
+      render: numberCell(formatPercent, rangeOf("pass_rate", "percent")),
     });
   }
 
@@ -226,12 +249,7 @@ function columnsFromPayload(
     cols.push({
       key: "avg_latency_ms",
       header: METRIC_LABELS.latency,
-      render: (v) =>
-        typeof v === "number" && Number.isFinite(v) ? (
-          formatLatencyMs(v)
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
+      render: numberCell(formatLatencyMs),
     });
   }
 
@@ -239,12 +257,7 @@ function columnsFromPayload(
     cols.push({
       key: "avg_cost",
       header: METRIC_LABELS.cost,
-      render: (v) =>
-        typeof v === "number" && Number.isFinite(v) ? (
-          formatCostUsd(v)
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
+      render: numberCell(formatCostUsd),
     });
   }
 
@@ -252,12 +265,7 @@ function columnsFromPayload(
     cols.push({
       key: "avg_tokens",
       header: METRIC_LABELS.tokens,
-      render: (v) =>
-        typeof v === "number" && Number.isFinite(v) ? (
-          formatTokens(v)
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
+      render: numberCell(formatTokens),
     });
   }
 
@@ -267,33 +275,20 @@ function columnsFromPayload(
     cols.push({
       key: "tool_call_pass_rate",
       header: "Tool-call pass rate (%)",
-      render: (v) =>
-        typeof v === "number" && Number.isFinite(v) ? (
-          formatPercent(v)
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
+      render: numberCell(formatPercent),
     });
   }
 
   for (const ev of payload.plan.evaluators) {
-    const header =
-      ev.type === "rating"
-        ? benchmarkRatingEvaluatorCaption(ev.label, ev.scale_min, ev.scale_max)
-        : ev.label;
+    const binary = ev.type === "binary";
     cols.push({
       key: ev.dataKey,
-      header,
-      render: (v) =>
-        typeof v === "number" && Number.isFinite(v) ? (
-          ev.type === "binary" ? (
-            formatPercent(v)
-          ) : (
-            formatRating(v)
-          )
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
+      header: binary
+        ? ev.label
+        : benchmarkRatingEvaluatorCaption(ev.label, ev.scale_min, ev.scale_max),
+      render: binary
+        ? numberCell(formatPercent, rangeOf(ev.dataKey, "percent"))
+        : numberCell((v) => formatRating(v), rangeOf(ev.dataKey, "rating")),
     });
   }
 
@@ -305,7 +300,7 @@ function columnsFromPayload(
  * one chart grid (two charts per row), aligned with STT/TTS `LeaderboardTab`.
  */
 export function BenchmarkCombinedLeaderboard({
-  leaderboardSummary,
+  payload,
   modelResults,
   formatModelName = displayModelName,
   filename,
@@ -316,33 +311,19 @@ export function BenchmarkCombinedLeaderboard({
   stoppedEarly = false,
   failureReason = null,
   runOver = false,
+  likelyRanges,
 }: BenchmarkCombinedLeaderboardProps) {
-  const payload = useMemo(
-    () =>
-      buildBenchmarkCombinedLeaderboardPayload(
-        leaderboardSummary,
-        modelResults,
-        benchmarkScoreLabel,
-        // A run that did not finish normally (it broke, or someone stopped
-        // it) has no summary from the backend; count what did finish, so the
-        // table is left out only when there is nothing to put in it.
-        failureReason !== null || runOver,
-      ),
-    [
-      leaderboardSummary,
-      modelResults,
-      benchmarkScoreLabel,
-      failureReason,
-      runOver,
-    ],
-  );
-
   const columns = useMemo(
     () =>
       payload
-        ? columnsFromPayload(payload, formatModelName, benchmarkScoreLabel)
+        ? columnsFromPayload(
+            payload,
+            formatModelName,
+            benchmarkScoreLabel,
+            likelyRanges === true,
+          )
         : [],
-    [payload, formatModelName, benchmarkScoreLabel],
+    [payload, formatModelName, benchmarkScoreLabel, likelyRanges],
   );
 
   // What the notes above already say. Worked out once, because it decides two
@@ -411,8 +392,10 @@ export function BenchmarkCombinedLeaderboard({
           filename={filename}
           getLabel={(key) => formatModelName(key)}
           nameKey="model"
+          showRanges={likelyRanges === true}
         />
       )}
+      {likelyRanges !== undefined && <LikelyRangesNote />}
     </div>
   );
 }

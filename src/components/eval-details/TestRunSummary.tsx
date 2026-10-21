@@ -2,7 +2,11 @@ import React, { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { RunNote } from "./RunNote";
 import { RunFailureBox, runFailureSentence } from "@/components/RunFailureBox";
-import { stoppedRunSentence, STOPPED_EARLY_SENTENCE } from "@/lib/testTypes";
+import {
+  passRateOf,
+  stoppedRunSentence,
+  STOPPED_EARLY_SENTENCE,
+} from "@/lib/testTypes";
 import { RESULT_TAB_LABELS } from "@/components/ui";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
@@ -19,8 +23,11 @@ import {
 } from "@/lib/llmMetrics";
 import {
   benchmarkRatingEvaluatorCaption,
+  likelyRangeText,
   type BenchmarkEvaluatorSummaryEntry,
+  type LikelyRange,
 } from "@/lib/benchmarkEvaluatorSummary";
+import { LikelyRangesNote } from "./LikelyRangesNote";
 
 type TestRunSummaryProps = {
   /** Tests that passed evaluation. */
@@ -73,6 +80,14 @@ type TestRunSummaryProps = {
   evaluatorSummary?: BenchmarkEvaluatorSummaryEntry[] | null;
   /** Disable evaluator detail links for public share pages. */
   enableEvaluatorLinks?: boolean;
+  /** The run's pass rate as the backend worked it out, out of 100. When
+   * absent it is worked out from `passed` and `total`. */
+  passRate?: number | null;
+  /** Where the true pass rate is likely to fall. */
+  passRateRange?: LikelyRange | null;
+  /** Whether the workspace shows likely ranges. Left out on the shared pages,
+   * which show neither the ranges nor the line pointing to the setting. */
+  likelyRanges?: boolean;
 };
 
 const descriptionIcon = (
@@ -146,28 +161,53 @@ function CardFooter({
 
 // One metric card (matches the SimulationMetricsGrid card style). `progress`
 // adds a pass-rate bar; `subtitle` is the small caption below the value;
-// `info` adds a hover tooltip (ⓘ) next to the label.
+// `info` adds a hover tooltip (ⓘ) next to the label; `range` is the likely
+// range under it. `onOpen` makes the whole card a button that opens it.
 function MetricCard({
   label,
   value,
   subtitle,
   progress,
   info,
+  range,
+  onOpen,
 }: {
   label: string;
   value: string;
   subtitle?: string;
   progress?: number;
-  info?: string;
+  info?: string | null;
+  range?: string | null;
+  onOpen?: () => void;
 }) {
-  return (
-    <div className="border border-border rounded-xl p-4 bg-muted/10">
+  const inner = (
+    <>
       <div className="text-[12px] text-muted-foreground mb-1 flex items-center gap-1.5">
         <span>{label}</span>
         {info && <Tooltip content={info}>{descriptionIcon}</Tooltip>}
+        {onOpen && linkIcon}
       </div>
       <div className="text-[18px] font-semibold text-foreground">{value}</div>
       <CardFooter progress={progress} subtitle={subtitle} />
+      {range && (
+        <div className="text-[11px] text-muted-foreground mt-1.5">{range}</div>
+      )}
+    </>
+  );
+  if (onOpen) {
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        className="group block w-full text-left border border-border rounded-xl p-4 bg-muted/10 hover:border-foreground/40 hover:bg-muted/30 transition-colors cursor-pointer"
+      >
+        {inner}
+      </button>
+    );
+  }
+  return (
+    <div className="border border-border rounded-xl p-4 bg-muted/10">
+      {inner}
     </div>
   );
 }
@@ -180,6 +220,7 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
   value: string;
   subtitle?: string;
   progress?: number;
+  range: string | null;
 } {
   const name = entry.name ?? entry.metric_key;
   if (entry.type === "binary") {
@@ -188,6 +229,7 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
       value: formatPercent(entry.pass_rate),
       subtitle: `${entry.passed}/${entry.total}`,
       progress: entry.pass_rate,
+      range: likelyRangeText(entry.ci, "percent"),
     };
   }
   return {
@@ -200,6 +242,7 @@ function evaluatorCardContent(entry: BenchmarkEvaluatorSummaryEntry): {
       ? `${formatRating(entry.mean)}/${entry.scale_max}`
       : formatRating(entry.mean),
     subtitle: `mean of ${entry.count}`,
+    range: likelyRangeText(entry.ci, "rating"),
   };
 }
 
@@ -226,6 +269,9 @@ export function TestRunSummary({
   toolCallEvaluatorUuid = null,
   evaluatorSummary,
   enableEvaluatorLinks = true,
+  passRate,
+  passRateRange,
+  likelyRanges,
 }: TestRunSummaryProps) {
   // The evaluator whose prompt is on show, opened from a metric card's name.
   // Null until a card is clicked.
@@ -234,11 +280,10 @@ export function TestRunSummary({
     name: string;
   } | null>(null);
 
-  const rate = total > 0 ? (passed / total) * 100 : null;
-  const toolCallRate =
-    toolCall && toolCall.total > 0
-      ? (toolCall.passed / toolCall.total) * 100
-      : null;
+  const rate = passRate ?? passRateOf(passed, total);
+  const toolCallRate = toolCall
+    ? passRateOf(toolCall.passed, toolCall.total)
+    : null;
 
   const evaluators = evaluatorSummary ?? [];
   const toolCallEvaluatorCharted =
@@ -271,6 +316,7 @@ export function TestRunSummary({
       value: formatPercent(rate),
       subtitle: `${passed}/${total}`,
       progress: rate,
+      range: likelyRanges ? likelyRangeText(passRateRange, "percent") : null,
     });
   const latencyValue = latencyP50(latency);
   if (latencyValue != null)
@@ -394,53 +440,28 @@ export function TestRunSummary({
               />
             )}
             {evaluators.map((entry) => {
-              const { label, value, subtitle, progress } =
-                evaluatorCardContent(entry);
+              const { range, ...card } = evaluatorCardContent(entry);
               const uuid = entry.evaluator_uuid;
-              const cardInner = (
-                <>
-                  <div className="text-[12px] text-muted-foreground mb-1 flex items-center gap-1.5">
-                    <span>{label}</span>
-                    {entry.description && (
-                      <Tooltip content={entry.description}>
-                        {descriptionIcon}
-                      </Tooltip>
-                    )}
-                    {uuid && enableEvaluatorLinks && linkIcon}
-                  </div>
-                  <div className="text-[18px] font-semibold text-foreground">
-                    {value}
-                  </div>
-                  <CardFooter progress={progress} subtitle={subtitle} />
-                </>
-              );
-              if (uuid && enableEvaluatorLinks) {
-                const evaluatorName = entry.name ?? entry.metric_key;
-                return (
-                  <button
-                    key={entry.metric_key}
-                    type="button"
-                    onClick={() =>
-                      setPreviewEvaluator({ uuid, name: evaluatorName })
-                    }
-                    className="group block w-full text-left border border-border rounded-xl p-4 bg-muted/10 hover:border-foreground/40 hover:bg-muted/30 transition-colors cursor-pointer"
-                  >
-                    {cardInner}
-                  </button>
-                );
-              }
+              const evaluatorName = entry.name ?? entry.metric_key;
               return (
-                <div
+                <MetricCard
                   key={entry.metric_key}
-                  className="border border-border rounded-xl p-4 bg-muted/10"
-                >
-                  {cardInner}
-                </div>
+                  {...card}
+                  info={entry.description}
+                  range={likelyRanges ? range : null}
+                  onOpen={
+                    uuid && enableEvaluatorLinks
+                      ? () => setPreviewEvaluator({ uuid, name: evaluatorName })
+                      : undefined
+                  }
+                />
               );
             })}
           </div>
         </div>
       )}
+
+      {likelyRanges !== undefined && <LikelyRangesNote />}
 
       <EvaluatorPreviewModal
         evaluatorUuid={previewEvaluator?.uuid ?? null}

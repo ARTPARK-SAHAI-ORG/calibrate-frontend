@@ -1,10 +1,32 @@
 import React from "react";
 import { render, screen } from "@/test-utils";
-import { BenchmarkTopPicks } from "../BenchmarkTopPicks";
-import type {
-  BenchmarkLeaderboardSummaryRow,
-  BenchmarkModelLike,
+import { BenchmarkTopPicks as TopPicks } from "../BenchmarkTopPicks";
+import {
+  buildBenchmarkCombinedLeaderboardPayload,
+  type BenchmarkLeaderboardSummaryRow,
+  type BenchmarkModelLike,
 } from "@/lib/benchmarkEvaluatorSummary";
+
+/** Top picks with its payload built from the run, as the result view does. */
+function BenchmarkTopPicks({
+  leaderboardSummary,
+  modelResults,
+  ...props
+}: Omit<React.ComponentProps<typeof TopPicks>, "payload"> & {
+  leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
+  modelResults: BenchmarkModelLike[];
+}) {
+  return (
+    <TopPicks
+      {...props}
+      payload={buildBenchmarkCombinedLeaderboardPayload(
+        leaderboardSummary,
+        modelResults,
+        "Test pass rate (%)",
+      )}
+    />
+  );
+}
 
 // recharts' ResponsiveContainer needs a measured box; jsdom reports 0×0, so the
 // chart body never renders. Stub the observer + layout box so the scatter mounts.

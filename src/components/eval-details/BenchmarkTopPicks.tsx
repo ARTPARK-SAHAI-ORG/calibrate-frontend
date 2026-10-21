@@ -8,14 +8,13 @@ import {
 } from "@/components/charts/ParetoFrontierChart";
 import { getColorMap } from "@/components/charts/LeaderboardBarChart";
 import {
-  buildBenchmarkCombinedLeaderboardPayload,
-  type BenchmarkLeaderboardSummaryRow,
-  type BenchmarkModelLike,
+  hasBenchmarkTopPicks,
+  type BenchmarkCombinedLeaderboardPayload,
 } from "@/lib/benchmarkEvaluatorSummary";
 
 type BenchmarkTopPicksProps = {
-  leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
-  modelResults: BenchmarkModelLike[];
+  /** The leaderboard rows, built once by the caller from the run. */
+  payload: BenchmarkCombinedLeaderboardPayload | null;
   filename: string;
   benchmarkScoreLabel?: string;
 };
@@ -25,21 +24,10 @@ type BenchmarkTopPicksProps = {
  * scatter lifted out of BenchmarkCombinedLeaderboard so it can stand on its own.
  */
 export function BenchmarkTopPicks({
-  leaderboardSummary,
-  modelResults,
+  payload,
   filename,
   benchmarkScoreLabel = "Test pass rate (%)",
 }: BenchmarkTopPicksProps) {
-  const payload = useMemo(
-    () =>
-      buildBenchmarkCombinedLeaderboardPayload(
-        leaderboardSummary,
-        modelResults,
-        benchmarkScoreLabel,
-      ),
-    [leaderboardSummary, modelResults, benchmarkScoreLabel],
-  );
-
   const paretoPoints = useMemo<ParetoModelPoint[]>(
     () =>
       (payload?.rows ?? []).map((row) => ({
@@ -60,12 +48,7 @@ export function BenchmarkTopPicks({
   // Nothing to plot without both a cost and an overall pass rate. The parent
   // gates the Top picks tab on the same check (hasBenchmarkTopPicks), so this is
   // a safety net rather than a visible empty state.
-  const showPareto =
-    !!payload &&
-    payload.rows.length > 0 &&
-    payload.plan.showCost &&
-    payload.plan.showOverallPassRate;
-  if (!showPareto) return null;
+  if (!hasBenchmarkTopPicks(payload)) return null;
 
   return (
     <ParetoFrontierChart

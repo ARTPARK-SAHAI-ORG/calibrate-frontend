@@ -1,10 +1,32 @@
 import React from "react";
 import { render, screen, setupUser } from "@/test-utils";
-import { BenchmarkCombinedLeaderboard } from "../BenchmarkCombinedLeaderboard";
-import type {
-  BenchmarkLeaderboardSummaryRow,
-  BenchmarkModelLike,
+import { BenchmarkCombinedLeaderboard as Board } from "../BenchmarkCombinedLeaderboard";
+import {
+  buildBenchmarkCombinedLeaderboardPayload,
+  type BenchmarkLeaderboardSummaryRow,
+  type BenchmarkModelLike,
 } from "@/lib/benchmarkEvaluatorSummary";
+
+/** The board as `BenchmarkResultView` draws it: the payload built from the
+ * run the same way, so each case here can describe the run itself. */
+function BenchmarkCombinedLeaderboard({
+  leaderboardSummary,
+  ...props
+}: Omit<React.ComponentProps<typeof Board>, "payload"> & {
+  leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
+}) {
+  return (
+    <Board
+      {...props}
+      payload={buildBenchmarkCombinedLeaderboardPayload(
+        leaderboardSummary,
+        props.modelResults,
+        props.benchmarkScoreLabel ?? "Test pass rate (%)",
+        (props.failureReason ?? null) !== null || !!props.runOver,
+      )}
+    />
+  );
+}
 
 describe("BenchmarkCombinedLeaderboard", () => {
   it("shows the empty state when there is no leaderboard data", () => {
@@ -828,5 +850,88 @@ describe("a stopped comparison that also left tests unanswered", () => {
     expect(
       screen.getAllByText("Test pass rate (%)").length,
     ).toBeGreaterThan(0);
+  });
+});
+
+describe("likely ranges on the leaderboard", () => {
+  const leaderboardSummary: BenchmarkLeaderboardSummaryRow[] = [
+    { model: "m1", passed: "19", total: "20", pass_rate: "95" },
+  ];
+  const modelResults: BenchmarkModelLike[] = [
+    {
+      model: "m1",
+      pass_rate: 95,
+      pass_rate_ci: { low: 76.4, high: 99.1 },
+      evaluator_summary: [
+        {
+          metric_key: "c",
+          name: "Correctness",
+          type: "binary",
+          passed: 15,
+          total: 20,
+          pass_rate: 75,
+          ci: { low: 53.1, high: 88.8 },
+        },
+        {
+          metric_key: "h",
+          name: "Helpfulness",
+          type: "rating",
+          mean: 4,
+          min: 3,
+          max: 5,
+          count: 20,
+          scale_min: 1,
+          scale_max: 5,
+          ci: null,
+        },
+      ],
+    },
+  ];
+
+  it("shows the range under the pass rate and each evaluator with one", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={leaderboardSummary}
+        modelResults={modelResults}
+        filename="bench"
+        likelyRanges
+      />,
+    );
+    expect(screen.getByText("Likely range 76% to 99%")).toBeInTheDocument();
+    expect(screen.getByText("Likely range 53% to 89%")).toBeInTheDocument();
+    // The rating has no range, so its cell shows the score alone.
+    expect(screen.getAllByText(/Likely range/)).toHaveLength(2);
+    expect(
+      screen.getByRole("link", { name: "Workspace settings" }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the ranges when the workspace does not show them", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={leaderboardSummary}
+        modelResults={modelResults}
+        filename="bench"
+        likelyRanges={false}
+      />,
+    );
+    expect(screen.queryByText(/Likely range/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Show or hide likely ranges in/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows neither the ranges nor the line on the shared page", () => {
+    render(
+      <BenchmarkCombinedLeaderboard
+        leaderboardSummary={leaderboardSummary}
+        modelResults={modelResults}
+        filename="bench"
+      />,
+    );
+    expect(screen.queryByText(/Likely range/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Show or hide likely ranges/),
+    ).not.toBeInTheDocument();
   });
 });

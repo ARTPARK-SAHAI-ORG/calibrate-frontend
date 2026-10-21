@@ -16,6 +16,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import {
   useOrganizations,
   useActiveOrgUuid,
+  useShowLikelyRanges,
   useOrgMembers,
   useWorkspaceApiKeys,
   useProviderKeys,
@@ -401,6 +402,33 @@ describe("useOrganizations hooks", () => {
       });
       await waitFor(() =>
         expect(result.current.organizations).toEqual([org1, org2]),
+      );
+    });
+  });
+
+  describe("useShowLikelyRanges", () => {
+    const withRanges = (on: boolean): Organization => ({
+      ...org1,
+      uuid: ORG_IN_ADDRESS,
+      settings: { model_benchmarking: { show_likely_ranges: on } },
+    });
+
+    it("is on when the workspace in the address turned it on", () => {
+      pathname = `/${ORG_IN_ADDRESS}/agents`;
+      seedOrgsCache([org2, withRanges(true)], "tok");
+      const { result } = renderHook(() => useShowLikelyRanges());
+      expect(result.current).toBe(true);
+    });
+
+    it("is off when the workspace turned it off or is not known", () => {
+      pathname = `/${ORG_IN_ADDRESS}/agents`;
+      seedOrgsCache([withRanges(false)], "tok");
+      expect(renderHook(() => useShowLikelyRanges()).result.current).toBe(
+        false,
+      );
+      seedOrgsCache([org2], "tok");
+      expect(renderHook(() => useShowLikelyRanges()).result.current).toBe(
+        false,
       );
     });
   });
