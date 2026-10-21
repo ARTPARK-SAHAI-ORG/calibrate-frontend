@@ -77,8 +77,6 @@ export function SuperadminsSection({ accessToken }: { accessToken: string }) {
 
   return (
     <section className="space-y-4">
-      <h2 className="text-lg font-semibold">Superadmins</h2>
-
       <div className="space-y-2">
         <div className="flex flex-col sm:flex-row gap-3">
           <input

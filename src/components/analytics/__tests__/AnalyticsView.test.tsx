@@ -207,6 +207,20 @@ describe("AnalyticsView", () => {
     expect(await screen.findByText("214")).toBeInTheDocument();
   });
 
+  it("shows the usage numbers first and the superadmins list on its own tab", async () => {
+    mockFetch.mockResolvedValue(response());
+    render(<AnalyticsView accessToken="t" />);
+    expect(await screen.findByText("214")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add superadmin" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Superadmins" }));
+    expect(await screen.findByRole("button", { name: "Add superadmin" })).toBeInTheDocument();
+    expect(screen.queryByText("214")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Usage" }));
+    expect(screen.getByText("214")).toBeInTheDocument();
+  });
+
   it("tells someone who is not the admin that the page is not for them", async () => {
     mockFetch.mockRejectedValue(new Error("Request failed: 403 - forbidden"));
     render(<AnalyticsView accessToken="t" />);
