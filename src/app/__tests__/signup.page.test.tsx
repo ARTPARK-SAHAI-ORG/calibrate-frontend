@@ -36,6 +36,8 @@ describe("SignupPage", () => {
       "href",
       "/login?callbackUrl=%2Ftools",
     );
+    // The card's own link is the only way to log in, not a second one under it
+    expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
     expect(sentBody(fetchMock).next).toBe("/tools");
     expect(localStorage.getItem("access_token")).toBeNull();
     expect(window.location.href).toBe("");
