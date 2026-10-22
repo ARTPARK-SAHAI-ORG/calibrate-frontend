@@ -178,10 +178,13 @@ describe("parseBackendErrorResponse", () => {
 
   it("drops the \"Value error, \" prefix from a validator's message", async () => {
     const res = mockResponse(422, {
-      detail: [{ msg: "Value error, webhook url must be public", loc: ["body"] }],
+      detail: [
+        { msg: "Value error, webhook url must be public", loc: ["body"] },
+        { msg: "Assertion failed, name too long", loc: ["body"] },
+      ],
     });
     expect(await parseBackendErrorResponse(res)).toBe(
-      "webhook url must be public",
+      "webhook url must be public — name too long",
     );
   });
 
