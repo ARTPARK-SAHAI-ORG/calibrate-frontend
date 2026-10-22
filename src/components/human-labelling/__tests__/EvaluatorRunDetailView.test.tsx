@@ -1689,6 +1689,9 @@ describe("EvaluatorRunDetailView", () => {
             agreement: 0.8,
             pair_count: 2,
             item_count: 1,
+            kappa: 0.4,
+            kappa_type: "cohen",
+            chance_agreement: 0.5,
           },
         ],
         items: [
@@ -1724,7 +1727,17 @@ describe("EvaluatorRunDetailView", () => {
       />,
     );
     expect(screen.getByText("Human agreement")).toBeInTheDocument();
-    expect(screen.getByText("80%")).toBeInTheDocument();
+    expect(screen.getByText("80%").className).toContain("text-foreground");
+    expect(screen.getByText("80%").className).not.toMatch(
+      /text-(green|red|yellow)/,
+    );
+    const fill = screen.getByTestId("agreement-fill");
+    expect(fill.style.width).toBe("80%");
+    expect(fill.className).toContain("bg-green-500");
+    expect(screen.getByTestId("chance-tick").style.left).toBe("50%");
+    expect(screen.getByText("Chance 50%")).toBeInTheDocument();
+    expect(screen.getByText("Kappa")).toBeInTheDocument();
+    expect(screen.getByText("0.40")).toBeInTheDocument();
   });
 
   it("shows each evaluator's summarised value across the items", () => {

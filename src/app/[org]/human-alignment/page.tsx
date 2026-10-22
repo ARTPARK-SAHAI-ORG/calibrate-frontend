@@ -1,27 +1,16 @@
 "use client";
 
 import {
+  Fragment,
   Suspense,
   useEffect,
   useState,
   useCallback,
-  type MouseEvent,
   type ReactNode,
 } from "react";
 import { Link, replaceUrl, useRouter, useSearchParams } from "@/lib/nav";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { AppLayout } from "@/components/AppLayout";
-// The chart above already has a `Tooltip` of its own, so the app's hover text
-// comes in under a second name.
-import { Tooltip as HoverText } from "@/components/Tooltip";
+import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import { EvaluatorPillList } from "@/components/EvaluatorPillList";
@@ -32,12 +21,23 @@ import { EmptyState } from "@/components/ui/LoadingState";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
 import { useAccessToken } from "@/hooks";
-import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { createAnnotator, renameAnnotator } from "@/lib/annotatorApi";
 import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { taskOptionsWithAgreement } from "./taskOptions";
-import { parseBackendTime } from "@/lib/relativeTime";
+import {
+  type AnswerKind,
+  type KappaByKind,
+} from "@/lib/agreementKappa";
+import {
+  KappaCell,
+  KappaInfoIcon,
+} from "@/components/human-labelling/KappaCell";
+import { AgreementOverviewSection } from "@/components/human-labelling/AgreementOverviewTable";
+import type {
+  AgreementGroup,
+  EvaluatorAgreement,
+} from "@/lib/taskOverviewData";
 
 type Tab = "overview" | "tasks" | "annotators";
 
@@ -49,6 +49,8 @@ type Annotator = {
   jobs_count?: number;
   current_agreement?: number | null;
   pair_count?: number | null;
+  /** Kappa for each kind of answer the annotator was compared on. */
+  kappa_by_kind?: KappaByKind[];
 };
 
 function parseApiError(err: unknown, fallback: string): string {
@@ -91,67 +93,42 @@ type LabellingTask = {
   evaluators?: LabellingTaskEvaluator[];
   /**
    * True when the task has at least one comparable pair (human-human or any
-   * human-evaluator). All-time / unfiltered — independent of `bucket`/`days`.
+   * human-evaluator). All-time and unfiltered.
    * Used to filter the Overview task-selector dropdown.
    */
   has_agreement?: boolean;
 };
 
-type SortDirection = "asc" | "desc";
-
-type AgreementSeriesPoint = {
-  bucket_start: string;
-  bucket_end: string;
-  agreement: number | null;
-  pair_count: number;
-};
-
-type AgreementBlock = {
-  current: number | null;
-  pair_count: number;
-  series: AgreementSeriesPoint[];
-};
-
-type EvaluatorAgreementBlock = AgreementBlock & {
-  evaluator_id: string;
-  name: string;
-};
-
 type AgreementResponse = {
-  bucket: string;
-  days: number;
   task_id?: string;
-  human_human: AgreementBlock;
-  evaluators: EvaluatorAgreementBlock[];
+  /** Overall agreement between annotators. */
+  human_human: AgreementGroup;
+  /** Overall agreement between evaluators and humans. */
+  evaluators_with_humans?: AgreementGroup | null;
+  evaluators: EvaluatorAgreement[];
 };
-
-type Bucket = "week" | "month" | "year";
 
 const ALL_TASKS = "all";
 
 const taskHref = (uuid: string) => `/human-alignment/tasks/${uuid}`;
-const DEFAULT_BUCKET: Bucket = "month";
-const DEFAULT_DAYS = 180;
-
-function agreementColor(fraction: number | null | undefined): string {
-  if (fraction == null) return "";
-  const pct = fraction * 100;
-  if (pct >= 75) return "text-green-600 dark:text-green-400";
-  if (pct <= 50) return "text-red-600 dark:text-red-400";
-  return "text-yellow-600 dark:text-yellow-400";
-}
-
-function formatBucketLabel(iso: string, bucket: Bucket): string {
-  const d = parseBackendTime(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  if (bucket === "year") return d.getUTCFullYear().toString();
-  return d.toLocaleString("en-US", {
-    month: "short",
-    timeZone: "UTC",
-  });
-}
 
 const TABS: Tab[] = ["overview", "tasks", "annotators"];
+
+const ANNOTATOR_GRID =
+  "grid grid-cols-[minmax(0,1fr)_80px_170px_minmax(0,1fr)_minmax(0,1fr)_88px] gap-4 px-4";
+const ANSWER_KINDS: AnswerKind[] = ["binary", "rating"];
+const KIND_KAPPA_COLUMNS: Record<AnswerKind, { title: string; help: string }> =
+  {
+    binary: {
+      title: "Kappa (binary)",
+      help: "Agreement with the other annotators on binary labels, after removing what chance alone would produce. 1 is full agreement, 0 is no better than chance, below 0 is worse than chance",
+    },
+    rating: {
+      title: "Kappa (rating)",
+      help: "Agreement with the other annotators on rating-style labels, after removing what chance alone would produce. Close ratings get partial credit. 1 is full agreement, 0 is no better than chance, below 0 is worse than chance",
+    },
+  };
+const MUTED_DASH = <span className="text-sm text-muted-foreground">—</span>;
 
 function isTab(value: string | null): value is Tab {
   return !!value && (TABS as string[]).includes(value);
@@ -225,8 +202,6 @@ function HumanLabellingPageInner() {
   const sortedTasks = [...tasks].sort((a, b) => a.name.localeCompare(b.name));
 
   const [selectedTaskId, setSelectedTaskId] = useState<string>(ALL_TASKS);
-  const [bucket] = useState<Bucket>(DEFAULT_BUCKET);
-  const [days] = useState<number>(DEFAULT_DAYS);
 
   // The dropdown only lists tasks with at least one comparable pair. The task
   // list now carries an all-time `has_agreement` flag, so we filter in memory
@@ -284,11 +259,10 @@ function HumanLabellingPageInner() {
     setAgreementLoading(true);
     setAgreementError(null);
     try {
-      const query = `?bucket=${bucket}&days=${days}`;
       const endpoint =
         selectedTaskId === ALL_TASKS
-          ? `/annotation-agreement/trend${query}`
-          : `/annotation-tasks/${encodeURIComponent(selectedTaskId)}/agreement${query}`;
+          ? "/annotation-agreement/trend"
+          : `/annotation-tasks/${encodeURIComponent(selectedTaskId)}/agreement`;
       const data = await apiClient<AgreementResponse>(endpoint, accessToken);
       setAgreement(data);
     } catch (err) {
@@ -297,7 +271,7 @@ function HumanLabellingPageInner() {
       setAgreementLoading(false);
       setAgreementFetchCompleted(true);
     }
-  }, [accessToken, selectedTaskId, bucket, days]);
+  }, [accessToken, selectedTaskId]);
 
   useEffect(() => {
     if (activeTab === "overview") {
@@ -505,7 +479,6 @@ function HumanLabellingPageInner() {
             agreement={agreement}
             agreementLoading={agreementLoading || !agreementFetchCompleted}
             agreementError={agreementError}
-            bucket={bucket}
             selectedTaskId={selectedTaskId}
             onSelectTask={setSelectedTaskId}
             taskOptions={taskOptions}
@@ -626,7 +599,7 @@ function HumanLabellingPageInner() {
                         <EvaluatorPillList evaluators={evaluators} />
                       </Link>
                       <div className="flex items-center">
-                        <HoverText content="Delete task" position="top">
+                        <Tooltip content="Delete task" position="top">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -649,7 +622,7 @@ function HumanLabellingPageInner() {
                               />
                             </svg>
                           </button>
-                        </HoverText>
+                        </Tooltip>
                       </div>
                     </div>
                   );
@@ -809,16 +782,28 @@ function HumanLabellingPageInner() {
                       : "hidden md:block"
                   } border border-border rounded-xl overflow-hidden`}
                 >
-                  <div className="grid grid-cols-[minmax(0,1fr)_120px_180px_88px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Name
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Jobs
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Current agreement
-                    </div>
+                  <div
+                    className={`${ANNOTATOR_GRID} py-2 border-b border-border bg-muted/30 items-center`}
+                  >
+                    {["Name", "Jobs", "Agreement with others"].map(
+                      (heading) => (
+                        <div
+                          key={heading}
+                          className="text-sm font-medium text-muted-foreground"
+                        >
+                          {heading}
+                        </div>
+                      ),
+                    )}
+                    {ANSWER_KINDS.map((kind) => (
+                      <div
+                        key={kind}
+                        className="flex items-center gap-1 text-sm font-medium text-muted-foreground"
+                      >
+                        {KIND_KAPPA_COLUMNS[kind].title}
+                        <KappaInfoIcon content={KIND_KAPPA_COLUMNS[kind].help} />
+                      </div>
+                    ))}
                     <div />
                   </div>
                   {visibleAnnotators.map((annotator) => {
@@ -841,7 +826,7 @@ function HumanLabellingPageInner() {
                     return (
                       <div
                         key={annotator.uuid}
-                        className={`grid grid-cols-[minmax(0,1fr)_120px_180px_88px] gap-4 px-4 border-b border-border last:border-b-0 transition-colors items-stretch ${
+                        className={`${ANNOTATOR_GRID} min-h-12 border-b border-border last:border-b-0 transition-colors items-stretch ${
                           isEditing ? "bg-muted/20" : "hover:bg-muted/20"
                         }`}
                       >
@@ -885,15 +870,34 @@ function HumanLabellingPageInner() {
                           annotator.jobs_count ?? 0,
                         )}
                         {cell(
-                          `flex items-center py-3 text-sm font-semibold tabular-nums ${agreementColor(agreement)}`,
-                          agreement != null
-                            ? `${Math.round(agreement * 100)}%`
-                            : "—",
+                          "flex items-center py-3 text-sm font-semibold tabular-nums text-foreground",
+                          agreement != null ? (
+                            <span>{Math.round(agreement * 100)}%</span>
+                          ) : (
+                            MUTED_DASH
+                          ),
                         )}
+                        {ANSWER_KINDS.map((kind) => {
+                          const entry = annotator.kappa_by_kind?.find(
+                            (k) => k.answer_kind === kind,
+                          );
+                          return (
+                            <Fragment key={kind}>
+                              {cell(
+                                "flex items-center py-3 text-sm font-semibold tabular-nums text-foreground whitespace-nowrap",
+                                entry ? (
+                                  <KappaCell fields={entry} />
+                                ) : (
+                                  MUTED_DASH
+                                ),
+                              )}
+                            </Fragment>
+                          );
+                        })}
                         <div className="flex items-center justify-end gap-1">
                           {isEditing ? (
                             <>
-                              <HoverText content="Save" position="top">
+                              <Tooltip content="Save" position="top">
                                 <button
                                   onClick={saveEditAnnotator}
                                   disabled={
@@ -917,8 +921,8 @@ function HumanLabellingPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
-                              <HoverText content="Cancel" position="top">
+                              </Tooltip>
+                              <Tooltip content="Cancel" position="top">
                                 <button
                                   onClick={cancelEditAnnotator}
                                   disabled={savingAnnotatorEdit}
@@ -939,11 +943,11 @@ function HumanLabellingPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
+                              </Tooltip>
                             </>
                           ) : (
                             <>
-                              <HoverText
+                              <Tooltip
                                 content="Rename annotator"
                                 position="top"
                               >
@@ -966,8 +970,8 @@ function HumanLabellingPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
-                              <HoverText
+                              </Tooltip>
+                              <Tooltip
                                 content="Remove annotator"
                                 position="top"
                               >
@@ -992,7 +996,7 @@ function HumanLabellingPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
+                              </Tooltip>
                             </>
                           )}
                         </div>
@@ -1040,18 +1044,33 @@ function HumanLabellingPageInner() {
                             {annotator.name}
                           </p>
                         )}
-                        <p className="text-xs text-muted-foreground">
+                        <div className="text-xs text-muted-foreground">
                           {annotator.jobs_count ?? 0} job
                           {(annotator.jobs_count ?? 0) === 1 ? "" : "s"}
                           {" · "}
-                          <span
-                            className={`font-semibold tabular-nums ${agreementColor(agreement)}`}
-                          >
-                            {agreement != null
-                              ? `${Math.round(agreement * 100)}% agreement`
-                              : "No agreement yet"}
-                          </span>
-                        </p>
+                          {agreement != null ? (
+                            <span className="font-semibold tabular-nums text-foreground">
+                              {Math.round(agreement * 100)}% agreement with
+                              others
+                            </span>
+                          ) : (
+                            "No agreement yet"
+                          )}
+                        </div>
+                        {ANSWER_KINDS.map((kind) => {
+                          const entry = annotator.kappa_by_kind?.find(
+                            (k) => k.answer_kind === kind,
+                          );
+                          return (
+                            <div
+                              key={kind}
+                              className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap"
+                            >
+                              {KIND_KAPPA_COLUMNS[kind].title}{" "}
+                              {entry ? <KappaCell fields={entry} /> : "—"}
+                            </div>
+                          );
+                        })}
                       </>
                     );
                     return (
@@ -1223,72 +1242,10 @@ function HumanLabellingPageInner() {
   );
 }
 
-type SeriesRow = {
-  key: string;
-  name: string;
-  color: string;
-  current: number | null;
-  pairCount: number;
-  series: AgreementSeriesPoint[];
-  evaluatorType?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
-  emptyTitle: string;
-  emptyDescription: string;
-};
-
-const EVAL_COLORS = [
-  "#3b82f6",
-  "#a855f7",
-  "#06b6d4",
-  "#ec4899",
-  "#f59e0b",
-  "#14b8a6",
-  "#6366f1",
-];
-
-type SortKey = "name" | "current";
-
-/**
- * One evaluator's name, as a pill that opens how that evaluator judges. The
- * name is cut to fit the row, and the whole of it is on hover only when it is
- * actually cut off: a name already fully readable would just be covered by a
- * popup saying the same thing.
- */
-function EvaluatorNamePill({
-  name,
-  onOpen,
-  fitClassName,
-}: {
-  name: string;
-  onOpen: (e: MouseEvent) => void;
-  /** Sizing for the row this pill sits in, on whatever wraps the pill. */
-  fitClassName: string;
-}) {
-  const { ref, clipped } = useIsNameClipped(name);
-  const pill = (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate w-full"
-    >
-      <span ref={ref} className="truncate">
-        {name}
-      </span>
-    </button>
-  );
-  return clipped ? (
-    <HoverText content={name} className={fitClassName}>
-      {pill}
-    </HoverText>
-  ) : (
-    <div className={`relative ${fitClassName}`}>{pill}</div>
-  );
-}
-
 function AgreementOverview({
   agreement,
   agreementLoading,
   agreementError,
-  bucket,
   selectedTaskId,
   onSelectTask,
   taskOptions,
@@ -1297,7 +1254,6 @@ function AgreementOverview({
   agreement: AgreementResponse | null;
   agreementLoading: boolean;
   agreementError: string | null;
-  bucket: Bucket;
   selectedTaskId: string;
   onSelectTask: (id: string) => void;
   taskOptions: LabellingTaskSummary[];
@@ -1316,100 +1272,21 @@ function AgreementOverview({
     }
     return m;
   })();
-  const [sortKey, setSortKey] = useState<SortKey>("current");
-  const [sortDir, setSortDir] = useState<SortDirection>("desc");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [previewEvaluator, setPreviewEvaluator] = useState<{
     uuid: string;
     name: string;
   } | null>(null);
 
-  const rows: SeriesRow[] = (() => {
-    if (!agreement) return [];
-    const out: SeriesRow[] = [];
-    const hh = agreement.human_human;
-    out.push({
-      key: "human_human",
-      name: "Annotator agreement",
-      color: "#10b981",
-      current: hh?.current ?? null,
-      pairCount: hh?.pair_count ?? 0,
-      series: hh?.series ?? [],
-      emptyTitle: "Not enough annotations yet to compute agreement",
-      emptyDescription:
-        "Inter-rater agreement will appear here once two or more annotators have labelled at least one of the same items",
-    });
-    (agreement.evaluators ?? []).forEach((ev, i) => {
-      out.push({
-        key: ev.evaluator_id,
-        name: ev.name,
-        color: EVAL_COLORS[i % EVAL_COLORS.length],
-        current: ev.current ?? null,
-        pairCount: ev.pair_count ?? 0,
-        series: ev.series ?? [],
-        evaluatorType: evaluatorTypeMap.get(ev.evaluator_id),
-        emptyTitle: "Not enough overlap yet to compute alignment",
-        emptyDescription: `This evaluator's alignment with humans will appear here once it's been run on items that humans have also labelled`,
-      });
-    });
-    return out;
-  })();
-
-  const sorted = [...rows].sort((a, b) => {
-    // Pin the inter-rater (human ↔ human) row to the top regardless of
-    // sort — it's the baseline every evaluator row is compared against.
-    if (a.key === "human_human" && b.key !== "human_human") return -1;
-    if (b.key === "human_human" && a.key !== "human_human") return 1;
-
-    // Group evaluators by type so all of the same type sit together.
-    // Rows missing a type sort after typed groups; within a group the
-    // user's chosen sort applies.
-    const aType = a.evaluatorType ?? "";
-    const bType = b.evaluatorType ?? "";
-    if (aType !== bType) {
-      if (!aType) return 1;
-      if (!bType) return -1;
-      return aType.localeCompare(bType);
-    }
-
-    const dir = sortDir === "desc" ? -1 : 1;
-    const cmp = (x: number | null, y: number | null) => {
-      if (x == null && y == null) return 0;
-      if (x == null) return 1; // nulls last
-      if (y == null) return -1;
-      return x === y ? 0 : x < y ? -1 : 1;
-    };
-    if (sortKey === "name") return dir * a.name.localeCompare(b.name);
-    return dir * cmp(a.current, b.current);
-  });
-
-  const buildChartData = (series: AgreementSeriesPoint[]) =>
-    series.map((p) => ({
-      month: formatBucketLabel(p.bucket_end, bucket),
-      agreement: p.agreement == null ? null : Math.round(p.agreement * 100),
-    }));
-
-  const toggleRow = (key: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
-    } else {
-      setSortKey(key);
-      setSortDir(key === "name" ? "asc" : "desc");
-    }
-  };
-
   const hasNoAgreementData =
-    rows.length === 0 ||
-    rows.every((r) => r.current == null && r.pairCount === 0);
+    (agreement?.human_human?.pair_count ?? 0) === 0 &&
+    (agreement?.evaluators_with_humans?.pair_count ?? 0) === 0 &&
+    (agreement?.evaluators ?? []).every(
+      (ev) =>
+        ev.current == null &&
+        (ev.pair_count ?? 0) === 0 &&
+        ev.inter_annotator?.current == null &&
+        (ev.inter_annotator?.pair_count ?? 0) === 0,
+    );
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -1424,8 +1301,8 @@ function AgreementOverview({
           <div>
             <h2 className="text-sm font-semibold">Agreement summary</h2>
             <p className="text-xs text-muted-foreground">
-              Agreement between annotators, and how closely each evaluator
-              aligns with the annotators
+              How often annotators agree with each other, and how often each
+              evaluator agrees with them
             </p>
           </div>
           <Select
@@ -1491,293 +1368,20 @@ function AgreementOverview({
           }
         />
       ) : (
-        <>
-          {/* Desktop table */}
-          <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
-              <SortHeader
-                label="Name"
-                active={sortKey === "name"}
-                dir={sortDir}
-                onClick={() => handleSort("name")}
-              />
-              <SortHeader
-                label="Current agreement"
-                active={sortKey === "current"}
-                dir={sortDir}
-                onClick={() => handleSort("current")}
-              />
-              <div />
-            </div>
-            {sorted.map((row) => {
-              const isOpen = expanded.has(row.key);
-              const hasData =
-                row.series.length > 0 &&
-                row.pairCount > 0 &&
-                row.current != null;
-              return (
-                <div
-                  key={row.key}
-                  className="border-b border-border last:border-b-0"
-                >
-                  <div
-                    onClick={() => toggleRow(row.key)}
-                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] gap-4 px-4 py-3 hover:bg-muted/20 transition-colors cursor-pointer items-center"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      {row.key === "human_human" ? (
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {row.name}
-                        </p>
-                      ) : (
-                        <>
-                          <EvaluatorNamePill
-                            name={row.name}
-                            fitClassName="max-w-full min-w-0"
-                            onOpen={(e) => {
-                              e.stopPropagation();
-                              setPreviewEvaluator({
-                                uuid: row.key,
-                                name: row.name,
-                              });
-                            }}
-                          />
-                          <span className="text-sm font-medium text-foreground shrink-0">
-                            alignment
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    <div
-                      className={`text-sm font-semibold tabular-nums ${agreementColor(row.current)}`}
-                    >
-                      {row.current != null
-                        ? `${Math.round(row.current * 100)}%`
-                        : "—"}
-                    </div>
-                    <div className="flex justify-end">
-                      <svg
-                        className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                  {isOpen && (
-                    <div className="border-t border-border bg-muted/10 p-4">
-                      <ExpandedChart
-                        hasData={hasData}
-                        data={buildChartData(row.series)}
-                        color={row.color}
-                        seriesName={row.name}
-                        emptyTitle={row.emptyTitle}
-                        emptyDescription={row.emptyDescription}
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Mobile cards */}
-          <div className="md:hidden space-y-2">
-            {sorted.map((row) => {
-              const isOpen = expanded.has(row.key);
-              const hasData =
-                row.series.length > 0 &&
-                row.pairCount > 0 &&
-                row.current != null;
-              return (
-                <div
-                  key={row.key}
-                  className="border border-border rounded-xl overflow-hidden"
-                >
-                  <div
-                    onClick={() => toggleRow(row.key)}
-                    className="p-4 hover:bg-muted/20 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      {row.key === "human_human" ? (
-                        <p className="text-sm font-medium text-foreground truncate flex-1">
-                          {row.name}
-                        </p>
-                      ) : (
-                        <>
-                          <EvaluatorNamePill
-                            name={row.name}
-                            fitClassName="flex-1 min-w-0"
-                            onOpen={(e) => {
-                              e.stopPropagation();
-                              setPreviewEvaluator({
-                                uuid: row.key,
-                                name: row.name,
-                              });
-                            }}
-                          />
-                          <span className="text-sm font-medium text-foreground shrink-0">
-                            alignment
-                          </span>
-                        </>
-                      )}
-                      <svg
-                        className={`w-4 h-4 text-muted-foreground transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                        />
-                      </svg>
-                    </div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span
-                        className={`text-base font-semibold tabular-nums ${agreementColor(row.current)}`}
-                      >
-                        {row.current != null
-                          ? `${Math.round(row.current * 100)}%`
-                          : "—"}
-                      </span>
-                    </div>
-                  </div>
-                  {isOpen && (
-                    <div className="border-t border-border bg-muted/10 p-4">
-                      <ExpandedChart
-                        hasData={hasData}
-                        data={buildChartData(row.series)}
-                        color={row.color}
-                        seriesName={row.name}
-                        emptyTitle={row.emptyTitle}
-                        emptyDescription={row.emptyDescription}
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </>
+        agreement && (
+          <AgreementOverviewSection
+            agreement={agreement}
+            onOpenEvaluator={setPreviewEvaluator}
+            allTasks={selectedTaskId === ALL_TASKS}
+            evaluatorTypeOf={(id) => evaluatorTypeMap.get(id)}
+          />
+        )
       )}
       <EvaluatorPreviewModal
         evaluatorUuid={previewEvaluator?.uuid ?? null}
         evaluatorName={previewEvaluator?.name}
         onClose={() => setPreviewEvaluator(null)}
       />
-    </div>
-  );
-}
-
-function SortHeader({
-  label,
-  active,
-  dir,
-  onClick,
-  align = "left",
-}: {
-  label: string;
-  active: boolean;
-  dir: SortDirection;
-  onClick: () => void;
-  align?: "left" | "right";
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit ${
-        active
-          ? "text-foreground"
-          : "text-muted-foreground hover:text-foreground"
-      } ${align === "right" ? "justify-self-end" : ""}`}
-    >
-      {label}
-      <svg
-        className={`w-3.5 h-3.5 ${active ? "opacity-100" : "opacity-40"}`}
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d={
-            dir === "desc"
-              ? "M19.5 8.25l-7.5 7.5-7.5-7.5"
-              : "M4.5 15.75l7.5-7.5 7.5 7.5"
-          }
-        />
-      </svg>
-    </button>
-  );
-}
-
-function ExpandedChart({
-  hasData,
-  data,
-  color,
-  seriesName,
-  emptyTitle,
-  emptyDescription,
-}: {
-  hasData: boolean;
-  data: Array<{ month: string; agreement: number | null }>;
-  color: string;
-  seriesName: string;
-  emptyTitle: string;
-  emptyDescription: string;
-}) {
-  if (!hasData) {
-    return (
-      <div className="flex flex-col items-center justify-center text-center h-48 px-6">
-        <p className="text-sm font-medium text-foreground">{emptyTitle}</p>
-        <p className="text-xs text-muted-foreground mt-1.5 max-w-md">
-          {emptyDescription}
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="w-full h-56 md:h-64">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="rgba(125,125,125,0.15)"
-          />
-          <XAxis dataKey="month" fontSize={11} />
-          <YAxis domain={[0, 100]} fontSize={11} unit="%" />
-          <Tooltip
-            contentStyle={{
-              background: "var(--background, #fff)",
-              border: "1px solid rgba(125,125,125,0.2)",
-              borderRadius: 8,
-              fontSize: 12,
-            }}
-          />
-          <Line
-            type="monotone"
-            dataKey="agreement"
-            name={seriesName}
-            stroke={color}
-            strokeWidth={2}
-            dot={{ r: 3 }}
-            connectNulls={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
     </div>
   );
 }

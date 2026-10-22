@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
+import { type KappaFields } from "@/lib/agreementKappa";
+import {
+  agreementStatPillBase,
+  KappaCell,
+} from "@/components/human-labelling/KappaCell";
 
 export function agreementColor(v: number | null | undefined): string {
   if (v == null) return "text-muted-foreground";
@@ -12,9 +17,6 @@ export function agreementColor(v: number | null | undefined): string {
   if (pct <= 50) return "text-red-600 dark:text-red-400";
   return "text-yellow-600 dark:text-yellow-400";
 }
-
-const agreementStatPillBase =
-  "inline-flex items-center max-w-full min-w-0 px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground";
 
 /** Evaluator name pills should show in full (wrap / grow); avoid min-w-0 + truncate. */
 const evaluatorAgreementPillLink =
@@ -27,16 +29,18 @@ function Stat({
   valueClassName = "",
   title,
 }: {
-  label: string;
-  value: string;
+  label?: ReactNode;
+  value: ReactNode;
   valueClassName?: string;
   title?: string;
 }) {
   const body = (
     <div className="min-w-0">
-      <div className="text-[11px] text-muted-foreground whitespace-nowrap">
-        {label}
-      </div>
+      {label != null && (
+        <div className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+          {label}
+        </div>
+      )}
       <div
         className={`text-2xl font-semibold tabular-nums mt-0.5 whitespace-nowrap ${valueClassName}`}
       >
@@ -53,6 +57,102 @@ function Stat({
     </Tooltip>
   ) : (
     body
+  );
+}
+
+/** A thin bar filled to the agreement, with a tick at what chance alone
+ * would agree. The fill is green when agreement beats chance, red when it
+ * falls short, and muted when they are equal or chance is unknown, compared
+ * as the whole percents shown so the colour never contradicts the numbers. */
+export function ChanceBar({
+  agreement,
+  chanceAgreement,
+}: {
+  agreement: number;
+  chanceAgreement: number | null | undefined;
+}) {
+  const pct = Math.round(agreement * 100);
+  const chance =
+    chanceAgreement == null ? null : Math.round(chanceAgreement * 100);
+  const fill =
+    chance == null || pct === chance
+      ? "bg-muted-foreground"
+      : pct > chance
+        ? "bg-green-500"
+        : "bg-red-500";
+  return (
+    <div className="relative mt-2 h-2 rounded-full bg-muted">
+      <div
+        data-testid="agreement-fill"
+        className={`h-full rounded-full ${fill}`}
+        style={{ width: `${pct}%` }}
+      />
+      {chance != null && (
+        <div
+          data-testid="chance-tick"
+          className={`absolute -top-1 -bottom-1 -ml-px ${TICK}`}
+          style={{ left: `${chance}%` }}
+        />
+      )}
+    </div>
+  );
+}
+
+const TICK = "w-0.5 bg-foreground";
+const SWATCH = "inline-block h-2 w-4 rounded-full";
+
+/** What the marks on a chance bar mean, drawn with the bar's own classes. */
+export function ChanceLegend({ className = "" }: { className?: string }) {
+  const items: [string, ReactNode][] = [
+    [
+      "Agreement expected by chance alone",
+      <span key="tick" className={`inline-block h-3 ${TICK}`} />,
+    ],
+    ["Better than chance", <span key="g" className={`${SWATCH} bg-green-500`} />],
+    ["Worse than chance", <span key="r" className={`${SWATCH} bg-red-500`} />],
+    [
+      "Same as chance, or cannot be compared",
+      <span key="m" className={`${SWATCH} bg-muted-foreground`} />,
+    ],
+  ];
+  return (
+    <div
+      className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground ${className}`}
+    >
+      {items.map(([text, swatch]) => (
+        <span key={text} className="inline-flex items-center gap-1.5">
+          {swatch}
+          {text}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The chance bar, and under it the chance and the kappa. */
+function AgreementBar({
+  agreement,
+  kappa,
+}: {
+  agreement: number;
+  kappa: KappaFields;
+}) {
+  const chance = kappa.chance_agreement;
+  return (
+    <>
+      <ChanceBar agreement={agreement} chanceAgreement={chance} />
+      <div className="flex items-center justify-between gap-4 mt-1.5 text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">
+        {chance != null ? (
+          <span>Chance {Math.round(chance * 100)}%</span>
+        ) : (
+          <span />
+        )}
+        <span className="inline-flex items-center gap-1">
+          Kappa
+          <KappaCell fields={kappa} />
+        </span>
+      </div>
+    </>
   );
 }
 
@@ -81,11 +181,10 @@ export function AgreementStatCard(
         };
       }
   ) & {
-    /** Human agreement, or an em dash when there is nothing to compare
-     * against yet. Null only where the score has a card of its own, so
-     * agreement is not this card's subject. */
-    value: string | null;
-    valueClassName?: string;
+    /** Human agreement, 0 to 1, shown as a neutral percentage, and with
+     * `kappa` as a bar against chance. Without it the card shows a dash, or
+     * only the score when it has one. */
+    agreement?: number | null;
     /** When present, the card shows this in place of, or next to, the
      * agreement number. */
     result?: EvaluatorResultStat | null;
@@ -104,15 +203,17 @@ export function AgreementStatCard(
      * mark beside the name that explains itself on hover, so a run with
      * unlabelled evaluators does not need a banner above the cards. */
     warning?: string | null;
+    /** Shown beside the human agreement number when there is one. */
+    kappa?: KappaFields | null;
   },
 ) {
   const {
-    value,
-    valueClassName = "",
     result = null,
     showResultLabel = true,
     showAlignmentLabel = true,
     warning = null,
+    kappa = null,
+    agreement = null,
   } = props;
   // The evaluator whose prompt is on show, opened from the pill below. Null
   // until the pill is clicked.
@@ -134,6 +235,7 @@ export function AgreementStatCard(
       </span>
     </span>
   );
+  const percent = agreement == null ? null : `${Math.round(agreement * 100)}%`;
   // One number, named by the section the card sits in.
   const singleNumber = (
     <div
@@ -142,12 +244,25 @@ export function AgreementStatCard(
           ? result.ratio == null
             ? ""
             : agreementColor(result.ratio)
-          : valueClassName
+          : percent == null
+            ? "text-muted-foreground"
+            : "text-foreground"
       }`}
     >
-      {result ? result.value : (value ?? "—")}
+      {result ? result.value : (percent ?? "—")}
     </div>
   );
+  const agreementBlock =
+    agreement != null && percent != null ? (
+      <div className="min-w-0">
+        <Stat
+          label={result ? "Human agreement" : undefined}
+          value={percent}
+          valueClassName="text-foreground"
+        />
+        {kappa && <AgreementBar agreement={agreement} kappa={kappa} />}
+      </div>
+    ) : null;
   const warningMark = warning ? (
     <Tooltip content={warning} position="top">
       <span
@@ -214,13 +329,13 @@ export function AgreementStatCard(
             {warningMark}
           </div>
         )}
-        {result && (value != null || showResultLabel) ? (
+        {result && (percent != null || showResultLabel) ? (
           // Each number is labelled, so the card reads the same whether or not
           // there is a human agreement number to sit beside the score. On its
           // own the score sits in the middle of the card.
           <div
             className={`mt-2 flex items-start gap-6 ${
-              value == null ? "justify-center text-center" : ""
+              percent == null ? "justify-center text-center" : ""
             }`}
           >
             <Stat
@@ -231,14 +346,10 @@ export function AgreementStatCard(
               }
               title={result.title}
             />
-            {value != null && (
-              <Stat
-                label="Human agreement"
-                value={value}
-                valueClassName={valueClassName}
-              />
-            )}
+            {agreementBlock}
           </div>
+        ) : !result && kappa && agreementBlock ? (
+          <div className="mt-2">{agreementBlock}</div>
         ) : result?.title ? (
           // The hover text says what the number counts, which is nowhere on
           // screen, so it is always worth showing. Below the number, since
@@ -258,3 +369,31 @@ export function AgreementStatCard(
     </>
   );
 }
+
+/** The two whole-workspace or whole-task numbers: a pill label over a large
+ * percentage in the neutral text colour, or a muted dash. */
+export function OverallAgreementCards({
+  interAnnotator,
+  withHumans,
+}: {
+  interAnnotator: { current: number | null } | null | undefined;
+  withHumans: { current: number | null } | null | undefined;
+}) {
+  return (
+    <>
+      {(
+        [
+          ["Inter-annotator agreement", interAnnotator],
+          ["Evaluator agreement with humans", withHumans],
+        ] as const
+      ).map(([title, group]) => (
+        <AgreementStatCard
+          key={title}
+          staticPillText={title}
+          agreement={group?.current}
+        />
+      ))}
+    </>
+  );
+}
+

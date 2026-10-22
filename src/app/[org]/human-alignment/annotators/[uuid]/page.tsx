@@ -14,19 +14,12 @@ import {
   useRouter,
   useSearchParams,
 } from "@/lib/nav";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { AppLayout } from "@/components/AppLayout";
-// The chart on this page already has a `Tooltip` of its own, so the app's
-// hover text comes in under a second name.
-import { Tooltip as HoverText } from "@/components/Tooltip";
+import {
+  AgreementTrendChart,
+  TrendHoverBox,
+} from "@/components/charts/AgreementTrendChart";
+import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { Breadcrumbs, CopyLinkButton, type Crumb } from "@/components/ui";
@@ -35,6 +28,13 @@ import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { parseBackendTime } from "@/lib/relativeTime";
+import {
+  annotatorTrendSeries,
+  type AnswerKind,
+  type KappaByKind,
+} from "@/lib/agreementKappa";
+import { KappaCell } from "@/components/human-labelling/KappaCell";
+import { MeasureCell } from "@/components/human-labelling/AgreementOverviewTable";
 
 type Tab = "overview" | "jobs";
 
@@ -55,15 +55,20 @@ type AnnotatorStats = {
   current_agreement: number | null;
   pair_count: number;
   jobs_count: number;
+  /** Kappa for each kind of answer the annotator was compared on. */
+  kappa_by_kind?: KappaByKind[];
 };
 
 type Bucket = "week" | "month" | "year";
+
+const ANSWER_KINDS: AnswerKind[] = ["binary", "rating"];
 
 type AgreementSeriesPoint = {
   bucket_start: string;
   bucket_end: string;
   agreement: number | null;
   pair_count: number;
+  kappa_by_kind?: KappaByKind[];
 };
 
 type AnnotatorTrend = {
@@ -236,18 +241,7 @@ function AnnotatorDetailPageInner() {
     }
   };
 
-  const formatPercent = (value: number | null | undefined): string => {
-    if (value == null) return "—";
-    return `${Math.round(value * 100)}%`;
-  };
 
-  const agreementColor = (value: number | null | undefined): string => {
-    if (value == null) return "";
-    const pct = value * 100;
-    if (pct >= 75) return "text-green-600 dark:text-green-400";
-    if (pct <= 50) return "text-red-600 dark:text-red-400";
-    return "text-yellow-600 dark:text-yellow-400";
-  };
 
   const jobsCount = stats?.jobs_count ?? jobs.length;
 
@@ -321,7 +315,7 @@ function AnnotatorDetailPageInner() {
                 {annotator?.name ?? "—"}
               </h1>
               {annotator && (
-                <HoverText content="Rename" position="top">
+                <Tooltip content="Rename" position="top">
                   <button
                     onClick={startEditName}
                     aria-label="Rename annotator"
@@ -341,7 +335,7 @@ function AnnotatorDetailPageInner() {
                       />
                     </svg>
                   </button>
-                </HoverText>
+                </Tooltip>
               )}
             </div>
           )}
@@ -377,21 +371,6 @@ function AnnotatorDetailPageInner() {
                 {detailError}
               </div>
             )}
-
-            {/* Stat cards */}
-            <div className="flex flex-wrap items-stretch gap-3">
-              <StatCard
-                label="Latest agreement"
-                value={
-                  detailLoading ? "—" : formatPercent(stats?.current_agreement)
-                }
-                valueClassName={agreementColor(stats?.current_agreement)}
-              />
-              <StatCard
-                label="Jobs"
-                value={detailLoading ? "—" : String(jobsCount)}
-              />
-            </div>
 
             {/* Trend chart */}
             {(() => {
@@ -464,46 +443,54 @@ function AnnotatorDetailPageInner() {
                       }
                     />
                   ) : (
-                    <div className="w-full h-56 md:h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={series.map((p) => ({
-                            month: formatBucketLabel(
-                              p.bucket_end,
-                              trend?.bucket ?? DEFAULT_BUCKET,
-                            ),
-                            agreement:
-                              p.agreement == null
-                                ? null
-                                : Math.round(p.agreement * 100),
-                          }))}
-                        >
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke="rgba(125,125,125,0.15)"
-                          />
-                          <XAxis dataKey="month" fontSize={11} />
-                          <YAxis domain={[0, 100]} fontSize={11} unit="%" />
-                          <Tooltip
-                            contentStyle={{
-                              background: "var(--background, #fff)",
-                              border: "1px solid rgba(125,125,125,0.2)",
-                              borderRadius: 8,
-                              fontSize: 12,
-                            }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="agreement"
-                            name="Agreement %"
-                            stroke="#10b981"
-                            strokeWidth={2}
-                            dot={{ r: 3 }}
-                            connectNulls={false}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
+                    <AgreementTrendChart
+                      series={annotatorTrendSeries(
+                        series,
+                        (iso) =>
+                          formatBucketLabel(
+                            iso,
+                            trend?.bucket ?? DEFAULT_BUCKET,
+                          ),
+                      )}
+                      renderHover={(bucketEnd, label) => {
+                        const point = series.find(
+                          (p) => p.bucket_end === bucketEnd,
+                        );
+                        if (!point) return null;
+                        return (
+                          <TrendHoverBox label={label}>
+                            <MeasureCell
+                              group={{
+                                current: point.agreement,
+                                pair_count: point.pair_count,
+                              }}
+                              kappa={
+                                <span className="flex flex-col gap-0.5 text-xs text-muted-foreground tabular-nums">
+                                  {ANSWER_KINDS.map((kind) => {
+                                    const entry = point.kappa_by_kind?.find(
+                                      (k) => k.answer_kind === kind,
+                                    );
+                                    return (
+                                      <span
+                                        key={kind}
+                                        className="inline-flex items-center gap-1 whitespace-nowrap"
+                                      >
+                                        Kappa ({kind})
+                                        {entry ? (
+                                          <KappaCell fields={entry} />
+                                        ) : (
+                                          <span>—</span>
+                                        )}
+                                      </span>
+                                    );
+                                  })}
+                                </span>
+                              }
+                            />
+                          </TrendHoverBox>
+                        );
+                      }}
+                    />
                   )}
                 </div>
               );
@@ -598,7 +585,7 @@ function JobTaskName({ name }: { name: string }) {
       {name}
     </div>
   );
-  return clipped ? <HoverText content={name}>{cell}</HoverText> : cell;
+  return clipped ? <Tooltip content={name}>{cell}</Tooltip> : cell;
 }
 
 function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
@@ -674,27 +661,6 @@ function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  valueClassName = "",
-}: {
-  label: string;
-  value: string;
-  valueClassName?: string;
-}) {
-  return (
-    <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[160px]">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className={`text-2xl font-semibold tabular-nums ${valueClassName}`}>
-        {value}
-      </div>
     </div>
   );
 }

@@ -66,12 +66,9 @@ import {
 } from "@/components/human-labelling/JobsCreatedDialog";
 import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvaluatorsDialog";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
+import { AgreementOverviewSection } from "@/components/human-labelling/AgreementOverviewTable";
 import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
-import {
-  AgreementStatCard,
-  agreementColor,
-  type EvaluatorResultStat,
-} from "@/components/human-labelling/AgreementStatCard";
+import type { EvaluatorResultStat } from "@/components/human-labelling/AgreementStatCard";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
@@ -110,6 +107,7 @@ import {
   readEvaluatorVariables,
 } from "@/lib/labellingItem";
 import { parseBackendTime } from "@/lib/relativeTime";
+import type { KappaFields } from "@/lib/agreementKappa";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
 
@@ -119,8 +117,14 @@ type AgreementBlock = {
 };
 
 type TaskAgreementResponse = {
+  /** Overall agreement between annotators. */
   human_human: AgreementBlock;
-  evaluators: (AgreementBlock & {
+  /** Overall agreement between evaluators and humans. */
+  evaluators_with_humans?: AgreementBlock | null;
+  evaluators: (AgreementBlock &
+    KappaFields & {
+    /** How well annotators agree with each other on this evaluator's items. */
+    inter_annotator?: (AgreementBlock & KappaFields) | null;
     evaluator_id: string;
     name: string;
     /** The evaluator's own rolled-up output across every item in the task,
@@ -1462,7 +1466,7 @@ function LabellingTaskPageInner() {
     setAgreementError(null);
     try {
       const data = await apiClient<TaskAgreementResponse>(
-        `/annotation-tasks/${uuid}/agreement?bucket=month&days=180`,
+        `/annotation-tasks/${uuid}/agreement`,
         accessToken,
       );
       setAgreement(data);
@@ -2936,8 +2940,8 @@ function LabellingTaskPageInner() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    How closely annotators agree with each other, and how
-                    closely each evaluator aligns with humans
+                    How often annotators agree with each other, and how often
+                    each evaluator agrees with them
                   </p>
                   {evaluatorsWithoutHumanLabels.length > 0 && (
                     <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2 mt-3">
@@ -2957,37 +2961,19 @@ function LabellingTaskPageInner() {
                       <span>{humanLabelNote}</span>
                     </div>
                   )}
+                  {/* Every linked evaluator has a row here, the tool-call one
+                      included: its inter-annotator agreement is a real
+                      number even though no evaluator judges it, so this
+                      reads `agreement.evaluators`, not `judgedEvaluators`. */}
                   {hasReliabilityNumber(
                     agreement.human_human,
-                    judgedEvaluators,
+                    agreement.evaluators ?? [],
                   ) && (
-                    <div className="flex flex-wrap items-stretch gap-3 mt-3">
-                      <AgreementStatCard
-                        staticPillText="Annotator agreement"
-                        value={
-                          agreement.human_human?.current != null
-                            ? `${Math.round(agreement.human_human.current * 100)}%`
-                            : "—"
-                        }
-                        valueClassName={agreementColor(
-                          agreement.human_human?.current,
-                        )}
+                    <div className="mt-3 space-y-4">
+                      <AgreementOverviewSection
+                        agreement={agreement}
+                        onOpenEvaluator={setPreviewEvaluator}
                       />
-                      {judgedEvaluators.map((ev) => (
-                        <AgreementStatCard
-                          key={ev.evaluator_id}
-                          evaluatorPill={{
-                            uuid: ev.evaluator_id,
-                            name: ev.name,
-                          }}
-                          value={
-                            ev.current != null
-                              ? `${Math.round(ev.current * 100)}%`
-                              : "—"
-                          }
-                          valueClassName={agreementColor(ev.current)}
-                        />
-                      ))}
                     </div>
                   )}
                 </section>

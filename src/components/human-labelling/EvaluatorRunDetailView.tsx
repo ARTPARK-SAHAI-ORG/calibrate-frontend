@@ -19,7 +19,6 @@ import {
 } from "@/lib/binaryLabels";
 import {
   AgreementStatCard,
-  agreementColor,
   type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
 import { summariseValues } from "@/lib/evaluatorResultStat";
@@ -49,6 +48,7 @@ import { ExpectedToolCalls } from "@/components/human-labelling/item-panes/Expec
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
 import { hasItemDetails, ItemDetailsBlock } from "./ItemDetailsBlock";
 import type { ReviewItem } from "./SendForReviewFlow";
+import type { KappaFields } from "@/lib/agreementKappa";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -128,7 +128,7 @@ export type HumanAnnotation = {
   updated_at: string;
 };
 
-export type HumanAgreementEvaluatorSummary = {
+export type HumanAgreementEvaluatorSummary = KappaFields & {
   evaluator_id: string;
   evaluator_version_id: string | null;
   agreement: number | null;
@@ -1621,11 +1621,6 @@ function EvaluatorSummary({
           // No human labels on these items means there is nothing to put in
           // the human agreement column, so the card leaves it out entirely
           // rather than showing a dash. The mark on the card says why.
-          const value =
-            row?.agreement != null
-              ? `${Math.round(row.agreement * 100)}%`
-              : null;
-          const valueClassName = agreementColor(row?.agreement);
           // Said on the card itself, on hover, rather than in a banner above
           // every card: this way it names which evaluator is missing labels.
           const warning =
@@ -1647,10 +1642,10 @@ function EvaluatorSummary({
                   name,
                   versionLabel: version,
                 }}
-                value={value}
-                valueClassName={valueClassName}
+                agreement={row?.agreement}
                 result={result}
                 warning={warning}
+                kappa={row}
               />
             );
           }
@@ -1660,10 +1655,10 @@ function EvaluatorSummary({
               staticPillText={
                 version ? `${name} ${version}` : name
               }
-              value={value}
-              valueClassName={valueClassName}
+              agreement={row?.agreement}
               result={result}
               warning={warning}
+              kappa={row}
             />
           );
         })}

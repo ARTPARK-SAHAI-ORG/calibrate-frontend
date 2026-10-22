@@ -1,4 +1,9 @@
 import type { EvaluatorResultStat } from "@/components/human-labelling/AgreementStatCard";
+import {
+  answerKindOf,
+  type AnswerKind,
+  type KappaFields,
+} from "@/lib/agreementKappa";
 
 /**
  * Does the task overview have anything to show, or only the placeholder?
@@ -81,3 +86,85 @@ export function taskEvaluatorScoreCards<
       stat: stats[ev.evaluator_id]!,
     }));
 }
+
+type OverviewGroup = { current: number | null; kappa?: number | null };
+
+/**
+ * The evaluator rows on the Human alignment overview. Across all tasks, an
+ * evaluator with no agreement and no kappa in either group, inter-annotator
+ * or with humans, has nothing to show and is left out. One task keeps every
+ * evaluator linked to it.
+ */
+export function overviewRows<
+  T extends { withHumans: OverviewGroup; interAnnotator: OverviewGroup },
+>(rows: T[], allTasks: boolean): T[] {
+  if (!allTasks) return rows;
+  const has = (g: OverviewGroup) => g.current != null || g.kappa != null;
+  return rows.filter((r) => has(r.withHumans) || has(r.interAnnotator));
+}
+
+export type AgreementGroup = KappaFields & {
+  current: number | null;
+  pair_count: number;
+};
+
+export type EvaluatorAgreement = AgreementGroup & {
+  evaluator_id: string;
+  name: string;
+  /** How well annotators agree with each other on this evaluator's items. */
+  inter_annotator?: AgreementGroup | null;
+};
+
+export type OverviewRow = {
+  key: string;
+  name: string;
+  kind: AnswerKind | null;
+  withHumans: AgreementGroup;
+  interAnnotator: AgreementGroup;
+};
+
+const EMPTY_GROUP: AgreementGroup = { current: null, pair_count: 0 };
+
+/** One row per evaluator, with its kind of answer and both measures. */
+export function buildOverviewRows(
+  evaluators: readonly EvaluatorAgreement[],
+): OverviewRow[] {
+  return evaluators.map((ev) => ({
+    key: ev.evaluator_id,
+    name: ev.name,
+    kind: answerKindOf(ev.kappa_type ?? ev.inter_annotator?.kappa_type),
+    withHumans: ev,
+    interAnnotator: ev.inter_annotator ?? EMPTY_GROUP,
+  }));
+}
+
+/**
+ * The overview rows in the reader's chosen order. Evaluators of the same type
+ * sit together, typed groups first. Within a group, a row with no agreement
+ * goes last whichever way the column is sorted, since a missing number is
+ * neither high nor low.
+ */
+export function sortOverviewRows<
+  T extends OverviewRow & { evaluatorType?: string },
+>(
+  rows: readonly T[],
+  sortKey: "name" | "interAnnotator" | "withHumans",
+  sortDir: "asc" | "desc",
+): T[] {
+  const dir = sortDir === "desc" ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const aType = a.evaluatorType ?? "";
+    const bType = b.evaluatorType ?? "";
+    if (aType !== bType) {
+      if (!aType) return 1;
+      if (!bType) return -1;
+      return aType.localeCompare(bType);
+    }
+    if (sortKey === "name") return dir * a.name.localeCompare(b.name);
+    const x = a[sortKey].current;
+    const y = b[sortKey].current;
+    if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;
+    return dir * (x - y);
+  });
+}
+

@@ -12,20 +12,15 @@ import {
 import { useParams, useRouter, useSearchParams } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
-// The chart on this page already has a `Tooltip` of its own, so the app's
-// hover text comes in under a second name.
-import { Tooltip as HoverText } from "@/components/Tooltip";
+import {
+  AgreementTrendChart,
+  TrendHoverBox,
+} from "@/components/charts/AgreementTrendChart";
+import { MeasureCell } from "@/components/human-labelling/AgreementOverviewTable";
+import { Tooltip } from "@/components/Tooltip";
+import type { KappaFields } from "@/lib/agreementKappa";
 import { NotFoundState, InfoNote } from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
@@ -132,20 +127,12 @@ type EvaluatorDetail = {
   evaluator_type?: EvaluatorType;
 };
 
-type TrendSeriesPoint = {
-  bucket_start: string;
-  bucket_end: string;
-  agreement: number | null;
-  pair_count: number;
-};
-
-type TrendVersion = {
+type TrendVersion = KappaFields & {
   version_id: string;
   version_number: number;
   is_live: boolean;
   current: number | null;
   pair_count: number;
-  series: TrendSeriesPoint[];
 };
 
 type TrendTask = {
@@ -153,7 +140,6 @@ type TrendTask = {
   task_name: string;
   current: number | null;
   pair_count: number;
-  series: TrendSeriesPoint[];
 };
 
 type EvaluatorTrendResponse = {
@@ -162,11 +148,6 @@ type EvaluatorTrendResponse = {
   bucket: string;
   days: number;
   filters: { task_id: string | null; version_id: string | null };
-  overall: {
-    current: number | null;
-    pair_count: number;
-    series: TrendSeriesPoint[];
-  };
   versions: TrendVersion[];
   tasks: TrendTask[];
 };
@@ -886,7 +867,7 @@ function EvaluatorDetailPageInner() {
                   <h1 className="text-xl md:text-2xl font-semibold text-foreground">
                     {evaluator.name}
                   </h1>
-                  <HoverText content="Edit name and description" position="top">
+                  <Tooltip content="Edit name and description" position="top">
                     <button
                       onClick={openEditDialog}
                       aria-label="Edit name and description"
@@ -906,7 +887,7 @@ function EvaluatorDetailPageInner() {
                         />
                       </svg>
                     </button>
-                  </HoverText>
+                  </Tooltip>
                 </div>
                 {evaluator.description && (
                   <p className="text-muted-foreground text-sm md:text-base leading-relaxed mt-2">
@@ -947,7 +928,7 @@ function EvaluatorDetailPageInner() {
                   }
                 />
                 {canDeleteEvaluator(evaluator) && (
-                  <HoverText content="Delete evaluator" position="top">
+                  <Tooltip content="Delete evaluator" position="top">
                     <button
                       onClick={() => setDeleteOpen(true)}
                       aria-label="Delete evaluator"
@@ -967,7 +948,7 @@ function EvaluatorDetailPageInner() {
                         />
                       </svg>
                     </button>
-                  </HoverText>
+                  </Tooltip>
                 )}
               </div>
             </div>
@@ -1036,7 +1017,7 @@ function EvaluatorDetailPageInner() {
                           </button>
 
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <HoverText
+                            <Tooltip
                               content={`Edit, starting from v${v.version_number}`}
                               position="top"
                             >
@@ -1064,9 +1045,9 @@ function EvaluatorDetailPageInner() {
                                   />
                                 </svg>
                               </button>
-                            </HoverText>
+                            </Tooltip>
                             {!isCurrent && (
-                              <HoverText
+                              <Tooltip
                                 content="Mark as current"
                                 position="top"
                               >
@@ -1090,10 +1071,10 @@ function EvaluatorDetailPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
+                              </Tooltip>
                             )}
                             {!isCurrent && (
-                              <HoverText
+                              <Tooltip
                                 content={`Delete v${v.version_number}`}
                                 position="top"
                               >
@@ -1116,7 +1097,7 @@ function EvaluatorDetailPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
+                              </Tooltip>
                             )}
                           </div>
                         </div>
@@ -1725,14 +1706,6 @@ function EvaluatorDetailPageInner() {
   );
 }
 
-function averageSeriesAgreement(series: TrendSeriesPoint[]): number | null {
-  const values = series
-    .map((p) => p.agreement)
-    .filter((v): v is number => v != null);
-  if (values.length === 0) return null;
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
-
 function VersionAxisTick({
   x,
   y,
@@ -1801,9 +1774,9 @@ function AgreementTrendTab({
   onSelectTask: (id: string) => void;
   allTasks: TrendTask[];
 }) {
-  const { chartData, liveLabels } = useMemo(() => {
+  const { points, liveLabels } = useMemo(() => {
     if (!trend?.versions?.length)
-      return { chartData: [], liveLabels: new Set<string>() };
+      return { points: [], liveLabels: new Set<string>() };
     const sorted = [...trend.versions].sort(
       (a, b) => a.version_number - b.version_number,
     );
@@ -1811,19 +1784,18 @@ function AgreementTrendTab({
       sorted.filter((v) => v.is_live).map((v) => `v${v.version_number}`),
     );
     return {
-      chartData: sorted.map((v) => ({
-        version: `v${v.version_number}`,
-        agreement: (() => {
-          const avg = averageSeriesAgreement(v.series);
-          return avg == null ? null : Math.round(avg * 100);
-        })(),
+      points: sorted.map((v) => ({
+        key: v.version_id,
+        label: `v${v.version_number}`,
+        agreement: v.current,
+        kappa: v.kappa,
+        kappa_type: v.kappa_type,
       })),
       liveLabels: liveSet,
     };
   }, [trend]);
 
-  const hasData =
-    chartData.length > 0 && chartData.some((p) => p.agreement != null);
+  const hasData = points.some((p) => p.agreement != null);
 
   type TaskOption = { id: string; name: string };
   const ALL_TASKS_OPTION: TaskOption = { id: "all", name: "All tasks" };
@@ -1920,43 +1892,51 @@ function AgreementTrendTab({
         </div>
       ) : (
         <div className="border border-border rounded-xl p-4 md:p-6">
-          <div className="w-full h-64 md:h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="rgba(125,125,125,0.15)"
-                />
-                <XAxis
-                  dataKey="version"
-                  padding={{ left: 40, right: 40 }}
-                  tick={(props) => (
-                    <VersionAxisTick {...props} liveLabels={liveLabels} />
-                  )}
-                  height={44}
-                />
-                <YAxis domain={[0, 100]} fontSize={11} unit="%" />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--background, #fff)",
-                    border: "1px solid rgba(125,125,125,0.2)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  formatter={(value) => (value == null ? "—" : `${value}%`)}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="agreement"
-                  name="Agreement"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  dot={{ r: 4 }}
-                  connectNulls={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <AgreementTrendChart
+            className="w-full h-64 md:h-72"
+            dotRadius={4}
+            xAxisProps={{
+              padding: { left: 40, right: 40 },
+              tick: (props) => (
+                <VersionAxisTick {...props} liveLabels={liveLabels} />
+              ),
+              height: 44,
+            }}
+            bothAxes
+            series={[
+              {
+                key: "agreement",
+                name: "Agreement",
+                kappaName: "Kappa",
+                plainKappaLine: true,
+                color: "var(--chart-2)",
+                kappaColor: "var(--chart-1)",
+                points,
+              },
+            ]}
+            renderHover={(versionId, label) => {
+              const version = trend?.versions.find(
+                (v) => v.version_id === versionId,
+              );
+              if (!version) return null;
+              return (
+                <TrendHoverBox
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      {label}
+                      {version.is_live && (
+                        <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400 leading-none flex-shrink-0">
+                          Live
+                        </span>
+                      )}
+                    </span>
+                  }
+                >
+                  <MeasureCell group={version} />
+                </TrendHoverBox>
+              );
+            }}
+          />
         </div>
       )}
     </div>
