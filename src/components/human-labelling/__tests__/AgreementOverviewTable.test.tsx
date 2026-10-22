@@ -35,7 +35,7 @@ function renderTable(onSort = jest.fn(), onOpenEvaluator = jest.fn()) {
   render(
     <AgreementOverviewTable
       rows={rows}
-      sortKey="current"
+      sortKey="withHumans"
       sortDir="desc"
       onSort={onSort}
       onOpenEvaluator={onOpenEvaluator}
@@ -96,14 +96,19 @@ describe("AgreementOverviewTable", () => {
     expect(screen.queryByText("rating")).not.toBeInTheDocument();
   });
 
-  it("sorts by name or by agreement with humans, and opens an evaluator", async () => {
+  it("sorts by name or by either agreement, and opens an evaluator", async () => {
     const user = setupUser();
     const { onSort, onOpenEvaluator } = renderTable();
     const t = within(table());
     await user.click(t.getByRole("button", { name: /Name/ }));
     expect(onSort).toHaveBeenLastCalledWith("name");
-    await user.click(t.getAllByRole("button", { name: /Agreement/ })[0]);
-    expect(onSort).toHaveBeenLastCalledWith("current");
+    const [interHeader, withHumansHeader] = t.getAllByRole("button", {
+      name: /^Agreement/,
+    });
+    await user.click(interHeader);
+    expect(onSort).toHaveBeenLastCalledWith("interAnnotator");
+    await user.click(withHumansHeader);
+    expect(onSort).toHaveBeenLastCalledWith("withHumans");
     await user.click(t.getByRole("button", { name: "Tone" }));
     expect(onOpenEvaluator).toHaveBeenCalledWith({ uuid: "ev-1", name: "Tone" });
   });

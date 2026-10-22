@@ -1901,7 +1901,7 @@ function AgreementTrendTab({
             series={[
               {
                 key: "agreement",
-                name: `${trend?.evaluator_name ?? "Evaluator"} agreement with annotators`,
+                name: `${trend?.evaluator_name ?? "Evaluator"} agreement with humans`,
                 kappaName: trend?.evaluator_name ?? "Evaluator",
                 color: "var(--chart-2)",
                 points,

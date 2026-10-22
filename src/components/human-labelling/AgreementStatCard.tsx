@@ -134,13 +134,9 @@ export function AgreementStatCard(
         };
       }
   ) & {
-    /** Human agreement, or an em dash when there is nothing to compare
-     * against yet. Null only where the score has a card of its own, so
-     * agreement is not this card's subject. */
-    value: string | null;
-    valueClassName?: string;
-    /** The agreement behind `value`, 0 to 1. With `kappa`, the card draws it
-     * as a bar against chance, in a neutral colour. */
+    /** Human agreement, 0 to 1, shown as a neutral percentage, and with
+     * `kappa` as a bar against chance. Without it the card shows a dash, or
+     * only the score when it has one. */
     agreement?: number | null;
     /** When present, the card shows this in place of, or next to, the
      * agreement number. */
@@ -163,7 +159,7 @@ export function AgreementStatCard(
     /** Shown beside the human agreement number when there is one. */
     kappa?: KappaFields | null;
     /** Several agreement numbers, each under its own title and drawn as a
-     * bar against chance. Takes the place of `value` and `kappa`. */
+     * bar against chance. Takes the place of `agreement` and `kappa`. */
     sections?: {
       title: string;
       agreement: number | null;
@@ -172,8 +168,6 @@ export function AgreementStatCard(
   },
 ) {
   const {
-    value,
-    valueClassName = "",
     result = null,
     showResultLabel = true,
     showAlignmentLabel = true,
@@ -202,6 +196,7 @@ export function AgreementStatCard(
       </span>
     </span>
   );
+  const percent = agreement == null ? null : `${Math.round(agreement * 100)}%`;
   // One number, named by the section the card sits in.
   const singleNumber = (
     <div
@@ -210,30 +205,24 @@ export function AgreementStatCard(
           ? result.ratio == null
             ? ""
             : agreementColor(result.ratio)
-          : valueClassName
+          : percent == null
+            ? "text-muted-foreground"
+            : "text-foreground"
       }`}
     >
-      {result ? result.value : (value ?? "—")}
+      {result ? result.value : (percent ?? "—")}
     </div>
   );
   const agreementBlock =
-    agreement != null && kappa != null && value != null ? (
+    agreement != null && percent != null ? (
       <div className="min-w-0">
         <Stat
           label={result ? "Human agreement" : undefined}
-          value={value}
+          value={percent}
           valueClassName="text-foreground"
         />
-        <AgreementBar agreement={agreement} kappa={kappa} />
+        {kappa && <AgreementBar agreement={agreement} kappa={kappa} />}
       </div>
-    ) : null;
-  const kappaStat =
-    value != null && kappa != null ? (
-      <Stat
-        label="Kappa"
-        value={<KappaCell fields={kappa} />}
-        valueClassName={kappa.kappa == null ? "text-muted-foreground" : ""}
-      />
     ) : null;
   const warningMark = warning ? (
     <Tooltip content={warning} position="top">
@@ -327,13 +316,13 @@ export function AgreementStatCard(
               </div>
             ))}
           </div>
-        ) : result && (value != null || showResultLabel) ? (
+        ) : result && (percent != null || showResultLabel) ? (
           // Each number is labelled, so the card reads the same whether or not
           // there is a human agreement number to sit beside the score. On its
           // own the score sits in the middle of the card.
           <div
             className={`mt-2 flex items-start gap-6 ${
-              value == null ? "justify-center text-center" : ""
+              percent == null ? "justify-center text-center" : ""
             }`}
           >
             <Stat
@@ -344,30 +333,10 @@ export function AgreementStatCard(
               }
               title={result.title}
             />
-            {agreementBlock ?? (
-              <>
-                {value != null && (
-                  <Stat
-                    label="Human agreement"
-                    value={value}
-                    valueClassName={valueClassName}
-                  />
-                )}
-                {kappaStat}
-              </>
-            )}
+            {agreementBlock}
           </div>
-        ) : !result && agreementBlock ? (
+        ) : !result && kappa && agreementBlock ? (
           <div className="mt-2">{agreementBlock}</div>
-        ) : !result && kappaStat ? (
-          <div className="mt-2 flex items-start gap-6">
-            <Stat
-              label="Agreement"
-              value={value}
-              valueClassName={valueClassName}
-            />
-            {kappaStat}
-          </div>
         ) : result?.title ? (
           // The hover text says what the number counts, which is nowhere on
           // screen, so it is always worth showing. Below the number, since
@@ -408,14 +377,54 @@ export function OverallAgreementCards({
         <AgreementStatCard
           key={title}
           staticPillText={title}
-          value={
-            group?.current != null
-              ? `${Math.round(group.current * 100)}%`
-              : "—"
-          }
-          valueClassName={
-            group?.current != null ? "text-foreground" : "text-muted-foreground"
-          }
+          agreement={group?.current}
+        />
+      ))}
+    </>
+  );
+}
+
+type ReliabilityGroup = KappaFields & { current: number | null };
+
+/** Score reliability on a task: the two overall numbers, then a card for
+ * every linked evaluator with its inter-annotator agreement and its
+ * agreement with humans. */
+export function ScoreReliabilityCards({
+  agreement,
+}: {
+  agreement: {
+    human_human?: { current: number | null } | null;
+    evaluators_with_humans?: { current: number | null } | null;
+    evaluators?: (ReliabilityGroup & {
+      evaluator_id: string;
+      name: string;
+      inter_annotator?: ReliabilityGroup | null;
+    })[];
+  };
+}) {
+  return (
+    <>
+      <OverallAgreementCards
+        interAnnotator={agreement.human_human}
+        withHumans={agreement.evaluators_with_humans}
+      />
+      {(agreement.evaluators ?? []).map((ev) => (
+        <AgreementStatCard
+          key={ev.evaluator_id}
+          evaluatorPill={{ uuid: ev.evaluator_id, name: ev.name }}
+          showAlignmentLabel={false}
+          sections={[
+            {
+              title: "Inter-annotator agreement",
+              agreement: ev.inter_annotator?.current ?? null,
+              kappa: ev.inter_annotator,
+            },
+            {
+              title: "Evaluator agreement with humans",
+              agreement: ev.current,
+              kappa: ev,
+            },
+          ]}
         />
       ))}
     </>

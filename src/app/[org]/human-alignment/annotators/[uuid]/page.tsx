@@ -385,12 +385,16 @@ function AnnotatorDetailPageInner() {
                 }
                 valueClassName={agreementColor(stats?.current_agreement)}
               />
-              {!detailLoading && stats && (
-                <StatCard
-                  label="Latest kappa"
-                  value={<KappaByKindList kinds={stats.kappa_by_kind} />}
-                />
-              )}
+              <StatCard
+                label="Latest kappa"
+                value={
+                  detailLoading ? (
+                    "—"
+                  ) : (
+                    <KappaByKindList kinds={stats?.kappa_by_kind} />
+                  )
+                }
+              />
               <StatCard
                 label="Jobs"
                 value={detailLoading ? "—" : String(jobsCount)}

@@ -7,8 +7,16 @@ describe("KappaCell", () => {
     render(<KappaCell fields={{ kappa: 0.4267, kappa_type: "fleiss" }} />);
     expect(screen.getByText("0.43")).toBeInTheDocument();
     expect(screen.queryByText("Fleiss' kappa")).not.toBeInTheDocument();
-    await user.hover(screen.getByRole("button", { name: "Kind of kappa" }));
+    await user.hover(screen.getByRole("button", { name: "Fleiss' kappa" }));
     expect(await screen.findByText("Fleiss' kappa")).toBeInTheDocument();
+  });
+
+  it("names the kind on the info icon and shows it on keyboard focus", async () => {
+    const user = setupUser();
+    render(<KappaCell fields={{ kappa: 0.2, kappa_type: "cohen" }} />);
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Cohen's kappa" })).toHaveFocus();
+    expect(await screen.findByText("Cohen's kappa")).toBeInTheDocument();
   });
 
   it.each([
@@ -34,9 +42,8 @@ describe("KappaCell", () => {
       expect(screen.getByText(text).className).toContain("rounded-md");
       expect(screen.queryByText("—")).not.toBeInTheDocument();
       expect(screen.queryByText(help)).not.toBeInTheDocument();
-      await user.hover(
-        screen.getByRole("button", { name: "Why there is no kappa" }),
-      );
+      await user.tab();
+      expect(screen.getByRole("button", { name: help })).toHaveFocus();
       expect(await screen.findByText(help)).toBeInTheDocument();
     },
   );
@@ -72,8 +79,8 @@ describe("KappaByKindList", () => {
     expect(binary).toHaveTextContent("Binary0.20");
     const rating = screen.getByText("Rating").parentElement!;
     expect(rating).toHaveTextContent("RatingEveryone agreed");
-    await user.hover(screen.getByRole("button", { name: "Kind of kappa" }));
-    expect(await screen.findByText("Cohen's kappa")).toBeInTheDocument();
+    await user.hover(screen.getByRole("button", { name: "Cohen's kappa" }));
+    expect(await screen.findByText("Cohen's kappa", { selector: "div" })).toBeInTheDocument();
   });
 
   it("shows a dash when no kind was compared", () => {

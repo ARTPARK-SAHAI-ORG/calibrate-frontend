@@ -6,6 +6,7 @@ import {
   overviewRows,
   taskEvaluatorScoreCards,
 } from "../taskOverviewData";
+import { buildTrendChart } from "../agreementKappa";
 
 describe("hasTaskOverviewData", () => {
   it("is false with no agreement response", () => {
@@ -297,6 +298,24 @@ describe("buildOverviewRows and overviewChartSeries", () => {
         false,
       ],
       ["ev-1", "Tone agreement with humans", "var(--chart-1)", false, false],
+    ]);
+    // The kappa view names each kappa line as a kappa, not as agreement,
+    // and the overall lines have no kappa line.
+    const withKappa = series.map((one) => ({
+      ...one,
+      points: one.points.map((p) => ({
+        ...p,
+        kappa: 0.3,
+        kappa_type: "cohen" as const,
+      })),
+    }));
+    expect(
+      buildTrendChart(withKappa)
+        .lines.filter((l) => l.kappa)
+        .map((l) => l.name),
+    ).toEqual([
+      "Tone inter-annotator kappa (Cohen's kappa)",
+      "Tone kappa with humans (Cohen's kappa)",
     ]);
     expect(series[2].points[0]).toMatchObject({
       key: "2026-01-31",

@@ -153,6 +153,23 @@ describe("buildTrendChart", () => {
     expect(kappaDomain).toEqual([0, 1]);
   });
 
+  it("names the kappa line after the agreement line when no kappa name is given", () => {
+    const { lines } = buildTrendChart([
+      {
+        key: "a",
+        name: "Tone kappa",
+        color: "#000",
+        points: [
+          { key: "1", label: "Jan", agreement: 0.4, kappa: 0.1, kappa_type: "cohen" },
+        ],
+      },
+    ]);
+    expect(lines.map((l) => l.name)).toEqual([
+      "Tone kappa",
+      "Tone kappa (Cohen's kappa)",
+    ]);
+  });
+
   it("keeps two buckets that share a label as two points", () => {
     const { data } = buildTrendChart(
       one([

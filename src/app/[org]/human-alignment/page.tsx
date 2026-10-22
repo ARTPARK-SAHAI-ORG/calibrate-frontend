@@ -1257,7 +1257,7 @@ function AgreementOverview({
     }
     return m;
   })();
-  const [sortKey, setSortKey] = useState<OverviewSortKey>("current");
+  const [sortKey, setSortKey] = useState<OverviewSortKey>("withHumans");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
   const [previewEvaluator, setPreviewEvaluator] = useState<{
     uuid: string;
@@ -1296,7 +1296,7 @@ function AgreementOverview({
       return x === y ? 0 : x < y ? -1 : 1;
     };
     if (sortKey === "name") return dir * a.name.localeCompare(b.name);
-    return dir * cmp(a.withHumans.current, b.withHumans.current);
+    return dir * cmp(a[sortKey].current, b[sortKey].current);
   });
 
   const chartSeries = agreement

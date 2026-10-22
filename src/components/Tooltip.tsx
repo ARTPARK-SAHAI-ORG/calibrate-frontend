@@ -225,6 +225,10 @@ export function Tooltip({
         className={`relative ${className}`}
         onMouseEnter={show}
         onMouseLeave={hide}
+        // Keyboard users reach the hover text by moving focus onto the
+        // trigger, since they cannot hover it.
+        onFocus={show}
+        onBlur={hide}
         // Hide on click too: clicking the trigger often opens a dialog/overlay
         // on top of it, so the pointer never physically leaves and no
         // mouseleave fires — leaving the tooltip stuck on screen. Use the

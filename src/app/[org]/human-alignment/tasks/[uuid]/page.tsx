@@ -68,8 +68,7 @@ import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvalu
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
 import {
-  AgreementStatCard,
-  OverallAgreementCards,
+  ScoreReliabilityCards,
   type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
@@ -2964,38 +2963,16 @@ function LabellingTaskPageInner() {
                       <span>{humanLabelNote}</span>
                     </div>
                   )}
+                  {/* Every linked evaluator has a card here, the tool-call one
+                      included: its inter-annotator agreement is a real
+                      number even though no evaluator judges it, so this
+                      reads `agreement.evaluators`, not `judgedEvaluators`. */}
                   {hasReliabilityNumber(
                     agreement.human_human,
-                    judgedEvaluators,
+                    agreement.evaluators ?? [],
                   ) && (
                     <div className="flex flex-wrap items-stretch gap-3 mt-3">
-                      <OverallAgreementCards
-                        interAnnotator={agreement.human_human}
-                        withHumans={agreement.evaluators_with_humans}
-                      />
-                      {judgedEvaluators.map((ev) => (
-                        <AgreementStatCard
-                          key={ev.evaluator_id}
-                          evaluatorPill={{
-                            uuid: ev.evaluator_id,
-                            name: ev.name,
-                          }}
-                          value={null}
-                          showAlignmentLabel={false}
-                          sections={[
-                            {
-                              title: "Inter-annotator agreement",
-                              agreement: ev.inter_annotator?.current ?? null,
-                              kappa: ev.inter_annotator,
-                            },
-                            {
-                              title: "Evaluator agreement with humans",
-                              agreement: ev.current,
-                              kappa: ev,
-                            },
-                          ]}
-                        />
-                      ))}
+                      <ScoreReliabilityCards agreement={agreement} />
                     </div>
                   )}
                 </section>

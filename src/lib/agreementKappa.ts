@@ -81,8 +81,9 @@ export type TrendSeries = {
   key: string;
   /** Legend name of the agreement line. */
   name: string;
-  /** Legend name of the kappa line, before the kind of kappa in brackets. */
-  kappaName: string;
+  /** Legend name of the kappa line, before the kind of kappa in brackets.
+   * Falls back to `name`. */
+  kappaName?: string;
   color: string;
   /** Inter-annotator lines are dashed, agreement with humans solid. */
   dashed?: boolean;
@@ -117,9 +118,10 @@ export function formatTrendValue(value: unknown, dataKey: unknown): string {
 }
 
 /**
- * Every agreement number and its kappa as lines on one chart. Agreement is a
- * percentage on the left axis; kappa keeps its own -1 to 1 scale on the
- * right axis, which drops below 0 only when some kappa does.
+ * Every agreement number and its kappa as lines for one chart, which shows
+ * either the agreement lines or the kappa lines. Agreement is a percentage;
+ * kappa keeps its own -1 to 1 scale, which drops below 0 only when some
+ * kappa does.
  */
 export function buildTrendChart(series: TrendSeries[]): {
   data: Record<string, string | number | null>[];
@@ -149,7 +151,7 @@ export function buildTrendChart(series: TrendSeries[]): {
     if (types.length > 0 && !s.overall) {
       lines.push({
         dataKey: kappaKey,
-        name: `${s.kappaName} (${types.map((t) => kappaLabel(t)).join(" or ")})`,
+        name: `${s.kappaName ?? s.name} (${types.map((t) => kappaLabel(t)).join(" or ")})`,
         color: s.color,
         kappa: true,
         dashed: !!s.dashed,
@@ -197,7 +199,6 @@ export function annotatorTrendSeries(
     {
       key: "agreement",
       name: "Agreement with other annotators",
-      kappaName: "Agreement with other annotators",
       color: "var(--chart-1)",
       points: points.map((p) => ({
         key: p.bucket_end,
@@ -208,7 +209,6 @@ export function annotatorTrendSeries(
     ...kinds.map((kind) => ({
       key: kind,
       name: `${ANSWER_KIND_LABELS[kind]} answers`,
-      kappaName: `${ANSWER_KIND_LABELS[kind]} answers`,
       color: KIND_COLORS[kind],
       points: points.map((p) => {
         const entry = p.kappa_by_kind?.find((k) => k.answer_kind === kind);

@@ -6,7 +6,7 @@ import { agreementColor } from "@/components/human-labelling/AgreementStatCard";
 import { KappaCell } from "@/components/human-labelling/KappaCell";
 import type { AgreementGroup, OverviewRow } from "@/lib/taskOverviewData";
 
-export type OverviewSortKey = "name" | "current";
+export type OverviewSortKey = "name" | "interAnnotator" | "withHumans";
 type SortDirection = "asc" | "desc";
 
 const GRID =
@@ -97,8 +97,16 @@ function percent(group: AgreementGroup): string {
 }
 
 const GROUPS = [
-  { title: "Inter-annotator agreement", pick: (r: OverviewRow) => r.interAnnotator },
-  { title: "Evaluator agreement with humans", pick: (r: OverviewRow) => r.withHumans },
+  {
+    title: "Inter-annotator agreement",
+    sortKey: "interAnnotator",
+    pick: (r: OverviewRow) => r.interAnnotator,
+  },
+  {
+    title: "Evaluator agreement with humans",
+    sortKey: "withHumans",
+    pick: (r: OverviewRow) => r.withHumans,
+  },
 ] as const;
 
 /** Each evaluator's inter-annotator agreement and its agreement with humans,
@@ -151,21 +159,21 @@ export function AgreementOverviewTable({
               dir={sortDir}
               onClick={() => onSort("name")}
             />
-            <div className="text-sm font-medium text-muted-foreground">
-              Agreement
-            </div>
-            <div className="text-sm font-medium text-muted-foreground">
-              Kappa
-            </div>
-            <SortHeader
-              label="Agreement"
-              active={sortKey === "current"}
-              dir={sortDir}
-              onClick={() => onSort("current")}
-            />
-            <div className="text-sm font-medium text-muted-foreground">
-              Kappa
-            </div>
+            {GROUPS.map((g) => [
+              <SortHeader
+                key={`${g.sortKey}-agreement`}
+                label="Agreement"
+                active={sortKey === g.sortKey}
+                dir={sortDir}
+                onClick={() => onSort(g.sortKey)}
+              />,
+              <div
+                key={`${g.sortKey}-kappa`}
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Kappa
+              </div>,
+            ])}
           </div>
         </div>
         {rows.map((row) => (

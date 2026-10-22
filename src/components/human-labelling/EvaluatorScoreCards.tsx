@@ -92,7 +92,6 @@ export function EvaluatorScoreCards({
                   },
                 }
               : { staticPillText: card.name })}
-            value={null}
             result={card.stat}
             showResultLabel={false}
             showAlignmentLabel={false}

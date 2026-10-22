@@ -11,19 +11,15 @@ import {
 export const agreementStatPillBase =
   "inline-flex items-center max-w-full min-w-0 px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground";
 
-export function KappaInfoIcon({
-  content,
-  label,
-}: {
-  content: string;
-  label: string;
-}) {
+/** An (i) button whose hover or focus shows `content`, which is also its
+ * name for a screen reader. */
+function KappaInfoIcon({ content }: { content: string }) {
   return (
     <Tooltip content={content}>
       <button
         type="button"
         className="p-1 rounded-md hover:bg-muted transition-colors cursor-pointer"
-        aria-label={label}
+        aria-label={content}
       >
         <svg
           className="w-4 h-4 text-muted-foreground"
@@ -50,7 +46,7 @@ function KappaReasonPill({ blank }: { blank: { text: string; help: string } }) {
       <span className={`${agreementStatPillBase} cursor-default`}>
         {blank.text}
       </span>
-      <KappaInfoIcon content={blank.help} label="Why there is no kappa" />
+      <KappaInfoIcon content={blank.help} />
     </span>
   );
 }
@@ -66,10 +62,7 @@ export function KappaCell({
     return (
       <span className="inline-flex items-center gap-1.5">
         {formatKappa(fields.kappa)}
-        <KappaInfoIcon
-          content={kappaLabel(fields.kappa_type)}
-          label="Kind of kappa"
-        />
+        <KappaInfoIcon content={kappaLabel(fields.kappa_type)} />
       </span>
     );
   }

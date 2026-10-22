@@ -104,7 +104,7 @@ export function overviewRows<
   return rows.filter((r) => has(r.withHumans) || has(r.interAnnotator));
 }
 
-export type AgreementSeriesPoint = KappaFields & {
+type AgreementSeriesPoint = KappaFields & {
   bucket_start: string;
   bucket_end: string;
   agreement: number | null;
@@ -173,11 +173,10 @@ export function overviewChartSeries(
     name: string,
     color: string,
     group: AgreementGroup | null | undefined,
-    style: { dashed?: boolean; overall?: boolean },
+    style: { dashed?: boolean; overall?: boolean; kappaName?: string },
   ): TrendSeries => ({
     key,
     name,
-    kappaName: name,
     color,
     points: points(group),
     ...style,
@@ -203,14 +202,14 @@ export function overviewChartSeries(
         `${row.name} inter-annotator agreement`,
         row.color,
         row.interAnnotator,
-        { dashed: true },
+        { dashed: true, kappaName: `${row.name} inter-annotator kappa` },
       ),
       line(
         row.key,
         `${row.name} agreement with humans`,
         row.color,
         row.withHumans,
-        {},
+        { kappaName: `${row.name} kappa with humans` },
       ),
     ]),
   ];
