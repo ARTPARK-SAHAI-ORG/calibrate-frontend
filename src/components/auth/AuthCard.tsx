@@ -12,8 +12,11 @@ export const AUTH_BUTTON_CLASS =
   "w-full py-3 px-4 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
 export const AUTH_ERROR_CLASS =
   "p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm";
-export const AUTH_LINK_CLASS =
-  "font-medium text-emerald-600 hover:text-emerald-700 transition-colors";
+// The login page's "Continue with Google" button, for the second action on a card
+export const AUTH_SECONDARY_BUTTON_CLASS =
+  "w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 cursor-pointer";
+// A link that does a card's main action, drawn as the main button
+export const AUTH_BUTTON_LINK_CLASS = `${AUTH_BUTTON_CLASS} block text-center`;
 
 export const CONNECTION_ERROR =
   "Unable to connect to server. Please try again later.";
@@ -35,9 +38,11 @@ export function useAuthSearch(): string {
 /** The page frame of the login page: logo bar, then one centred card. */
 export function AuthCard({
   title,
+  icon,
   children,
 }: {
   title: string;
+  icon?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -64,6 +69,7 @@ export function AuthCard({
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 p-8 md:p-10">
             <div className="text-center mb-8">
+              {icon && <div className="flex justify-center mb-4">{icon}</div>}
               <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-2">
                 {title}
               </h1>
@@ -85,6 +91,17 @@ export function ButtonLoading({ text }: { text: string }) {
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
       </svg>
       {text}
+    </span>
+  );
+}
+
+/** A green tick, shown above a card that says an email went out */
+export function SentTick() {
+  return (
+    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+      <svg className="h-6 w-6 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
     </span>
   );
 }

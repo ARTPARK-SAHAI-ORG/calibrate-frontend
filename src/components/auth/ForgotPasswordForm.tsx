@@ -9,7 +9,7 @@ import {
   AUTH_ERROR_CLASS,
   AUTH_INPUT_CLASS,
   AUTH_LABEL_CLASS,
-  AUTH_LINK_CLASS,
+  AUTH_SECONDARY_BUTTON_CLASS,
   AuthCard,
   ButtonLoading,
   CONNECTION_ERROR,
@@ -52,14 +52,12 @@ export function ForgotPasswordForm() {
   };
 
   const loginLink = (
-    <p className="mt-6 text-center text-sm text-gray-600">
-      <Link
-        href={withCallback("/login", search)}
-        className={AUTH_LINK_CLASS}
-      >
-        Back to sign in
-      </Link>
-    </p>
+    <Link
+      href={withCallback("/login", search)}
+      className={`${AUTH_SECONDARY_BUTTON_CLASS} mt-4`}
+    >
+      Back to sign in
+    </Link>
   );
 
   if (sentTo) {

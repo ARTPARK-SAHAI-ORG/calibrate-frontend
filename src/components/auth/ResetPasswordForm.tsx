@@ -9,7 +9,7 @@ import {
   AUTH_ERROR_CLASS,
   AUTH_INPUT_CLASS,
   AUTH_LABEL_CLASS,
-  AUTH_LINK_CLASS,
+  AUTH_BUTTON_LINK_CLASS,
   AuthCard,
   ButtonLoading,
   CONNECTION_ERROR,
@@ -68,17 +68,17 @@ export function ResetPasswordForm() {
   if (expired) {
     return (
       <AuthCard title="Reset password">
-        <p className="text-center text-gray-600">
-          This link has expired or was already used.
-        </p>
-        <p className="mt-6 text-center text-sm text-gray-600">
+        <div className="space-y-6">
+          <p className="text-center text-gray-600">
+            This link has expired or was already used.
+          </p>
           <Link
             href={withCallback("/forgot-password", search)}
-            className={AUTH_LINK_CLASS}
+            className={AUTH_BUTTON_LINK_CLASS}
           >
             Get a new reset link
           </Link>
-        </p>
+        </div>
       </AuthCard>
     );
   }
