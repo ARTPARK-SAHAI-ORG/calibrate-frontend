@@ -190,7 +190,8 @@ function readDetail(body: DetailObject): string | undefined {
       .map((entry) => {
         if (entry && typeof entry === "object" && "msg" in entry) {
           const msg = (entry as { msg?: unknown }).msg;
-          return typeof msg === "string" ? msg : "";
+          // Pydantic prefixes a validator's own message with "Value error, ".
+          return typeof msg === "string" ? msg.replace(/^Value error, /, "") : "";
         }
         return "";
       })

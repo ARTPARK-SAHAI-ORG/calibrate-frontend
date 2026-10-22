@@ -176,6 +176,15 @@ describe("parseBackendErrorResponse", () => {
     );
   });
 
+  it("drops the \"Value error, \" prefix from a validator's message", async () => {
+    const res = mockResponse(422, {
+      detail: [{ msg: "Value error, webhook url must be public", loc: ["body"] }],
+    });
+    expect(await parseBackendErrorResponse(res)).toBe(
+      "webhook url must be public",
+    );
+  });
+
   it("skips array entries without a msg field", async () => {
     const res = mockResponse(422, {
       detail: [{ loc: ["body"] }, { msg: "ok" }],

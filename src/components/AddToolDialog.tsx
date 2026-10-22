@@ -8,7 +8,10 @@ import { ParameterCard, Parameter } from "@/components/ParameterCard";
 import { NestedContainer } from "@/components/ui/NestedContainer";
 import { FieldError } from "@/components/ui/FieldError";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { readNameConflictMessage } from "@/lib/parseBackendError";
+import {
+  parseBackendErrorResponse,
+  readNameConflictMessage,
+} from "@/lib/parseBackendError";
 import { parseSchemaNode, NormalizedToolParam } from "@/lib/toolParams";
 
 export type ToolData = {
@@ -183,6 +186,13 @@ export function AddToolDialog({
     }, 60);
     return () => clearTimeout(timer);
   }, [errorScrollTick]);
+
+  // A failed save shows its message at the top of the form; bring it into view.
+  useEffect(() => {
+    if (createError) {
+      sidebarContentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [createError]);
 
   // Scroll to newly added query parameter
   useEffect(() => {
@@ -1227,7 +1237,9 @@ export function AddToolDialog({
           setIsCreating(false);
           return;
         }
-        throw new Error("Failed to create tool");
+        throw new Error(
+          await parseBackendErrorResponse(response, "Error creating tool"),
+        );
       }
 
       await refetchTools();
@@ -1334,7 +1346,9 @@ export function AddToolDialog({
           setIsCreating(false);
           return;
         }
-        throw new Error("Failed to update tool");
+        throw new Error(
+          await parseBackendErrorResponse(response, "Error updating tool"),
+        );
       }
 
       await refetchTools();
@@ -1431,6 +1445,17 @@ export function AddToolDialog({
             </div>
           ) : (
             <>
+              {createError && (
+                <div
+                  role="alert"
+                  className="rounded-md border border-red-500 bg-red-500/10 px-4 py-3"
+                >
+                  <p className="text-sm text-red-500 whitespace-pre-line">
+                    {createError}
+                  </p>
+                </div>
+              )}
+
               {/* Helper Callout — shown at the top in both Form and JSON views */}
               <div className="flex gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
                 <svg
@@ -2008,7 +2033,6 @@ export function AddToolDialog({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-border space-y-3">
-          {createError && <p className="text-sm text-red-500">{createError}</p>}
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={handleClose}
