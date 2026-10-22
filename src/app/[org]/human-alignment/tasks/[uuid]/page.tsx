@@ -1468,7 +1468,7 @@ function LabellingTaskPageInner() {
     setAgreementError(null);
     try {
       const data = await apiClient<TaskAgreementResponse>(
-        `/annotation-tasks/${uuid}/agreement?bucket=month&days=180`,
+        `/annotation-tasks/${uuid}/agreement`,
         accessToken,
       );
       setAgreement(data);

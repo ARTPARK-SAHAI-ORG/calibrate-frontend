@@ -566,7 +566,7 @@ describe("AgreementStatCard sections", () => {
 });
 
 describe("OverallAgreementCards", () => {
-  it("draws each overall number like a score card: a pill label over a large coloured percentage", () => {
+  it("draws each overall number as a pill label over a large neutral percentage", () => {
     render(
       <OverallAgreementCards
         interAnnotator={{ current: 0.82 }}
@@ -581,22 +581,27 @@ describe("OverallAgreementCards", () => {
     expect(pill.closest(".rounded-lg")!.className).toContain("min-w-[160px]");
     const number = screen.getByText("82%");
     expect(number.className).toContain("text-2xl");
-    expect(number.className).toContain(agreementColor(0.82));
+    expect(number.className).toContain("text-foreground");
+    expect(number.className).not.toMatch(/text-(green|red|yellow)/);
     expect(screen.getByText("Evaluator agreement with humans")).toBeInTheDocument();
     expect(screen.getByText("—").className).toContain("text-muted-foreground");
     expect(screen.queryByText(/Kappa|Chance/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("agreement-fill")).not.toBeInTheDocument();
   });
 
-  it("colours the percentage the way the score cards do", () => {
+  it("keeps low and middling numbers neutral too", () => {
     render(
       <OverallAgreementCards
         interAnnotator={{ current: 0.4 }}
         withHumans={{ current: 0.6 }}
       />
     );
-    expect(screen.getByText("40%").className).toContain("text-red-600");
-    expect(screen.getByText("60%").className).toContain("text-yellow-600");
+    expect(screen.getByText("40%").className).not.toMatch(
+      /text-(green|red|yellow)/,
+    );
+    expect(screen.getByText("60%").className).not.toMatch(
+      /text-(green|red|yellow)/,
+    );
   });
 });
 

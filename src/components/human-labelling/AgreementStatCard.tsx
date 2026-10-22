@@ -158,9 +158,8 @@ function AgreementBar({
 
 /** The evaluator's own summarised result across the run's items. */
 export type EvaluatorResultStat = {
-  /** What the number is, e.g. the "true" label or "Average score". Only
-   * read where the card names the score. */
-  label?: string;
+  /** What the number is, e.g. the "true" label or "Average score". */
+  label: string;
   value: string;
   /** Hover text, e.g. "8 of 10 items". */
   title?: string;
@@ -405,8 +404,8 @@ export function AgreementStatCard(
   );
 }
 
-/** The two whole-workspace or whole-task numbers, drawn like the score cards
- * beside them: a pill label over a large percentage in the agreement colour. */
+/** The two whole-workspace or whole-task numbers: a pill label over a large
+ * percentage in the neutral text colour, or a muted dash. */
 export function OverallAgreementCards({
   interAnnotator,
   withHumans,
@@ -425,17 +424,7 @@ export function OverallAgreementCards({
         <AgreementStatCard
           key={title}
           staticPillText={title}
-          // With no number there is no result, so the card shows the same
-          // muted dash every other empty number does.
-          result={
-            group?.current != null
-              ? {
-                  value: `${Math.round(group.current * 100)}%`,
-                  ratio: group.current,
-                }
-              : null
-          }
-          showResultLabel={false}
+          agreement={group?.current}
         />
       ))}
     </>

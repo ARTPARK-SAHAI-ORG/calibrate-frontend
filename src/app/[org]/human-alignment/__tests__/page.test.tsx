@@ -85,15 +85,15 @@ jest.mock("../../../../lib/api", () => ({
 
 import HumanLabellingPage from "../page";
 
-it("shows the overall numbers like the score cards, and the plain-words subtitle", async () => {
+it("shows the overall numbers as neutral pill cards, and the plain-words subtitle", async () => {
   render(<HumanLabellingPage />);
   expect(
     await screen.findByText(
       "How often annotators agree with each other, and how often each evaluator agrees with them",
     ),
   ).toBeInTheDocument();
-  // The overall numbers are drawn like the task page's score cards: a pill
-  // label over a large percentage in the agreement colour.
+  // The overall numbers are pill cards like the task page's score cards,
+  // with the percentage in the neutral text colour.
   const card = (label: string) =>
     screen
       .getAllByText(label)
@@ -102,7 +102,10 @@ it("shows the overall numbers like the score cards, and the plain-words subtitle
   expect(card("Inter-annotator agreement")).toHaveTextContent(
     "Inter-annotator agreement72%",
   );
-  expect(screen.getByText("72%").className).toContain("text-yellow-600");
+  expect(screen.getByText("72%").className).toContain("text-foreground");
+  expect(screen.getByText("72%").className).not.toMatch(
+    /text-(green|red|yellow)/,
+  );
   expect(card("Evaluator agreement with humans")).toHaveTextContent(
     "Evaluator agreement with humans—",
   );
@@ -137,11 +140,13 @@ describe("the Annotators tab", () => {
     // Each kappa heading says what it measures on hover of its (i).
     expect(
       screen.getByRole("button", {
-        name: /^Agreement with the other annotators on pass or fail answers/,
+        name: "Agreement with the other annotators on binary labels, after removing what chance alone would produce. 1 is full agreement, 0 is no better than chance, below 0 is worse than chance",
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Close ratings get partial credit/ }),
+      screen.getByRole("button", {
+        name: "Agreement with the other annotators on rating-style labels, after removing what chance alone would produce. Close ratings get partial credit. 1 is full agreement, 0 is no better than chance, below 0 is worse than chance",
+      }),
     ).toBeInTheDocument();
     expect(header).toEqual([
       "Name",

@@ -131,11 +131,11 @@ const KIND_KAPPA_COLUMNS: Record<AnswerKind, { title: string; help: string }> =
   {
     binary: {
       title: "Kappa (binary)",
-      help: "Agreement with the other annotators on pass or fail answers, after removing what chance alone would produce. 1 is full agreement, 0 is no better than chance, below 0 is worse than chance",
+      help: "Agreement with the other annotators on binary labels, after removing what chance alone would produce. 1 is full agreement, 0 is no better than chance, below 0 is worse than chance",
     },
     rating: {
       title: "Kappa (rating)",
-      help: "Agreement with the other annotators on rating answers, after removing what chance alone would produce. Close ratings get partial credit. 1 is full agreement, 0 is no better than chance, below 0 is worse than chance",
+      help: "Agreement with the other annotators on rating-style labels, after removing what chance alone would produce. Close ratings get partial credit. 1 is full agreement, 0 is no better than chance, below 0 is worse than chance",
     },
   };
 const MUTED_DASH = <span className="text-sm text-muted-foreground">—</span>;
