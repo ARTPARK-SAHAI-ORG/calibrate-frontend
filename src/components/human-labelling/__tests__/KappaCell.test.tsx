@@ -23,11 +23,45 @@ describe("KappaCell", () => {
     ).toBeInTheDocument();
   });
 
+  it.each([
+    [
+      "too_few_items",
+      "Too few items",
+      "Kappa needs at least two items, because one item cannot show what chance alone would produce",
+    ],
+    [
+      "everyone_agreed",
+      "Everyone agreed",
+      "Every answer was the same, so chance alone would also agree every time and kappa cannot be worked out",
+    ],
+  ] as const)(
+    "says why there is no kappa when the reason is %s",
+    async (reason, text, help) => {
+      const user = setupUser();
+      render(
+        <KappaCell
+          fields={{ kappa: null, kappa_type: null, kappa_blank_reason: reason }}
+        />,
+      );
+      expect(screen.getByText(text).className).toContain(
+        "text-muted-foreground",
+      );
+      expect(screen.queryByText("—")).not.toBeInTheDocument();
+      expect(screen.queryByText(help)).not.toBeInTheDocument();
+      await user.hover(
+        screen.getByRole("button", { name: "Why there is no kappa" }),
+      );
+      expect(await screen.findByText(help)).toBeInTheDocument();
+    },
+  );
+
   it("shows a dash and no info icon when there is no kappa", () => {
-    render(<KappaCell fields={{ kappa: null, kappa_type: null }} />);
+    render(
+      <KappaCell
+        fields={{ kappa: null, kappa_type: null, kappa_blank_reason: null }}
+      />,
+    );
     expect(screen.getByText("—")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Kind of kappa" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });

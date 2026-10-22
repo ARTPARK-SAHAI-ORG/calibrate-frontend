@@ -365,6 +365,34 @@ describe("AgreementStatCard", () => {
     expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
   });
 
+  it("says why there is no kappa in the place of the number", async () => {
+    const user = setupUser();
+    render(
+      <AgreementStatCard
+        staticPillText="Annotator agreement"
+        value="100%"
+        kappa={{
+          kappa: null,
+          kappa_type: "fleiss",
+          kappa_blank_reason: "everyone_agreed",
+        }}
+      />,
+    );
+    expect(screen.getByText("Fleiss' kappa")).toBeInTheDocument();
+    expect(screen.getByText("Everyone agreed").className).toContain(
+      "text-muted-foreground",
+    );
+    await user.hover(screen.getByText("Fleiss' kappa"));
+    expect(
+      await screen.findByText(
+        "Every answer was the same, so chance alone would also agree every time and kappa cannot be worked out",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/0 means no better than chance/),
+    ).not.toBeInTheDocument();
+  });
+
   it("leaves kappa out when there is no agreement number beside it", () => {
     render(
       <AgreementStatCard

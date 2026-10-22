@@ -3,8 +3,10 @@ import {
   formatKappa,
   formatTrendValue,
   KAPPA_HELP,
+  kappaBlank,
   kappaLabel,
   kappaText,
+  kappaValue,
   type TrendSeries,
 } from "../agreementKappa";
 
@@ -65,10 +67,54 @@ describe("kappaText", () => {
     );
   });
 
+  it("says why there is no kappa after the kind", () => {
+    expect(
+      kappaText({
+        kappa: null,
+        kappa_type: "cohen",
+        kappa_blank_reason: "everyone_agreed",
+      }),
+    ).toBe("Cohen's kappa: Everyone agreed");
+    expect(
+      kappaText({ kappa: null, kappa_blank_reason: "too_few_items" }),
+    ).toBe("Kappa: Too few items");
+  });
+
   it("is null when there is no kappa", () => {
     expect(kappaText({ kappa: null, kappa_type: null })).toBeNull();
     expect(kappaText({})).toBeNull();
     expect(kappaText(undefined)).toBeNull();
+  });
+});
+
+describe("kappaBlank and kappaValue", () => {
+  it("gives the short text and the hover sentence for each reason", () => {
+    expect(
+      kappaBlank({ kappa: null, kappa_blank_reason: "too_few_items" }),
+    ).toEqual({
+      text: "Too few items",
+      help: "Kappa needs at least two items, because one item cannot show what chance alone would produce",
+    });
+    expect(
+      kappaBlank({ kappa: null, kappa_blank_reason: "everyone_agreed" }),
+    ).toEqual({
+      text: "Everyone agreed",
+      help: "Every answer was the same, so chance alone would also agree every time and kappa cannot be worked out",
+    });
+    expect(
+      kappaValue({ kappa: null, kappa_blank_reason: "too_few_items" }),
+    ).toBe("Too few items");
+  });
+
+  it("has no reason when there is a kappa or no reason was sent", () => {
+    expect(
+      kappaBlank({ kappa: 0.2, kappa_blank_reason: "too_few_items" }),
+    ).toBeNull();
+    expect(kappaBlank({ kappa: null, kappa_blank_reason: null })).toBeNull();
+    expect(kappaBlank({})).toBeNull();
+    expect(kappaBlank(undefined)).toBeNull();
+    expect(kappaValue({ kappa: 0.2 })).toBe("0.20");
+    expect(kappaValue({ kappa: null })).toBeNull();
   });
 });
 

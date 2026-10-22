@@ -5,9 +5,10 @@ import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
-  formatKappa,
   KAPPA_HELP,
+  kappaBlank,
   kappaLabel,
+  kappaValue,
   type KappaFields,
 } from "@/lib/agreementKappa";
 
@@ -157,12 +158,15 @@ export function AgreementStatCard(
       {result ? result.value : (value ?? "—")}
     </div>
   );
+  const kappaShown = kappaValue(kappa);
+  const kappaBlankReason = kappaBlank(kappa);
   const kappaStat =
-    value != null && kappa?.kappa != null ? (
+    value != null && kappaShown != null ? (
       <Stat
-        label={kappaLabel(kappa.kappa_type)}
-        value={formatKappa(kappa.kappa)}
-        title={KAPPA_HELP}
+        label={kappaLabel(kappa?.kappa_type)}
+        value={kappaShown}
+        valueClassName={kappaBlankReason ? "text-muted-foreground" : ""}
+        title={kappaBlankReason?.help ?? KAPPA_HELP}
       />
     ) : null;
   const warningMark = warning ? (

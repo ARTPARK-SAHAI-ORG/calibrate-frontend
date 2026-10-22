@@ -25,11 +25,7 @@ import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { parseBackendTime } from "@/lib/relativeTime";
-import {
-  formatKappa,
-  kappaLabel,
-  type KappaFields,
-} from "@/lib/agreementKappa";
+import { kappaLabel, kappaValue, type KappaFields } from "@/lib/agreementKappa";
 
 type Tab = "overview" | "jobs";
 
@@ -382,10 +378,13 @@ function AnnotatorDetailPageInner() {
                 }
                 valueClassName={agreementColor(stats?.current_agreement)}
               />
-              {!detailLoading && stats?.kappa != null && (
+              {!detailLoading && kappaValue(stats) != null && (
                 <StatCard
-                  label={`Latest ${kappaLabel(stats.kappa_type, true)}`}
-                  value={formatKappa(stats.kappa)}
+                  label={`Latest ${kappaLabel(stats?.kappa_type, true)}`}
+                  value={kappaValue(stats)!}
+                  valueClassName={
+                    stats?.kappa == null ? "text-muted-foreground" : ""
+                  }
                 />
               )}
               <StatCard
