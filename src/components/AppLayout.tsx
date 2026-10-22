@@ -1,7 +1,7 @@
 "use client";
 
 import { Link, useRouter } from "@/lib/nav";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect, useRef } from "react";
 import { WHATSAPP_INVITE_URL } from "@/constants/links";
 import {
@@ -11,11 +11,12 @@ import {
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { requestTour, TOUR_IDS } from "@/lib/onboarding";
 import {
+  clearOrgsCache,
   useAuth,
   useIsSuperadmin,
   useOrganizations,
 } from "@/hooks";
-import { signOutCompletely } from "@/lib/api";
+import { clearActiveOrgUuid } from "@/lib/orgs";
 // Imported straight from the file, not the ui barrel: the barrel pulls in
 // SlidePanel, which imports back from here.
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -1032,7 +1033,19 @@ export function AppLayout({
                   {/* Logout */}
                   <div className="p-2">
                     <button
-                      onClick={() => signOutCompletely("/login")}
+                      onClick={() => {
+                        // Clear localStorage
+                        localStorage.removeItem("access_token");
+                        localStorage.removeItem("user");
+                        clearActiveOrgUuid();
+                        // Clear in-memory caches scoped to this user.
+                        clearOrgsCache();
+                        // Clear cookie
+                        document.cookie =
+                          "access_token=; path=/; max-age=0; SameSite=Lax";
+                        // Sign out via NextAuth
+                        signOut({ callbackUrl: "/login" });
+                      }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
                     >
                       <svg
