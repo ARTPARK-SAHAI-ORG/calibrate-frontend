@@ -80,6 +80,22 @@ export function getDefaultHeaders(accessToken?: string | null): Record<string, s
 }
 
 /**
+ * Sign out of every place a sign-in is kept: the stored login key, the
+ * `access_token` cookie and the Google sign-in. Leaving any one behind lets
+ * the server think the person is signed in while the page has no key to send,
+ * which bounces them between the login page and the page they asked for.
+ */
+export async function signOutCompletely(callbackUrl: string): Promise<void> {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("user");
+  clearActiveOrgUuid();
+  // Clear in-memory caches that are scoped to the signed-in user.
+  clearOrgsCache();
+  document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
+  await signOut({ callbackUrl });
+}
+
+/**
  * API client for making authenticated requests to the backend
  * Handles 401 responses by signing out the user
  * 
@@ -122,19 +138,10 @@ export async function apiClient<T>(
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  // Handle 401 Unauthorized - sign out user
+  // Handle 401 Unauthorized - sign out user, remembering the page they were
+  // on so signing in again brings them back to it.
   if (response.status === 401) {
-    // Clear localStorage
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("user");
-    clearActiveOrgUuid();
-    // Clear in-memory caches that are scoped to the signed-in user.
-    clearOrgsCache();
-    // Clear cookie
-    document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
-    // Sign out via NextAuth, remembering the page they were on so signing in
-    // again brings them back to it.
-    await signOut({ callbackUrl: loginPathAfterSignOut() });
+    await signOutCompletely(loginPathAfterSignOut());
     throw new Error("Unauthorized - session expired");
   }
 

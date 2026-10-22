@@ -10,6 +10,7 @@ import {
   setActiveOrgUuid,
 } from "@/lib/orgs";
 import { withWorkspace } from "@/lib/routes";
+import { signOutCompletely } from "@/lib/api";
 import { CALLBACK_PARAM, safeCallbackUrl } from "@/lib/postLoginRedirect";
 import { ErrorState, LoadingState } from "@/components/ui/LoadingState";
 
@@ -42,12 +43,13 @@ export default function OpeningPage() {
   useEffect(() => {
     if (isAuthLoading) return;
 
-    // The middleware only shows this page to someone signed in, so a missing
-    // token means the sign-in lapsed in between. Send them to sign in, keeping
-    // the page they asked for, rather than leaving them on a spinner forever.
+    // The middleware only shows this page when it finds a sign-in cookie, so
+    // a missing token means the cookie outlived the key. Sign out of
+    // everything before going to login: with the cookie still there, the
+    // login page would send them straight back here, forever.
     if (!accessToken) {
       const wanted = encodeURIComponent(wantedPage());
-      router.replace(`/login?${CALLBACK_PARAM}=${wanted}`);
+      void signOutCompletely(`/login?${CALLBACK_PARAM}=${wanted}`);
       return;
     }
 
