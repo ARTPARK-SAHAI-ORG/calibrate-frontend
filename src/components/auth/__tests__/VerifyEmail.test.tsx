@@ -4,8 +4,6 @@ import { waitFor } from "@testing-library/react";
 import { VerifyEmail } from "../VerifyEmail";
 
 const EXPIRED = "This link has expired. Request a new verification link.";
-const EXPIRED_NO_ADDRESS =
-  "This link has expired. Sign in to get a new verification link.";
 
 /** The verify call answers first, then the resend call. */
 function mockFetchSequence(...answers: Array<[number, unknown]>) {
@@ -47,6 +45,8 @@ describe("VerifyEmail", () => {
     render(<VerifyEmail />);
 
     expect(await screen.findByText(EXPIRED)).toBeInTheDocument();
+    // The link carries the address, so nothing to type
+    expect(screen.queryByLabelText("Email")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Send verification email" }));
 
     expect(await screen.findByText("Verification email sent")).toBeInTheDocument();
@@ -75,17 +75,22 @@ describe("VerifyEmail", () => {
     expect(localStorage.getItem("access_token")).toBeNull();
   });
 
-  it("sends a link with no address to sign in, which sends a new one", async () => {
-    setLocation("?token=old&callbackUrl=%2Finvite%2Ftok");
-    const fetchMock = mockFetchOnce(400, { detail: "expired_token" });
+  it("asks for the address when the link does not carry one", async () => {
+    setLocation("?token=old");
+    const fetchMock = mockFetchSequence(
+      [400, { detail: "expired_token" }],
+      [202, { status: "sent", email: "a@b.co" }],
+    );
+    const user = setupUser();
     render(<VerifyEmail />);
 
-    expect(await screen.findByText(EXPIRED_NO_ADDRESS)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
-      "href",
-      "/login?callbackUrl=%2Finvite%2Ftok",
-    );
+    expect(await screen.findByText(EXPIRED)).toBeInTheDocument();
     expect(sentBody(fetchMock)).toEqual({ token: "old" });
+    await user.type(screen.getByLabelText("Email"), " a@b.co ");
+    await user.click(screen.getByRole("button", { name: "Send verification email" }));
+
+    expect(await screen.findByText("Verification email sent")).toBeInTheDocument();
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ email: "a@b.co" });
   });
 
   it("asks nothing when the address has no token", async () => {
