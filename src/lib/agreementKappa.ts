@@ -24,7 +24,14 @@ const KAPPA_LABELS: Record<KappaType, string> = {
 export const KAPPA_HELP =
   "Kappa is agreement after removing what chance alone would produce. 1 means full agreement, 0 means no better than chance, and below 0 means worse than chance";
 
-export function kappaLabel(type: KappaType | null | undefined): string {
+/** `oneAgainstOthers`: the number compares one annotator with the others,
+ * which is Cohen's kappa, so a `mixed` one is named Cohen's, not Fleiss'. */
+export function kappaLabel(
+  type: KappaType | null | undefined,
+  oneAgainstOthers = false,
+): string {
+  if (type === "mixed" && oneAgainstOthers)
+    return "Cohen's kappa, linear weighted for ratings";
   return (type && KAPPA_LABELS[type]) || "Kappa";
 }
 
@@ -36,9 +43,10 @@ export function formatKappa(kappa: number): string {
 /** "Fleiss' kappa 0.42", or null when there is no kappa to show. */
 export function kappaText(
   fields: KappaFields | null | undefined,
+  oneAgainstOthers = false,
 ): string | null {
   if (fields?.kappa == null) return null;
-  return `${kappaLabel(fields.kappa_type)} ${formatKappa(fields.kappa)}`;
+  return `${kappaLabel(fields.kappa_type, oneAgainstOthers)} ${formatKappa(fields.kappa)}`;
 }
 
 export type TrendSeries = {
@@ -47,6 +55,7 @@ export type TrendSeries = {
   name: string;
   /** Legend name of the kappa line, before the kind of kappa in brackets. */
   kappaName: string;
+  oneAgainstOthers?: boolean;
   color: string;
   /** `key` tells points apart, since two month buckets can share a label. */
   points: ({
@@ -104,7 +113,7 @@ export function buildTrendChart(series: TrendSeries[]): {
     if (types.length > 0) {
       lines.push({
         dataKey: kappaKey,
-        name: `${s.kappaName} (${types.map(kappaLabel).join(" or ")})`,
+        name: `${s.kappaName} (${types.map((t) => kappaLabel(t, s.oneAgainstOthers)).join(" or ")})`,
         color: s.color,
         kappa: true,
       });

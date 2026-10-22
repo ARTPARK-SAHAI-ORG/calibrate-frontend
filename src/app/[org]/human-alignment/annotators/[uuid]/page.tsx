@@ -384,7 +384,7 @@ function AnnotatorDetailPageInner() {
               />
               {!detailLoading && stats?.kappa != null && (
                 <StatCard
-                  label={`Latest ${kappaLabel(stats.kappa_type)}`}
+                  label={`Latest ${kappaLabel(stats.kappa_type, true)}`}
                   value={formatKappa(stats.kappa)}
                 />
               )}
@@ -471,6 +471,7 @@ function AnnotatorDetailPageInner() {
                           key: "agreement",
                           name: "Agreement with other annotators",
                           kappaName: "Agreement with other annotators",
+                          oneAgainstOthers: true,
                           color: "#10b981",
                           points: series.map((p) => ({
                             ...p,

@@ -23,6 +23,19 @@ describe("kappaLabel", () => {
     );
   });
 
+  it("names a mixed kappa Cohen's when it compares one annotator with the others", () => {
+    expect(kappaLabel("mixed")).toBe(
+      "Fleiss' kappa, linear weighted for ratings",
+    );
+    expect(kappaLabel("mixed", true)).toBe(
+      "Cohen's kappa, linear weighted for ratings",
+    );
+    expect(kappaLabel("cohen", true)).toBe("Cohen's kappa");
+    expect(kappaText({ kappa: 0.3, kappa_type: "mixed" }, true)).toBe(
+      "Cohen's kappa, linear weighted for ratings 0.30",
+    );
+  });
+
   it("falls back to a plain name when the kind is missing", () => {
     expect(kappaLabel(null)).toBe("Kappa");
     expect(kappaLabel(undefined)).toBe("Kappa");
@@ -187,6 +200,18 @@ describe("buildTrendChart", () => {
         ]),
       ).kappaDomain,
     ).toEqual([0, 1]);
+  });
+
+  it("names a mixed line Cohen's on one annotator's chart", () => {
+    const { lines } = buildTrendChart([
+      {
+        ...one([
+          { key: "1", label: "Jan", agreement: 0.4, kappa: 0.1, kappa_type: "mixed" },
+        ])[0],
+        oneAgainstOthers: true,
+      },
+    ]);
+    expect(lines[1].name).toBe("A (Cohen's kappa, linear weighted for ratings)");
   });
 
   it("names both kinds when the kind changes along the line", () => {

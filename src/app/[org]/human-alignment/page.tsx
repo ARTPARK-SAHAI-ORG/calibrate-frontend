@@ -880,9 +880,9 @@ function HumanLabellingPageInner() {
                             {agreement != null
                               ? `${Math.round(agreement * 100)}%`
                               : "—"}
-                            {kappaText(annotator) && (
+                            {kappaText(annotator, true) && (
                               <span className="block text-xs font-normal text-muted-foreground">
-                                {kappaText(annotator)}
+                                {kappaText(annotator, true)}
                               </span>
                             )}
                           </span>,
@@ -1048,10 +1048,10 @@ function HumanLabellingPageInner() {
                               ? `${Math.round(agreement * 100)}% agreement`
                               : "No agreement yet"}
                           </span>
-                          {kappaText(annotator) && (
+                          {kappaText(annotator, true) && (
                             <>
                               {" · "}
-                              {kappaText(annotator)}
+                              {kappaText(annotator, true)}
                             </>
                           )}
                         </p>
