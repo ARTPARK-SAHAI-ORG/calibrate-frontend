@@ -20,21 +20,21 @@ import {
 
 type State =
   | { kind: "verifying" }
-  // The latest link, only too old: it can ask for a new one
+  // Too old, used, or replaced by a newer link: it can ask for a new one
   | { kind: "expired" }
-  // Used, replaced by a newer link, or not a link at all
-  | { kind: "used" }
+  | { kind: "verified" }
   | { kind: "failed"; message: string }
   | { kind: "sent"; email: string };
 
-const USED = "This link was already used, or a newer one was sent to you.";
+const EXPIRED = "This link has expired. Request a new verification link.";
 const FAILED = "Could not verify your email. Please open the link again.";
 
 export function VerifyEmail() {
   const [state, setState] = useState<State>({ kind: "verifying" });
   // Kept so the sign in button and a new link still lead back to an invite
   const [search, setSearch] = useState("");
-  const [token, setToken] = useState("");
+  // The address the link was sent to, which a new link is sent to
+  const [email, setEmail] = useState("");
   const [resending, setResending] = useState(false);
   const [resendError, setResendError] = useState("");
   // The link works once, so a second request (React runs effects twice in
@@ -46,16 +46,18 @@ export function VerifyEmail() {
     sent.current = true;
     const search = window.location.search;
     setSearch(search);
-    const token = new URLSearchParams(search).get("token");
+    const params = new URLSearchParams(search);
+    const token = params.get("token");
+    const address = params.get("email") ?? "";
+    setEmail(address);
     if (!token) {
-      setState({ kind: "used" });
+      setState({ kind: "expired" });
       return;
     }
-    setToken(token);
     fetch(`${getBackendUrl()}/auth/verify-email`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify(address ? { token, email: address } : { token }),
     })
       .then(async (response) => {
         if (response.ok) {
@@ -67,7 +69,7 @@ export function VerifyEmail() {
           return;
         }
         const data = await response.json().catch(() => ({}));
-        setState({ kind: data.detail === "expired_token" ? "expired" : "used" });
+        setState({ kind: data.detail === "already_verified" ? "verified" : "expired" });
       })
       .catch(() => setState({ kind: "failed", message: CONNECTION_ERROR }));
   }, []);
@@ -79,11 +81,9 @@ export function VerifyEmail() {
       const response = await fetch(`${getBackendUrl()}/auth/resend-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, next: nextForBackend(search) }),
+        body: JSON.stringify({ email, next: nextForBackend(search) }),
       });
-      if (response.status === 400) {
-        setState({ kind: "used" });
-      } else if (!response.ok) {
+      if (!response.ok) {
         setResendError("Could not send a new link. Please try again.");
       } else {
         setState({ kind: "sent", email: (await response.json()).email });
@@ -125,11 +125,13 @@ export function VerifyEmail() {
     );
   }
 
-  if (state.kind === "expired") {
+  // A link sent before links carried the address cannot ask for a new one;
+  // signing in with the password sends one instead.
+  if (state.kind === "expired" && email) {
     return (
       <AuthCard title="Verify your email">
         <div className="space-y-6">
-          <p className="text-center text-gray-600">This verification link has expired.</p>
+          <p className="text-center text-gray-600">{EXPIRED}</p>
           {resendError && <div className={AUTH_ERROR_CLASS}>{resendError}</div>}
           <button
             type="button"
@@ -137,11 +139,7 @@ export function VerifyEmail() {
             disabled={resending}
             className={AUTH_BUTTON_CLASS}
           >
-            {resending ? (
-              <ButtonLoading text="Sending..." />
-            ) : (
-              "Send a new verification email"
-            )}
+            {resending ? <ButtonLoading text="Sending..." /> : "Send verification email"}
           </button>
         </div>
       </AuthCard>
@@ -152,7 +150,11 @@ export function VerifyEmail() {
     <AuthCard title="Verify your email">
       <div className="space-y-6">
         <p className="text-center text-gray-600">
-          {state.kind === "used" ? USED : state.message}
+          {state.kind === "verified"
+            ? "Your email is already verified."
+            : state.kind === "expired"
+              ? "This link has expired. Sign in to get a new verification link."
+              : state.message}
         </p>
         {signIn}
       </div>
