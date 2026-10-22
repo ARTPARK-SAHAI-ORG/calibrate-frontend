@@ -25,8 +25,11 @@ import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { parseBackendTime } from "@/lib/relativeTime";
-import { type KappaFields } from "@/lib/agreementKappa";
-import { KappaCell } from "@/components/human-labelling/KappaCell";
+import {
+  annotatorTrendSeries,
+  type KappaByKind,
+} from "@/lib/agreementKappa";
+import { KappaByKindList } from "@/components/human-labelling/KappaCell";
 
 type Tab = "overview" | "jobs";
 
@@ -43,19 +46,22 @@ type Annotator = {
   updated_at?: string;
 };
 
-type AnnotatorStats = KappaFields & {
+type AnnotatorStats = {
   current_agreement: number | null;
   pair_count: number;
   jobs_count: number;
+  /** Kappa for each kind of answer the annotator was compared on. */
+  kappa_by_kind?: KappaByKind[];
 };
 
 type Bucket = "week" | "month" | "year";
 
-type AgreementSeriesPoint = KappaFields & {
+type AgreementSeriesPoint = {
   bucket_start: string;
   bucket_end: string;
   agreement: number | null;
   pair_count: number;
+  kappa_by_kind?: KappaByKind[];
 };
 
 type AnnotatorTrend = {
@@ -382,7 +388,7 @@ function AnnotatorDetailPageInner() {
               {!detailLoading && stats && (
                 <StatCard
                   label="Latest kappa"
-                  value={<KappaCell fields={stats} oneAgainstOthers />}
+                  value={<KappaByKindList kinds={stats.kappa_by_kind} />}
                 />
               )}
               <StatCard
@@ -463,23 +469,14 @@ function AnnotatorDetailPageInner() {
                     />
                   ) : (
                     <AgreementTrendChart
-                      series={[
-                        {
-                          key: "agreement",
-                          name: "Agreement with other annotators",
-                          kappaName: "Agreement with other annotators",
-                          oneAgainstOthers: true,
-                          color: "var(--chart-1)",
-                          points: series.map((p) => ({
-                            ...p,
-                            key: p.bucket_end,
-                            label: formatBucketLabel(
-                              p.bucket_end,
-                              trend?.bucket ?? DEFAULT_BUCKET,
-                            ),
-                          })),
-                        },
-                      ]}
+                      series={annotatorTrendSeries(
+                        series,
+                        (iso) =>
+                          formatBucketLabel(
+                            iso,
+                            trend?.bucket ?? DEFAULT_BUCKET,
+                          ),
+                      )}
                     />
                   )}
                 </div>

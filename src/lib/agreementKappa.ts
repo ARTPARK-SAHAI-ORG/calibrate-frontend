@@ -2,8 +2,26 @@ type KappaType =
   | "fleiss"
   | "linear_weighted_fleiss"
   | "cohen"
-  | "linear_weighted_cohen"
-  | "mixed";
+  | "linear_weighted_cohen";
+
+export type AnswerKind = "binary" | "rating";
+
+export const ANSWER_KIND_LABELS: Record<AnswerKind, string> = {
+  binary: "Binary",
+  rating: "Rating",
+};
+
+/** One kind of answer's kappa, for a number that covers both kinds. */
+export type KappaByKind = KappaFields & { answer_kind: AnswerKind };
+
+/** Rating answers are compared with a linear weighted kappa, pass/fail
+ * answers with a plain one. Null when there is no kind to go by. */
+export function answerKindOf(
+  type: KappaType | null | undefined,
+): AnswerKind | null {
+  if (!type) return null;
+  return type.startsWith("linear_weighted") ? "rating" : "binary";
+}
 
 /** Sent beside an agreement number that covers many items. Both are absent
  * on responses from before kappa existed, and null when there is too little
@@ -48,17 +66,9 @@ const KAPPA_LABELS: Record<KappaType, string> = {
   linear_weighted_fleiss: "Linear weighted Fleiss' kappa",
   cohen: "Cohen's kappa",
   linear_weighted_cohen: "Linear weighted Cohen's kappa",
-  mixed: "Fleiss' kappa, linear weighted for ratings",
 };
 
-/** `oneAgainstOthers`: the number compares one annotator with the others,
- * which is Cohen's kappa, so a `mixed` one is named Cohen's, not Fleiss'. */
-export function kappaLabel(
-  type: KappaType | null | undefined,
-  oneAgainstOthers = false,
-): string {
-  if (type === "mixed" && oneAgainstOthers)
-    return "Cohen's kappa, linear weighted for ratings";
+export function kappaLabel(type: KappaType | null | undefined): string {
   return (type && KAPPA_LABELS[type]) || "Kappa";
 }
 
@@ -73,8 +83,12 @@ export type TrendSeries = {
   name: string;
   /** Legend name of the kappa line, before the kind of kappa in brackets. */
   kappaName: string;
-  oneAgainstOthers?: boolean;
   color: string;
+  /** Inter-annotator lines are dashed, agreement with humans solid. */
+  dashed?: boolean;
+  /** A thicker line for a whole-workspace number, which the chart can hide.
+   * It has no kappa line. */
+  overall?: boolean;
   /** `key` tells points apart, since two month buckets can share a label. */
   points: ({
     key: string;
@@ -88,6 +102,8 @@ type TrendLine = {
   name: string;
   color: string;
   kappa: boolean;
+  dashed: boolean;
+  overall: boolean;
 };
 
 const KAPPA_KEY_SUFFIX = "__kappa";
@@ -126,14 +142,18 @@ export function buildTrendChart(series: TrendSeries[]): {
         name: s.name,
         color: s.color,
         kappa: false,
+        dashed: !!s.dashed,
+        overall: !!s.overall,
       });
     }
-    if (types.length > 0) {
+    if (types.length > 0 && !s.overall) {
       lines.push({
         dataKey: kappaKey,
-        name: `${s.kappaName} (${types.map((t) => kappaLabel(t, s.oneAgainstOthers)).join(" or ")})`,
+        name: `${s.kappaName} (${types.map((t) => kappaLabel(t)).join(" or ")})`,
         color: s.color,
         kappa: true,
+        dashed: !!s.dashed,
+        overall: false,
       });
     }
     for (const p of s.points) {
@@ -150,3 +170,57 @@ export function buildTrendChart(series: TrendSeries[]): {
     kappaDomain: [negative ? -1 : 0, 1],
   };
 }
+
+const KIND_COLORS: Record<AnswerKind, string> = {
+  binary: "var(--chart-1)",
+  rating: "var(--chart-2)",
+};
+
+/**
+ * One annotator's trend: a single agreement line, and in the kappa view one
+ * line per kind of answer, since kappas of different kinds are never merged.
+ */
+export function annotatorTrendSeries(
+  points: readonly {
+    bucket_end: string;
+    agreement: number | null;
+    kappa_by_kind?: KappaByKind[];
+  }[],
+  label: (bucketEnd: string) => string,
+): TrendSeries[] {
+  const kinds = [
+    ...new Set(
+      points.flatMap((p) => (p.kappa_by_kind ?? []).map((k) => k.answer_kind)),
+    ),
+  ].sort((a, b) => (a === b ? 0 : a === "binary" ? -1 : 1));
+  return [
+    {
+      key: "agreement",
+      name: "Agreement with other annotators",
+      kappaName: "Agreement with other annotators",
+      color: "var(--chart-1)",
+      points: points.map((p) => ({
+        key: p.bucket_end,
+        label: label(p.bucket_end),
+        agreement: p.agreement,
+      })),
+    },
+    ...kinds.map((kind) => ({
+      key: kind,
+      name: `${ANSWER_KIND_LABELS[kind]} answers`,
+      kappaName: `${ANSWER_KIND_LABELS[kind]} answers`,
+      color: KIND_COLORS[kind],
+      points: points.map((p) => {
+        const entry = p.kappa_by_kind?.find((k) => k.answer_kind === kind);
+        return {
+          key: p.bucket_end,
+          label: label(p.bucket_end),
+          agreement: null,
+          kappa: entry?.kappa ?? null,
+          kappa_type: entry?.kappa_type ?? null,
+        };
+      }),
+    })),
+  ];
+}
+

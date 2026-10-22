@@ -1,6 +1,10 @@
 import React from "react";
 import { render, screen, setupUser, waitFor } from "@/test-utils";
-import { AgreementStatCard, agreementColor } from "../AgreementStatCard";
+import {
+  AgreementStatCard,
+  OverallAgreementCards,
+  agreementColor,
+} from "../AgreementStatCard";
 import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
 
 jest.mock("../../../hooks", () => ({
@@ -580,3 +584,82 @@ describe("AgreementStatCard agreement bar", () => {
     expect(screen.getByText("Chance 80%")).toBeInTheDocument();
   });
 });
+
+describe("AgreementStatCard sections", () => {
+  it("shows both titled sections, each with its own bar against chance", () => {
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ uuid: "ev-1", name: "Tone" }}
+        value={null}
+        showAlignmentLabel={false}
+        sections={[
+          {
+            title: "Inter-annotator agreement",
+            agreement: 0.7,
+            kappa: { kappa: 0.4, kappa_type: "cohen", chance_agreement: 0.5 },
+          },
+          {
+            title: "Evaluator agreement with humans",
+            agreement: 0.4,
+            kappa: { kappa: -0.1, kappa_type: "cohen", chance_agreement: 0.45 },
+          },
+        ]}
+      />
+    );
+    expect(screen.getByText("Inter-annotator agreement")).toBeInTheDocument();
+    expect(
+      screen.getByText("Evaluator agreement with humans"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("alignment")).not.toBeInTheDocument();
+    const fills = screen.getAllByTestId("agreement-fill");
+    expect(fills.map((f) => f.style.width)).toEqual(["70%", "40%"]);
+    expect(fills[0].className).toContain("bg-green-500");
+    expect(fills[1].className).toContain("bg-red-500");
+    expect(
+      screen.getAllByTestId("chance-tick").map((t) => t.style.left),
+    ).toEqual(["50%", "45%"]);
+    expect(screen.getByText("70%").className).toContain("text-foreground");
+    expect(screen.getByText("Chance 45%")).toBeInTheDocument();
+    expect(screen.getByText("0.40")).toBeInTheDocument();
+    expect(screen.getByText("-0.10")).toBeInTheDocument();
+  });
+
+  it("shows a muted dash and no bar for a section with no agreement", () => {
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ uuid: "ev-1", name: "Tone" }}
+        value={null}
+        sections={[
+          { title: "Inter-annotator agreement", agreement: null, kappa: null },
+          {
+            title: "Evaluator agreement with humans",
+            agreement: 0.9,
+            kappa: { kappa: 0.5, kappa_type: "cohen", chance_agreement: 0.6 },
+          },
+        ]}
+      />
+    );
+    expect(screen.getByText("—").className).toContain("text-muted-foreground");
+    expect(screen.getAllByTestId("agreement-fill")).toHaveLength(1);
+  });
+});
+
+describe("OverallAgreementCards", () => {
+  it("shows each overall number as its label and a neutral percentage only", () => {
+    render(
+      <OverallAgreementCards
+        interAnnotator={{ current: 0.62 }}
+        withHumans={{ current: null }}
+      />
+    );
+    expect(screen.getByText("Inter-annotator agreement")).toBeInTheDocument();
+    expect(screen.getByText("62%").className).toContain("text-foreground");
+    expect(
+      screen.getByText("Evaluator agreement with humans"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("—").className).toContain("text-muted-foreground");
+    expect(screen.queryByText(/Kappa|Chance/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agreement-fill")).not.toBeInTheDocument();
+  });
+});
+

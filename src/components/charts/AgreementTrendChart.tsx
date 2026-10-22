@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { SegmentedFilter } from "@/components/ui";
+import { Switch } from "@/components/ui/Switch";
 import {
   buildTrendChart,
   formatTrendValue,
@@ -35,19 +36,38 @@ export function AgreementTrendChart({
   const { data, lines, kappaDomain } = buildTrendChart(series);
   const hasKappa = lines.some((line) => line.kappa);
   const showKappa = hasKappa && view === "kappa";
+  const [overallOn, setOverallOn] = useState(true);
+  const hasOverall = !showKappa && lines.some((line) => line.overall);
+  const showOverall = hasOverall && overallOn;
   return (
     <div>
-      {hasKappa && (
-        <SegmentedFilter
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "agreement", label: "Agreement" },
-            { value: "kappa", label: "Kappa" },
-          ]}
-          ariaLabel="Show agreement or kappa"
-          className="w-fit mb-3"
-        />
+      {(hasKappa || hasOverall) && (
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+          {hasKappa ? (
+            <SegmentedFilter
+              value={view}
+              onChange={setView}
+              options={[
+                { value: "agreement", label: "Agreement" },
+                { value: "kappa", label: "Kappa" },
+              ]}
+              ariaLabel="Show agreement or kappa"
+              className="w-fit"
+            />
+          ) : (
+            <span />
+          )}
+          {hasOverall && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Switch
+                checked={overallOn}
+                onChange={setOverallOn}
+                label="Show overall"
+              />
+              Show overall
+            </div>
+          )}
+        </div>
       )}
       <div className={className}>
         <ResponsiveContainer width="100%" height="100%">
@@ -77,19 +97,32 @@ export function AgreementTrendChart({
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {lines
-              .filter((line) => line.kappa === showKappa)
-              .map((line) => (
-                <Line
-                  key={line.dataKey}
-                  legendType="plainline"
-                  type="monotone"
-                  dataKey={line.dataKey}
-                  name={line.name}
-                  stroke={line.color}
-                  strokeWidth={2}
-                  dot={{ r: dotRadius, fill: "var(--background)" }}
-                />
-              ))}
+              .filter(
+                (line) =>
+                  line.kappa === showKappa && (!line.overall || showOverall),
+              )
+              .map((line) => {
+                // Evaluator lines fade while the overall lines are drawn.
+                const opacity = showOverall && !line.overall ? 0.35 : 1;
+                return (
+                  <Line
+                    key={line.dataKey}
+                    legendType="plainline"
+                    type="monotone"
+                    dataKey={line.dataKey}
+                    name={line.name}
+                    stroke={line.color}
+                    strokeWidth={line.overall ? 3.5 : 2}
+                    strokeDasharray={line.dashed ? "6 4" : undefined}
+                    strokeOpacity={opacity}
+                    dot={{
+                      r: dotRadius,
+                      fill: "var(--background)",
+                      strokeOpacity: opacity,
+                    }}
+                  />
+                );
+              })}
           </LineChart>
         </ResponsiveContainer>
       </div>

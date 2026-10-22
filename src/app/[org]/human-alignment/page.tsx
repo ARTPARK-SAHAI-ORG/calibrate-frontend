@@ -21,21 +21,30 @@ import { EmptyState } from "@/components/ui/LoadingState";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
 import { useAccessToken } from "@/hooks";
-import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { createAnnotator, renameAnnotator } from "@/lib/annotatorApi";
 import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { taskOptionsWithAgreement } from "./taskOptions";
 import { parseBackendTime } from "@/lib/relativeTime";
-import { type KappaFields } from "@/lib/agreementKappa";
+import { type KappaByKind } from "@/lib/agreementKappa";
+import { KappaByKindList } from "@/components/human-labelling/KappaCell";
+import { OverallAgreementCards } from "@/components/human-labelling/AgreementStatCard";
 import {
-  KappaCell,
-} from "@/components/human-labelling/KappaCell";
-import { overviewRows } from "@/lib/taskOverviewData";
+  AgreementOverviewTable,
+  type OverviewSortKey,
+} from "@/components/human-labelling/AgreementOverviewTable";
+import {
+  buildOverviewRows,
+  overviewChartSeries,
+  overviewRows,
+  type AgreementGroup,
+  type EvaluatorAgreement,
+  type OverviewRow,
+} from "@/lib/taskOverviewData";
 
 type Tab = "overview" | "tasks" | "annotators";
 
-type Annotator = KappaFields & {
+type Annotator = {
   uuid: string;
   name: string;
   created_at?: string;
@@ -43,6 +52,8 @@ type Annotator = KappaFields & {
   jobs_count?: number;
   current_agreement?: number | null;
   pair_count?: number | null;
+  /** Kappa for each kind of answer the annotator was compared on. */
+  kappa_by_kind?: KappaByKind[];
 };
 
 function parseApiError(err: unknown, fallback: string): string {
@@ -93,30 +104,15 @@ type LabellingTask = {
 
 type SortDirection = "asc" | "desc";
 
-type AgreementSeriesPoint = KappaFields & {
-  bucket_start: string;
-  bucket_end: string;
-  agreement: number | null;
-  pair_count: number;
-};
-
-type AgreementBlock = KappaFields & {
-  current: number | null;
-  pair_count: number;
-  series: AgreementSeriesPoint[];
-};
-
-type EvaluatorAgreementBlock = AgreementBlock & {
-  evaluator_id: string;
-  name: string;
-};
-
 type AgreementResponse = {
   bucket: string;
   days: number;
   task_id?: string;
-  human_human: AgreementBlock;
-  evaluators: EvaluatorAgreementBlock[];
+  /** Overall agreement between annotators. */
+  human_human: AgreementGroup;
+  /** Overall agreement between evaluators and humans. */
+  evaluators_with_humans?: AgreementGroup | null;
+  evaluators: EvaluatorAgreement[];
 };
 
 type Bucket = "week" | "month" | "year";
@@ -891,7 +887,7 @@ function HumanLabellingPageInner() {
                         )}
                         {cell(
                           "flex items-center py-3 text-sm font-semibold tabular-nums text-foreground",
-                          <KappaCell fields={annotator} oneAgainstOthers />,
+                          <KappaByKindList kinds={annotator.kappa_by_kind} />,
                         )}
                         <div className="flex items-center justify-end gap-1">
                           {isEditing ? (
@@ -1056,7 +1052,7 @@ function HumanLabellingPageInner() {
                           </span>
                           {" · "}
                           Kappa{" "}
-                          <KappaCell fields={annotator} oneAgainstOthers />
+                          <KappaByKindList kinds={annotator.kappa_by_kind} />
                         </div>
                       </>
                     );
@@ -1229,66 +1225,6 @@ function HumanLabellingPageInner() {
   );
 }
 
-type SeriesRow = {
-  key: string;
-  name: string;
-  color: string;
-  current: number | null;
-  pairCount: number;
-  series: AgreementSeriesPoint[];
-  evaluatorType?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
-  kappa: KappaFields;
-};
-
-const EVAL_COLORS = [
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-  "var(--chart-6)",
-  "var(--chart-7)",
-  "var(--chart-8)",
-];
-
-type SortKey = "name" | "current";
-
-/**
- * One evaluator's name, as a pill that opens how that evaluator judges. The
- * name is cut to fit the row, and the whole of it is on hover only when it is
- * actually cut off: a name already fully readable would just be covered by a
- * popup saying the same thing.
- */
-function EvaluatorNamePill({
-  name,
-  onOpen,
-  fitClassName,
-}: {
-  name: string;
-  onOpen: () => void;
-  /** Sizing for the row this pill sits in, on whatever wraps the pill. */
-  fitClassName: string;
-}) {
-  const { ref, clipped } = useIsNameClipped(name);
-  const pill = (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate w-full"
-    >
-      <span ref={ref} className="truncate">
-        {name}
-      </span>
-    </button>
-  );
-  return clipped ? (
-    <Tooltip content={name} className={fitClassName}>
-      {pill}
-    </Tooltip>
-  ) : (
-    <div className={`relative ${fitClassName}`}>{pill}</div>
-  );
-}
-
 function AgreementOverview({
   agreement,
   agreementLoading,
@@ -1321,47 +1257,26 @@ function AgreementOverview({
     }
     return m;
   })();
-  const [sortKey, setSortKey] = useState<SortKey>("current");
+  const [sortKey, setSortKey] = useState<OverviewSortKey>("current");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
   const [previewEvaluator, setPreviewEvaluator] = useState<{
     uuid: string;
     name: string;
   } | null>(null);
 
-  const rows: SeriesRow[] = (() => {
-    if (!agreement) return [];
-    const out: SeriesRow[] = [];
-    const hh = agreement.human_human;
-    out.push({
-      key: "human_human",
-      name: "Annotator agreement",
-      color: "var(--chart-1)",
-      current: hh?.current ?? null,
-      pairCount: hh?.pair_count ?? 0,
-      series: hh?.series ?? [],
-      kappa: hh ?? {},
-    });
-    (agreement.evaluators ?? []).forEach((ev, i) => {
-      out.push({
-        key: ev.evaluator_id,
-        name: ev.name,
-        color: EVAL_COLORS[i % EVAL_COLORS.length],
-        current: ev.current ?? null,
-        pairCount: ev.pair_count ?? 0,
-        series: ev.series ?? [],
-        evaluatorType: evaluatorTypeMap.get(ev.evaluator_id),
-        kappa: ev,
-      });
-    });
-    return overviewRows(out, selectedTaskId === ALL_TASKS);
-  })();
+  const rows: (OverviewRow & {
+    evaluatorType?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
+  })[] = agreement
+    ? overviewRows(
+        buildOverviewRows(agreement.evaluators ?? []).map((row) => ({
+          ...row,
+          evaluatorType: evaluatorTypeMap.get(row.key),
+        })),
+        selectedTaskId === ALL_TASKS,
+      )
+    : [];
 
   const sorted = [...rows].sort((a, b) => {
-    // Pin the inter-rater (human ↔ human) row to the top regardless of
-    // sort — it's the baseline every evaluator row is compared against.
-    if (a.key === "human_human" && b.key !== "human_human") return -1;
-    if (b.key === "human_human" && a.key !== "human_human") return 1;
-
     // Group evaluators by type so all of the same type sit together.
     // Rows missing a type sort after typed groups; within a group the
     // user's chosen sort applies.
@@ -1381,25 +1296,16 @@ function AgreementOverview({
       return x === y ? 0 : x < y ? -1 : 1;
     };
     if (sortKey === "name") return dir * a.name.localeCompare(b.name);
-    return dir * cmp(a.current, b.current);
+    return dir * cmp(a.withHumans.current, b.withHumans.current);
   });
 
-  const chartSeries = rows.map((row) => ({
-    key: row.key,
-    name:
-      row.key === "human_human"
-        ? row.name
-        : `${row.name} agreement with annotators`,
-    kappaName: row.name,
-    color: row.color,
-    points: row.series.map((p) => ({
-      ...p,
-      key: p.bucket_end,
-      label: formatBucketLabel(p.bucket_end, bucket),
-    })),
-  }));
+  const chartSeries = agreement
+    ? overviewChartSeries(agreement, rows, (iso) =>
+        formatBucketLabel(iso, bucket),
+      )
+    : [];
 
-  const handleSort = (key: SortKey) => {
+  const handleSort = (key: OverviewSortKey) => {
     if (sortKey === key) {
       setSortDir((d) => (d === "desc" ? "asc" : "desc"));
     } else {
@@ -1409,8 +1315,15 @@ function AgreementOverview({
   };
 
   const hasNoAgreementData =
-    rows.length === 0 ||
-    rows.every((r) => r.current == null && r.pairCount === 0);
+    (agreement?.human_human?.pair_count ?? 0) === 0 &&
+    (agreement?.evaluators_with_humans?.pair_count ?? 0) === 0 &&
+    rows.every(
+      (r) =>
+        r.withHumans.current == null &&
+        r.withHumans.pair_count === 0 &&
+        r.interAnnotator.current == null &&
+        r.interAnnotator.pair_count === 0,
+    );
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -1493,116 +1406,24 @@ function AgreementOverview({
         />
       ) : (
         <>
+          <div className="flex flex-wrap items-stretch gap-3">
+            <OverallAgreementCards
+              interAnnotator={agreement?.human_human}
+              withHumans={agreement?.evaluators_with_humans}
+            />
+          </div>
+
           <div className="border border-border rounded-xl p-4 md:p-6">
             <AgreementTrendChart series={chartSeries} />
           </div>
 
-          {/* Desktop table */}
-          <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
-              <SortHeader
-                label="Name"
-                active={sortKey === "name"}
-                dir={sortDir}
-                onClick={() => handleSort("name")}
-              />
-              <SortHeader
-                label="Current agreement"
-                active={sortKey === "current"}
-                dir={sortDir}
-                onClick={() => handleSort("current")}
-              />
-              <div className="text-sm font-medium text-muted-foreground">
-                Kappa
-              </div>
-            </div>
-            {sorted.map((row) => (
-              <div
-                key={row.key}
-                className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-4 px-4 py-3 border-b border-border last:border-b-0 items-center"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  {row.key === "human_human" ? (
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {row.name}
-                    </p>
-                  ) : (
-                    <>
-                      <EvaluatorNamePill
-                        name={row.name}
-                        fitClassName="max-w-full min-w-0"
-                        onOpen={() =>
-                          setPreviewEvaluator({
-                            uuid: row.key,
-                            name: row.name,
-                          })
-                        }
-                      />
-                      <span className="text-sm font-medium text-foreground shrink-0">
-                        alignment
-                      </span>
-                    </>
-                  )}
-                </div>
-                <div
-                  className={`text-sm font-semibold tabular-nums ${agreementColor(row.current)}`}
-                >
-                  {row.current != null
-                    ? `${Math.round(row.current * 100)}%`
-                    : "—"}
-                </div>
-                <div className="text-sm font-semibold tabular-nums text-foreground">
-                  <KappaCell fields={row.kappa} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Mobile cards */}
-          <div className="md:hidden space-y-2">
-            {sorted.map((row) => (
-              <div
-                key={row.key}
-                className="border border-border rounded-xl overflow-hidden p-4"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  {row.key === "human_human" ? (
-                    <p className="text-sm font-medium text-foreground truncate flex-1">
-                      {row.name}
-                    </p>
-                  ) : (
-                    <>
-                      <EvaluatorNamePill
-                        name={row.name}
-                        fitClassName="flex-1 min-w-0"
-                        onOpen={() =>
-                          setPreviewEvaluator({
-                            uuid: row.key,
-                            name: row.name,
-                          })
-                        }
-                      />
-                      <span className="text-sm font-medium text-foreground shrink-0">
-                        alignment
-                      </span>
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span
-                    className={`text-base font-semibold tabular-nums ${agreementColor(row.current)}`}
-                  >
-                    {row.current != null
-                      ? `${Math.round(row.current * 100)}%`
-                      : "—"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    Kappa <KappaCell fields={row.kappa} />
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+          <AgreementOverviewTable
+            rows={sorted}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+            onOpenEvaluator={setPreviewEvaluator}
+          />
         </>
       )}
       <EvaluatorPreviewModal
@@ -1611,50 +1432,5 @@ function AgreementOverview({
         onClose={() => setPreviewEvaluator(null)}
       />
     </div>
-  );
-}
-
-function SortHeader({
-  label,
-  active,
-  dir,
-  onClick,
-  align = "left",
-}: {
-  label: string;
-  active: boolean;
-  dir: SortDirection;
-  onClick: () => void;
-  align?: "left" | "right";
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer w-fit ${
-        active
-          ? "text-foreground"
-          : "text-muted-foreground hover:text-foreground"
-      } ${align === "right" ? "justify-self-end" : ""}`}
-    >
-      {label}
-      <svg
-        className={`w-3.5 h-3.5 ${active ? "opacity-100" : "opacity-40"}`}
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d={
-            dir === "desc"
-              ? "M19.5 8.25l-7.5 7.5-7.5-7.5"
-              : "M4.5 15.75l7.5-7.5 7.5 7.5"
-          }
-        />
-      </svg>
-    </button>
   );
 }

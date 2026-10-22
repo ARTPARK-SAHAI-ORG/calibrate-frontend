@@ -1,4 +1,10 @@
 import type { EvaluatorResultStat } from "@/components/human-labelling/AgreementStatCard";
+import {
+  answerKindOf,
+  type AnswerKind,
+  type KappaFields,
+  type TrendSeries,
+} from "@/lib/agreementKappa";
 
 /**
  * Does the task overview have anything to show, or only the placeholder?
@@ -82,20 +88,131 @@ export function taskEvaluatorScoreCards<
     }));
 }
 
+type OverviewGroup = { current: number | null; kappa?: number | null };
+
 /**
- * The rows on the Human alignment overview. Across all tasks, an evaluator
- * with no agreement and no kappa has nothing to show and is left out. The
- * annotator row always stays, and one task keeps every evaluator linked to it.
+ * The evaluator rows on the Human alignment overview. Across all tasks, an
+ * evaluator with no agreement and no kappa in either group, inter-annotator
+ * or with humans, has nothing to show and is left out. One task keeps every
+ * evaluator linked to it.
  */
 export function overviewRows<
-  T extends {
-    key: string;
-    current: number | null;
-    kappa: { kappa?: number | null };
-  },
+  T extends { withHumans: OverviewGroup; interAnnotator: OverviewGroup },
 >(rows: T[], allTasks: boolean): T[] {
   if (!allTasks) return rows;
-  return rows.filter(
-    (r) => r.key === "human_human" || r.current != null || r.kappa.kappa != null,
-  );
+  const has = (g: OverviewGroup) => g.current != null || g.kappa != null;
+  return rows.filter((r) => has(r.withHumans) || has(r.interAnnotator));
 }
+
+export type AgreementSeriesPoint = KappaFields & {
+  bucket_start: string;
+  bucket_end: string;
+  agreement: number | null;
+  pair_count: number;
+};
+
+export type AgreementGroup = KappaFields & {
+  current: number | null;
+  pair_count: number;
+  series: AgreementSeriesPoint[];
+};
+
+export type EvaluatorAgreement = AgreementGroup & {
+  evaluator_id: string;
+  name: string;
+  /** How well annotators agree with each other on this evaluator's items. */
+  inter_annotator?: AgreementGroup | null;
+};
+
+export type OverviewRow = {
+  key: string;
+  name: string;
+  color: string;
+  kind: AnswerKind | null;
+  withHumans: AgreementGroup;
+  interAnnotator: AgreementGroup;
+};
+
+const EMPTY_GROUP: AgreementGroup = { current: null, pair_count: 0, series: [] };
+
+/** One row per evaluator, each in its own chart colour. */
+export function buildOverviewRows(
+  evaluators: readonly EvaluatorAgreement[],
+): OverviewRow[] {
+  return evaluators.map((ev, i) => ({
+    key: ev.evaluator_id,
+    name: ev.name,
+    color: `var(--chart-${(i % 8) + 1})`,
+    kind: answerKindOf(ev.kappa_type ?? ev.inter_annotator?.kappa_type),
+    withHumans: ev,
+    interAnnotator: ev.inter_annotator ?? EMPTY_GROUP,
+  }));
+}
+
+/**
+ * The overview chart: the two overall numbers as thick lines, then for each
+ * evaluator its inter-annotator agreement, dashed, and its agreement with
+ * humans, solid, both in the evaluator's colour.
+ */
+export function overviewChartSeries(
+  overall: {
+    human_human?: AgreementGroup | null;
+    evaluators_with_humans?: AgreementGroup | null;
+  },
+  rows: readonly OverviewRow[],
+  label: (bucketEnd: string) => string,
+): TrendSeries[] {
+  const points = (group: AgreementGroup | null | undefined) =>
+    (group?.series ?? []).map((p) => ({
+      ...p,
+      key: p.bucket_end,
+      label: label(p.bucket_end),
+    }));
+  const line = (
+    key: string,
+    name: string,
+    color: string,
+    group: AgreementGroup | null | undefined,
+    style: { dashed?: boolean; overall?: boolean },
+  ): TrendSeries => ({
+    key,
+    name,
+    kappaName: name,
+    color,
+    points: points(group),
+    ...style,
+  });
+  return [
+    line(
+      "overall_inter_annotator",
+      "Overall inter-annotator agreement",
+      "var(--foreground)",
+      overall.human_human,
+      { dashed: true, overall: true },
+    ),
+    line(
+      "overall_with_humans",
+      "Overall evaluator agreement with humans",
+      "var(--foreground)",
+      overall.evaluators_with_humans,
+      { overall: true },
+    ),
+    ...rows.flatMap((row) => [
+      line(
+        `${row.key}__inter_annotator`,
+        `${row.name} inter-annotator agreement`,
+        row.color,
+        row.interAnnotator,
+        { dashed: true },
+      ),
+      line(
+        row.key,
+        `${row.name} agreement with humans`,
+        row.color,
+        row.withHumans,
+        {},
+      ),
+    ]),
+  ];
+}
+

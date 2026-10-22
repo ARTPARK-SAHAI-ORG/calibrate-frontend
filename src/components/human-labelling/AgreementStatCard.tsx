@@ -162,6 +162,13 @@ export function AgreementStatCard(
     warning?: string | null;
     /** Shown beside the human agreement number when there is one. */
     kappa?: KappaFields | null;
+    /** Several agreement numbers, each under its own title and drawn as a
+     * bar against chance. Takes the place of `value` and `kappa`. */
+    sections?: {
+      title: string;
+      agreement: number | null;
+      kappa: KappaFields | null | undefined;
+    }[];
   },
 ) {
   const {
@@ -173,6 +180,7 @@ export function AgreementStatCard(
     warning = null,
     kappa = null,
     agreement = null,
+    sections = null,
   } = props;
   // The evaluator whose prompt is on show, opened from the pill below. Null
   // until the pill is clicked.
@@ -293,7 +301,33 @@ export function AgreementStatCard(
             {warningMark}
           </div>
         )}
-        {result && (value != null || showResultLabel) ? (
+        {sections ? (
+          <div className="mt-2 flex items-start gap-6">
+            {sections.map((section) => (
+              <div key={section.title} className="min-w-0">
+                <Stat
+                  label={section.title}
+                  value={
+                    section.agreement == null
+                      ? "—"
+                      : `${Math.round(section.agreement * 100)}%`
+                  }
+                  valueClassName={
+                    section.agreement == null
+                      ? "text-muted-foreground"
+                      : "text-foreground"
+                  }
+                />
+                {section.agreement != null && (
+                  <AgreementBar
+                    agreement={section.agreement}
+                    kappa={section.kappa ?? {}}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        ) : result && (value != null || showResultLabel) ? (
           // Each number is labelled, so the card reads the same whether or not
           // there is a human agreement number to sit beside the score. On its
           // own the score sits in the middle of the card.
@@ -353,3 +387,38 @@ export function AgreementStatCard(
     </>
   );
 }
+
+/** The two whole-workspace or whole-task numbers, each a label and a
+ * percentage and nothing else. */
+export function OverallAgreementCards({
+  interAnnotator,
+  withHumans,
+}: {
+  interAnnotator: { current: number | null } | null | undefined;
+  withHumans: { current: number | null } | null | undefined;
+}) {
+  return (
+    <>
+      {(
+        [
+          ["Inter-annotator agreement", interAnnotator],
+          ["Evaluator agreement with humans", withHumans],
+        ] as const
+      ).map(([title, group]) => (
+        <AgreementStatCard
+          key={title}
+          staticPillText={title}
+          value={
+            group?.current != null
+              ? `${Math.round(group.current * 100)}%`
+              : "—"
+          }
+          valueClassName={
+            group?.current != null ? "text-foreground" : "text-muted-foreground"
+          }
+        />
+      ))}
+    </>
+  );
+}
+

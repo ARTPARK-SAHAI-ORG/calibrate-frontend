@@ -1,5 +1,5 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { KappaCell } from "../KappaCell";
+import { KappaByKindList, KappaCell } from "../KappaCell";
 
 describe("KappaCell", () => {
   it("shows only the kappa, with its kind on hover of the info icon", async () => {
@@ -9,18 +9,6 @@ describe("KappaCell", () => {
     expect(screen.queryByText("Fleiss' kappa")).not.toBeInTheDocument();
     await user.hover(screen.getByRole("button", { name: "Kind of kappa" }));
     expect(await screen.findByText("Fleiss' kappa")).toBeInTheDocument();
-  });
-
-  it("names a mixed kappa Cohen's when it compares one annotator with the others", async () => {
-    const user = setupUser();
-    render(
-      <KappaCell fields={{ kappa: 0, kappa_type: "mixed" }} oneAgainstOthers />,
-    );
-    expect(screen.getByText("0.00")).toBeInTheDocument();
-    await user.hover(screen.getByRole("button", { name: "Kind of kappa" }));
-    expect(
-      await screen.findByText("Cohen's kappa, linear weighted for ratings"),
-    ).toBeInTheDocument();
   });
 
   it.each([
@@ -63,3 +51,37 @@ describe("KappaCell", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });
+
+describe("KappaByKindList", () => {
+  it("shows one kappa per kind of answer, each after its kind", async () => {
+    const user = setupUser();
+    render(
+      <KappaByKindList
+        kinds={[
+          { answer_kind: "binary", kappa: 0.2, kappa_type: "cohen" },
+          {
+            answer_kind: "rating",
+            kappa: null,
+            kappa_type: "linear_weighted_cohen",
+            kappa_blank_reason: "everyone_agreed",
+          },
+        ]}
+      />,
+    );
+    const binary = screen.getByText("Binary").parentElement!;
+    expect(binary).toHaveTextContent("Binary0.20");
+    const rating = screen.getByText("Rating").parentElement!;
+    expect(rating).toHaveTextContent("RatingEveryone agreed");
+    await user.hover(screen.getByRole("button", { name: "Kind of kappa" }));
+    expect(await screen.findByText("Cohen's kappa")).toBeInTheDocument();
+  });
+
+  it("shows a dash when no kind was compared", () => {
+    const { rerender } = render(<KappaByKindList kinds={[]} />);
+    expect(screen.getByText("—")).toBeInTheDocument();
+    rerender(<KappaByKindList kinds={undefined} />);
+    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.queryByText("Binary")).not.toBeInTheDocument();
+  });
+});
+

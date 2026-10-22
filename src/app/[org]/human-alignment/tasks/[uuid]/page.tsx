@@ -69,7 +69,7 @@ import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewM
 import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
 import {
   AgreementStatCard,
-  agreementColor,
+  OverallAgreementCards,
   type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
@@ -114,14 +114,20 @@ import type { KappaFields } from "@/lib/agreementKappa";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
 
-type AgreementBlock = KappaFields & {
+type AgreementBlock = {
   current: number | null;
   pair_count: number;
 };
 
 type TaskAgreementResponse = {
+  /** Overall agreement between annotators. */
   human_human: AgreementBlock;
-  evaluators: (AgreementBlock & {
+  /** Overall agreement between evaluators and humans. */
+  evaluators_with_humans?: AgreementBlock | null;
+  evaluators: (AgreementBlock &
+    KappaFields & {
+    /** How well annotators agree with each other on this evaluator's items. */
+    inter_annotator?: (AgreementBlock & KappaFields) | null;
     evaluator_id: string;
     name: string;
     /** The evaluator's own rolled-up output across every item in the task,
@@ -2963,18 +2969,9 @@ function LabellingTaskPageInner() {
                     judgedEvaluators,
                   ) && (
                     <div className="flex flex-wrap items-stretch gap-3 mt-3">
-                      <AgreementStatCard
-                        staticPillText="Annotator agreement"
-                        value={
-                          agreement.human_human?.current != null
-                            ? `${Math.round(agreement.human_human.current * 100)}%`
-                            : "—"
-                        }
-                        valueClassName={agreementColor(
-                          agreement.human_human?.current,
-                        )}
-                        agreement={agreement.human_human?.current}
-                        kappa={agreement.human_human}
+                      <OverallAgreementCards
+                        interAnnotator={agreement.human_human}
+                        withHumans={agreement.evaluators_with_humans}
                       />
                       {judgedEvaluators.map((ev) => (
                         <AgreementStatCard
@@ -2983,14 +2980,20 @@ function LabellingTaskPageInner() {
                             uuid: ev.evaluator_id,
                             name: ev.name,
                           }}
-                          value={
-                            ev.current != null
-                              ? `${Math.round(ev.current * 100)}%`
-                              : "—"
-                          }
-                          valueClassName={agreementColor(ev.current)}
-                          agreement={ev.current}
-                          kappa={ev}
+                          value={null}
+                          showAlignmentLabel={false}
+                          sections={[
+                            {
+                              title: "Inter-annotator agreement",
+                              agreement: ev.inter_annotator?.current ?? null,
+                              kappa: ev.inter_annotator,
+                            },
+                            {
+                              title: "Evaluator agreement with humans",
+                              agreement: ev.current,
+                              kappa: ev,
+                            },
+                          ]}
                         />
                       ))}
                     </div>

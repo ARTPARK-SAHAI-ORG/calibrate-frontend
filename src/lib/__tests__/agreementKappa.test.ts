@@ -1,4 +1,6 @@
 import {
+  annotatorTrendSeries,
+  answerKindOf,
   buildTrendChart,
   formatKappa,
   formatTrendValue,
@@ -17,19 +19,6 @@ describe("kappaLabel", () => {
     expect(kappaLabel("linear_weighted_cohen")).toBe(
       "Linear weighted Cohen's kappa",
     );
-    expect(kappaLabel("mixed")).toBe(
-      "Fleiss' kappa, linear weighted for ratings",
-    );
-  });
-
-  it("names a mixed kappa Cohen's when it compares one annotator with the others", () => {
-    expect(kappaLabel("mixed")).toBe(
-      "Fleiss' kappa, linear weighted for ratings",
-    );
-    expect(kappaLabel("mixed", true)).toBe(
-      "Cohen's kappa, linear weighted for ratings",
-    );
-    expect(kappaLabel("cohen", true)).toBe("Cohen's kappa");
   });
 
   it("falls back to a plain name when the kind is missing", () => {
@@ -206,16 +195,30 @@ describe("buildTrendChart", () => {
     ).toEqual([0, 1]);
   });
 
-  it("names a mixed line Cohen's on one annotator's chart", () => {
+  it("styles inter-annotator lines dashed and gives overall lines no kappa line", () => {
     const { lines } = buildTrendChart([
       {
         ...one([
-          { key: "1", label: "Jan", agreement: 0.4, kappa: 0.1, kappa_type: "mixed" },
+          { key: "1", label: "Jan", agreement: 0.4, kappa: 0.1, kappa_type: "cohen" },
         ])[0],
-        oneAgainstOthers: true,
+        dashed: true,
+      },
+      {
+        key: "o",
+        name: "Overall",
+        kappaName: "Overall",
+        color: "#111",
+        overall: true,
+        points: [
+          { key: "1", label: "Jan", agreement: 0.5, kappa: 0.3, kappa_type: "fleiss" },
+        ],
       },
     ]);
-    expect(lines[1].name).toBe("A (Cohen's kappa, linear weighted for ratings)");
+    expect(lines.map((l) => [l.name, l.kappa, l.dashed, l.overall])).toEqual([
+      ["A", false, true, false],
+      ["A (Cohen's kappa)", true, true, false],
+      ["Overall", false, false, true],
+    ]);
   });
 
   it("names both kinds when the kind changes along the line", () => {
@@ -248,3 +251,84 @@ describe("buildTrendChart", () => {
     expect(data).toEqual([{ key: "1", label: "Jan", a: null, a__kappa: null }]);
   });
 });
+
+describe("answerKindOf", () => {
+  it("reads a linear weighted kappa as rating answers and a plain one as binary", () => {
+    expect(answerKindOf("linear_weighted_cohen")).toBe("rating");
+    expect(answerKindOf("linear_weighted_fleiss")).toBe("rating");
+    expect(answerKindOf("cohen")).toBe("binary");
+    expect(answerKindOf("fleiss")).toBe("binary");
+    expect(answerKindOf(null)).toBeNull();
+    expect(answerKindOf(undefined)).toBeNull();
+  });
+});
+
+describe("annotatorTrendSeries", () => {
+  const k = (
+    answer_kind: "binary" | "rating",
+    kappa: number,
+    kappa_type: "cohen" | "linear_weighted_cohen",
+  ) => ({ answer_kind, kappa, kappa_type });
+
+  it("draws one agreement line and one kappa line per kind, binary first", () => {
+    const series = annotatorTrendSeries(
+      [
+        {
+          bucket_end: "2026-01-31",
+          agreement: 0.8,
+          kappa_by_kind: [k("rating", 0.6, "linear_weighted_cohen")],
+        },
+        {
+          bucket_end: "2026-02-28",
+          agreement: 0.7,
+          kappa_by_kind: [
+            k("binary", 0.2, "cohen"),
+            k("rating", 0.5, "linear_weighted_cohen"),
+          ],
+        },
+      ],
+      (iso) => iso.slice(5, 7),
+    );
+    const { lines, data } = buildTrendChart(series);
+    expect(lines.map((l) => [l.name, l.kappa])).toEqual([
+      ["Agreement with other annotators", false],
+      ["Binary answers (Cohen's kappa)", true],
+      ["Rating answers (Linear weighted Cohen's kappa)", true],
+    ]);
+    expect(data).toEqual([
+      {
+        key: "2026-01-31",
+        label: "01",
+        agreement: 80,
+        agreement__kappa: null,
+        binary: null,
+        binary__kappa: null,
+        rating: null,
+        rating__kappa: 0.6,
+      },
+      {
+        key: "2026-02-28",
+        label: "02",
+        agreement: 70,
+        agreement__kappa: null,
+        binary: null,
+        binary__kappa: 0.2,
+        rating: null,
+        rating__kappa: 0.5,
+      },
+    ]);
+  });
+
+  it("draws only the agreement line when no kappa came back", () => {
+    const { lines } = buildTrendChart(
+      annotatorTrendSeries(
+        [{ bucket_end: "2026-01-31", agreement: 0.8 }],
+        (iso) => iso,
+      ),
+    );
+    expect(lines.map((l) => l.name)).toEqual([
+      "Agreement with other annotators",
+    ]);
+  });
+});
+
