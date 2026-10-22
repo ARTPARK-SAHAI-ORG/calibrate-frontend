@@ -134,7 +134,7 @@ export default function LoginPage() {
       </nav>
 
       {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
+      <div className="flex-1 flex items-start justify-center px-4 pb-8">
         <div className="w-full max-w-md">
           {/* Card */}
           <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 p-8 md:p-10">
@@ -298,7 +298,7 @@ export default function LoginPage() {
           </div>
 
           {/* Sign up link */}
-          <p className="mt-6 text-center text-sm text-gray-600">
+          <p className="mt-4 text-center text-sm text-gray-600">
             Don&apos;t have an account?{" "}
             <Link
               href={withCallback("/signup", authSearch)}

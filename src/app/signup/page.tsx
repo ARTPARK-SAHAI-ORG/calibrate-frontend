@@ -206,7 +206,7 @@ export default function SignupPage() {
       </nav>
 
       {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
+      <div className="flex-1 flex items-start justify-center px-4 pb-8">
         <div className="w-full max-w-lg">
           {/* Card */}
           <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 p-8 md:p-10">
