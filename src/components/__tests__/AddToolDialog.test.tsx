@@ -405,7 +405,7 @@ describe("AddToolDialog", () => {
           {
             type: "value_error",
             loc: ["body"],
-            msg: "Value error, webhook url must be public",
+            msg: "Value error, webhook url must not resolve to a private or reserved network address",
           },
         ],
       }),
@@ -429,7 +429,7 @@ describe("AddToolDialog", () => {
     await user.click(screen.getByRole("button", { name: "Add tool" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "webhook url must be public",
+      "This URL points to a private or internal network address. Use a public URL that can be reached from the internet.",
     );
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
   });

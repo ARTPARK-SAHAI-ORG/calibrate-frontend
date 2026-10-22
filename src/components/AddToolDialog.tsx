@@ -12,6 +12,7 @@ import {
   parseBackendErrorResponse,
   readNameConflictMessage,
 } from "@/lib/parseBackendError";
+import { friendlyUrlError } from "@/lib/urlErrorMessage";
 import { parseSchemaNode, NormalizedToolParam } from "@/lib/toolParams";
 
 export type ToolData = {
@@ -1238,7 +1239,9 @@ export function AddToolDialog({
           return;
         }
         throw new Error(
-          await parseBackendErrorResponse(response, "Error creating tool"),
+          friendlyUrlError(
+            await parseBackendErrorResponse(response, "Error creating tool"),
+          ),
         );
       }
 
@@ -1347,7 +1350,9 @@ export function AddToolDialog({
           return;
         }
         throw new Error(
-          await parseBackendErrorResponse(response, "Error updating tool"),
+          friendlyUrlError(
+            await parseBackendErrorResponse(response, "Error updating tool"),
+          ),
         );
       }
 
