@@ -13,6 +13,9 @@ export type KappaFields = {
   kappa_type?: KappaType | null;
   /** Why kappa is null although items were compared. Null otherwise. */
   kappa_blank_reason?: KappaBlankReason | null;
+  /** Agreement chance alone would produce, 0 to 1. Null when kappa is blank
+   * for any reason other than everyone agreeing. */
+  chance_agreement?: number | null;
 };
 
 type KappaBlankReason = "too_few_items" | "everyone_agreed";

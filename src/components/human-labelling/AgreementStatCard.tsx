@@ -29,16 +29,18 @@ function Stat({
   valueClassName = "",
   title,
 }: {
-  label: ReactNode;
+  label?: ReactNode;
   value: ReactNode;
   valueClassName?: string;
   title?: string;
 }) {
   const body = (
     <div className="min-w-0">
-      <div className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-        {label}
-      </div>
+      {label != null && (
+        <div className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+          {label}
+        </div>
+      )}
       <div
         className={`text-2xl font-semibold tabular-nums mt-0.5 whitespace-nowrap ${valueClassName}`}
       >
@@ -55,6 +57,55 @@ function Stat({
     </Tooltip>
   ) : (
     body
+  );
+}
+
+/** A bar filled to the agreement, a tick at what chance alone would agree,
+ * and under it the chance and the kappa. The fill is green when agreement
+ * beats chance and red when it falls short, compared as the whole percents
+ * shown, so the colour never contradicts the numbers. */
+function AgreementBar({
+  agreement,
+  kappa,
+}: {
+  agreement: number;
+  kappa: KappaFields;
+}) {
+  const pct = Math.round(agreement * 100);
+  const chance =
+    kappa.chance_agreement == null
+      ? null
+      : Math.round(kappa.chance_agreement * 100);
+  const fill =
+    chance == null || pct === chance
+      ? "bg-muted-foreground"
+      : pct > chance
+        ? "bg-green-500"
+        : "bg-red-500";
+  return (
+    <>
+      <div className="relative mt-2 h-2 rounded-full bg-muted">
+        <div
+          data-testid="agreement-fill"
+          className={`h-full rounded-full ${fill}`}
+          style={{ width: `${pct}%` }}
+        />
+        {chance != null && (
+          <div
+            data-testid="chance-tick"
+            className="absolute -top-1 -bottom-1 w-0.5 -ml-px bg-foreground"
+            style={{ left: `${chance}%` }}
+          />
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-4 mt-1.5 text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">
+        {chance != null ? <span>Chance {chance}%</span> : <span />}
+        <span className="inline-flex items-center gap-1">
+          Kappa
+          <KappaCell fields={kappa} />
+        </span>
+      </div>
+    </>
   );
 }
 
@@ -88,6 +139,9 @@ export function AgreementStatCard(
      * agreement is not this card's subject. */
     value: string | null;
     valueClassName?: string;
+    /** The agreement behind `value`, 0 to 1. With `kappa`, the card draws it
+     * as a bar against chance, in a neutral colour. */
+    agreement?: number | null;
     /** When present, the card shows this in place of, or next to, the
      * agreement number. */
     result?: EvaluatorResultStat | null;
@@ -118,6 +172,7 @@ export function AgreementStatCard(
     showAlignmentLabel = true,
     warning = null,
     kappa = null,
+    agreement = null,
   } = props;
   // The evaluator whose prompt is on show, opened from the pill below. Null
   // until the pill is clicked.
@@ -153,6 +208,17 @@ export function AgreementStatCard(
       {result ? result.value : (value ?? "—")}
     </div>
   );
+  const agreementBlock =
+    agreement != null && kappa != null && value != null ? (
+      <div className="min-w-0">
+        <Stat
+          label={result ? "Human agreement" : undefined}
+          value={value}
+          valueClassName="text-foreground"
+        />
+        <AgreementBar agreement={agreement} kappa={kappa} />
+      </div>
+    ) : null;
   const kappaStat =
     value != null && kappa != null ? (
       <Stat
@@ -244,15 +310,21 @@ export function AgreementStatCard(
               }
               title={result.title}
             />
-            {value != null && (
-              <Stat
-                label="Human agreement"
-                value={value}
-                valueClassName={valueClassName}
-              />
+            {agreementBlock ?? (
+              <>
+                {value != null && (
+                  <Stat
+                    label="Human agreement"
+                    value={value}
+                    valueClassName={valueClassName}
+                  />
+                )}
+                {kappaStat}
+              </>
             )}
-            {kappaStat}
           </div>
+        ) : !result && agreementBlock ? (
+          <div className="mt-2">{agreementBlock}</div>
         ) : !result && kappaStat ? (
           <div className="mt-2 flex items-start gap-6">
             <Stat

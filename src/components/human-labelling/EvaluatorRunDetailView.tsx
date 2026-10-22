@@ -1650,6 +1650,7 @@ function EvaluatorSummary({
                 }}
                 value={value}
                 valueClassName={valueClassName}
+                agreement={row?.agreement}
                 result={result}
                 warning={warning}
                 kappa={row}
@@ -1664,6 +1665,7 @@ function EvaluatorSummary({
               }
               value={value}
               valueClassName={valueClassName}
+              agreement={row?.agreement}
               result={result}
               warning={warning}
               kappa={row}

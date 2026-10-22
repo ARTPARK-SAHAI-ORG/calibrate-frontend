@@ -2973,6 +2973,7 @@ function LabellingTaskPageInner() {
                         valueClassName={agreementColor(
                           agreement.human_human?.current,
                         )}
+                        agreement={agreement.human_human?.current}
                         kappa={agreement.human_human}
                       />
                       {judgedEvaluators.map((ev) => (
@@ -2988,6 +2989,7 @@ function LabellingTaskPageInner() {
                               : "—"
                           }
                           valueClassName={agreementColor(ev.current)}
+                          agreement={ev.current}
                           kappa={ev}
                         />
                       ))}

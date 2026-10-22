@@ -470,3 +470,113 @@ describe("AgreementStatCard", () => {
     expect(screen.getByText("Safety")).toBeInTheDocument();
   });
 });
+
+describe("AgreementStatCard agreement bar", () => {
+  const fill = () => screen.getByTestId("agreement-fill");
+
+  it("fills green to the agreement, ticks at chance, and keeps the number neutral", () => {
+    render(
+      <AgreementStatCard
+        staticPillText="Annotator agreement"
+        value="62%"
+        valueClassName="text-yellow-600 dark:text-yellow-400"
+        agreement={0.62}
+        kappa={{ kappa: 0.42, kappa_type: "cohen", chance_agreement: 0.35 }}
+      />
+    );
+    const number = screen.getByText("62%");
+    expect(number.className).toContain("text-foreground");
+    expect(number.className).not.toMatch(/text-(green|red|yellow)/);
+    expect(fill().style.width).toBe("62%");
+    expect(fill().className).toContain("bg-green-500");
+    expect(screen.getByTestId("chance-tick").style.left).toBe("35%");
+    expect(screen.getByText("Chance 35%")).toBeInTheDocument();
+    expect(screen.getByText("Kappa")).toBeInTheDocument();
+    expect(screen.getByText("0.42")).toBeInTheDocument();
+    expect(screen.queryByText("Agreement")).not.toBeInTheDocument();
+  });
+
+  it("fills red when agreement falls short of chance", () => {
+    render(
+      <AgreementStatCard
+        staticPillText="Annotator agreement"
+        value="94%"
+        agreement={0.94}
+        kappa={{ kappa: -0.33, kappa_type: "cohen", chance_agreement: 0.96 }}
+      />
+    );
+    expect(fill().style.width).toBe("94%");
+    expect(fill().className).toContain("bg-red-500");
+    expect(screen.getByTestId("chance-tick").style.left).toBe("96%");
+    expect(screen.getByText("Chance 96%")).toBeInTheDocument();
+    expect(screen.getByText("-0.33")).toBeInTheDocument();
+  });
+
+  it("fills muted when agreement equals chance", () => {
+    render(
+      <AgreementStatCard
+        staticPillText="Annotator agreement"
+        value="100%"
+        agreement={1}
+        kappa={{
+          kappa: null,
+          kappa_blank_reason: "everyone_agreed",
+          chance_agreement: 1,
+        }}
+      />
+    );
+    expect(fill().className).toContain("bg-muted-foreground");
+    expect(screen.getByText("Chance 100%")).toBeInTheDocument();
+    expect(screen.getByText("Everyone agreed")).toBeInTheDocument();
+  });
+
+  it("draws no tick and no chance when chance is unknown", () => {
+    render(
+      <AgreementStatCard
+        staticPillText="Annotator agreement"
+        value="80%"
+        agreement={0.8}
+        kappa={{
+          kappa: null,
+          kappa_blank_reason: "too_few_items",
+          chance_agreement: null,
+        }}
+      />
+    );
+    expect(fill().style.width).toBe("80%");
+    expect(screen.queryByTestId("chance-tick")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Chance/)).not.toBeInTheDocument();
+    expect(screen.getByText("Kappa")).toBeInTheDocument();
+    expect(screen.getByText("Too few items")).toBeInTheDocument();
+  });
+
+  it("draws no bar when there is no agreement number", () => {
+    render(
+      <AgreementStatCard
+        staticPillText="Annotator agreement"
+        value="—"
+        agreement={null}
+        kappa={{ kappa: null, kappa_type: null, chance_agreement: null }}
+      />
+    );
+    expect(screen.queryByTestId("agreement-fill")).not.toBeInTheDocument();
+    expect(screen.getByText("Agreement")).toBeInTheDocument();
+  });
+
+  it("keeps the score first and names the agreement beside it", () => {
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
+        value="90%"
+        agreement={0.9}
+        result={{ label: "Score", value: "75%", ratio: 0.75 }}
+        kappa={{ kappa: 0.5, kappa_type: "cohen", chance_agreement: 0.8 }}
+      />
+    );
+    const text = document.body.textContent!;
+    expect(text.indexOf("Score")).toBeLessThan(text.indexOf("Human agreement"));
+    expect(screen.getByText("90%").className).toContain("text-foreground");
+    expect(fill().style.width).toBe("90%");
+    expect(screen.getByText("Chance 80%")).toBeInTheDocument();
+  });
+});
