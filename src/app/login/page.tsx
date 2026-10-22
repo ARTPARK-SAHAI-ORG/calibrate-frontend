@@ -4,7 +4,12 @@ import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
-import { postLoginPath, withCallback } from "@/lib/postLoginRedirect";
+import {
+  nextForBackend,
+  postLoginPath,
+  storeLoginAndRedirect,
+  withCallback,
+} from "@/lib/postLoginRedirect";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -58,7 +63,11 @@ export default function LoginPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          next: nextForBackend(window.location.search),
+        }),
       });
 
       if (!response.ok) {
@@ -67,6 +76,12 @@ export default function LoginPage() {
         // Handle specific HTTP status codes
         if (response.status === 401) {
           throw new Error("Invalid email or password");
+        }
+        // The password was right; the backend has just sent a new link
+        if (response.status === 403 && data.detail === "email_not_verified") {
+          throw new Error(
+            `Your email is not confirmed yet. We sent a new link to ${email.trim()}. Click it, then log in.`,
+          );
         }
         if (response.status === 422) {
           // Validation error from backend
@@ -81,14 +96,7 @@ export default function LoginPage() {
         throw new Error(data.detail || data.message || "Login failed");
       }
 
-      const data = await response.json();
-      // Store the JWT token in both localStorage and cookie
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      // Set cookie for middleware to read (httpOnly: false so JS can set it)
-      document.cookie = `access_token=${data.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-      // Use window.location for hard redirect
-      window.location.href = postLoginPath(window.location.search);
+      storeLoginAndRedirect(await response.json(), window.location.search);
     } catch (err) {
       if (err instanceof TypeError && err.message === "Failed to fetch") {
         setError("Unable to connect to server. Please try again later.");
@@ -234,6 +242,14 @@ export default function LoginPage() {
                       </svg>
                     )}
                   </button>
+                </div>
+                <div className="mt-2 text-right text-sm">
+                  <Link
+                    href={withCallback("/forgot-password", authSearch)}
+                    className="font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                  >
+                    Forgot password?
+                  </Link>
                 </div>
               </div>
 

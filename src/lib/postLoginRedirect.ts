@@ -40,6 +40,9 @@ export function safeCallbackUrl(raw: string | null | undefined): string {
   if (
     parsed.pathname === "/login" ||
     parsed.pathname === "/signup" ||
+    parsed.pathname === "/verify-email" ||
+    parsed.pathname === "/forgot-password" ||
+    parsed.pathname === "/reset-password" ||
     parsed.pathname === OPENING_PATH
   ) {
     return DEFAULT_POST_LOGIN_PATH;
@@ -50,6 +53,32 @@ export function safeCallbackUrl(raw: string | null | undefined): string {
 /** Read the wanted page out of a query string, e.g. `window.location.search`. */
 export function postLoginPath(search: string): string {
   return safeCallbackUrl(new URLSearchParams(search).get(CALLBACK_PARAM));
+}
+
+/**
+ * The wanted page to hand the backend as `next`, so the link it emails brings
+ * the person back to it. Undefined when the address names no page.
+ */
+export function nextForBackend(search: string): string | undefined {
+  return new URLSearchParams(search).get(CALLBACK_PARAM)
+    ? postLoginPath(search)
+    : undefined;
+}
+
+/**
+ * Keep the login the backend just handed back, then go to the wanted page.
+ * Used by every page that signs someone in with an email address.
+ */
+export function storeLoginAndRedirect(
+  data: { access_token: string; user: unknown },
+  search: string,
+): void {
+  localStorage.setItem("access_token", data.access_token);
+  localStorage.setItem("user", JSON.stringify(data.user));
+  // The middleware reads the cookie, so it cannot be httpOnly
+  document.cookie = `access_token=${data.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+  // A full page load, so everything starts again signed in
+  window.location.href = postLoginPath(search);
 }
 
 /** Carry the wanted page across the link between the login and signup pages. */

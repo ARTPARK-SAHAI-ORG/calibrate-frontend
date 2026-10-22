@@ -4,7 +4,12 @@ import { useState, useEffect, useMemo } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
-import { postLoginPath, withCallback } from "@/lib/postLoginRedirect";
+import {
+  nextForBackend,
+  postLoginPath,
+  storeLoginAndRedirect,
+  withCallback,
+} from "@/lib/postLoginRedirect";
 
 type PasswordStrength = "weak" | "fair" | "good" | "strong";
 
@@ -59,6 +64,10 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+  const [verificationSent, setVerificationSent] = useState<{
+    email: string;
+    alreadyPending: boolean;
+  } | null>(null);
   // The page a shared link pointed at, kept on the URL by the middleware
   const [authSearch, setAuthSearch] = useState("");
 
@@ -112,6 +121,7 @@ export default function SignupPage() {
           last_name: lastName.trim(),
           email: email.trim(),
           password,
+          next: nextForBackend(window.location.search),
         }),
       });
 
@@ -136,13 +146,15 @@ export default function SignupPage() {
       }
 
       const data = await response.json();
-      // Store the JWT token in both localStorage and cookie
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      // Set cookie for middleware to read (httpOnly: false so JS can set it)
-      document.cookie = `access_token=${data.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-      // Use window.location for hard redirect
-      window.location.href = postLoginPath(window.location.search);
+      // The backend sends a confirmation email instead of signing in
+      if (response.status === 202) {
+        setVerificationSent({
+          email: data.email,
+          alreadyPending: data.already_pending,
+        });
+        return;
+      }
+      storeLoginAndRedirect(data, window.location.search);
     } catch (err) {
       if (err instanceof TypeError && err.message === "Failed to fetch") {
         setError("Unable to connect to server. Please try again later.");
@@ -198,6 +210,27 @@ export default function SignupPage() {
         <div className="w-full max-w-lg">
           {/* Card */}
           <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 p-8 md:p-10">
+            {verificationSent ? (
+              <div className="text-center">
+                <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-4">
+                  Check your email
+                </h1>
+                <p className="text-gray-600">
+                  {verificationSent.alreadyPending
+                    ? `An account with this email already exists but its email is not confirmed yet. We sent you a new link to ${verificationSent.email}.`
+                    : `We sent a link to ${verificationSent.email}. Click it to confirm your email, then you can log in.`}
+                </p>
+                <p className="mt-6 text-sm">
+                  <Link
+                    href={withCallback("/login", authSearch)}
+                    className="font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                  >
+                    Go to log in
+                  </Link>
+                </p>
+              </div>
+            ) : (
+            <>
             <div className="text-center mb-8">
               <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-2">
                 Create your account
@@ -457,6 +490,8 @@ export default function SignupPage() {
                 Privacy Policy
               </Link>
             </p>
+            </>
+            )}
           </div>
 
           {/* Sign in link */}

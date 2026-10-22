@@ -60,10 +60,12 @@ function route(req: NextRequest & { auth: unknown }): NextResponse {
   // "starts with" would let "/invite/agents/<uuid>" through, and Next would
   // read "invite" as the workspace and serve the agent page to a visitor who
   // has not signed in.
+  // Opened from an email link by someone who is not signed in yet
+  const isAccountEmailPage = ["/verify-email", "/forgot-password", "/reset-password"].includes(req.nextUrl.pathname);
   const isInviteRoute = /^\/invite\/[^/]+\/?$/.test(req.nextUrl.pathname);
 
-  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, blog, robots.txt and sitemap.xml, public share links, annotate-job links, invite links
-  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isChangelogPage || isLearnPage || isBlogRoute || isCrawlerFile || isPublicShareRoute || isAnnotateJobRoute || isInviteRoute) {
+  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, blog, robots.txt and sitemap.xml, public share links, annotate-job links, invite links, email confirmation and password reset
+  if (isAccountEmailPage || isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isChangelogPage || isLearnPage || isBlogRoute || isCrawlerFile || isPublicShareRoute || isAnnotateJobRoute || isInviteRoute) {
     return NextResponse.next();
   }
 

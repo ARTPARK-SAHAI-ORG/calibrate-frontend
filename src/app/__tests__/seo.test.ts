@@ -61,7 +61,15 @@ describe("sitemap", () => {
 
   it("keeps pages that need signing in out of it", () => {
     const urls = sitemap().map((entry) => entry.url);
-    for (const path of ["/login", "/signup", "/opening", "/public/"]) {
+    for (const path of [
+      "/login",
+      "/signup",
+      "/verify-email",
+      "/forgot-password",
+      "/reset-password",
+      "/opening",
+      "/public/",
+    ]) {
       expect(urls.some((url) => url.includes(path))).toBe(false);
     }
   });
@@ -73,6 +81,14 @@ describe("robots", () => {
 
     expect(disallow).toContain("/public/");
     expect(disallow).toContain("/annotate-job/");
+  });
+
+  it("keeps crawlers away from the account email pages, which carry tokens", () => {
+    const { disallow } = robots().rules as { disallow: string[] };
+
+    for (const path of ["/verify-email", "/forgot-password", "/reset-password"]) {
+      expect(disallow).toContain(path);
+    }
   });
 
   it("points at the sitemap", () => {
