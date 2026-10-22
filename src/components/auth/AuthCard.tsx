@@ -1,7 +1,10 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { getBackendUrl } from "@/lib/api";
+import { nextForBackend } from "@/lib/postLoginRedirect";
+import { SpinnerIcon } from "@/components/icons";
 
 // The same classes the login and signup pages use, so the account pages
 // opened from an email read as part of the same set.
@@ -18,6 +21,7 @@ export const AUTH_BUTTON_LINK_CLASS = `${AUTH_BUTTON_CLASS} block text-center`;
 
 export const CONNECTION_ERROR =
   "Unable to connect to server. Please try again later.";
+const RESEND_FAILED = "Could not send a new link. Please try again.";
 
 const noSubscribe = () => () => {};
 
@@ -33,14 +37,23 @@ export function useAuthSearch(): string {
   );
 }
 
-/** The page frame of the login page: logo bar, then one centred card. */
+/**
+ * The page frame every account page shares: logo bar, then one card just under
+ * it. `below` sits under the card, such as the "Sign up" line on login.
+ */
 export function AuthCard({
   title,
+  subtitle,
   icon,
+  wide,
+  below,
   children,
 }: {
-  title: string;
+  title?: string;
+  subtitle?: string;
   icon?: React.ReactNode;
+  wide?: boolean;
+  below?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -63,38 +76,105 @@ export function AuthCard({
         </Link>
       </nav>
 
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md">
+      <div className="flex-1 flex items-start justify-center px-4 pb-8">
+        <div className={`w-full ${wide ? "max-w-lg" : "max-w-md"}`}>
           <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 p-8 md:p-10">
-            <div className="text-center mb-8">
-              {icon && <div className="flex justify-center mb-4">{icon}</div>}
-              <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-2">
-                {title}
-              </h1>
-            </div>
+            {title && (
+              <div className="text-center mb-8">
+                {icon && <div className="flex justify-center mb-4">{icon}</div>}
+                <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-2">
+                  {title}
+                </h1>
+                {subtitle && <p className="text-gray-500">{subtitle}</p>}
+              </div>
+            )}
             {children}
           </div>
+          {below}
         </div>
       </div>
     </div>
   );
 }
 
-/** The login button's loading state: spinner and text, copied from the login page */
+/** A card that only says something is being asked, with a spinner */
+export function AuthCardLoading({ title, label }: { title: string; label: string }) {
+  return (
+    <AuthCard title={title}>
+      <div className="flex justify-center" role="status" aria-label={label}>
+        <SpinnerIcon className="animate-spin h-6 w-6 text-gray-500" />
+      </div>
+    </AuthCard>
+  );
+}
+
+/** A button's loading state: spinner and text */
 export function ButtonLoading({ text }: { text: string }) {
   return (
     <span className="flex items-center justify-center gap-2">
-      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-      </svg>
+      <SpinnerIcon className="animate-spin h-5 w-5" />
       {text}
     </span>
   );
 }
 
+/**
+ * Asks the backend for a new link from an expired one. The link's token is all
+ * it needs: the backend works out the account and answers with its address.
+ */
+export function useSendNewLink(path: string) {
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const [sentTo, setSentTo] = useState("");
+
+  /** Resolves to the backend's reason when it refuses, so a page can act on it */
+  const send = async (token: string, search: string) => {
+    setError("");
+    setSending(true);
+    try {
+      const response = await fetch(`${getBackendUrl()}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, next: nextForBackend(search) }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        setSentTo(data.email);
+        return undefined;
+      }
+      setError(RESEND_FAILED);
+      return data.detail as string | undefined;
+    } catch {
+      setError(CONNECTION_ERROR);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return { send, sending, error, sentTo };
+}
+
+/** The card shown once a new link went out */
+export function LinkSentCard({
+  title,
+  text,
+  email,
+}: {
+  title: string;
+  text: string;
+  email: string;
+}) {
+  return (
+    <AuthCard title={title} icon={<SentTick />}>
+      <p className="text-gray-600">
+        <TextWithEmail text={text} email={email} />
+      </p>
+    </AuthCard>
+  );
+}
+
 /** A green tick, shown above a card that says an email went out */
-export function SentTick() {
+function SentTick() {
   return (
     <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
       <svg className="h-6 w-6 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">

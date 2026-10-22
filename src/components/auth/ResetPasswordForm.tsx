@@ -1,76 +1,55 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
 import { ErrorNote } from "@/components/ui";
-import {
-  nextForBackend,
-  storeLoginAndRedirect,
-  withCallback,
-} from "@/lib/postLoginRedirect";
+import { storeLoginAndRedirect } from "@/lib/postLoginRedirect";
 import {
   AUTH_BUTTON_CLASS,
-  AUTH_BUTTON_LINK_CLASS,
   AuthCard,
+  AuthCardLoading,
   ButtonLoading,
   CONNECTION_ERROR,
-  SentTick,
-  TextWithEmail,
+  LinkSentCard,
   useAuthSearch,
+  useSendNewLink,
 } from "./AuthCard";
 import { NewPasswordFields } from "./PasswordFields";
 
+export const RESET_EXPIRED =
+  "This link has expired. Request a new password verification link.";
+
 export function ResetPasswordForm() {
   const search = useAuthSearch();
+  const token = new URLSearchParams(search).get("token");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [expired, setExpired] = useState(false);
   // Whether the link still works is asked before the boxes are shown
   const [checking, setChecking] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const newLink = useSendNewLink("/auth/resend-reset");
 
   useEffect(() => {
+    // Read from the address itself: on the first pass `search` is still empty
     const token = new URLSearchParams(window.location.search).get("token");
-    if (!token) {
-      setExpired(true);
+    // No token at all reads the same as an expired link
+    const isExpired = token
+      ? fetch(`${getBackendUrl()}/auth/check-reset-link`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        })
+          .then((response) => response.status === 400)
+          // Could not ask: show the boxes, and saving says what went wrong
+          .catch(() => false)
+      : Promise.resolve(true);
+    isExpired.then((value) => {
+      setExpired(value);
       setChecking(false);
-      return;
-    }
-    fetch(`${getBackendUrl()}/auth/check-reset-link`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    })
-      .then((response) => {
-        if (response.status === 400) setExpired(true);
-      })
-      // Could not ask: show the boxes, and saving says what went wrong
-      .catch(() => {})
-      .finally(() => setChecking(false));
+    });
   }, []);
-  const [isLoading, setIsLoading] = useState(false);
-  const [resending, setResending] = useState(false);
-  const [resendError, setResendError] = useState("");
-  const [sentTo, setSentTo] = useState("");
-
-  const resend = async (email: string) => {
-    setResendError("");
-    setResending(true);
-    try {
-      const response = await fetch(`${getBackendUrl()}/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, next: nextForBackend(search) }),
-      });
-      if (response.ok) setSentTo(email);
-      else setResendError("Could not send a new link. Please try again.");
-    } catch {
-      setResendError(CONNECTION_ERROR);
-    } finally {
-      setResending(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,11 +61,6 @@ export function ResetPasswordForm() {
     }
     // The box itself already says the two do not match
     if (password !== confirmPassword) return;
-    const token = new URLSearchParams(search).get("token");
-    if (!token) {
-      setExpired(true);
-      return;
-    }
     setIsLoading(true);
     try {
       const response = await fetch(`${getBackendUrl()}/auth/reset-password`, {
@@ -112,58 +86,33 @@ export function ResetPasswordForm() {
   };
 
   if (checking) {
-    return (
-      <AuthCard title="Reset password">
-        <div className="flex justify-center" role="status" aria-label="Checking the link">
-          <svg className="animate-spin h-6 w-6 text-gray-500" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-        </div>
-      </AuthCard>
-    );
+    return <AuthCardLoading title="Reset password" label="Checking the link" />;
   }
 
-  if (sentTo) {
+  if (newLink.sentTo) {
     return (
-      <AuthCard title="Reset email sent" icon={<SentTick />}>
-        <p className="text-gray-600">
-          <TextWithEmail
-            text={`We sent a new link to ${sentTo}. Click it to choose a new password.`}
-            email={sentTo}
-          />
-        </p>
-      </AuthCard>
+      <LinkSentCard
+        title="Reset email sent"
+        text={`We sent a new link to ${newLink.sentTo}. Click it to choose a new password.`}
+        email={newLink.sentTo}
+      />
     );
   }
 
   if (expired) {
-    // A link carries its address, so a new one is sent without typing it
-    const email = new URLSearchParams(search).get("email");
     return (
       <AuthCard title="Reset password">
         <div className="space-y-6">
-          <p className="text-gray-600">
-            This link has expired. Request a new password verification link.
-          </p>
-          {resendError && <ErrorNote>{resendError}</ErrorNote>}
-          {email ? (
-            <button
-              type="button"
-              onClick={() => resend(email)}
-              disabled={resending}
-              className={AUTH_BUTTON_CLASS}
-            >
-              {resending ? <ButtonLoading text="Sending..." /> : "Send reset link"}
-            </button>
-          ) : (
-            <Link
-              href={withCallback("/forgot-password", search)}
-              className={AUTH_BUTTON_LINK_CLASS}
-            >
-              Send reset link
-            </Link>
-          )}
+          <p className="text-gray-600">{RESET_EXPIRED}</p>
+          {newLink.error && <ErrorNote>{newLink.error}</ErrorNote>}
+          <button
+            type="button"
+            onClick={() => newLink.send(token ?? "", search)}
+            disabled={newLink.sending}
+            className={AUTH_BUTTON_CLASS}
+          >
+            {newLink.sending ? <ButtonLoading text="Sending..." /> : "Send reset link"}
+          </button>
         </div>
       </AuthCard>
     );

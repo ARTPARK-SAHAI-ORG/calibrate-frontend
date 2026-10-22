@@ -8,12 +8,23 @@ export function setLocation(search: string) {
   });
 }
 
-/** Make the next backend call answer with this status and body. */
-export function mockFetchOnce(status: number, body: unknown = {}) {
-  const fetchMock = jest.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => body,
+export type Answer = [status: number, body?: unknown] | "unreachable";
+
+/**
+ * Make the backend answer each call in turn, the last answer repeating. Returns
+ * the mock so a test can read what was sent.
+ */
+export function fakeBackend(...answers: Answer[]) {
+  let call = 0;
+  const fetchMock = jest.fn<Promise<unknown>, [string, RequestInit?]>(() => {
+    const answer = answers[Math.min(call++, answers.length - 1)];
+    return answer === "unreachable"
+      ? Promise.reject(new TypeError("Failed to fetch"))
+      : Promise.resolve({
+          ok: answer[0] >= 200 && answer[0] < 300,
+          status: answer[0],
+          json: async () => answer[1] ?? {},
+        });
   });
   global.fetch = fetchMock as unknown as typeof fetch;
   return fetchMock;
@@ -25,8 +36,9 @@ export const LOGIN = {
   user: { email: "a@b.co" },
 };
 
-export function sentBody(fetchMock: jest.Mock) {
-  return JSON.parse(fetchMock.mock.calls[0][1].body);
+/** What the call at `index` sent to the backend */
+export function sentBody(fetchMock: jest.Mock, index = 0) {
+  return JSON.parse(String(fetchMock.mock.calls[index][1]?.body));
 }
 
 /**

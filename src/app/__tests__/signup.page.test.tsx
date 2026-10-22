@@ -1,5 +1,5 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { LOGIN, mockFetchOnce, sentBody, setLocation, fullText } from "@/test-utils/auth";
+import { LOGIN, fakeBackend, sentBody, setLocation, fullText } from "@/test-utils/auth";
 import { waitFor } from "@testing-library/react";
 import SignupPage from "../signup/page";
 
@@ -19,11 +19,11 @@ beforeEach(() => localStorage.clear());
 describe("SignupPage", () => {
   it("asks the person to check their email when the backend sends a link", async () => {
     setLocation("?callbackUrl=%2Ftools");
-    const fetchMock = mockFetchOnce(202, {
+    const fetchMock = fakeBackend([202, {
       status: "verification_sent",
       email: "asha@example.com",
       already_pending: false,
-    });
+    }]);
     await signUp();
 
     expect(await screen.findByText("Check your email")).toBeInTheDocument();
@@ -41,11 +41,11 @@ describe("SignupPage", () => {
 
   it("says the account is waiting on its email when it already exists", async () => {
     setLocation("");
-    const fetchMock = mockFetchOnce(202, {
+    const fetchMock = fakeBackend([202, {
       status: "verification_sent",
       email: "asha@example.com",
       already_pending: true,
-    });
+    }]);
     await signUp();
 
     expect(
@@ -58,7 +58,7 @@ describe("SignupPage", () => {
 
   it("still signs in straight away when the backend returns a login", async () => {
     setLocation("?callbackUrl=%2Ftools");
-    mockFetchOnce(200, LOGIN);
+    fakeBackend([200, LOGIN]);
     await signUp();
 
     await waitFor(() => expect(window.location.href).toBe("/tools"));

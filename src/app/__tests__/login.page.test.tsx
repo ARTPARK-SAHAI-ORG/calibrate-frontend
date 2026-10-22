@@ -1,5 +1,5 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { LOGIN, mockFetchOnce, sentBody, setLocation, fullText } from "@/test-utils/auth";
+import { LOGIN, fakeBackend, sentBody, setLocation, fullText } from "@/test-utils/auth";
 import { waitFor } from "@testing-library/react";
 import LoginPage from "../login/page";
 
@@ -16,7 +16,7 @@ beforeEach(() => localStorage.clear());
 describe("LoginPage", () => {
   it("says the email is not verified and a link went out", async () => {
     setLocation("");
-    mockFetchOnce(403, { detail: "email_not_verified" });
+    fakeBackend([403, { detail: "email_not_verified" }]);
     await logIn();
 
     expect(
@@ -38,7 +38,7 @@ describe("LoginPage", () => {
 
   it("signs in, sends the wanted page and goes there", async () => {
     setLocation("?callbackUrl=%2Ftools");
-    const fetchMock = mockFetchOnce(200, LOGIN);
+    const fetchMock = fakeBackend([200, LOGIN]);
     await logIn();
 
     await waitFor(() => expect(window.location.href).toBe("/tools"));

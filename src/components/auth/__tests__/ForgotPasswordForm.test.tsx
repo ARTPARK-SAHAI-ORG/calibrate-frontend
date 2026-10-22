@@ -1,11 +1,11 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { mockFetchOnce, sentBody, setLocation, fullText } from "@/test-utils/auth";
+import { fakeBackend, sentBody, setLocation, fullText } from "@/test-utils/auth";
 import { ForgotPasswordForm } from "../ForgotPasswordForm";
 
 describe("ForgotPasswordForm", () => {
   it("sends the email with the wanted page and always says a link was sent", async () => {
     setLocation("?callbackUrl=%2Ftools");
-    const fetchMock = mockFetchOnce(202, { status: "sent" });
+    const fetchMock = fakeBackend([202, { status: "sent" }]);
     const user = setupUser();
     render(<ForgotPasswordForm />);
 
@@ -27,7 +27,7 @@ describe("ForgotPasswordForm", () => {
 
   it("says the link was not sent when the server fails", async () => {
     setLocation("");
-    mockFetchOnce(500, { detail: "boom" });
+    fakeBackend([500, { detail: "boom" }]);
     const user = setupUser();
     render(<ForgotPasswordForm />);
 
@@ -42,7 +42,7 @@ describe("ForgotPasswordForm", () => {
 
   it("leaves next out when the address names no page", async () => {
     setLocation("");
-    const fetchMock = mockFetchOnce(202, { status: "sent" });
+    const fetchMock = fakeBackend([202, { status: "sent" }]);
     const user = setupUser();
     render(<ForgotPasswordForm />);
 

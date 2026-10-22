@@ -1,31 +1,12 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { LOGIN, fullText, setLocation } from "@/test-utils/auth";
+import { type Answer, LOGIN, fakeBackend, fullText, sentBody, setLocation } from "@/test-utils/auth";
 import { waitFor } from "@testing-library/react";
-import { ResetPasswordForm } from "../ResetPasswordForm";
+import { RESET_EXPIRED as EXPIRED, ResetPasswordForm } from "../ResetPasswordForm";
 
-const EXPIRED = "This link has expired. Request a new password verification link.";
+const EXPIRED_ANSWER: Answer = [400, { detail: "invalid_or_expired_token" }];
 
-type Answer = [number, unknown] | "unreachable";
-
-/**
- * The page first checks the link, then saves the password: each call gets its
- * own answer. Returns the mock so a test can read what was sent to each.
- */
-function mockBackend(check: Answer, save: Answer = [200, LOGIN]) {
-  const reply = (answer: Answer) =>
-    answer === "unreachable"
-      ? Promise.reject(new TypeError("Failed to fetch"))
-      : Promise.resolve({
-          ok: answer[0] >= 200 && answer[0] < 300,
-          status: answer[0],
-          json: async () => answer[1],
-        });
-  const fetchMock = jest.fn<Promise<unknown>, [string, RequestInit?]>((url) =>
-    reply(url.endsWith("/auth/check-reset-link") ? check : save),
-  );
-  global.fetch = fetchMock as unknown as typeof fetch;
-  return fetchMock;
-}
+/** The page first checks the link, then saves the password */
+const mockBackend = (check: Answer, save: Answer = [200, LOGIN]) => fakeBackend(check, save);
 
 const saveCalls = (fetchMock: jest.Mock) =>
   fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/auth/reset-password"));
@@ -43,24 +24,18 @@ beforeEach(() => localStorage.clear());
 describe("ResetPasswordForm", () => {
   it("says an expired link has expired before asking for a password", async () => {
     setLocation("?token=old&callbackUrl=%2Fpersonas");
-    const fetchMock = mockBackend([400, { detail: "invalid_or_expired_token" }]);
+    const fetchMock = mockBackend(EXPIRED_ANSWER);
     render(<ResetPasswordForm />);
 
     expect(await screen.findByText(EXPIRED)).toBeInTheDocument();
     expect(screen.queryByLabelText("Password")).toBeNull();
-    // No address in this link, so it can only go to the forgot password page
-    expect(
-      screen.getByRole("link", { name: "Send reset link" }),
-    ).toHaveAttribute("href", "/forgot-password?callbackUrl=%2Fpersonas");
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ token: "old" });
+    expect(screen.queryByRole("link", { name: "Send reset link" })).toBeNull();
+    expect(sentBody(fetchMock)).toEqual({ token: "old" });
   });
 
-  it("sends a new reset link straight away to the address the link carries", async () => {
-    setLocation("?token=old&email=a%40b.co&callbackUrl=%2Fpersonas");
-    const fetchMock = mockBackend(
-      [400, { detail: "invalid_or_expired_token" }],
-      [202, { status: "sent" }],
-    );
+  it("sends a new reset link from the expired one with one click", async () => {
+    setLocation("?token=old&callbackUrl=%2Fpersonas");
+    const fetchMock = mockBackend(EXPIRED_ANSWER, [202, { status: "sent", email: "a@b.co" }]);
     const user = setupUser();
     render(<ResetPasswordForm />);
 
@@ -69,14 +44,13 @@ describe("ResetPasswordForm", () => {
     expect(
       screen.getByText(fullText("We sent a new link to a@b.co. Click it to choose a new password.")),
     ).toBeInTheDocument();
-    const [url, init] = fetchMock.mock.calls[1];
-    expect(url).toMatch(/\/auth\/forgot-password$/);
-    expect(JSON.parse(String(init?.body))).toEqual({ email: "a@b.co", next: "/personas" });
+    expect(fetchMock.mock.calls[1][0]).toMatch(/\/auth\/resend-reset$/);
+    expect(sentBody(fetchMock, 1)).toEqual({ token: "old", next: "/personas" });
   });
 
   it("says so and keeps the button when sending a new link fails", async () => {
-    setLocation("?token=old&email=a%40b.co");
-    mockBackend([400, { detail: "invalid_or_expired_token" }], [500, {}]);
+    setLocation("?token=old");
+    mockBackend(EXPIRED_ANSWER, EXPIRED_ANSWER);
     const user = setupUser();
     render(<ResetPasswordForm />);
 
@@ -88,8 +62,8 @@ describe("ResetPasswordForm", () => {
   });
 
   it("says when sending a new link cannot reach the server", async () => {
-    setLocation("?token=old&email=a%40b.co");
-    mockBackend([400, { detail: "invalid_or_expired_token" }], "unreachable");
+    setLocation("?token=old");
+    mockBackend(EXPIRED_ANSWER, "unreachable");
     const user = setupUser();
     render(<ResetPasswordForm />);
 
@@ -148,7 +122,7 @@ describe("ResetPasswordForm", () => {
     const fetchMock = mockBackend([200, { valid: true }]);
     await submit("secret1", "secret1");
     await waitFor(() => expect(window.location.href).toBe("/personas"));
-    expect(JSON.parse(String(saveCalls(fetchMock)[0][1]?.body))).toEqual({
+    expect(sentBody(fetchMock, 1)).toEqual({
       token: "tok",
       password: "secret1",
     });
@@ -157,7 +131,7 @@ describe("ResetPasswordForm", () => {
 
   it("says the link has expired when it runs out while the page is open", async () => {
     setLocation("?token=tok");
-    mockBackend([200, { valid: true }], [400, { detail: "invalid_or_expired_token" }]);
+    mockBackend([200, { valid: true }], EXPIRED_ANSWER);
     await submit("secret1", "secret1");
     expect(await screen.findByText(EXPIRED)).toBeInTheDocument();
   });

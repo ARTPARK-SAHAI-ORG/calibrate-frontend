@@ -51,6 +51,13 @@ const strengthColors: Record<PasswordStrength, string> = {
   strong: "bg-emerald-500",
 };
 
+const strengthTextColors: Record<PasswordStrength, string> = {
+  weak: "text-red-600",
+  fair: "text-orange-600",
+  good: "text-yellow-600",
+  strong: "text-emerald-600",
+};
+
 const strengthLabels: Record<PasswordStrength, string> = {
   weak: "Weak",
   fair: "Fair",
@@ -166,15 +173,7 @@ export function NewPasswordFields({
                 />
               </div>
               <span
-                className={`text-xs font-medium ${
-                  passwordAnalysis.strength === "weak"
-                    ? "text-red-600"
-                    : passwordAnalysis.strength === "fair"
-                      ? "text-orange-600"
-                      : passwordAnalysis.strength === "good"
-                        ? "text-yellow-600"
-                        : "text-emerald-600"
-                }`}
+                className={`text-xs font-medium ${strengthTextColors[passwordAnalysis.strength]}`}
               >
                 {strengthLabels[passwordAnalysis.strength]}
               </span>

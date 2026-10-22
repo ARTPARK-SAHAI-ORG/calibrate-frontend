@@ -4,19 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
 import { ErrorNote } from "@/components/ui";
-import {
-  nextForBackend,
-  storeLoginAndRedirect,
-  withCallback,
-} from "@/lib/postLoginRedirect";
+import { storeLoginAndRedirect, withCallback } from "@/lib/postLoginRedirect";
 import {
   AUTH_BUTTON_CLASS,
   AUTH_BUTTON_LINK_CLASS,
   AuthCard,
+  AuthCardLoading,
   ButtonLoading,
   CONNECTION_ERROR,
-  SentTick,
-  TextWithEmail,
+  LinkSentCard,
+  useAuthSearch,
+  useSendNewLink,
 } from "./AuthCard";
 
 type State =
@@ -24,20 +22,17 @@ type State =
   // Too old, used, or replaced by a newer link: it can ask for a new one
   | { kind: "expired" }
   | { kind: "verified" }
-  | { kind: "failed"; message: string }
-  | { kind: "sent"; email: string };
+  | { kind: "failed"; message: string };
 
-const EXPIRED = "This link has expired. Request a new verification link.";
+export const VERIFY_EXPIRED = "This link has expired. Request a new verification link.";
 const FAILED = "Could not verify your email. Please open the link again.";
 
 export function VerifyEmail() {
   const [state, setState] = useState<State>({ kind: "verifying" });
   // Kept so the sign in button and a new link still lead back to an invite
-  const [search, setSearch] = useState("");
-  // The address the link was sent to, which a new link is sent to
-  const [email, setEmail] = useState("");
-  const [resending, setResending] = useState(false);
-  const [resendError, setResendError] = useState("");
+  const search = useAuthSearch();
+  const token = new URLSearchParams(search).get("token");
+  const newLink = useSendNewLink("/auth/resend-verification");
   // The link works once, so a second request (React runs effects twice in
   // development) would turn a verified email into an error on screen.
   const sent = useRef(false);
@@ -45,24 +40,22 @@ export function VerifyEmail() {
   useEffect(() => {
     if (sent.current) return;
     sent.current = true;
-    const search = window.location.search;
-    setSearch(search);
-    const params = new URLSearchParams(search);
-    const token = params.get("token");
-    const address = params.get("email") ?? "";
-    setEmail(address);
-    if (!token) {
-      setState({ kind: "expired" });
-      return;
-    }
-    fetch(`${getBackendUrl()}/auth/verify-email`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(address ? { token, email: address } : { token }),
-    })
+    const token = new URLSearchParams(window.location.search).get("token");
+    const answer = token
+      ? fetch(`${getBackendUrl()}/auth/verify-email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        })
+      : Promise.resolve(null);
+    answer
       .then(async (response) => {
+        if (!response) {
+          setState({ kind: "expired" });
+          return;
+        }
         if (response.ok) {
-          storeLoginAndRedirect(await response.json(), search);
+          storeLoginAndRedirect(await response.json(), window.location.search);
           return;
         }
         if (response.status !== 400) {
@@ -76,79 +69,40 @@ export function VerifyEmail() {
   }, []);
 
   const resend = async () => {
-    setResendError("");
-    setResending(true);
-    try {
-      const response = await fetch(`${getBackendUrl()}/auth/resend-verification`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, next: nextForBackend(search) }),
-      });
-      if (!response.ok) {
-        setResendError("Could not send a new link. Please try again.");
-      } else {
-        setState({ kind: "sent", email: (await response.json()).email });
-      }
-    } catch {
-      setResendError(CONNECTION_ERROR);
-    } finally {
-      setResending(false);
+    if ((await newLink.send(token ?? "", search)) === "already_verified") {
+      setState({ kind: "verified" });
     }
   };
 
-  const signIn = (
-    <Link href={withCallback("/login", search)} className={AUTH_BUTTON_LINK_CLASS}>
-      Sign in
-    </Link>
-  );
-
   if (state.kind === "verifying") {
-    return (
-      <AuthCard title="Verifying your email">
-        <div className="flex justify-center" role="status" aria-label="Verifying your email">
-          <svg className="animate-spin h-6 w-6 text-gray-500" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-        </div>
-      </AuthCard>
-    );
+    return <AuthCardLoading title="Verifying your email" label="Verifying your email" />;
   }
 
-  if (state.kind === "sent") {
+  if (newLink.sentTo) {
     return (
-      <AuthCard title="Verification email sent" icon={<SentTick />}>
-        <p className="text-gray-600">
-          <TextWithEmail
-            text={`We sent a new link to ${state.email}. Click it to verify your email, then you can sign in.`}
-            email={state.email}
-          />
-        </p>
-      </AuthCard>
+      <LinkSentCard
+        title="Verification email sent"
+        text={`We sent a new link to ${newLink.sentTo}. Click it to verify your email, then you can sign in.`}
+        email={newLink.sentTo}
+      />
     );
   }
 
   if (state.kind === "expired") {
     return (
       <AuthCard title="Verify your email">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            resend();
-          }}
-          className="space-y-6"
-        >
-          <p className="text-gray-600">{EXPIRED}</p>
-          {resendError && <ErrorNote>{resendError}</ErrorNote>}
-          {/* Every link carries its address; only one sent before that did not */}
-          {email ? (
-            <button type="submit" disabled={resending} className={AUTH_BUTTON_CLASS}>
-              {resending ? <ButtonLoading text="Sending..." /> : "Send verification email"}
-            </button>
-          ) : (
-            signIn
-          )}
-        </form>
+        <div className="space-y-6">
+          <p className="text-gray-600">{VERIFY_EXPIRED}</p>
+          {newLink.error && <ErrorNote>{newLink.error}</ErrorNote>}
+          <button
+            type="button"
+            onClick={resend}
+            disabled={newLink.sending}
+            className={AUTH_BUTTON_CLASS}
+          >
+            {newLink.sending ? <ButtonLoading text="Sending..." /> : "Send verification email"}
+          </button>
+        </div>
       </AuthCard>
     );
   }
@@ -159,7 +113,9 @@ export function VerifyEmail() {
         <p className="text-gray-600">
           {state.kind === "verified" ? "Your email is already verified." : state.message}
         </p>
-        {signIn}
+        <Link href={withCallback("/login", search)} className={AUTH_BUTTON_LINK_CLASS}>
+          Sign in
+        </Link>
       </div>
     </AuthCard>
   );
