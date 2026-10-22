@@ -318,6 +318,63 @@ describe("AgreementStatCard", () => {
     );
   });
 
+  it("shows kappa beside the agreement number, with its kind named", async () => {
+    const user = setupUser();
+    render(
+      <AgreementStatCard
+        staticPillText="Annotator agreement"
+        value="82%"
+        kappa={{ kappa: -0.125, kappa_type: "linear_weighted_fleiss" }}
+      />,
+    );
+    expect(screen.getByText("Human agreement")).toBeInTheDocument();
+    expect(screen.getByText("82%")).toBeInTheDocument();
+    expect(screen.getByText("-0.13")).toBeInTheDocument();
+    await user.hover(screen.getByText("Linear weighted Fleiss' kappa"));
+    expect(
+      await screen.findByText(/0 means no better than chance/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows kappa as a third number next to the score and agreement", () => {
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
+        value="90%"
+        result={{ label: "Score", value: "75%", ratio: 0.75 }}
+        kappa={{ kappa: 0.5, kappa_type: "cohen" }}
+      />,
+    );
+    expect(screen.getByText("Score")).toBeInTheDocument();
+    expect(screen.getByText("Human agreement")).toBeInTheDocument();
+    expect(screen.getByText("Cohen's kappa")).toBeInTheDocument();
+    expect(screen.getByText("0.50")).toBeInTheDocument();
+  });
+
+  it("shows nothing for kappa when there is none", () => {
+    render(
+      <AgreementStatCard
+        staticPillText="Annotator agreement"
+        value="82%"
+        kappa={{ kappa: null, kappa_type: null }}
+      />,
+    );
+    expect(screen.queryByText(/kappa/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
+  });
+
+  it("leaves kappa out when there is no agreement number beside it", () => {
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
+        value={null}
+        result={{ label: "Score", value: "75%", ratio: 0.75 }}
+        kappa={{ kappa: 0.5, kappa_type: "cohen" }}
+      />,
+    );
+    expect(screen.queryByText("Cohen's kappa")).not.toBeInTheDocument();
+  });
+
   it("renders the evaluator pill variant without a version label", () => {
     render(
       <AgreementStatCard

@@ -1,0 +1,108 @@
+export type KappaType =
+  | "fleiss"
+  | "linear_weighted_fleiss"
+  | "cohen"
+  | "linear_weighted_cohen"
+  | "mixed";
+
+/** Sent beside an agreement number that covers many items. Both are absent
+ * on responses from before kappa existed, and null when there is too little
+ * overlap to compute one. */
+export type KappaFields = {
+  kappa?: number | null;
+  kappa_type?: KappaType | null;
+};
+
+const KAPPA_LABELS: Record<KappaType, string> = {
+  fleiss: "Fleiss' kappa",
+  linear_weighted_fleiss: "Linear weighted Fleiss' kappa",
+  cohen: "Cohen's kappa",
+  linear_weighted_cohen: "Linear weighted Cohen's kappa",
+  mixed: "Fleiss' kappa, linear weighted for ratings",
+};
+
+export const KAPPA_HELP =
+  "Kappa is agreement after removing what chance alone would produce. 0 means no better than chance, 1 means full agreement";
+
+export function kappaLabel(type: KappaType | null | undefined): string {
+  return (type && KAPPA_LABELS[type]) || "Kappa";
+}
+
+export function formatKappa(kappa: number): string {
+  return kappa.toFixed(2);
+}
+
+/** "Fleiss' kappa 0.42", or null when there is no kappa to show. */
+export function kappaText(fields: KappaFields | null | undefined): string | null {
+  if (fields?.kappa == null) return null;
+  return `${kappaLabel(fields.kappa_type)} ${formatKappa(fields.kappa)}`;
+}
+
+export type TrendSeries = {
+  key: string;
+  /** Legend name of the agreement line. */
+  name: string;
+  /** Legend name of the kappa line, before the kind of kappa in brackets. */
+  kappaName: string;
+  color: string;
+  points: ({ x: string; agreement: number | null } & KappaFields)[];
+};
+
+export type TrendLine = {
+  dataKey: string;
+  name: string;
+  color: string;
+  kappa: boolean;
+};
+
+const KAPPA_KEY_SUFFIX = "__kappa";
+
+/** Hover text for one point: agreement as a percentage, kappa to two places. */
+export function formatTrendValue(value: unknown, dataKey: unknown): string {
+  if (typeof value !== "number") return "—";
+  return String(dataKey).endsWith(KAPPA_KEY_SUFFIX)
+    ? formatKappa(value / 100)
+    : `${value}%`;
+}
+
+/**
+ * Every agreement number and its kappa as lines on one chart. Agreement is
+ * plotted as a percentage and kappa times 100, so both share one axis; the
+ * axis drops below 0 only when some kappa does.
+ */
+export function buildTrendChart(series: TrendSeries[]): {
+  data: Record<string, string | number | null>[];
+  lines: TrendLine[];
+  yDomain: [number, number];
+} {
+  const rows = new Map<string, Record<string, string | number | null>>();
+  const lines: TrendLine[] = [];
+  let negative = false;
+  for (const s of series) {
+    const kappaKey = `${s.key}${KAPPA_KEY_SUFFIX}`;
+    const types = [
+      ...new Set(
+        s.points.filter((p) => p.kappa != null).map((p) => p.kappa_type),
+      ),
+    ];
+    if (s.points.some((p) => p.agreement != null)) {
+      lines.push({ dataKey: s.key, name: s.name, color: s.color, kappa: false });
+    }
+    if (types.length > 0) {
+      lines.push({
+        dataKey: kappaKey,
+        name: `${s.kappaName} (${types.map(kappaLabel).join(" or ")})`,
+        color: s.color,
+        kappa: true,
+      });
+    }
+    for (const p of s.points) {
+      const row = rows.get(p.x) ?? { x: p.x };
+      rows.set(p.x, row);
+      row[s.key] = p.agreement == null ? null : Math.round(p.agreement * 100);
+      row[kappaKey] = p.kappa == null ? null : Math.round(p.kappa * 100);
+      if (p.kappa != null && p.kappa < 0) negative = true;
+    }
+  }
+  return { data: [...rows.values()], lines, yDomain: [negative ? -100 : 0, 100] };
+}

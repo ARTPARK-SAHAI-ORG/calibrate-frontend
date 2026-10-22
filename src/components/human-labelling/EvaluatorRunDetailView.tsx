@@ -49,6 +49,7 @@ import { ExpectedToolCalls } from "@/components/human-labelling/item-panes/Expec
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
 import { hasItemDetails, ItemDetailsBlock } from "./ItemDetailsBlock";
 import type { ReviewItem } from "./SendForReviewFlow";
+import type { KappaFields } from "@/lib/agreementKappa";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -128,7 +129,7 @@ export type HumanAnnotation = {
   updated_at: string;
 };
 
-export type HumanAgreementEvaluatorSummary = {
+export type HumanAgreementEvaluatorSummary = KappaFields & {
   evaluator_id: string;
   evaluator_version_id: string | null;
   agreement: number | null;
@@ -1651,6 +1652,7 @@ function EvaluatorSummary({
                 valueClassName={valueClassName}
                 result={result}
                 warning={warning}
+                kappa={row}
               />
             );
           }
@@ -1664,6 +1666,7 @@ function EvaluatorSummary({
               valueClassName={valueClassName}
               result={result}
               warning={warning}
+              kappa={row}
             />
           );
         })}

@@ -5,22 +5,11 @@ import {
   useEffect,
   useState,
   useCallback,
-  type MouseEvent,
   type ReactNode,
 } from "react";
 import { Link, replaceUrl, useRouter, useSearchParams } from "@/lib/nav";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { AppLayout } from "@/components/AppLayout";
-// The chart above already has a `Tooltip` of its own, so the app's hover text
-// comes in under a second name.
+import { AgreementTrendChart } from "@/components/charts/AgreementTrendChart";
 import { Tooltip as HoverText } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { EvaluatorTypePill } from "@/components/EvaluatorPills";
@@ -38,10 +27,11 @@ import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { taskOptionsWithAgreement } from "./taskOptions";
 import { parseBackendTime } from "@/lib/relativeTime";
+import { kappaText, type KappaFields } from "@/lib/agreementKappa";
 
 type Tab = "overview" | "tasks" | "annotators";
 
-type Annotator = {
+type Annotator = KappaFields & {
   uuid: string;
   name: string;
   created_at?: string;
@@ -99,14 +89,14 @@ type LabellingTask = {
 
 type SortDirection = "asc" | "desc";
 
-type AgreementSeriesPoint = {
+type AgreementSeriesPoint = KappaFields & {
   bucket_start: string;
   bucket_end: string;
   agreement: number | null;
   pair_count: number;
 };
 
-type AgreementBlock = {
+type AgreementBlock = KappaFields & {
   current: number | null;
   pair_count: number;
   series: AgreementSeriesPoint[];
@@ -886,9 +876,16 @@ function HumanLabellingPageInner() {
                         )}
                         {cell(
                           `flex items-center py-3 text-sm font-semibold tabular-nums ${agreementColor(agreement)}`,
-                          agreement != null
-                            ? `${Math.round(agreement * 100)}%`
-                            : "—",
+                          <span>
+                            {agreement != null
+                              ? `${Math.round(agreement * 100)}%`
+                              : "—"}
+                            {agreement != null && kappaText(annotator) && (
+                              <span className="block text-xs font-normal text-muted-foreground">
+                                {kappaText(annotator)}
+                              </span>
+                            )}
+                          </span>,
                         )}
                         <div className="flex items-center justify-end gap-1">
                           {isEditing ? (
@@ -1051,6 +1048,12 @@ function HumanLabellingPageInner() {
                               ? `${Math.round(agreement * 100)}% agreement`
                               : "No agreement yet"}
                           </span>
+                          {agreement != null && kappaText(annotator) && (
+                            <>
+                              {" · "}
+                              {kappaText(annotator)}
+                            </>
+                          )}
                         </p>
                       </>
                     );
@@ -1231,8 +1234,7 @@ type SeriesRow = {
   pairCount: number;
   series: AgreementSeriesPoint[];
   evaluatorType?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
-  emptyTitle: string;
-  emptyDescription: string;
+  kappa: KappaFields;
 };
 
 const EVAL_COLORS = [
@@ -1259,7 +1261,7 @@ function EvaluatorNamePill({
   fitClassName,
 }: {
   name: string;
-  onOpen: (e: MouseEvent) => void;
+  onOpen: () => void;
   /** Sizing for the row this pill sits in, on whatever wraps the pill. */
   fitClassName: string;
 }) {
@@ -1318,7 +1320,6 @@ function AgreementOverview({
   })();
   const [sortKey, setSortKey] = useState<SortKey>("current");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [previewEvaluator, setPreviewEvaluator] = useState<{
     uuid: string;
     name: string;
@@ -1335,9 +1336,7 @@ function AgreementOverview({
       current: hh?.current ?? null,
       pairCount: hh?.pair_count ?? 0,
       series: hh?.series ?? [],
-      emptyTitle: "Not enough annotations yet to compute agreement",
-      emptyDescription:
-        "Inter-rater agreement will appear here once two or more annotators have labelled at least one of the same items",
+      kappa: hh ?? {},
     });
     (agreement.evaluators ?? []).forEach((ev, i) => {
       out.push({
@@ -1348,8 +1347,7 @@ function AgreementOverview({
         pairCount: ev.pair_count ?? 0,
         series: ev.series ?? [],
         evaluatorType: evaluatorTypeMap.get(ev.evaluator_id),
-        emptyTitle: "Not enough overlap yet to compute alignment",
-        emptyDescription: `This evaluator's alignment with humans will appear here once it's been run on items that humans have also labelled`,
+        kappa: ev,
       });
     });
     return out;
@@ -1383,20 +1381,19 @@ function AgreementOverview({
     return dir * cmp(a.current, b.current);
   });
 
-  const buildChartData = (series: AgreementSeriesPoint[]) =>
-    series.map((p) => ({
-      month: formatBucketLabel(p.bucket_end, bucket),
-      agreement: p.agreement == null ? null : Math.round(p.agreement * 100),
-    }));
-
-  const toggleRow = (key: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
+  const chartSeries = sorted.map((row) => ({
+    key: row.key,
+    name:
+      row.key === "human_human"
+        ? row.name
+        : `${row.name} agreement with annotators`,
+    kappaName: row.name,
+    color: row.color,
+    points: row.series.map((p) => ({
+      ...p,
+      x: formatBucketLabel(p.bucket_end, bucket),
+    })),
+  }));
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -1492,9 +1489,13 @@ function AgreementOverview({
         />
       ) : (
         <>
+          <div className="border border-border rounded-xl p-4 md:p-6">
+            <AgreementTrendChart series={chartSeries} />
+          </div>
+
           {/* Desktop table */}
           <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
               <SortHeader
                 label="Name"
                 active={sortKey === "name"}
@@ -1507,166 +1508,97 @@ function AgreementOverview({
                 dir={sortDir}
                 onClick={() => handleSort("current")}
               />
-              <div />
             </div>
-            {sorted.map((row) => {
-              const isOpen = expanded.has(row.key);
-              const hasData =
-                row.series.length > 0 &&
-                row.pairCount > 0 &&
-                row.current != null;
-              return (
-                <div
-                  key={row.key}
-                  className="border-b border-border last:border-b-0"
-                >
-                  <div
-                    onClick={() => toggleRow(row.key)}
-                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] gap-4 px-4 py-3 hover:bg-muted/20 transition-colors cursor-pointer items-center"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      {row.key === "human_human" ? (
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {row.name}
-                        </p>
-                      ) : (
-                        <>
-                          <EvaluatorNamePill
-                            name={row.name}
-                            fitClassName="max-w-full min-w-0"
-                            onOpen={(e) => {
-                              e.stopPropagation();
-                              setPreviewEvaluator({
-                                uuid: row.key,
-                                name: row.name,
-                              });
-                            }}
-                          />
-                          <span className="text-sm font-medium text-foreground shrink-0">
-                            alignment
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    <div
-                      className={`text-sm font-semibold tabular-nums ${agreementColor(row.current)}`}
-                    >
-                      {row.current != null
-                        ? `${Math.round(row.current * 100)}%`
-                        : "—"}
-                    </div>
-                    <div className="flex justify-end">
-                      <svg
-                        className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                  {isOpen && (
-                    <div className="border-t border-border bg-muted/10 p-4">
-                      <ExpandedChart
-                        hasData={hasData}
-                        data={buildChartData(row.series)}
-                        color={row.color}
-                        seriesName={row.name}
-                        emptyTitle={row.emptyTitle}
-                        emptyDescription={row.emptyDescription}
+            {sorted.map((row) => (
+              <div
+                key={row.key}
+                className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 px-4 py-3 border-b border-border last:border-b-0 items-center"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {row.key === "human_human" ? (
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {row.name}
+                    </p>
+                  ) : (
+                    <>
+                      <EvaluatorNamePill
+                        name={row.name}
+                        fitClassName="max-w-full min-w-0"
+                        onOpen={() =>
+                          setPreviewEvaluator({
+                            uuid: row.key,
+                            name: row.name,
+                          })
+                        }
                       />
-                    </div>
+                      <span className="text-sm font-medium text-foreground shrink-0">
+                        alignment
+                      </span>
+                    </>
                   )}
                 </div>
-              );
-            })}
+                <div
+                  className={`text-sm font-semibold tabular-nums ${agreementColor(row.current)}`}
+                >
+                  {row.current != null
+                    ? `${Math.round(row.current * 100)}%`
+                    : "—"}
+                  {row.current != null && kappaText(row.kappa) && (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      {kappaText(row.kappa)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Mobile cards */}
           <div className="md:hidden space-y-2">
-            {sorted.map((row) => {
-              const isOpen = expanded.has(row.key);
-              const hasData =
-                row.series.length > 0 &&
-                row.pairCount > 0 &&
-                row.current != null;
-              return (
-                <div
-                  key={row.key}
-                  className="border border-border rounded-xl overflow-hidden"
-                >
-                  <div
-                    onClick={() => toggleRow(row.key)}
-                    className="p-4 hover:bg-muted/20 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      {row.key === "human_human" ? (
-                        <p className="text-sm font-medium text-foreground truncate flex-1">
-                          {row.name}
-                        </p>
-                      ) : (
-                        <>
-                          <EvaluatorNamePill
-                            name={row.name}
-                            fitClassName="flex-1 min-w-0"
-                            onOpen={(e) => {
-                              e.stopPropagation();
-                              setPreviewEvaluator({
-                                uuid: row.key,
-                                name: row.name,
-                              });
-                            }}
-                          />
-                          <span className="text-sm font-medium text-foreground shrink-0">
-                            alignment
-                          </span>
-                        </>
-                      )}
-                      <svg
-                        className={`w-4 h-4 text-muted-foreground transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                        />
-                      </svg>
-                    </div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span
-                        className={`text-base font-semibold tabular-nums ${agreementColor(row.current)}`}
-                      >
-                        {row.current != null
-                          ? `${Math.round(row.current * 100)}%`
-                          : "—"}
-                      </span>
-                    </div>
-                  </div>
-                  {isOpen && (
-                    <div className="border-t border-border bg-muted/10 p-4">
-                      <ExpandedChart
-                        hasData={hasData}
-                        data={buildChartData(row.series)}
-                        color={row.color}
-                        seriesName={row.name}
-                        emptyTitle={row.emptyTitle}
-                        emptyDescription={row.emptyDescription}
+            {sorted.map((row) => (
+              <div
+                key={row.key}
+                className="border border-border rounded-xl overflow-hidden p-4"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  {row.key === "human_human" ? (
+                    <p className="text-sm font-medium text-foreground truncate flex-1">
+                      {row.name}
+                    </p>
+                  ) : (
+                    <>
+                      <EvaluatorNamePill
+                        name={row.name}
+                        fitClassName="flex-1 min-w-0"
+                        onOpen={() =>
+                          setPreviewEvaluator({
+                            uuid: row.key,
+                            name: row.name,
+                          })
+                        }
                       />
-                    </div>
+                      <span className="text-sm font-medium text-foreground shrink-0">
+                        alignment
+                      </span>
+                    </>
                   )}
                 </div>
-              );
-            })}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span
+                    className={`text-base font-semibold tabular-nums ${agreementColor(row.current)}`}
+                  >
+                    {row.current != null
+                      ? `${Math.round(row.current * 100)}%`
+                      : "—"}
+                  </span>
+                  {row.current != null && kappaText(row.kappa) && (
+                    <span className="text-xs text-muted-foreground">
+                      {kappaText(row.kappa)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}
@@ -1721,63 +1653,5 @@ function SortHeader({
         />
       </svg>
     </button>
-  );
-}
-
-function ExpandedChart({
-  hasData,
-  data,
-  color,
-  seriesName,
-  emptyTitle,
-  emptyDescription,
-}: {
-  hasData: boolean;
-  data: Array<{ month: string; agreement: number | null }>;
-  color: string;
-  seriesName: string;
-  emptyTitle: string;
-  emptyDescription: string;
-}) {
-  if (!hasData) {
-    return (
-      <div className="flex flex-col items-center justify-center text-center h-48 px-6">
-        <p className="text-sm font-medium text-foreground">{emptyTitle}</p>
-        <p className="text-xs text-muted-foreground mt-1.5 max-w-md">
-          {emptyDescription}
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="w-full h-56 md:h-64">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="rgba(125,125,125,0.15)"
-          />
-          <XAxis dataKey="month" fontSize={11} />
-          <YAxis domain={[0, 100]} fontSize={11} unit="%" />
-          <Tooltip
-            contentStyle={{
-              background: "var(--background, #fff)",
-              border: "1px solid rgba(125,125,125,0.2)",
-              borderRadius: 8,
-              fontSize: 12,
-            }}
-          />
-          <Line
-            type="monotone"
-            dataKey="agreement"
-            name={seriesName}
-            stroke={color}
-            strokeWidth={2}
-            dot={{ r: 3 }}
-            connectNulls={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
   );
 }

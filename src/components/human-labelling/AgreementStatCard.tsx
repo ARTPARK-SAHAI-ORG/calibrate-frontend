@@ -4,6 +4,12 @@ import { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
+import {
+  formatKappa,
+  KAPPA_HELP,
+  kappaLabel,
+  type KappaFields,
+} from "@/lib/agreementKappa";
 
 export function agreementColor(v: number | null | undefined): string {
   if (v == null) return "text-muted-foreground";
@@ -104,6 +110,8 @@ export function AgreementStatCard(
      * mark beside the name that explains itself on hover, so a run with
      * unlabelled evaluators does not need a banner above the cards. */
     warning?: string | null;
+    /** Shown beside the human agreement number when there is one. */
+    kappa?: KappaFields | null;
   },
 ) {
   const {
@@ -113,6 +121,7 @@ export function AgreementStatCard(
     showResultLabel = true,
     showAlignmentLabel = true,
     warning = null,
+    kappa = null,
   } = props;
   // The evaluator whose prompt is on show, opened from the pill below. Null
   // until the pill is clicked.
@@ -148,6 +157,14 @@ export function AgreementStatCard(
       {result ? result.value : (value ?? "—")}
     </div>
   );
+  const kappaStat =
+    value != null && kappa?.kappa != null ? (
+      <Stat
+        label={kappaLabel(kappa.kappa_type)}
+        value={formatKappa(kappa.kappa)}
+        title={KAPPA_HELP}
+      />
+    ) : null;
   const warningMark = warning ? (
     <Tooltip content={warning} position="top">
       <span
@@ -238,6 +255,16 @@ export function AgreementStatCard(
                 valueClassName={valueClassName}
               />
             )}
+            {kappaStat}
+          </div>
+        ) : !result && kappaStat ? (
+          <div className="mt-2 flex items-start gap-6">
+            <Stat
+              label="Human agreement"
+              value={value ?? ""}
+              valueClassName={valueClassName}
+            />
+            {kappaStat}
           </div>
         ) : result?.title ? (
           // The hover text says what the number counts, which is nowhere on

@@ -12,20 +12,11 @@ import {
 import { useParams, useRouter, useSearchParams } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
-// The chart on this page already has a `Tooltip` of its own, so the app's
-// hover text comes in under a second name.
+import { AgreementTrendChart } from "@/components/charts/AgreementTrendChart";
 import { Tooltip as HoverText } from "@/components/Tooltip";
+import type { KappaFields } from "@/lib/agreementKappa";
 import { NotFoundState, InfoNote } from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
@@ -132,14 +123,14 @@ type EvaluatorDetail = {
   evaluator_type?: EvaluatorType;
 };
 
-type TrendSeriesPoint = {
+type TrendSeriesPoint = KappaFields & {
   bucket_start: string;
   bucket_end: string;
   agreement: number | null;
   pair_count: number;
 };
 
-type TrendVersion = {
+type TrendVersion = KappaFields & {
   version_id: string;
   version_number: number;
   is_live: boolean;
@@ -148,7 +139,7 @@ type TrendVersion = {
   series: TrendSeriesPoint[];
 };
 
-type TrendTask = {
+type TrendTask = KappaFields & {
   task_id: string;
   task_name: string;
   current: number | null;
@@ -162,7 +153,7 @@ type EvaluatorTrendResponse = {
   bucket: string;
   days: number;
   filters: { task_id: string | null; version_id: string | null };
-  overall: {
+  overall: KappaFields & {
     current: number | null;
     pair_count: number;
     series: TrendSeriesPoint[];
@@ -1801,9 +1792,9 @@ function AgreementTrendTab({
   onSelectTask: (id: string) => void;
   allTasks: TrendTask[];
 }) {
-  const { chartData, liveLabels } = useMemo(() => {
+  const { points, liveLabels } = useMemo(() => {
     if (!trend?.versions?.length)
-      return { chartData: [], liveLabels: new Set<string>() };
+      return { points: [], liveLabels: new Set<string>() };
     const sorted = [...trend.versions].sort(
       (a, b) => a.version_number - b.version_number,
     );
@@ -1811,19 +1802,17 @@ function AgreementTrendTab({
       sorted.filter((v) => v.is_live).map((v) => `v${v.version_number}`),
     );
     return {
-      chartData: sorted.map((v) => ({
-        version: `v${v.version_number}`,
-        agreement: (() => {
-          const avg = averageSeriesAgreement(v.series);
-          return avg == null ? null : Math.round(avg * 100);
-        })(),
+      points: sorted.map((v) => ({
+        x: `v${v.version_number}`,
+        agreement: averageSeriesAgreement(v.series),
+        kappa: v.kappa,
+        kappa_type: v.kappa_type,
       })),
       liveLabels: liveSet,
     };
   }, [trend]);
 
-  const hasData =
-    chartData.length > 0 && chartData.some((p) => p.agreement != null);
+  const hasData = points.some((p) => p.agreement != null);
 
   type TaskOption = { id: string; name: string };
   const ALL_TASKS_OPTION: TaskOption = { id: "all", name: "All tasks" };
@@ -1920,43 +1909,26 @@ function AgreementTrendTab({
         </div>
       ) : (
         <div className="border border-border rounded-xl p-4 md:p-6">
-          <div className="w-full h-64 md:h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="rgba(125,125,125,0.15)"
-                />
-                <XAxis
-                  dataKey="version"
-                  padding={{ left: 40, right: 40 }}
-                  tick={(props) => (
-                    <VersionAxisTick {...props} liveLabels={liveLabels} />
-                  )}
-                  height={44}
-                />
-                <YAxis domain={[0, 100]} fontSize={11} unit="%" />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--background, #fff)",
-                    border: "1px solid rgba(125,125,125,0.2)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  formatter={(value) => (value == null ? "—" : `${value}%`)}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="agreement"
-                  name="Agreement"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  dot={{ r: 4 }}
-                  connectNulls={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <AgreementTrendChart
+            className="w-full h-64 md:h-72"
+            dotRadius={4}
+            xAxisProps={{
+              padding: { left: 40, right: 40 },
+              tick: (props) => (
+                <VersionAxisTick {...props} liveLabels={liveLabels} />
+              ),
+              height: 44,
+            }}
+            series={[
+              {
+                key: "agreement",
+                name: `${trend?.evaluator_name ?? "Evaluator"} agreement with annotators`,
+                kappaName: trend?.evaluator_name ?? "Evaluator",
+                color: "#3b82f6",
+                points,
+              },
+            ]}
+          />
         </div>
       )}
     </div>

@@ -110,10 +110,11 @@ import {
   readEvaluatorVariables,
 } from "@/lib/labellingItem";
 import { parseBackendTime } from "@/lib/relativeTime";
+import type { KappaFields } from "@/lib/agreementKappa";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
 
-type AgreementBlock = {
+type AgreementBlock = KappaFields & {
   current: number | null;
   pair_count: number;
 };
@@ -2972,6 +2973,7 @@ function LabellingTaskPageInner() {
                         valueClassName={agreementColor(
                           agreement.human_human?.current,
                         )}
+                        kappa={agreement.human_human}
                       />
                       {judgedEvaluators.map((ev) => (
                         <AgreementStatCard
@@ -2986,6 +2988,7 @@ function LabellingTaskPageInner() {
                               : "—"
                           }
                           valueClassName={agreementColor(ev.current)}
+                          kappa={ev}
                         />
                       ))}
                     </div>

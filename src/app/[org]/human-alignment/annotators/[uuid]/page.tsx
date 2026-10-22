@@ -14,18 +14,8 @@ import {
   useRouter,
   useSearchParams,
 } from "@/lib/nav";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { AppLayout } from "@/components/AppLayout";
-// The chart on this page already has a `Tooltip` of its own, so the app's
-// hover text comes in under a second name.
+import { AgreementTrendChart } from "@/components/charts/AgreementTrendChart";
 import { Tooltip as HoverText } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { EmptyState } from "@/components/ui/LoadingState";
@@ -35,6 +25,11 @@ import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { parseBackendTime } from "@/lib/relativeTime";
+import {
+  formatKappa,
+  kappaLabel,
+  type KappaFields,
+} from "@/lib/agreementKappa";
 
 type Tab = "overview" | "jobs";
 
@@ -51,7 +46,7 @@ type Annotator = {
   updated_at?: string;
 };
 
-type AnnotatorStats = {
+type AnnotatorStats = KappaFields & {
   current_agreement: number | null;
   pair_count: number;
   jobs_count: number;
@@ -59,7 +54,7 @@ type AnnotatorStats = {
 
 type Bucket = "week" | "month" | "year";
 
-type AgreementSeriesPoint = {
+type AgreementSeriesPoint = KappaFields & {
   bucket_start: string;
   bucket_end: string;
   agreement: number | null;
@@ -387,6 +382,12 @@ function AnnotatorDetailPageInner() {
                 }
                 valueClassName={agreementColor(stats?.current_agreement)}
               />
+              {!detailLoading && stats?.kappa != null && (
+                <StatCard
+                  label={kappaLabel(stats.kappa_type)}
+                  value={formatKappa(stats.kappa)}
+                />
+              )}
               <StatCard
                 label="Jobs"
                 value={detailLoading ? "—" : String(jobsCount)}
@@ -464,46 +465,23 @@ function AnnotatorDetailPageInner() {
                       }
                     />
                   ) : (
-                    <div className="w-full h-56 md:h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={series.map((p) => ({
-                            month: formatBucketLabel(
+                    <AgreementTrendChart
+                      series={[
+                        {
+                          key: "agreement",
+                          name: "Agreement with other annotators",
+                          kappaName: "Agreement with other annotators",
+                          color: "#10b981",
+                          points: series.map((p) => ({
+                            ...p,
+                            x: formatBucketLabel(
                               p.bucket_end,
                               trend?.bucket ?? DEFAULT_BUCKET,
                             ),
-                            agreement:
-                              p.agreement == null
-                                ? null
-                                : Math.round(p.agreement * 100),
-                          }))}
-                        >
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke="rgba(125,125,125,0.15)"
-                          />
-                          <XAxis dataKey="month" fontSize={11} />
-                          <YAxis domain={[0, 100]} fontSize={11} unit="%" />
-                          <Tooltip
-                            contentStyle={{
-                              background: "var(--background, #fff)",
-                              border: "1px solid rgba(125,125,125,0.2)",
-                              borderRadius: 8,
-                              fontSize: 12,
-                            }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="agreement"
-                            name="Agreement %"
-                            stroke="#10b981"
-                            strokeWidth={2}
-                            dot={{ r: 3 }}
-                            connectNulls={false}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
+                          })),
+                        },
+                      ]}
+                    />
                   )}
                 </div>
               );

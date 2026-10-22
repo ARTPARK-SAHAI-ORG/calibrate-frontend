@@ -1689,6 +1689,8 @@ describe("EvaluatorRunDetailView", () => {
             agreement: 0.8,
             pair_count: 2,
             item_count: 1,
+            kappa: 0.4,
+            kappa_type: "cohen",
           },
         ],
         items: [
@@ -1725,6 +1727,8 @@ describe("EvaluatorRunDetailView", () => {
     );
     expect(screen.getByText("Human agreement")).toBeInTheDocument();
     expect(screen.getByText("80%")).toBeInTheDocument();
+    expect(screen.getByText("Cohen's kappa")).toBeInTheDocument();
+    expect(screen.getByText("0.40")).toBeInTheDocument();
   });
 
   it("shows each evaluator's summarised value across the items", () => {
