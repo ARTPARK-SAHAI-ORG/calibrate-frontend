@@ -14,7 +14,7 @@ async function logIn() {
 beforeEach(() => localStorage.clear());
 
 describe("LoginPage", () => {
-  it("says the email is not confirmed and a link went out", async () => {
+  it("says the email is not verified and a link went out", async () => {
     setLocation("");
     mockFetchOnce(403, { detail: "email_not_verified" });
     await logIn();

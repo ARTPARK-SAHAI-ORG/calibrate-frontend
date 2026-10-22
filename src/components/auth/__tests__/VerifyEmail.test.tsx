@@ -9,12 +9,12 @@ const EXPIRED =
 beforeEach(() => localStorage.clear());
 
 describe("VerifyEmail", () => {
-  it("confirms the email once, keeps the login and goes to the wanted page", async () => {
+  it("verifies the email once, keeps the login and goes to the wanted page", async () => {
     setLocation("?token=tok-1&callbackUrl=%2Fsimulations");
     const fetchMock = mockFetchOnce(200, LOGIN);
     render(<VerifyEmail />);
 
-    expect(screen.getByText("Confirming your email")).toBeInTheDocument();
+    expect(screen.getByText("Verifying your email")).toBeInTheDocument();
     await waitFor(() => expect(window.location.href).toBe("/simulations"));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/auth\/verify-email$/);
@@ -51,7 +51,7 @@ describe("VerifyEmail", () => {
     render(<VerifyEmail />);
 
     expect(
-      await screen.findByText("Could not confirm your email. Please open the link again."),
+      await screen.findByText("Could not verify your email. Please open the link again."),
     ).toBeInTheDocument();
     expect(screen.queryByText(EXPIRED)).toBeNull();
   });

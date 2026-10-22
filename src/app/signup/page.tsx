@@ -146,7 +146,7 @@ export default function SignupPage() {
       }
 
       const data = await response.json();
-      // The backend sends a confirmation email instead of signing in
+      // The backend sends a verification email instead of signing in
       if (response.status === 202) {
         setVerificationSent({
           email: data.email,
@@ -217,8 +217,8 @@ export default function SignupPage() {
                 </h1>
                 <p className="text-gray-600">
                   {verificationSent.alreadyPending
-                    ? `This email already has an account that is not confirmed yet. We sent a link to ${verificationSent.email}. Click it to confirm your email, then you can sign in.`
-                    : `We sent a link to ${verificationSent.email}. Click it to confirm your email, then you can sign in.`}
+                    ? `This email already has an account that is not verified yet. We sent a link to ${verificationSent.email}. Click it to verify your email, then you can sign in.`
+                    : `We sent a link to ${verificationSent.email}. Click it to verify your email, then you can sign in.`}
                 </p>
               </div>
             ) : (

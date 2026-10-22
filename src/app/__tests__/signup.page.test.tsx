@@ -29,7 +29,7 @@ describe("SignupPage", () => {
     expect(await screen.findByText("Check your email")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "We sent a link to asha@example.com. Click it to confirm your email, then you can sign in.",
+        "We sent a link to asha@example.com. Click it to verify your email, then you can sign in.",
       ),
     ).toBeInTheDocument();
     // Only the text: nothing to click until the email link is opened
@@ -50,7 +50,7 @@ describe("SignupPage", () => {
 
     expect(
       await screen.findByText(
-        "This email already has an account that is not confirmed yet. We sent a link to asha@example.com. Click it to confirm your email, then you can sign in.",
+        "This email already has an account that is not verified yet. We sent a link to asha@example.com. Click it to verify your email, then you can sign in.",
       ),
     ).toBeInTheDocument();
     expect(sentBody(fetchMock)).not.toHaveProperty("next");
