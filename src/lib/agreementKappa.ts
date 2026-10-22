@@ -1,4 +1,4 @@
-export type KappaType =
+type KappaType =
   | "fleiss"
   | "linear_weighted_fleiss"
   | "cohen"
@@ -56,7 +56,7 @@ export type TrendSeries = {
   } & KappaFields)[];
 };
 
-export type TrendLine = {
+type TrendLine = {
   dataKey: string;
   name: string;
   color: string;

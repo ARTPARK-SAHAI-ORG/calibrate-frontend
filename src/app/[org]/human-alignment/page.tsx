@@ -880,7 +880,7 @@ function HumanLabellingPageInner() {
                             {agreement != null
                               ? `${Math.round(agreement * 100)}%`
                               : "—"}
-                            {agreement != null && kappaText(annotator) && (
+                            {kappaText(annotator) && (
                               <span className="block text-xs font-normal text-muted-foreground">
                                 {kappaText(annotator)}
                               </span>
@@ -1048,7 +1048,7 @@ function HumanLabellingPageInner() {
                               ? `${Math.round(agreement * 100)}% agreement`
                               : "No agreement yet"}
                           </span>
-                          {agreement != null && kappaText(annotator) && (
+                          {kappaText(annotator) && (
                             <>
                               {" · "}
                               {kappaText(annotator)}
@@ -1544,7 +1544,7 @@ function AgreementOverview({
                   {row.current != null
                     ? `${Math.round(row.current * 100)}%`
                     : "—"}
-                  {row.current != null && kappaText(row.kappa) && (
+                  {kappaText(row.kappa) && (
                     <span className="block text-xs font-normal text-muted-foreground">
                       {kappaText(row.kappa)}
                     </span>
@@ -1592,7 +1592,7 @@ function AgreementOverview({
                       ? `${Math.round(row.current * 100)}%`
                       : "—"}
                   </span>
-                  {row.current != null && kappaText(row.kappa) && (
+                  {kappaText(row.kappa) && (
                     <span className="text-xs text-muted-foreground">
                       {kappaText(row.kappa)}
                     </span>

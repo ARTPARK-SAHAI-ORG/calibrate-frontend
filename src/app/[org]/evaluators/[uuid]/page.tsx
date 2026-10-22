@@ -123,28 +123,19 @@ type EvaluatorDetail = {
   evaluator_type?: EvaluatorType;
 };
 
-type TrendSeriesPoint = KappaFields & {
-  bucket_start: string;
-  bucket_end: string;
-  agreement: number | null;
-  pair_count: number;
-};
-
 type TrendVersion = KappaFields & {
   version_id: string;
   version_number: number;
   is_live: boolean;
   current: number | null;
   pair_count: number;
-  series: TrendSeriesPoint[];
 };
 
-type TrendTask = KappaFields & {
+type TrendTask = {
   task_id: string;
   task_name: string;
   current: number | null;
   pair_count: number;
-  series: TrendSeriesPoint[];
 };
 
 type EvaluatorTrendResponse = {
@@ -153,11 +144,6 @@ type EvaluatorTrendResponse = {
   bucket: string;
   days: number;
   filters: { task_id: string | null; version_id: string | null };
-  overall: KappaFields & {
-    current: number | null;
-    pair_count: number;
-    series: TrendSeriesPoint[];
-  };
   versions: TrendVersion[];
   tasks: TrendTask[];
 };

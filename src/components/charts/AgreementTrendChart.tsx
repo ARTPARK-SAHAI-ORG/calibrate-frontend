@@ -72,7 +72,6 @@ export function AgreementTrendChart({
               strokeWidth={2}
               strokeDasharray={line.kappa ? "5 4" : undefined}
               dot={{ r: dotRadius }}
-              connectNulls={false}
             />
           ))}
         </LineChart>
