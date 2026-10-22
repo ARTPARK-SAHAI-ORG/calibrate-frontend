@@ -71,9 +71,13 @@ command -v uv >/dev/null 2>&1 || { echo "ERROR: 'uv' is required to run the back
 DB_DIR="$(mktemp -d)"
 echo "==> Starting FAKE_AI backend on :${PORT}"
 echo "    dir=${BACKEND_DIR}  db=${DB_DIR}"
+# RESEND_API_KEY is emptied so signup never waits on a confirmation email,
+# even when the backend's own .env has a key: e2e/auth.setup.ts needs the
+# token signup returns straight away.
 (
   cd "${BACKEND_DIR}/src"
   FAKE_AI_PROVIDERS=1 \
+  RESEND_API_KEY= \
   CORS_ALLOWED_ORIGINS="http://localhost:${DEV_PORT}" \
   DB_ROOT_DIR="${DB_DIR}" \
   JWT_SECRET_KEY="${JWT_SECRET_KEY:-e2e-fake-secret}" \

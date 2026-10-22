@@ -75,6 +75,14 @@ describe("robots", () => {
     expect(disallow).toContain("/annotate-job/");
   });
 
+  it("keeps crawlers away from the account email pages, which carry tokens", () => {
+    const { disallow } = robots().rules as { disallow: string[] };
+
+    for (const path of ["/verify-email", "/forgot-password", "/reset-password"]) {
+      expect(disallow).toContain(path);
+    }
+  });
+
   it("points at the sitemap", () => {
     expect(robots().sitemap).toBe(`${SITE_URL}/sitemap.xml`);
   });

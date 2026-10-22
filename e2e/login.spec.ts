@@ -23,14 +23,14 @@ test.describe("Login page", () => {
       page.getByRole("heading", { name: "Welcome back", exact: true }),
     ).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
-    await expect(page.getByLabel("Password")).toBeVisible();
+    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   });
 
   test("toggles password visibility when the eye icon is clicked", async ({
     page,
   }) => {
-    const password = page.getByLabel("Password");
+    const password = page.getByLabel("Password", { exact: true });
     await password.fill("secret123");
     await expect(password).toHaveAttribute("type", "password");
 
@@ -44,7 +44,7 @@ test.describe("Login page", () => {
     page,
   }) => {
     await page.getByLabel("Email").fill("user@example.com");
-    await page.getByLabel("Password").fill("123"); // < 6 chars
+    await page.getByLabel("Password", { exact: true }).fill("123"); // < 6 chars
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(

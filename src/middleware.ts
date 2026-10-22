@@ -52,6 +52,8 @@ function route(req: NextRequest & { auth: unknown }): NextResponse {
   const isCrawlerFile =
     req.nextUrl.pathname === "/robots.txt" ||
     req.nextUrl.pathname === "/sitemap.xml";
+  // Opened from an email link by someone who is not signed in yet
+  const isAccountEmailPage = ["/verify-email", "/forgot-password", "/reset-password"].includes(req.nextUrl.pathname);
   const isPublicShareRoute = req.nextUrl.pathname.startsWith("/public/");
   const isAnnotateJobRoute = req.nextUrl.pathname.startsWith("/annotate-job/");
   // An invite link is opened by someone who may have no account yet, so the
@@ -62,8 +64,8 @@ function route(req: NextRequest & { auth: unknown }): NextResponse {
   // has not signed in.
   const isInviteRoute = /^\/invite\/[^/]+\/?$/.test(req.nextUrl.pathname);
 
-  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, blog, robots.txt and sitemap.xml, public share links, annotate-job links, invite links
-  if (isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isChangelogPage || isLearnPage || isBlogRoute || isCrawlerFile || isPublicShareRoute || isAnnotateJobRoute || isInviteRoute) {
+  // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, blog, robots.txt and sitemap.xml, public share links, annotate-job links, invite links, email confirmation and password reset
+  if (isAccountEmailPage || isHomePage || isAuthRoute || isDebugRoute || isDocsRoute || isTermsPage || isPrivacyPage || isChangelogPage || isLearnPage || isBlogRoute || isCrawlerFile || isPublicShareRoute || isAnnotateJobRoute || isInviteRoute) {
     return NextResponse.next();
   }
 
