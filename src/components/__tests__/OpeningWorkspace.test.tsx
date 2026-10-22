@@ -37,9 +37,11 @@ const fetchOrganizationsDedup = jest.fn();
 jest.mock("../../hooks/useOrganizations", () => ({
   __esModule: true,
   fetchOrganizationsDedup: (token: string) => fetchOrganizationsDedup(token),
+  clearOrgsCache: jest.fn(),
 }));
 
-import OpeningPage from "../opening/page";
+import { signOut } from "next-auth/react";
+import OpeningPage from "../OpeningWorkspace";
 
 const PERSONAL = "8f3c1a2b-4d5e-4f6a-8b9c-0d1e2f3a4b5c";
 const TEAM = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
@@ -66,6 +68,7 @@ const DEEP_PAGE = "/simulations/abc/runs/def";
 
 beforeEach(() => {
   replace.mockClear();
+  (signOut as jest.Mock).mockClear();
   fetchOrganizationsDedup.mockReset();
   fetchOrganizationsDedup.mockResolvedValue(ORGS);
   authState = { accessToken: "token-1", isLoading: false };
@@ -129,17 +132,24 @@ it("opens the agents page when someone types the opening address itself", async 
   await waitFor(() => expect(replace).toHaveBeenCalledWith(`/${TEAM}/agents`));
 });
 
-it("sends someone with no sign-in to login, carrying the page they asked for", async () => {
+it("signs out of everything and goes to login when the cookie outlived the login key", async () => {
+  // The middleware let them in on the cookie, but there is no key to use.
+  // Going to login with the cookie still set would bounce them straight back.
   authState = { accessToken: null, isLoading: false };
   askedFor(`${DEEP_PAGE}?tab=x`);
+  document.cookie = "access_token=stale; path=/";
+  window.localStorage.setItem("user", "{}");
 
   render(<OpeningPage />);
 
   await waitFor(() =>
-    expect(replace).toHaveBeenCalledWith(
-      `/login?callbackUrl=${encodeURIComponent(`${DEEP_PAGE}?tab=x`)}`,
-    ),
+    expect(signOut).toHaveBeenCalledWith({
+      callbackUrl: `/login?callbackUrl=${encodeURIComponent(`${DEEP_PAGE}?tab=x`)}`,
+    }),
   );
+  expect(document.cookie).not.toContain("access_token=stale");
+  expect(window.localStorage.getItem("user")).toBeNull();
+  expect(replace).not.toHaveBeenCalled();
   expect(fetchOrganizationsDedup).not.toHaveBeenCalled();
 });
 
