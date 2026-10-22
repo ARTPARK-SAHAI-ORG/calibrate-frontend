@@ -10,7 +10,7 @@ import {
 import { Link, replaceUrl, useRouter, useSearchParams } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
 import { AgreementTrendChart } from "@/components/charts/AgreementTrendChart";
-import { Tooltip as HoverText } from "@/components/Tooltip";
+import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import { EvaluatorPillList } from "@/components/EvaluatorPillList";
@@ -616,7 +616,7 @@ function HumanLabellingPageInner() {
                         <EvaluatorPillList evaluators={evaluators} />
                       </Link>
                       <div className="flex items-center">
-                        <HoverText content="Delete task" position="top">
+                        <Tooltip content="Delete task" position="top">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -639,7 +639,7 @@ function HumanLabellingPageInner() {
                               />
                             </svg>
                           </button>
-                        </HoverText>
+                        </Tooltip>
                       </div>
                     </div>
                   );
@@ -890,7 +890,7 @@ function HumanLabellingPageInner() {
                         <div className="flex items-center justify-end gap-1">
                           {isEditing ? (
                             <>
-                              <HoverText content="Save" position="top">
+                              <Tooltip content="Save" position="top">
                                 <button
                                   onClick={saveEditAnnotator}
                                   disabled={
@@ -914,8 +914,8 @@ function HumanLabellingPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
-                              <HoverText content="Cancel" position="top">
+                              </Tooltip>
+                              <Tooltip content="Cancel" position="top">
                                 <button
                                   onClick={cancelEditAnnotator}
                                   disabled={savingAnnotatorEdit}
@@ -936,11 +936,11 @@ function HumanLabellingPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
+                              </Tooltip>
                             </>
                           ) : (
                             <>
-                              <HoverText
+                              <Tooltip
                                 content="Rename annotator"
                                 position="top"
                               >
@@ -963,8 +963,8 @@ function HumanLabellingPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
-                              <HoverText
+                              </Tooltip>
+                              <Tooltip
                                 content="Remove annotator"
                                 position="top"
                               >
@@ -989,7 +989,7 @@ function HumanLabellingPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
+                              </Tooltip>
                             </>
                           )}
                         </div>
@@ -1278,9 +1278,9 @@ function EvaluatorNamePill({
     </button>
   );
   return clipped ? (
-    <HoverText content={name} className={fitClassName}>
+    <Tooltip content={name} className={fitClassName}>
       {pill}
-    </HoverText>
+    </Tooltip>
   ) : (
     <div className={`relative ${fitClassName}`}>{pill}</div>
   );
@@ -1381,7 +1381,7 @@ function AgreementOverview({
     return dir * cmp(a.current, b.current);
   });
 
-  const chartSeries = sorted.map((row) => ({
+  const chartSeries = rows.map((row) => ({
     key: row.key,
     name:
       row.key === "human_human"
@@ -1391,7 +1391,8 @@ function AgreementOverview({
     color: row.color,
     points: row.series.map((p) => ({
       ...p,
-      x: formatBucketLabel(p.bucket_end, bucket),
+      key: p.bucket_end,
+      label: formatBucketLabel(p.bucket_end, bucket),
     })),
   }));
 

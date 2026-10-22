@@ -16,7 +16,7 @@ import {
 } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
 import { AgreementTrendChart } from "@/components/charts/AgreementTrendChart";
-import { Tooltip as HoverText } from "@/components/Tooltip";
+import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { EmptyState } from "@/components/ui/LoadingState";
 import { Breadcrumbs, CopyLinkButton, type Crumb } from "@/components/ui";
@@ -316,7 +316,7 @@ function AnnotatorDetailPageInner() {
                 {annotator?.name ?? "—"}
               </h1>
               {annotator && (
-                <HoverText content="Rename" position="top">
+                <Tooltip content="Rename" position="top">
                   <button
                     onClick={startEditName}
                     aria-label="Rename annotator"
@@ -336,7 +336,7 @@ function AnnotatorDetailPageInner() {
                       />
                     </svg>
                   </button>
-                </HoverText>
+                </Tooltip>
               )}
             </div>
           )}
@@ -384,7 +384,7 @@ function AnnotatorDetailPageInner() {
               />
               {!detailLoading && stats?.kappa != null && (
                 <StatCard
-                  label={kappaLabel(stats.kappa_type)}
+                  label={`Latest ${kappaLabel(stats.kappa_type)}`}
                   value={formatKappa(stats.kappa)}
                 />
               )}
@@ -474,7 +474,8 @@ function AnnotatorDetailPageInner() {
                           color: "#10b981",
                           points: series.map((p) => ({
                             ...p,
-                            x: formatBucketLabel(
+                            key: p.bucket_end,
+                            label: formatBucketLabel(
                               p.bucket_end,
                               trend?.bucket ?? DEFAULT_BUCKET,
                             ),
@@ -576,7 +577,7 @@ function JobTaskName({ name }: { name: string }) {
       {name}
     </div>
   );
-  return clipped ? <HoverText content={name}>{cell}</HoverText> : cell;
+  return clipped ? <Tooltip content={name}>{cell}</Tooltip> : cell;
 }
 
 function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {

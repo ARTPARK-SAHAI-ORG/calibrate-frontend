@@ -258,12 +258,9 @@ export function AgreementStatCard(
             {kappaStat}
           </div>
         ) : !result && kappaStat ? (
-          <div className="mt-2 flex items-start gap-6">
-            <Stat
-              label="Human agreement"
-              value={value ?? ""}
-              valueClassName={valueClassName}
-            />
+          // Same bare number as a card with no kappa, so a row of cards reads alike.
+          <div className="flex items-end gap-6">
+            {singleNumber}
             {kappaStat}
           </div>
         ) : result?.title ? (

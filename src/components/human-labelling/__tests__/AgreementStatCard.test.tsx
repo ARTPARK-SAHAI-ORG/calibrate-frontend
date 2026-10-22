@@ -327,8 +327,10 @@ describe("AgreementStatCard", () => {
         kappa={{ kappa: -0.125, kappa_type: "linear_weighted_fleiss" }}
       />,
     );
-    expect(screen.getByText("Human agreement")).toBeInTheDocument();
-    expect(screen.getByText("82%")).toBeInTheDocument();
+    // The agreement number keeps the bare look it has on a card with no
+    // kappa, so a row of cards reads the same.
+    expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
+    expect(screen.getByText("82%").className).toContain("text-2xl");
     expect(screen.getByText("-0.13")).toBeInTheDocument();
     await user.hover(screen.getByText("Linear weighted Fleiss' kappa"));
     expect(

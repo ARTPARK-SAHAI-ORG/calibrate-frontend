@@ -15,7 +15,7 @@ import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
 import { AgreementTrendChart } from "@/components/charts/AgreementTrendChart";
-import { Tooltip as HoverText } from "@/components/Tooltip";
+import { Tooltip } from "@/components/Tooltip";
 import type { KappaFields } from "@/lib/agreementKappa";
 import { NotFoundState, InfoNote } from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
@@ -877,7 +877,7 @@ function EvaluatorDetailPageInner() {
                   <h1 className="text-xl md:text-2xl font-semibold text-foreground">
                     {evaluator.name}
                   </h1>
-                  <HoverText content="Edit name and description" position="top">
+                  <Tooltip content="Edit name and description" position="top">
                     <button
                       onClick={openEditDialog}
                       aria-label="Edit name and description"
@@ -897,7 +897,7 @@ function EvaluatorDetailPageInner() {
                         />
                       </svg>
                     </button>
-                  </HoverText>
+                  </Tooltip>
                 </div>
                 {evaluator.description && (
                   <p className="text-muted-foreground text-sm md:text-base leading-relaxed mt-2">
@@ -938,7 +938,7 @@ function EvaluatorDetailPageInner() {
                   }
                 />
                 {canDeleteEvaluator(evaluator) && (
-                  <HoverText content="Delete evaluator" position="top">
+                  <Tooltip content="Delete evaluator" position="top">
                     <button
                       onClick={() => setDeleteOpen(true)}
                       aria-label="Delete evaluator"
@@ -958,7 +958,7 @@ function EvaluatorDetailPageInner() {
                         />
                       </svg>
                     </button>
-                  </HoverText>
+                  </Tooltip>
                 )}
               </div>
             </div>
@@ -1027,7 +1027,7 @@ function EvaluatorDetailPageInner() {
                           </button>
 
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <HoverText
+                            <Tooltip
                               content={`Edit, starting from v${v.version_number}`}
                               position="top"
                             >
@@ -1055,9 +1055,9 @@ function EvaluatorDetailPageInner() {
                                   />
                                 </svg>
                               </button>
-                            </HoverText>
+                            </Tooltip>
                             {!isCurrent && (
-                              <HoverText
+                              <Tooltip
                                 content="Mark as current"
                                 position="top"
                               >
@@ -1081,10 +1081,10 @@ function EvaluatorDetailPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
+                              </Tooltip>
                             )}
                             {!isCurrent && (
-                              <HoverText
+                              <Tooltip
                                 content={`Delete v${v.version_number}`}
                                 position="top"
                               >
@@ -1107,7 +1107,7 @@ function EvaluatorDetailPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
+                              </Tooltip>
                             )}
                           </div>
                         </div>
@@ -1716,14 +1716,6 @@ function EvaluatorDetailPageInner() {
   );
 }
 
-function averageSeriesAgreement(series: TrendSeriesPoint[]): number | null {
-  const values = series
-    .map((p) => p.agreement)
-    .filter((v): v is number => v != null);
-  if (values.length === 0) return null;
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
-
 function VersionAxisTick({
   x,
   y,
@@ -1803,8 +1795,9 @@ function AgreementTrendTab({
     );
     return {
       points: sorted.map((v) => ({
-        x: `v${v.version_number}`,
-        agreement: averageSeriesAgreement(v.series),
+        key: v.version_id,
+        label: `v${v.version_number}`,
+        agreement: v.current,
         kappa: v.kappa,
         kappa_type: v.kappa_type,
       })),

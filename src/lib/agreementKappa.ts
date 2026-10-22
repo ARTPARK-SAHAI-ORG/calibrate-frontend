@@ -22,18 +22,21 @@ const KAPPA_LABELS: Record<KappaType, string> = {
 };
 
 export const KAPPA_HELP =
-  "Kappa is agreement after removing what chance alone would produce. 0 means no better than chance, 1 means full agreement";
+  "Kappa is agreement after removing what chance alone would produce. 1 means full agreement, 0 means no better than chance, and below 0 means worse than chance";
 
 export function kappaLabel(type: KappaType | null | undefined): string {
   return (type && KAPPA_LABELS[type]) || "Kappa";
 }
 
 export function formatKappa(kappa: number): string {
-  return kappa.toFixed(2);
+  const text = kappa.toFixed(2);
+  return text === "-0.00" ? "0.00" : text;
 }
 
 /** "Fleiss' kappa 0.42", or null when there is no kappa to show. */
-export function kappaText(fields: KappaFields | null | undefined): string | null {
+export function kappaText(
+  fields: KappaFields | null | undefined,
+): string | null {
   if (fields?.kappa == null) return null;
   return `${kappaLabel(fields.kappa_type)} ${formatKappa(fields.kappa)}`;
 }
@@ -45,7 +48,12 @@ export type TrendSeries = {
   /** Legend name of the kappa line, before the kind of kappa in brackets. */
   kappaName: string;
   color: string;
-  points: ({ x: string; agreement: number | null } & KappaFields)[];
+  /** `key` tells points apart, since two month buckets can share a label. */
+  points: ({
+    key: string;
+    label: string;
+    agreement: number | null;
+  } & KappaFields)[];
 };
 
 export type TrendLine = {
@@ -61,19 +69,19 @@ const KAPPA_KEY_SUFFIX = "__kappa";
 export function formatTrendValue(value: unknown, dataKey: unknown): string {
   if (typeof value !== "number") return "—";
   return String(dataKey).endsWith(KAPPA_KEY_SUFFIX)
-    ? formatKappa(value / 100)
+    ? formatKappa(value)
     : `${value}%`;
 }
 
 /**
- * Every agreement number and its kappa as lines on one chart. Agreement is
- * plotted as a percentage and kappa times 100, so both share one axis; the
- * axis drops below 0 only when some kappa does.
+ * Every agreement number and its kappa as lines on one chart. Agreement is a
+ * percentage on the left axis; kappa keeps its own -1 to 1 scale on the
+ * right axis, which drops below 0 only when some kappa does.
  */
 export function buildTrendChart(series: TrendSeries[]): {
   data: Record<string, string | number | null>[];
   lines: TrendLine[];
-  yDomain: [number, number];
+  kappaDomain: [number, number];
 } {
   const rows = new Map<string, Record<string, string | number | null>>();
   const lines: TrendLine[] = [];
@@ -86,7 +94,12 @@ export function buildTrendChart(series: TrendSeries[]): {
       ),
     ];
     if (s.points.some((p) => p.agreement != null)) {
-      lines.push({ dataKey: s.key, name: s.name, color: s.color, kappa: false });
+      lines.push({
+        dataKey: s.key,
+        name: s.name,
+        color: s.color,
+        kappa: false,
+      });
     }
     if (types.length > 0) {
       lines.push({
@@ -97,12 +110,16 @@ export function buildTrendChart(series: TrendSeries[]): {
       });
     }
     for (const p of s.points) {
-      const row = rows.get(p.x) ?? { x: p.x };
-      rows.set(p.x, row);
+      const row = rows.get(p.key) ?? { key: p.key, label: p.label };
+      rows.set(p.key, row);
       row[s.key] = p.agreement == null ? null : Math.round(p.agreement * 100);
-      row[kappaKey] = p.kappa == null ? null : Math.round(p.kappa * 100);
-      if (p.kappa != null && p.kappa < 0) negative = true;
+      row[kappaKey] = p.kappa ?? null;
+      if (p.kappa != null && Number(formatKappa(p.kappa)) < 0) negative = true;
     }
   }
-  return { data: [...rows.values()], lines, yDomain: [negative ? -100 : 0, 100] };
+  return {
+    data: [...rows.values()],
+    lines,
+    kappaDomain: [negative ? -1 : 0, 1],
+  };
 }

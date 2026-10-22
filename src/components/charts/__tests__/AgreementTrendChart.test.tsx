@@ -49,8 +49,8 @@ beforeAll(() => {
   };
 });
 
-it("shows the agreement line and its kappa line in one legend", () => {
-  render(
+it("shows the agreement line and its dashed kappa line in one legend", () => {
+  const { container } = render(
     <AgreementTrendChart
       series={[
         {
@@ -59,8 +59,8 @@ it("shows the agreement line and its kappa line in one legend", () => {
           kappaName: "Annotator agreement",
           color: "#10b981",
           points: [
-            { x: "Jan", agreement: 0.8, kappa: -0.5, kappa_type: "fleiss" },
-            { x: "Feb", agreement: 0.9, kappa: 0.5, kappa_type: "fleiss" },
+            { key: "1", label: "Jan", agreement: 0.8, kappa: -0.5, kappa_type: "fleiss" },
+            { key: "2", label: "Feb", agreement: 0.9, kappa: 0.5, kappa_type: "fleiss" },
           ],
         },
       ]}
@@ -70,4 +70,11 @@ it("shows the agreement line and its kappa line in one legend", () => {
   expect(
     screen.getByText("Annotator agreement (Fleiss' kappa)"),
   ).toBeInTheDocument();
+  // Each legend entry draws its line's own stroke, so the kappa entry is
+  // dashed and the agreement entry is solid.
+  const icons = [...container.querySelectorAll(".recharts-legend-icon")];
+  expect(icons.map((icon) => icon.getAttribute("stroke-dasharray"))).toEqual([
+    null,
+    "5 4",
+  ]);
 });
