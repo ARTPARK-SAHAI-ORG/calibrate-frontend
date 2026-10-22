@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
 import { storeLoginAndRedirect, withCallback } from "@/lib/postLoginRedirect";
@@ -21,6 +21,28 @@ export function ResetPasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [expired, setExpired] = useState(false);
+  // Whether the link still works is asked before the boxes are shown
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("token");
+    if (!token) {
+      setExpired(true);
+      setChecking(false);
+      return;
+    }
+    fetch(`${getBackendUrl()}/auth/check-reset-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    })
+      .then((response) => {
+        if (response.status === 400) setExpired(true);
+      })
+      // Could not ask: show the boxes, and saving says what went wrong
+      .catch(() => {})
+      .finally(() => setChecking(false));
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,12 +84,25 @@ export function ResetPasswordForm() {
     setIsLoading(false);
   };
 
+  if (checking) {
+    return (
+      <AuthCard title="Reset password">
+        <div className="flex justify-center" role="status" aria-label="Checking the link">
+          <svg className="animate-spin h-6 w-6 text-gray-500" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      </AuthCard>
+    );
+  }
+
   if (expired) {
     return (
       <AuthCard title="Reset password">
         <div className="space-y-6">
           <p className="text-gray-600">
-            This link has expired or was already used.
+            This link has expired. Request a new password verification link.
           </p>
           <Link
             href={withCallback("/forgot-password", search)}
