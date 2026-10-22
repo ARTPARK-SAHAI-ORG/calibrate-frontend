@@ -6,7 +6,7 @@ import { ResetPasswordForm } from "../ResetPasswordForm";
 async function submit(password: string, confirm: string) {
   const user = setupUser();
   render(<ResetPasswordForm />);
-  await user.type(screen.getByLabelText("New password"), password);
+  await user.type(screen.getByLabelText("Password"), password);
   await user.type(screen.getByLabelText("Confirm password"), confirm);
   await user.click(screen.getByRole("button", { name: "Save new password" }));
 }
@@ -30,6 +30,16 @@ describe("ResetPasswordForm", () => {
     await submit("secret1", "secret2");
     expect(screen.getByText("Passwords do not match")).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("has the signup page's eye button to show the password", async () => {
+    setLocation("?token=tok");
+    const user = setupUser();
+    render(<ResetPasswordForm />);
+    const box = screen.getByLabelText("Password");
+    expect(box).toHaveAttribute("type", "password");
+    await user.click(screen.getAllByRole("button", { name: "Show password" })[0]);
+    expect(box).toHaveAttribute("type", "text");
   });
 
   it("saves the password, keeps the login and goes to the wanted page", async () => {

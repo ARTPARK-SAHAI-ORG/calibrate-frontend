@@ -13,6 +13,7 @@ import {
   AuthCard,
   ButtonLoading,
   CONNECTION_ERROR,
+  TextWithEmail,
   useAuthSearch,
 } from "./AuthCard";
 
@@ -64,8 +65,10 @@ export function ForgotPasswordForm() {
     return (
       <AuthCard title="Check your email">
         <p className="text-gray-600">
-          If an account exists for {sentTo}, we sent a link to reset your
-          password.
+          <TextWithEmail
+            text={`If an account exists for ${sentTo}, we sent a link to reset your password.`}
+            email={sentTo}
+          />
         </p>
         {loginLink}
       </AuthCard>

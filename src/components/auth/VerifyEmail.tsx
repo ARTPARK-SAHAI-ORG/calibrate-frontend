@@ -18,6 +18,7 @@ import {
   ButtonLoading,
   CONNECTION_ERROR,
   SentTick,
+  TextWithEmail,
 } from "./AuthCard";
 
 type State =
@@ -122,8 +123,10 @@ export function VerifyEmail() {
     return (
       <AuthCard title="Verification email sent" icon={<SentTick />}>
         <p className="text-gray-600">
-          We sent a new link to {state.email}. Click it to verify your email,
-          then you can sign in.
+          <TextWithEmail
+            text={`We sent a new link to ${state.email}. Click it to verify your email, then you can sign in.`}
+            email={state.email}
+          />
         </p>
       </AuthCard>
     );

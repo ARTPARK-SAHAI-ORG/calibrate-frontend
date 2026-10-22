@@ -1,5 +1,5 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { LOGIN, mockFetchOnce, sentBody, setLocation } from "@/test-utils/auth";
+import { LOGIN, mockFetchOnce, sentBody, setLocation, fullText } from "@/test-utils/auth";
 import { waitFor } from "@testing-library/react";
 import LoginPage from "../login/page";
 
@@ -21,7 +21,7 @@ describe("LoginPage", () => {
 
     expect(
       await screen.findByText(
-        "Your email is not verified yet. We sent a verification link to asha@example.com. Verify to sign in!",
+        fullText("Your email is not verified yet. We sent a verification link to asha@example.com. Verify to sign in!"),
       ),
     ).toBeInTheDocument();
     expect(localStorage.getItem("access_token")).toBeNull();

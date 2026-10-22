@@ -105,3 +105,19 @@ export function SentTick() {
     </span>
   );
 }
+
+/**
+ * A sentence with an email address in it. The address may break at any point,
+ * so a long one wraps with the sentence instead of jumping to a line of its own.
+ */
+export function TextWithEmail({ text, email }: { text: string; email: string }) {
+  const at = email ? text.indexOf(email) : -1;
+  if (at < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, at)}
+      <span className="break-all">{email}</span>
+      {text.slice(at + email.length)}
+    </>
+  );
+}

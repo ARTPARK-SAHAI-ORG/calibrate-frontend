@@ -1,5 +1,5 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { mockFetchOnce, sentBody, setLocation } from "@/test-utils/auth";
+import { mockFetchOnce, sentBody, setLocation, fullText } from "@/test-utils/auth";
 import { ForgotPasswordForm } from "../ForgotPasswordForm";
 
 describe("ForgotPasswordForm", () => {
@@ -18,7 +18,7 @@ describe("ForgotPasswordForm", () => {
 
     expect(
       await screen.findByText(
-        "If an account exists for a@b.co, we sent a link to reset your password.",
+        fullText("If an account exists for a@b.co, we sent a link to reset your password."),
       ),
     ).toBeInTheDocument();
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/auth\/forgot-password$/);
@@ -49,7 +49,9 @@ describe("ForgotPasswordForm", () => {
     await user.type(screen.getByLabelText("Email"), "a@b.co");
     await user.click(screen.getByRole("button", { name: "Send reset link" }));
 
-    await screen.findByText(/If an account exists for a@b.co/);
+    await screen.findByText(
+      fullText("If an account exists for a@b.co, we sent a link to reset your password."),
+    );
     expect(sentBody(fetchMock)).toEqual({ email: "a@b.co" });
   });
 

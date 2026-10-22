@@ -1,5 +1,5 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { LOGIN, mockFetchOnce, sentBody, setLocation } from "@/test-utils/auth";
+import { LOGIN, mockFetchOnce, sentBody, setLocation, fullText } from "@/test-utils/auth";
 import { waitFor } from "@testing-library/react";
 import { VerifyEmail } from "../VerifyEmail";
 
@@ -52,7 +52,7 @@ describe("VerifyEmail", () => {
     expect(await screen.findByText("Verification email sent")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "We sent a new link to a@b.co. Click it to verify your email, then you can sign in.",
+        fullText("We sent a new link to a@b.co. Click it to verify your email, then you can sign in."),
       ),
     ).toBeInTheDocument();
     expect(fetchMock.mock.calls[1][0]).toMatch(/\/auth\/resend-verification$/);

@@ -7,14 +7,13 @@ import { storeLoginAndRedirect, withCallback } from "@/lib/postLoginRedirect";
 import {
   AUTH_BUTTON_CLASS,
   AUTH_ERROR_CLASS,
-  AUTH_INPUT_CLASS,
-  AUTH_LABEL_CLASS,
   AUTH_BUTTON_LINK_CLASS,
   AuthCard,
   ButtonLoading,
   CONNECTION_ERROR,
   useAuthSearch,
 } from "./AuthCard";
+import { NewPasswordFields } from "./PasswordFields";
 
 export function ResetPasswordForm() {
   const search = useAuthSearch();
@@ -32,10 +31,8 @@ export function ResetPasswordForm() {
       setError("Password must be at least 6 characters");
       return;
     }
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
+    // The box itself already says the two do not match
+    if (password !== confirmPassword) return;
     const token = new URLSearchParams(search).get("token");
     if (!token) {
       setExpired(true);
@@ -87,34 +84,12 @@ export function ResetPasswordForm() {
     <AuthCard title="Reset password">
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && <div className={AUTH_ERROR_CLASS}>{error}</div>}
-        <div>
-          <label htmlFor="password" className={AUTH_LABEL_CLASS}>
-            New password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="At least 6 characters"
-            required
-            className={AUTH_INPUT_CLASS}
-          />
-        </div>
-        <div>
-          <label htmlFor="confirmPassword" className={AUTH_LABEL_CLASS}>
-            Confirm password
-          </label>
-          <input
-            id="confirmPassword"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Type the new password again"
-            required
-            className={AUTH_INPUT_CLASS}
-          />
-        </div>
+        <NewPasswordFields
+          password={password}
+          onPasswordChange={setPassword}
+          confirmPassword={confirmPassword}
+          onConfirmPasswordChange={setConfirmPassword}
+        />
         <button type="submit" disabled={isLoading} className={AUTH_BUTTON_CLASS}>
           {isLoading ? <ButtonLoading text="Saving..." /> : "Save new password"}
         </button>
