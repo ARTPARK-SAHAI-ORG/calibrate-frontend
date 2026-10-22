@@ -32,12 +32,8 @@ describe("SignupPage", () => {
         "We sent a link to asha@example.com. Click it to confirm your email, then you can sign in.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
-      "href",
-      "/login?callbackUrl=%2Ftools",
-    );
-    // The card's own link is the only way to sign in, not a second one under it
-    expect(screen.getAllByRole("link", { name: "Sign in" })).toHaveLength(1);
+    // Only the text: nothing to click until the email link is opened
+    expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
     expect(sentBody(fetchMock).next).toBe("/tools");
     expect(localStorage.getItem("access_token")).toBeNull();
     expect(window.location.href).toBe("");

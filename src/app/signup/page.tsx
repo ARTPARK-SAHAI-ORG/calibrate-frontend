@@ -220,14 +220,6 @@ export default function SignupPage() {
                     ? `This email already has an account that is not confirmed yet. We sent a link to ${verificationSent.email}. Click it to confirm your email, then you can sign in.`
                     : `We sent a link to ${verificationSent.email}. Click it to confirm your email, then you can sign in.`}
                 </p>
-                <p className="mt-6 text-sm">
-                  <Link
-                    href={withCallback("/login", authSearch)}
-                    className="font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
-                  >
-                    Sign in
-                  </Link>
-                </p>
               </div>
             ) : (
             <>
@@ -494,7 +486,7 @@ export default function SignupPage() {
             )}
           </div>
 
-          {/* Sign in link; the check-your-email card already has its own */}
+          {/* Sign in link, not shown once the check-your-email card is up */}
           {!verificationSent && (
             <p className="mt-6 text-center text-sm text-gray-600">
               Already have an account?{" "}
