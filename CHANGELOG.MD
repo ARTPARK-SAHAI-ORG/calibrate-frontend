@@ -1,5 +1,6 @@
 ## October 2026
 
+- Creating a new evaluator from Manage evaluators no longer closes the window and the form when you click inside the form ([#760](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/760))
 - Confirm email at signup and add password reset ([#753](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/753))
 - Error messages across the app now share one red box with the same spacing and darker, easier to read text in light mode ([#755](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/755))
 - When saving a tool or an agent, or verifying an agent connection, fails, the app now shows the reason in plain words instead of a general failure message ([#751](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/751))
