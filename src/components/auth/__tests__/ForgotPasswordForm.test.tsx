@@ -9,7 +9,7 @@ describe("ForgotPasswordForm", () => {
     const user = setupUser();
     render(<ForgotPasswordForm />);
 
-    expect(screen.getByRole("link", { name: "Back to log in" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Back to sign in" })).toHaveAttribute(
       "href",
       "/login?callbackUrl=%2Ftools",
     );
@@ -23,6 +23,21 @@ describe("ForgotPasswordForm", () => {
     ).toBeInTheDocument();
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/auth\/forgot-password$/);
     expect(sentBody(fetchMock)).toEqual({ email: "a@b.co", next: "/tools" });
+  });
+
+  it("says the link was not sent when the server fails", async () => {
+    setLocation("");
+    mockFetchOnce(500, { detail: "boom" });
+    const user = setupUser();
+    render(<ForgotPasswordForm />);
+
+    await user.type(screen.getByLabelText("Email"), "a@b.co");
+    await user.click(screen.getByRole("button", { name: "Send reset link" }));
+
+    expect(
+      await screen.findByText("Could not send the link. Please try again."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/If an account exists/)).toBeNull();
   });
 
   it("leaves next out when the address names no page", async () => {

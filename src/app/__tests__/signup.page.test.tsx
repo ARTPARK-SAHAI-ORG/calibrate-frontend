@@ -29,15 +29,15 @@ describe("SignupPage", () => {
     expect(await screen.findByText("Check your email")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "We sent a link to asha@example.com. Click it to confirm your email, then you can log in.",
+        "We sent a link to asha@example.com. Click it to confirm your email, then you can sign in.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Go to log in" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
       "href",
       "/login?callbackUrl=%2Ftools",
     );
-    // The card's own link is the only way to log in, not a second one under it
-    expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
+    // The card's own link is the only way to sign in, not a second one under it
+    expect(screen.getAllByRole("link", { name: "Sign in" })).toHaveLength(1);
     expect(sentBody(fetchMock).next).toBe("/tools");
     expect(localStorage.getItem("access_token")).toBeNull();
     expect(window.location.href).toBe("");
@@ -54,7 +54,7 @@ describe("SignupPage", () => {
 
     expect(
       await screen.findByText(
-        "An account with this email already exists but its email is not confirmed yet. We sent you a new link to asha@example.com.",
+        "This email already has an account that is not confirmed yet. We sent a link to asha@example.com. Click it to confirm your email, then you can sign in.",
       ),
     ).toBeInTheDocument();
     expect(sentBody(fetchMock)).not.toHaveProperty("next");

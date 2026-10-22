@@ -14,14 +14,14 @@ async function logIn() {
 beforeEach(() => localStorage.clear());
 
 describe("LoginPage", () => {
-  it("says the email is not confirmed and a new link went out", async () => {
+  it("says the email is not confirmed and a link went out", async () => {
     setLocation("");
     mockFetchOnce(403, { detail: "email_not_verified" });
     await logIn();
 
     expect(
       await screen.findByText(
-        "Your email is not confirmed yet. We sent a new link to asha@example.com. Click it, then log in.",
+        "Your email is not confirmed yet. We sent a link to asha@example.com. Click it, then sign in.",
       ),
     ).toBeInTheDocument();
     expect(localStorage.getItem("access_token")).toBeNull();

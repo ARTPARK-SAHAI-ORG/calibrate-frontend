@@ -80,7 +80,7 @@ export default function LoginPage() {
         // The password was right; the backend has just sent a new link
         if (response.status === 403 && data.detail === "email_not_verified") {
           throw new Error(
-            `Your email is not confirmed yet. We sent a new link to ${email.trim()}. Click it, then log in.`,
+            `Your email is not confirmed yet. We sent a link to ${email.trim()}. Click it, then sign in.`,
           );
         }
         if (response.status === 422) {

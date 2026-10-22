@@ -3,14 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
-import { storeLoginAndRedirect } from "@/lib/postLoginRedirect";
+import { storeLoginAndRedirect, withCallback } from "@/lib/postLoginRedirect";
 import { AUTH_LINK_CLASS, AuthCard, CONNECTION_ERROR } from "./AuthCard";
 
 const EXPIRED =
-  "This link has expired or was already used. Log in to get a new one.";
+  "This link has expired or was already used. Sign in to get a new one.";
+const FAILED = "Could not confirm your email. Please open the link again.";
 
 export function VerifyEmail() {
   const [error, setError] = useState("");
+  // Kept so the sign in link still leads back to an invite after an expired link
+  const [search, setSearch] = useState("");
   // The link works once, so a second request (React runs effects twice in
   // development) would turn a confirmed email into an error on screen.
   const sent = useRef(false);
@@ -19,6 +22,7 @@ export function VerifyEmail() {
     if (sent.current) return;
     sent.current = true;
     const search = window.location.search;
+    setSearch(search);
     const token = new URLSearchParams(search).get("token");
     // No token reads the same as a used one, without asking the backend
     const request = token
@@ -30,8 +34,12 @@ export function VerifyEmail() {
       : Promise.resolve(null);
     request
       .then(async (response) => {
-        if (!response?.ok) {
+        if (!response || response.status === 400) {
           setError(EXPIRED);
+          return;
+        }
+        if (!response.ok) {
+          setError(FAILED);
           return;
         }
         storeLoginAndRedirect(await response.json(), search);
@@ -56,8 +64,8 @@ export function VerifyEmail() {
     <AuthCard title="Confirm your email">
       <p className="text-center text-gray-600">{error}</p>
       <p className="mt-6 text-center text-sm text-gray-600">
-        <Link href="/login" className={AUTH_LINK_CLASS}>
-          Go to log in
+        <Link href={withCallback("/login", search)} className={AUTH_LINK_CLASS}>
+          Sign in
         </Link>
       </p>
     </AuthCard>

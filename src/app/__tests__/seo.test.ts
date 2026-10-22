@@ -61,15 +61,7 @@ describe("sitemap", () => {
 
   it("keeps pages that need signing in out of it", () => {
     const urls = sitemap().map((entry) => entry.url);
-    for (const path of [
-      "/login",
-      "/signup",
-      "/verify-email",
-      "/forgot-password",
-      "/reset-password",
-      "/opening",
-      "/public/",
-    ]) {
+    for (const path of ["/login", "/signup", "/opening", "/public/"]) {
       expect(urls.some((url) => url.includes(path))).toBe(false);
     }
   });

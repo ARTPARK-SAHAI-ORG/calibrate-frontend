@@ -11,6 +11,7 @@ import {
   AUTH_LABEL_CLASS,
   AUTH_LINK_CLASS,
   AuthCard,
+  ButtonLoading,
   CONNECTION_ERROR,
   useAuthSearch,
 } from "./AuthCard";
@@ -115,7 +116,7 @@ export function ResetPasswordForm() {
           />
         </div>
         <button type="submit" disabled={isLoading} className={AUTH_BUTTON_CLASS}>
-          {isLoading ? "Saving..." : "Save new password"}
+          {isLoading ? <ButtonLoading text="Saving..." /> : "Save new password"}
         </button>
       </form>
     </AuthCard>

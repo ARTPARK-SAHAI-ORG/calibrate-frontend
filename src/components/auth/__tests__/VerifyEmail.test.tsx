@@ -4,7 +4,7 @@ import { waitFor } from "@testing-library/react";
 import { VerifyEmail } from "../VerifyEmail";
 
 const EXPIRED =
-  "This link has expired or was already used. Log in to get a new one.";
+  "This link has expired or was already used. Sign in to get a new one.";
 
 beforeEach(() => localStorage.clear());
 
@@ -23,14 +23,15 @@ describe("VerifyEmail", () => {
   });
 
   it("says the link is used up when the backend refuses it", async () => {
-    setLocation("?token=old");
+    setLocation("?token=old&callbackUrl=%2Finvite%2Ftok");
     mockFetchOnce(400, { detail: "invalid_or_expired_token" });
     render(<VerifyEmail />);
 
     expect(await screen.findByText(EXPIRED)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Go to log in" })).toHaveAttribute(
+    // Signing in from here still leads back to the invite
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
       "href",
-      "/login",
+      "/login?callbackUrl=%2Finvite%2Ftok",
     );
     expect(localStorage.getItem("access_token")).toBeNull();
   });
@@ -42,6 +43,17 @@ describe("VerifyEmail", () => {
 
     expect(await screen.findByText(EXPIRED)).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not call the link used up when the server fails", async () => {
+    setLocation("?token=tok-1");
+    mockFetchOnce(500, { detail: "boom" });
+    render(<VerifyEmail />);
+
+    expect(
+      await screen.findByText("Could not confirm your email. Please open the link again."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(EXPIRED)).toBeNull();
   });
 
   it("says when the server cannot be reached", async () => {

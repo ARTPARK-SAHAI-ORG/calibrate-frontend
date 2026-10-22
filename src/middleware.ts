@@ -52,6 +52,8 @@ function route(req: NextRequest & { auth: unknown }): NextResponse {
   const isCrawlerFile =
     req.nextUrl.pathname === "/robots.txt" ||
     req.nextUrl.pathname === "/sitemap.xml";
+  // Opened from an email link by someone who is not signed in yet
+  const isAccountEmailPage = ["/verify-email", "/forgot-password", "/reset-password"].includes(req.nextUrl.pathname);
   const isPublicShareRoute = req.nextUrl.pathname.startsWith("/public/");
   const isAnnotateJobRoute = req.nextUrl.pathname.startsWith("/annotate-job/");
   // An invite link is opened by someone who may have no account yet, so the
@@ -60,8 +62,6 @@ function route(req: NextRequest & { auth: unknown }): NextResponse {
   // "starts with" would let "/invite/agents/<uuid>" through, and Next would
   // read "invite" as the workspace and serve the agent page to a visitor who
   // has not signed in.
-  // Opened from an email link by someone who is not signed in yet
-  const isAccountEmailPage = ["/verify-email", "/forgot-password", "/reset-password"].includes(req.nextUrl.pathname);
   const isInviteRoute = /^\/invite\/[^/]+\/?$/.test(req.nextUrl.pathname);
 
   // Allow public pages: landing page, auth API, debug, docs, terms, privacy, changelog, learn, blog, robots.txt and sitemap.xml, public share links, annotate-job links, invite links, email confirmation and password reset

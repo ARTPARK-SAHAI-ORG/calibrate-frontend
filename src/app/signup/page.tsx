@@ -217,15 +217,15 @@ export default function SignupPage() {
                 </h1>
                 <p className="text-gray-600">
                   {verificationSent.alreadyPending
-                    ? `An account with this email already exists but its email is not confirmed yet. We sent you a new link to ${verificationSent.email}.`
-                    : `We sent a link to ${verificationSent.email}. Click it to confirm your email, then you can log in.`}
+                    ? `This email already has an account that is not confirmed yet. We sent a link to ${verificationSent.email}. Click it to confirm your email, then you can sign in.`
+                    : `We sent a link to ${verificationSent.email}. Click it to confirm your email, then you can sign in.`}
                 </p>
                 <p className="mt-6 text-sm">
                   <Link
                     href={withCallback("/login", authSearch)}
                     className="font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
                   >
-                    Go to log in
+                    Sign in
                   </Link>
                 </p>
               </div>

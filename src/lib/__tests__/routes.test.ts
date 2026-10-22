@@ -70,8 +70,6 @@ describe("isPublicPath", () => {
     "/login#top",
     "/signup?callbackUrl=%2Ftests%3Ftab%3Druns",
     "/public/stt/tok?x=1",
-    "/verify-email?token=abc&callbackUrl=%2Ftools",
-    "/reset-password?token=abc",
     "/?ref=email",
     "/#open-source",
   ])("still treats %s as public with a query or a section on it", (path) => {

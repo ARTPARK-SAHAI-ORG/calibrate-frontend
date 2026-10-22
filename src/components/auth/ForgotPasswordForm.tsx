@@ -11,6 +11,7 @@ import {
   AUTH_LABEL_CLASS,
   AUTH_LINK_CLASS,
   AuthCard,
+  ButtonLoading,
   CONNECTION_ERROR,
   useAuthSearch,
 } from "./AuthCard";
@@ -30,7 +31,7 @@ export function ForgotPasswordForm() {
     try {
       // The backend answers the same whether or not the account exists, so
       // the page never says which addresses have one.
-      await fetch(`${getBackendUrl()}/auth/forgot-password`, {
+      const response = await fetch(`${getBackendUrl()}/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -38,6 +39,10 @@ export function ForgotPasswordForm() {
           next: nextForBackend(search),
         }),
       });
+      if (!response.ok) {
+        setError("Could not send the link. Please try again.");
+        return;
+      }
       setSentTo(address);
     } catch {
       setError(CONNECTION_ERROR);
@@ -52,7 +57,7 @@ export function ForgotPasswordForm() {
         href={withCallback("/login", search)}
         className={AUTH_LINK_CLASS}
       >
-        Back to log in
+        Back to sign in
       </Link>
     </p>
   );
@@ -88,7 +93,7 @@ export function ForgotPasswordForm() {
           />
         </div>
         <button type="submit" disabled={isLoading} className={AUTH_BUTTON_CLASS}>
-          {isLoading ? "Sending..." : "Send reset link"}
+          {isLoading ? <ButtonLoading text="Sending..." /> : "Send reset link"}
         </button>
       </form>
       {loginLink}
