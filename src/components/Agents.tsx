@@ -11,6 +11,7 @@ import { DuplicateAgentDialog } from "@/components/DuplicateAgentDialog";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { Tooltip } from "@/components/Tooltip";
 import {
+  ErrorNote,
   InteractionTypePill,
   InteractionTypeChooser,
   type InteractionType,
@@ -1030,9 +1031,7 @@ function NewAgentDialog({
 
             {/* Error Message */}
             {error && (
-              <div className="mb-5 p-3 rounded-md bg-red-500/10 border border-red-500/20">
-                <p className="text-[13px] text-red-500">{error}</p>
-              </div>
+              <ErrorNote className="mb-5">{error}</ErrorNote>
             )}
 
             {/* Footer Buttons */}

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { jsPDF } from "jspdf";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { ErrorNote } from "@/components/ui";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { apiClient } from "@/lib/api";
@@ -277,9 +278,9 @@ export function UnknownItemNamesWarning({
 }) {
   if (names.length === 0) return null;
   return (
-    <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
+    <ErrorNote>
       {unknownItemNamesMessage(names)}
-    </div>
+    </ErrorNote>
   );
 }
 
@@ -1406,9 +1407,9 @@ export function BulkUploadDialogShell({
           {!hideUploadSection && itemCount > 0 && itemsPreview}
 
           {!hideUploadSection && uploadError && (
-            <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">
+            <ErrorNote>
               {uploadError}
-            </div>
+            </ErrorNote>
           )}
         </div>
 

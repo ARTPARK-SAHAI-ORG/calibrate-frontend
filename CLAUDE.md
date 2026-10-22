@@ -212,6 +212,7 @@ Where it lives today, and what counts as one unit of work:
 
 - Read a backend time with `parseBackendTime` from `src/lib/relativeTime.ts`, never `new Date(value.replace(" ", "T"))`. The backend writes UTC with no zone ("2026-08-22 02:16:02"), and reading that as local time showed times 5½ hours early in India. Jest runs every test in `Asia/Kolkata` (set in `jest.config.js`) so this mistake fails a test even on a UTC machine.
 - An explaining note on a page is `InfoNote` from `@/components/ui`: the blue box with the "i" icon. Use it rather than copying its classes.
+- A box saying what went wrong is `ErrorNote` from `@/components/ui`: the red box, dark red text in light mode. Use it rather than writing red border and background classes by hand; pass only layout classes (margins, width, spacing). A failed run is `RunFailureBox`, which has its own heading and details.
 - Tailwind v4 with semantic tokens (`foreground`, `background`, `muted`, `accent`, `border`). Avoid hardcoded colors outside the validation/status patterns documented in `.cursor/rules/design.md`.
 - All interactive elements need `cursor-pointer`; disabled elements `cursor-not-allowed disabled:opacity-50`. Never `cursor-help`, on anything, including a word that only shows hover text.
 - A one-line description or label never ends in a full stop. This covers the line under a heading, a setting's description, a hint under a field, and any single-sentence label. Full stops belong in prose of more than one sentence.

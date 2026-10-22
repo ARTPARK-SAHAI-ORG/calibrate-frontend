@@ -11,6 +11,7 @@ import {
   isEvaluatorNameConflict,
 } from "@/lib/evaluatorApi";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { ErrorNote } from "@/components/ui";
 import {
   isReservedEvaluatorName,
   reservedEvaluatorNameError,
@@ -192,9 +193,7 @@ export function DuplicateEvaluatorDialog({
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-3 rounded-md bg-red-500/10 border border-red-500/20">
-            <p className="text-[13px] text-red-500">{error}</p>
-          </div>
+          <ErrorNote className="mb-6">{error}</ErrorNote>
         )}
 
         {/* Footer Buttons */}

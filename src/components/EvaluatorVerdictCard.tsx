@@ -1,6 +1,7 @@
 "use client";
 
 import { Tooltip } from "@/components/Tooltip";
+import { ErrorNote } from "@/components/ui";
 
 // Single source of truth for the per-evaluator card surface used in:
 //
@@ -584,18 +585,18 @@ function WriteControls({
   // the evaluator's actual rubric.
   if (typeof scaleMin !== "number" || typeof scaleMax !== "number") {
     return (
-      <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-400">
+      <ErrorNote>
         Rating scale is missing for this evaluator. Reload the page; if the
         problem persists, the evaluator&apos;s scale config wasn&apos;t returned
         by the backend.
-      </div>
+      </ErrorNote>
     );
   }
   if (scaleMax < scaleMin) {
     return (
-      <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-400">
+      <ErrorNote>
         Invalid rating scale ({scaleMin}..{scaleMax}) — max is below min.
-      </div>
+      </ErrorNote>
     );
   }
   const options = Array.from(

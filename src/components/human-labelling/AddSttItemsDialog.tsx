@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
-import { DialogNavHeader, type MetadataEntry } from "@/components/ui";
+import { DialogNavHeader, ErrorNote, type MetadataEntry } from "@/components/ui";
 import { FieldError } from "@/components/ui/FieldError";
 import { humaniseDetailObject } from "./bulk-upload-shared";
 import {
@@ -489,9 +489,9 @@ export function AddSttItemsDialog({
             ))}
 
           {error && (
-            <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">
+            <ErrorNote>
               {error}
-            </div>
+            </ErrorNote>
           )}
         </div>
 

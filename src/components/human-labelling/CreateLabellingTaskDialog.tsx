@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { ErrorNote } from "@/components/ui";
 import {
   EVALUATOR_TYPE_LABELS,
   type EvaluatorType,
@@ -446,9 +447,9 @@ export function CreateLabellingTaskDialog({
           )}
 
           {submitError && (
-            <div className="mt-5 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">
+            <ErrorNote className="mt-5">
               {submitError}
-            </div>
+            </ErrorNote>
           )}
         </div>
 

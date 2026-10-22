@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { apiClient } from "@/lib/api";
-import { ClippedText } from "@/components/ui";
+import { ClippedText, ErrorNote } from "@/components/ui";
 import {
   AnnotationOptIn,
   BulkUploadDialogShell,
@@ -852,19 +852,19 @@ export function BulkUploadItemsDialog({
           />
         )}
         {duplicateNames.length > 0 && (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
+          <ErrorNote>
             Two or more linked evaluators share the same name (
             {duplicateNames.map((n) => `"${n}"`).join(", ")}). Their variable
             and annotation columns would collide in the CSV. Rename one on the
             evaluators page before uploading.
-          </div>
+          </ErrorNote>
         )}
         {uploadAnnotations && evaluatorsMissingOutputType.length > 0 && (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
+          <ErrorNote>
             Annotation upload isn&apos;t available. Evaluator(s){" "}
             {evaluatorsMissingOutputType.map((e) => `"${e.name}"`).join(", ")}{" "}
             have no binary/rating output configured.
-          </div>
+          </ErrorNote>
         )}
       </div>
     ) : null;

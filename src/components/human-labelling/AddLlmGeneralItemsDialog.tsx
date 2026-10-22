@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 import { FieldError } from "@/components/ui/FieldError";
-import { DialogNavHeader, type MetadataEntry } from "@/components/ui";
+import { DialogNavHeader, ErrorNote, type MetadataEntry } from "@/components/ui";
 import {
   ToolPicker,
   getToolParams,
@@ -918,9 +918,9 @@ export function AddLlmGeneralItemsDialog({
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-5 md:px-6 py-4 border-t border-border">
           {error && (
-            <div className="mr-auto rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
+            <ErrorNote className="mr-auto">
               {error}
-            </div>
+            </ErrorNote>
           )}
           <button
             onClick={handleSubmit}

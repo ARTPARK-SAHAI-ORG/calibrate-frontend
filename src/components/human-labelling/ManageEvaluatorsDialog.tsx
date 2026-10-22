@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { ErrorNote } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import {
@@ -570,9 +571,9 @@ export function ManageEvaluatorsDialog({
           )}
 
           {saveError && (
-            <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">
+            <ErrorNote>
               {saveError}
-            </div>
+            </ErrorNote>
           )}
         </div>
 

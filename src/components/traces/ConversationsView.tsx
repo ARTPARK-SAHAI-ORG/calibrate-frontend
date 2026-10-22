@@ -7,6 +7,7 @@ import { TracesFilter } from "@/components/traces/TracesFilter";
 import { SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
+  ErrorNote,
   LoadingState,
   SearchInput,
   ServerPaginatedListBar,
@@ -196,7 +197,7 @@ export function ConversationsView({
       </div>
 
       {error ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">
+        <ErrorNote className="flex flex-wrap items-center justify-between gap-3">
           <span>{error}</span>
           <button
             type="button"
@@ -219,7 +220,7 @@ export function ConversationsView({
             </svg>
             {isLoading ? "Trying again" : "Try again"}
           </button>
-        </div>
+        </ErrorNote>
       ) : !page ? (
         <LoadingState />
       ) : total === 0 ? (
