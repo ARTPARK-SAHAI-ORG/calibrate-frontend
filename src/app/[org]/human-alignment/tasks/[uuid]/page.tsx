@@ -66,7 +66,7 @@ import {
 } from "@/components/human-labelling/JobsCreatedDialog";
 import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvaluatorsDialog";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
-import { TaskAgreementOverview } from "@/components/human-labelling/AgreementOverviewTable";
+import { AgreementOverviewSection } from "@/components/human-labelling/AgreementOverviewTable";
 import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
 import type { EvaluatorResultStat } from "@/components/human-labelling/AgreementStatCard";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
@@ -2969,8 +2969,8 @@ function LabellingTaskPageInner() {
                     agreement.human_human,
                     agreement.evaluators ?? [],
                   ) && (
-                    <div className="mt-3">
-                      <TaskAgreementOverview
+                    <div className="mt-3 space-y-4">
+                      <AgreementOverviewSection
                         agreement={agreement}
                         onOpenEvaluator={setPreviewEvaluator}
                       />

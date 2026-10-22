@@ -11,6 +11,7 @@ import {
 import { KappaCell } from "@/components/human-labelling/KappaCell";
 import {
   buildOverviewRows,
+  overviewRows,
   sortOverviewRows,
   type AgreementGroup,
   type EvaluatorAgreement,
@@ -236,13 +237,16 @@ export function AgreementOverviewTable({
 }
 
 /**
- * One task's agreement, laid out like the Overview tab: the two overall
- * numbers, then every linked evaluator in the sortable table, each listed
- * even with nothing to show.
+ * Agreement laid out for the Overview tab and the task page: the two overall
+ * numbers, then the evaluators in the sortable table. Under All tasks an
+ * evaluator with nothing in either measure is left out; one task lists every
+ * linked evaluator. Rendered as siblings so the caller's spacing applies.
  */
-export function TaskAgreementOverview({
+export function AgreementOverviewSection({
   agreement,
   onOpenEvaluator,
+  allTasks = false,
+  evaluatorTypeOf,
 }: {
   agreement: {
     human_human?: { current: number | null } | null;
@@ -250,6 +254,9 @@ export function TaskAgreementOverview({
     evaluators?: EvaluatorAgreement[];
   };
   onOpenEvaluator: (evaluator: { uuid: string; name: string }) => void;
+  allTasks?: boolean;
+  /** Groups evaluators of the same type together in the table. */
+  evaluatorTypeOf?: (evaluatorId: string) => string | undefined;
 }) {
   const [sortKey, setSortKey] = useState<OverviewSortKey>("withHumans");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
@@ -261,8 +268,15 @@ export function TaskAgreementOverview({
       setSortDir(key === "name" ? "asc" : "desc");
     }
   };
+  const rows = overviewRows(
+    buildOverviewRows(agreement.evaluators ?? []).map((row) => ({
+      ...row,
+      evaluatorType: evaluatorTypeOf?.(row.key),
+    })),
+    allTasks,
+  );
   return (
-    <div className="space-y-4">
+    <>
       <div className="flex flex-wrap items-stretch gap-3">
         <OverallAgreementCards
           interAnnotator={agreement.human_human}
@@ -270,17 +284,12 @@ export function TaskAgreementOverview({
         />
       </div>
       <AgreementOverviewTable
-        rows={sortOverviewRows(
-          buildOverviewRows(agreement.evaluators ?? []),
-          sortKey,
-          sortDir,
-        )}
+        rows={sortOverviewRows(rows, sortKey, sortDir)}
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={handleSort}
         onOpenEvaluator={onOpenEvaluator}
       />
-    </div>
+    </>
   );
 }
-

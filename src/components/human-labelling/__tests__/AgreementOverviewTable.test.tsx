@@ -2,7 +2,7 @@ import { render, screen, setupUser, within } from "@/test-utils";
 import { buildOverviewRows } from "@/lib/taskOverviewData";
 import {
   AgreementOverviewTable,
-  TaskAgreementOverview,
+  AgreementOverviewSection,
 } from "../AgreementOverviewTable";
 
 const rows = buildOverviewRows([
@@ -205,7 +205,7 @@ describe("AgreementOverviewTable", () => {
   });
 });
 
-describe("TaskAgreementOverview", () => {
+describe("AgreementOverviewSection", () => {
   const agreement = {
     human_human: { current: 0.7, pair_count: 6 },
     evaluators_with_humans: { current: 0.85, pair_count: 8 },
@@ -245,7 +245,7 @@ describe("TaskAgreementOverview", () => {
 
   it("shows the two overall cards, the legend and a row for every linked evaluator", () => {
     render(
-      <TaskAgreementOverview agreement={agreement} onOpenEvaluator={jest.fn()} />,
+      <AgreementOverviewSection agreement={agreement} onOpenEvaluator={jest.fn()} />,
     );
     const pill = screen
       .getAllByText("Inter-annotator agreement")
@@ -268,7 +268,7 @@ describe("TaskAgreementOverview", () => {
     const user = setupUser();
     const onOpen = jest.fn();
     render(
-      <TaskAgreementOverview agreement={agreement} onOpenEvaluator={onOpen} />,
+      <AgreementOverviewSection agreement={agreement} onOpenEvaluator={onOpen} />,
     );
     await user.click(
       within(table()).getByRole("button", {
@@ -292,6 +292,40 @@ describe("TaskAgreementOverview", () => {
     ]);
     await user.click(within(table()).getByRole("button", { name: "Tone" }));
     expect(onOpen).toHaveBeenCalledWith({ uuid: "ev-high", name: "Tone" });
+  });
+
+  it("leaves out evaluators with nothing to show under All tasks only", () => {
+    const { rerender } = render(
+      <AgreementOverviewSection
+        agreement={agreement}
+        onOpenEvaluator={jest.fn()}
+        allTasks
+      />,
+    );
+    expect(rowNames()).toEqual(["Tone", "Clarity", "Tool call correctness"]);
+    rerender(
+      <AgreementOverviewSection
+        agreement={agreement}
+        onOpenEvaluator={jest.fn()}
+      />,
+    );
+    expect(rowNames()).toContain("Brevity");
+  });
+
+  it("keeps evaluators of one type together", () => {
+    render(
+      <AgreementOverviewSection
+        agreement={agreement}
+        onOpenEvaluator={jest.fn()}
+        evaluatorTypeOf={(id) => (id === "ev-low" ? "llm" : "stt")}
+      />,
+    );
+    expect(rowNames()).toEqual([
+      "Clarity",
+      "Tone",
+      "Tool call correctness",
+      "Brevity",
+    ]);
   });
 });
 

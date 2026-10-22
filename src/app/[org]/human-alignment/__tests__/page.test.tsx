@@ -40,6 +40,8 @@ const AGREEMENT = {
       kappa_type: "cohen",
       chance_agreement: 0.6,
     },
+    // Nothing compared yet, so All tasks leaves it out.
+    { evaluator_id: "ev-2", name: "Ghost", current: null, pair_count: 0 },
   ],
 };
 
@@ -111,6 +113,7 @@ it("shows the overall numbers as neutral pill cards, and the plain-words subtitl
   );
   expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "Tone" }).length).toBeGreaterThan(0);
+  expect(screen.queryByRole("button", { name: "Ghost" })).not.toBeInTheDocument();
 });
 
 describe("the Annotators tab", () => {

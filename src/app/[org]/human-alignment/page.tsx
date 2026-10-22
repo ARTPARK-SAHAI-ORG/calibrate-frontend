@@ -20,7 +20,6 @@ import { CreateLabellingTaskDialog } from "@/components/human-labelling/CreateLa
 import { EmptyState } from "@/components/ui/LoadingState";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
-import { OverallAgreementCards } from "@/components/human-labelling/AgreementStatCard";
 import { useAccessToken } from "@/hooks";
 import { createAnnotator, renameAnnotator } from "@/lib/annotatorApi";
 import { apiClient, unwrapList } from "@/lib/api";
@@ -34,17 +33,10 @@ import {
   KappaCell,
   KappaInfoIcon,
 } from "@/components/human-labelling/KappaCell";
-import {
-  AgreementOverviewTable,
-  type OverviewSortKey,
-} from "@/components/human-labelling/AgreementOverviewTable";
-import {
-  buildOverviewRows,
-  overviewRows,
-  sortOverviewRows,
-  type AgreementGroup,
-  type EvaluatorAgreement,
-  type OverviewRow,
+import { AgreementOverviewSection } from "@/components/human-labelling/AgreementOverviewTable";
+import type {
+  AgreementGroup,
+  EvaluatorAgreement,
 } from "@/lib/taskOverviewData";
 
 type Tab = "overview" | "tasks" | "annotators";
@@ -106,8 +98,6 @@ type LabellingTask = {
    */
   has_agreement?: boolean;
 };
-
-type SortDirection = "asc" | "desc";
 
 type AgreementResponse = {
   task_id?: string;
@@ -1282,45 +1272,20 @@ function AgreementOverview({
     }
     return m;
   })();
-  const [sortKey, setSortKey] = useState<OverviewSortKey>("withHumans");
-  const [sortDir, setSortDir] = useState<SortDirection>("desc");
   const [previewEvaluator, setPreviewEvaluator] = useState<{
     uuid: string;
     name: string;
   } | null>(null);
 
-  const rows: (OverviewRow & {
-    evaluatorType?: "llm" | "llm-general" | "stt" | "tts" | "conversation";
-  })[] = agreement
-    ? overviewRows(
-        buildOverviewRows(agreement.evaluators ?? []).map((row) => ({
-          ...row,
-          evaluatorType: evaluatorTypeMap.get(row.key),
-        })),
-        selectedTaskId === ALL_TASKS,
-      )
-    : [];
-
-  const sorted = sortOverviewRows(rows, sortKey, sortDir);
-
-  const handleSort = (key: OverviewSortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
-    } else {
-      setSortKey(key);
-      setSortDir(key === "name" ? "asc" : "desc");
-    }
-  };
-
   const hasNoAgreementData =
     (agreement?.human_human?.pair_count ?? 0) === 0 &&
     (agreement?.evaluators_with_humans?.pair_count ?? 0) === 0 &&
-    rows.every(
-      (r) =>
-        r.withHumans.current == null &&
-        r.withHumans.pair_count === 0 &&
-        r.interAnnotator.current == null &&
-        r.interAnnotator.pair_count === 0,
+    (agreement?.evaluators ?? []).every(
+      (ev) =>
+        ev.current == null &&
+        (ev.pair_count ?? 0) === 0 &&
+        ev.inter_annotator?.current == null &&
+        (ev.inter_annotator?.pair_count ?? 0) === 0,
     );
 
   return (
@@ -1403,22 +1368,14 @@ function AgreementOverview({
           }
         />
       ) : (
-        <>
-          <div className="flex flex-wrap items-stretch gap-3">
-            <OverallAgreementCards
-              interAnnotator={agreement?.human_human}
-              withHumans={agreement?.evaluators_with_humans}
-            />
-          </div>
-
-          <AgreementOverviewTable
-            rows={sorted}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={handleSort}
+        agreement && (
+          <AgreementOverviewSection
+            agreement={agreement}
             onOpenEvaluator={setPreviewEvaluator}
+            allTasks={selectedTaskId === ALL_TASKS}
+            evaluatorTypeOf={(id) => evaluatorTypeMap.get(id)}
           />
-        </>
+        )
       )}
       <EvaluatorPreviewModal
         evaluatorUuid={previewEvaluator?.uuid ?? null}
