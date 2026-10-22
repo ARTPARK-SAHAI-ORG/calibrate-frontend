@@ -73,6 +73,14 @@ jest.mock(
   }),
 );
 
+// The trend chart cannot be laid out in jsdom; a stand-in shows which lines
+// the Agreement tab asks it to draw.
+jest.mock("../../../../../components/charts/AgreementTrendChart", () => ({
+  AgreementTrendChart: ({ series }: { series: { name: string }[] }) => (
+    <div data-testid="trend-chart">{series.map((s) => s.name).join(", ")}</div>
+  ),
+}));
+
 import EvaluatorDetailPage from "../page";
 
 const EVALUATOR = {
@@ -542,3 +550,46 @@ describe("after creating a version", () => {
     expect(screen.queryByText("Grade the reply strictly")).toBeNull();
   });
 });
+
+describe("the Agreement tab", () => {
+  it("draws the agreement trend across versions", async () => {
+    searchParams = new URLSearchParams("tab=agreement");
+    const trend = {
+      evaluator_id: "eval-1",
+      evaluator_name: "Refund policy",
+      bucket: "week",
+      days: 90,
+      filters: { task_id: null, version_id: null },
+      versions: [
+        {
+          version_id: "ver-1",
+          version_number: 1,
+          is_live: true,
+          current: 0.8,
+          pair_count: 4,
+          kappa: 0.5,
+          kappa_type: "cohen",
+        },
+      ],
+      tasks: [],
+    };
+    global.fetch = jest.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => (String(url).includes("/trend") ? trend : EVALUATOR),
+      }),
+    ) as unknown as typeof fetch;
+    render(<EvaluatorDetailPage />);
+    expect(await screen.findByTestId("trend-chart")).toHaveTextContent(
+      "Refund policy agreement with humans",
+    );
+    expect(
+      (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+        /\/trend\?bucket=week&days=90/.test(String(url)),
+      ),
+    ).toBe(true);
+  });
+});
+

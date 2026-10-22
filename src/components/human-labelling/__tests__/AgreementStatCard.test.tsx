@@ -566,27 +566,37 @@ describe("AgreementStatCard sections", () => {
 });
 
 describe("OverallAgreementCards", () => {
-  it("shows each overall number as a small muted label over a large percentage, with no pill", () => {
+  it("draws each overall number like a score card: a pill label over a large coloured percentage", () => {
     render(
       <OverallAgreementCards
-        interAnnotator={{ current: 0.62 }}
+        interAnnotator={{ current: 0.82 }}
         withHumans={{ current: null }}
       />
     );
-    const label = screen.getByText("Inter-annotator agreement");
-    expect(label.className).toContain("uppercase");
-    expect(label.className).toContain("text-muted-foreground");
-    expect(label.className).not.toContain("rounded-md");
-    const number = screen.getByText("62%");
+    const pill = screen.getByText("Inter-annotator agreement");
+    // The same pill and the same card the score cards use.
+    expect(pill.closest("span.rounded-md")!.className).toContain(
+      "border-border",
+    );
+    expect(pill.closest(".rounded-lg")!.className).toContain("min-w-[160px]");
+    const number = screen.getByText("82%");
     expect(number.className).toContain("text-2xl");
-    expect(number.className).not.toMatch(/text-(green|red|yellow)/);
-    expect(label.parentElement).toBe(number.parentElement);
-    expect(
-      screen.getByText("Evaluator agreement with humans").className,
-    ).toContain("uppercase");
-    expect(screen.getByText("—").className).toContain("text-muted-foreground");
+    expect(number.className).toContain(agreementColor(0.82));
+    expect(screen.getByText("Evaluator agreement with humans")).toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
     expect(screen.queryByText(/Kappa|Chance/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("agreement-fill")).not.toBeInTheDocument();
+  });
+
+  it("colours the percentage the way the score cards do", () => {
+    render(
+      <OverallAgreementCards
+        interAnnotator={{ current: 0.4 }}
+        withHumans={{ current: 0.6 }}
+      />
+    );
+    expect(screen.getByText("40%").className).toContain("text-red-600");
+    expect(screen.getByText("60%").className).toContain("text-yellow-600");
   });
 });
 
@@ -624,37 +634,6 @@ describe("ScoreReliabilityCards", () => {
     expect(tool).toHaveTextContent("Evaluator agreement with humans—");
     // The two overall cards come first, then one card per evaluator.
     expect(screen.getAllByText("Inter-annotator agreement")).toHaveLength(3);
-  });
-});
-
-describe("chance bar on the cards", () => {
-  it("says the agreement and the chance on hover", async () => {
-    const user = setupUser();
-    render(
-      <AgreementStatCard
-        staticPillText="Annotator agreement"
-        agreement={0.88}
-        kappa={{ kappa: -0.2, kappa_type: "cohen", chance_agreement: 0.91 }}
-      />
-    );
-    const bar = screen.getByRole("img", { name: "Agreement 88%, chance 91%" });
-    await user.hover(bar);
-    expect(
-      await screen.findByText("Agreement 88%, chance 91%", { selector: "div" }),
-    ).toBeInTheDocument();
-  });
-
-  it("says only the agreement when chance is unknown", () => {
-    render(
-      <AgreementStatCard
-        staticPillText="Annotator agreement"
-        agreement={0.5}
-        kappa={{ kappa: null, kappa_type: "cohen", chance_agreement: null }}
-      />
-    );
-    expect(
-      screen.getByRole("img", { name: "Agreement 50%" }),
-    ).toBeInTheDocument();
   });
 });
 

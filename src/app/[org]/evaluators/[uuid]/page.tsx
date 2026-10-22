@@ -14,7 +14,9 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
+import { AgreementTrendChart } from "@/components/charts/AgreementTrendChart";
 import { Tooltip } from "@/components/Tooltip";
+import type { KappaFields } from "@/lib/agreementKappa";
 import { NotFoundState, InfoNote } from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
@@ -121,7 +123,7 @@ type EvaluatorDetail = {
   evaluator_type?: EvaluatorType;
 };
 
-type TrendVersion = {
+type TrendVersion = KappaFields & {
   version_id: string;
   version_number: number;
   is_live: boolean;
@@ -1700,6 +1702,59 @@ function EvaluatorDetailPageInner() {
   );
 }
 
+function VersionAxisTick({
+  x,
+  y,
+  payload,
+  liveLabels,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value: string };
+  liveLabels: Set<string>;
+}) {
+  const cx = x ?? 0;
+  const cy = y ?? 0;
+  const label = payload?.value ?? "";
+  const isLive = liveLabels.has(label);
+  return (
+    <g transform={`translate(${cx},${cy})`}>
+      <text
+        x={0}
+        y={0}
+        dy={12}
+        textAnchor="middle"
+        fontSize={11}
+        fill="currentColor"
+      >
+        {label}
+      </text>
+      {isLive && (
+        <>
+          <rect
+            x={-17}
+            y={18}
+            width={34}
+            height={14}
+            rx={3}
+            className="fill-green-500/10"
+          />
+          <text
+            x={0}
+            y={29}
+            textAnchor="middle"
+            fontSize={9}
+            fontWeight={600}
+            className="fill-green-600 dark:fill-green-400"
+          >
+            Live
+          </text>
+        </>
+      )}
+    </g>
+  );
+}
+
 function AgreementTrendTab({
   trend,
   trendLoading,
@@ -1715,7 +1770,28 @@ function AgreementTrendTab({
   onSelectTask: (id: string) => void;
   allTasks: TrendTask[];
 }) {
-  const hasData = (trend?.versions ?? []).some((v) => v.current != null);
+  const { points, liveLabels } = useMemo(() => {
+    if (!trend?.versions?.length)
+      return { points: [], liveLabels: new Set<string>() };
+    const sorted = [...trend.versions].sort(
+      (a, b) => a.version_number - b.version_number,
+    );
+    const liveSet = new Set(
+      sorted.filter((v) => v.is_live).map((v) => `v${v.version_number}`),
+    );
+    return {
+      points: sorted.map((v) => ({
+        key: v.version_id,
+        label: `v${v.version_number}`,
+        agreement: v.current,
+        kappa: v.kappa,
+        kappa_type: v.kappa_type,
+      })),
+      liveLabels: liveSet,
+    };
+  }, [trend]);
+
+  const hasData = points.some((p) => p.agreement != null);
 
   type TaskOption = { id: string; name: string };
   const ALL_TASKS_OPTION: TaskOption = { id: "all", name: "All tasks" };
@@ -1810,7 +1886,30 @@ function AgreementTrendTab({
             items that annotators have also labelled
           </p>
         </div>
-      ) : null}
+      ) : (
+        <div className="border border-border rounded-xl p-4 md:p-6">
+          <AgreementTrendChart
+            className="w-full h-64 md:h-72"
+            dotRadius={4}
+            xAxisProps={{
+              padding: { left: 40, right: 40 },
+              tick: (props) => (
+                <VersionAxisTick {...props} liveLabels={liveLabels} />
+              ),
+              height: 44,
+            }}
+            series={[
+              {
+                key: "agreement",
+                name: `${trend?.evaluator_name ?? "Evaluator"} agreement with humans`,
+                kappaName: trend?.evaluator_name ?? "Evaluator",
+                color: "var(--chart-2)",
+                points,
+              },
+            ]}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -49,23 +49,26 @@ jest.mock("../../../../lib/api", () => ({
 
 import HumanLabellingPage from "../page";
 
-it("shows the overall numbers as plain stat cards and the plain-words subtitle", async () => {
+it("shows the overall numbers like the score cards, and the plain-words subtitle", async () => {
   render(<HumanLabellingPage />);
   expect(
     await screen.findByText(
       "How often annotators agree with each other, and how often each evaluator agrees with them",
     ),
   ).toBeInTheDocument();
-  const inter = screen
-    .getAllByText("Inter-annotator agreement")
-    .find((el) => el.className.includes("uppercase"))!;
-  expect(inter.parentElement).toHaveTextContent("Inter-annotator agreement72%");
-  const withHumans = screen
-    .getAllByText("Evaluator agreement with humans")
-    .find((el) => el.className.includes("uppercase"))!;
-  expect(withHumans.nextElementSibling!.textContent).toBe("—");
-  expect(withHumans.nextElementSibling!.className).toContain(
-    "text-muted-foreground",
+  // The overall numbers are drawn like the task page's score cards: a pill
+  // label over a large percentage in the agreement colour.
+  const card = (label: string) =>
+    screen
+      .getAllByText(label)
+      .find((el) => el.closest("span.rounded-md"))!
+      .closest(".rounded-lg") as HTMLElement;
+  expect(card("Inter-annotator agreement")).toHaveTextContent(
+    "Inter-annotator agreement72%",
+  );
+  expect(screen.getByText("72%").className).toContain("text-yellow-600");
+  expect(card("Evaluator agreement with humans")).toHaveTextContent(
+    "Evaluator agreement with humans—",
   );
   expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "Tone" }).length).toBeGreaterThan(0);

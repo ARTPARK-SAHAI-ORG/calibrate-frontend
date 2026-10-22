@@ -1,7 +1,7 @@
 /**
  * The stat cards at the top of one annotator's page: the latest agreement,
  * the latest kappa for each kind of answer, and the number of jobs. The page
- * chrome is stubbed so only the cards run.
+ * chrome and the trend chart are stubbed so only the cards run.
  */
 import React from "react";
 import { render, screen, within } from "@/test-utils";
@@ -21,16 +21,26 @@ jest.mock("../../../../../../components/AppLayout", () => ({
   useHideFloatingButton: () => {},
 }));
 
+// The trend chart cannot be laid out in jsdom; a stand-in shows which lines
+// the page asks it to draw.
+jest.mock("../../../../../../components/charts/AgreementTrendChart", () => ({
+  AgreementTrendChart: ({ series }: { series: { name: string }[] }) => (
+    <div data-testid="trend-chart">{series.map((s) => s.name).join(", ")}</div>
+  ),
+}));
+
 jest.mock("../../../../../../hooks", () => ({
   ...jest.requireActual("../../../../../../hooks"),
   useAccessToken: () => "test-token",
 }));
 
 let resolveDetail: (value: unknown) => void = () => {};
+let requested = "";
 jest.mock("../../../../../../lib/api", () => ({
   ...jest.requireActual("../../../../../../lib/api"),
-  apiClient: () =>
+  apiClient: (endpoint: string) =>
     new Promise((resolve) => {
+      requested = endpoint;
       resolveDetail = resolve;
     }),
 }));
@@ -45,6 +55,7 @@ const detail = (kappa_by_kind: unknown[]) => ({
     jobs_count: 2,
     kappa_by_kind,
   },
+  trend: { bucket: "month", days: 365, series: [] },
   jobs: [],
 });
 
@@ -79,3 +90,35 @@ it("shows a dash when no kind of answer was compared", async () => {
   expect(await screen.findByText("80%")).toBeInTheDocument();
   expect(within(kappaCard()).getByText("—")).toBeInTheDocument();
 });
+
+it("draws the agreement trend, with one kappa line per kind of answer", async () => {
+  render(<AnnotatorDetailPage />);
+  expect(requested).toBe("/annotators/ann-1?bucket=month&days=365");
+  resolveDetail({
+    ...detail([]),
+    trend: {
+      bucket: "month",
+      days: 365,
+      series: [
+        {
+          bucket_start: "2026-01-01",
+          bucket_end: "2026-01-31",
+          agreement: 0.8,
+          pair_count: 3,
+          kappa_by_kind: [
+            { answer_kind: "binary", kappa: 0.3, kappa_type: "cohen" },
+            {
+              answer_kind: "rating",
+              kappa: 0.6,
+              kappa_type: "linear_weighted_cohen",
+            },
+          ],
+        },
+      ],
+    },
+  });
+  expect(await screen.findByTestId("trend-chart")).toHaveTextContent(
+    "Agreement with other annotators, Binary answers, Rating answers",
+  );
+});
+

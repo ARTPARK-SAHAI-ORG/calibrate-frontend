@@ -2,7 +2,6 @@
 
 import { useState, type ReactNode } from "react";
 import { Tooltip } from "@/components/Tooltip";
-import { StatCard } from "@/components/ui/StatCard";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { type KappaFields } from "@/lib/agreementKappa";
@@ -81,31 +80,21 @@ export function ChanceBar({
       : pct > chance
         ? "bg-green-500"
         : "bg-red-500";
-  const label =
-    chance == null
-      ? `Agreement ${pct}%`
-      : `Agreement ${pct}%, chance ${chance}%`;
   return (
-    <Tooltip content={label} className="mt-2">
+    <div className="relative mt-2 h-2 rounded-full bg-muted">
       <div
-        role="img"
-        aria-label={label}
-        className="relative h-2 rounded-full bg-muted"
-      >
+        data-testid="agreement-fill"
+        className={`h-full rounded-full ${fill}`}
+        style={{ width: `${pct}%` }}
+      />
+      {chance != null && (
         <div
-          data-testid="agreement-fill"
-          className={`h-full rounded-full ${fill}`}
-          style={{ width: `${pct}%` }}
+          data-testid="chance-tick"
+          className={`absolute -top-1 -bottom-1 -ml-px ${TICK}`}
+          style={{ left: `${chance}%` }}
         />
-        {chance != null && (
-          <div
-            data-testid="chance-tick"
-            className={`absolute -top-1 -bottom-1 -ml-px ${TICK}`}
-            style={{ left: `${chance}%` }}
-          />
-        )}
-      </div>
-    </Tooltip>
+      )}
+    </div>
   );
 }
 
@@ -415,8 +404,8 @@ export function AgreementStatCard(
   );
 }
 
-/** The two whole-workspace or whole-task numbers, each a small label over a
- * large percentage and nothing else. */
+/** The two whole-workspace or whole-task numbers, drawn like the score cards
+ * beside them: a pill label over a large percentage in the agreement colour. */
 export function OverallAgreementCards({
   interAnnotator,
   withHumans,
@@ -432,17 +421,19 @@ export function OverallAgreementCards({
           ["Evaluator agreement with humans", withHumans],
         ] as const
       ).map(([title, group]) => (
-        <StatCard
+        <AgreementStatCard
           key={title}
-          label={title}
-          value={
-            group?.current != null
-              ? `${Math.round(group.current * 100)}%`
-              : "—"
-          }
-          valueClassName={
-            group?.current != null ? "" : "text-muted-foreground"
-          }
+          staticPillText={title}
+          result={{
+            label: title,
+            value:
+              group?.current != null
+                ? `${Math.round(group.current * 100)}%`
+                : "—",
+            ratio: group?.current ?? null,
+          }}
+          showResultLabel={false}
+          showAlignmentLabel={false}
         />
       ))}
     </>

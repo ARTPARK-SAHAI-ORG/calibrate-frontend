@@ -196,22 +196,5 @@ describe("AgreementOverviewTable", () => {
       screen.queryByText("Agreement expected by chance alone"),
     ).not.toBeInTheDocument();
   });
-
-  it("says the agreement and the chance on hover of a bar", async () => {
-    const user = setupUser();
-    renderTable();
-    const tone = cells(tableRow("Tone"))[2];
-    const bar = within(tone).getByRole("img", {
-      name: "Agreement 90%, chance 60%",
-    });
-    await user.hover(bar);
-    expect(
-      await screen.findByText("Agreement 90%, chance 60%", { selector: "div" }),
-    ).toBeInTheDocument();
-    const brevity = cells(tableRow("Brevity"))[2];
-    expect(
-      within(brevity).getByRole("img", { name: "Agreement 70%" }),
-    ).toBeInTheDocument();
-  });
 });
 
