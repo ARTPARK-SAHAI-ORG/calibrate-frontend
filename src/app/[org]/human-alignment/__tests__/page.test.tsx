@@ -27,6 +27,9 @@ jest.mock("../../../../hooks", () => ({
   useAccessToken: () => "test-token",
 }));
 
+let mockAgreement: unknown = null;
+let mockTasks: unknown[] = [];
+
 const AGREEMENT = {
   human_human: { current: 0.72, pair_count: 10 },
   evaluators_with_humans: { current: null, pair_count: 0 },
@@ -78,10 +81,12 @@ jest.mock("../../../../lib/api", () => ({
   apiClient: (endpoint: string) =>
     Promise.resolve(
       endpoint.startsWith("/annotation-agreement")
-        ? AGREEMENT
+        ? (mockAgreement ?? AGREEMENT)
         : endpoint === "/annotators"
           ? ANNOTATORS
-          : [],
+          : endpoint === "/annotation-tasks"
+            ? mockTasks
+            : [],
     ),
 }));
 
@@ -207,5 +212,57 @@ describe("the Annotators tab", () => {
     expect(card).toHaveTextContent("Kappa (rating) —");
     expect(card).toHaveTextContent("42% agreement with others");
   });
+});
+
+it("keeps evaluators of the same type together in the Overview table", async () => {
+  const ev = (id: string, name: string, current: number) => ({
+    evaluator_id: id,
+    name,
+    current,
+    pair_count: 4,
+    kappa: 0.3,
+    kappa_type: "cohen",
+  });
+  // Highest agreement first would interleave the two types; grouping keeps
+  // the two conversation evaluators together.
+  mockAgreement = {
+    human_human: { current: 0.7, pair_count: 6 },
+    evaluators_with_humans: { current: 0.8, pair_count: 12 },
+    evaluators: [
+      ev("ev-a", "Accuracy", 0.9),
+      ev("ev-b", "Brevity", 0.8),
+      ev("ev-c", "Courtesy", 0.7),
+    ],
+  };
+  mockTasks = [
+    {
+      uuid: "t-1",
+      name: "Calls",
+      type: "conversation",
+      has_agreement: true,
+      evaluators: [
+        { uuid: "ev-a", name: "Accuracy", evaluator_type: "conversation" },
+        { uuid: "ev-b", name: "Brevity", evaluator_type: "llm" },
+        { uuid: "ev-c", name: "Courtesy", evaluator_type: "conversation" },
+      ],
+    },
+  ];
+  try {
+    render(<HumanLabellingPage />);
+    await screen.findAllByRole("button", { name: "Accuracy" });
+    const table = screen
+      .getByRole("button", { name: /^Evaluator$/ })
+      .closest(".md\\:block") as HTMLElement;
+    const order = [...table.querySelectorAll(".grid")]
+      .slice(1)
+      .map(
+        (row) =>
+          within(row as HTMLElement).getAllByRole("button")[0].textContent,
+      );
+    expect(order).toEqual(["Accuracy", "Courtesy", "Brevity"]);
+  } finally {
+    mockAgreement = null;
+    mockTasks = [];
+  }
 });
 
