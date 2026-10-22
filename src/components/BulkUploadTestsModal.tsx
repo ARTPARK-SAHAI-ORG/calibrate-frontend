@@ -24,7 +24,7 @@ import type { AvailableTool } from "@/components/ToolPicker";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { parseJsonLenient } from "@/lib/jsonSanitize";
 import { Tooltip } from "@/components/Tooltip";
-import { ClippedText } from "@/components/ui";
+import { ClippedText, ErrorNote } from "@/components/ui";
 
 
 // Inline link styling for the in-modal helper text. Tuned to read as a link
@@ -1665,11 +1665,9 @@ export function BulkUploadTestsModal({
 
               {/* Parse Error */}
               {parseError && (
-                <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                  <p className="text-sm text-red-500 whitespace-pre-line">
-                    {parseError}
-                  </p>
-                </div>
+                <ErrorNote className="mt-3">
+                  <p className="whitespace-pre-line">{parseError}</p>
+                </ErrorNote>
               )}
 
               {/* Sample CSV — placed below the dropzone, with a tip

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
 import { ShareButton } from "@/components/ShareButton";
-import { Breadcrumbs, RetryIcon, type Crumb } from "@/components/ui";
+import { Breadcrumbs, ErrorNote, RetryIcon, type Crumb } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { useAccessToken, usePageErrorState } from "@/hooks";
@@ -558,9 +558,7 @@ export default function EvaluatorRunDetailPage() {
         )}
 
         {error && (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
-            {error}
-          </div>
+          <ErrorNote>{error}</ErrorNote>
         )}
 
         {job &&

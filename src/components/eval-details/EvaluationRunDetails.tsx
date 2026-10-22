@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ErrorNote } from "@/components/ui";
 import {
   formatEvaluatorAggregate,
   readProviderEvaluatorMean,
@@ -1448,12 +1449,12 @@ function ProviderLoadingState() {
 function ProviderErrorState() {
   return (
     <div className="flex items-center justify-center h-full min-h-[200px]">
-      <div className="border border-red-500/50 bg-red-500/10 rounded-lg p-4 max-w-md text-center">
-        <div className="text-red-500 text-[14px] font-medium mb-1">
+      <ErrorNote className="max-w-md text-center">
+        <div className="font-medium mb-1">
           There was an error running this provider. Please contact us by posting
           your issue to help us help you.
         </div>
-      </div>
+      </ErrorNote>
     </div>
   );
 }

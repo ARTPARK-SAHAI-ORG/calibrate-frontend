@@ -12,6 +12,7 @@ import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
 import {
   Breadcrumbs,
+  ErrorNote,
   type Crumb,
   StatusBadge,
   NotFoundState,
@@ -816,9 +817,7 @@ export default function TTSEvaluationDetailPage() {
             </div>
 
             {retryError && (
-              <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
-                {retryError}
-              </div>
+              <ErrorNote>{retryError}</ErrorNote>
             )}
 
             {/* Only show tabs and content when we have at least one provider result */}

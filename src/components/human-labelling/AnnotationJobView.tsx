@@ -6,7 +6,7 @@ import { getBackendUrl } from "@/lib/api";
 import { payloadHasVersions } from "@/lib/messageVersions";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
-import { type MetadataEntry } from "@/components/ui";
+import { ErrorNote, type MetadataEntry } from "@/components/ui";
 import { ItemDetailsBlock } from "./ItemDetailsBlock";
 import {
   getBinaryDescription,
@@ -1219,9 +1219,9 @@ function AnnotateView({
         )}
 
         {topError && (
-          <div className="mx-4 md:mx-6 mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
+          <ErrorNote className="mx-4 md:mx-6 mt-3">
             {topError}
-          </div>
+          </ErrorNote>
         )}
 
         <div className="flex-1 flex flex-col md:flex-row min-h-0">

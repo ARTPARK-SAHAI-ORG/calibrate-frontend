@@ -24,7 +24,7 @@ import {
   runStateOf,
 } from "@/lib/testTypes";
 import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
-import { RunStateMark, ServerPaginatedListBar } from "@/components/ui";
+import { ErrorNote, RunStateMark, ServerPaginatedListBar } from "@/components/ui";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
@@ -678,9 +678,7 @@ export function RunsTabContent({
       </div>
 
       {error && (
-        <div className="border border-red-500/40 bg-red-500/10 rounded-xl px-4 py-3 text-sm text-red-600 dark:text-red-400">
-          {error}
-        </div>
+        <ErrorNote>{error}</ErrorNote>
       )}
 
       {/* A fetch the reader asked for takes the rows away at once, rather than
