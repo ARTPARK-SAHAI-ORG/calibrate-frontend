@@ -81,3 +81,21 @@ export function taskEvaluatorScoreCards<
       stat: stats[ev.evaluator_id]!,
     }));
 }
+
+/**
+ * The rows on the Human alignment overview. Across all tasks, an evaluator
+ * with no agreement and no kappa has nothing to show and is left out. The
+ * annotator row always stays, and one task keeps every evaluator linked to it.
+ */
+export function overviewRows<
+  T extends {
+    key: string;
+    current: number | null;
+    kappa: { kappa?: number | null };
+  },
+>(rows: T[], allTasks: boolean): T[] {
+  if (!allTasks) return rows;
+  return rows.filter(
+    (r) => r.key === "human_human" || r.current != null || r.kappa.kappa != null,
+  );
+}

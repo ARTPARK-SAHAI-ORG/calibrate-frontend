@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import { AgreementTrendChart } from "../AgreementTrendChart";
 
 // jsdom has no layout, so recharts' ResponsiveContainer is given a fixed size.
@@ -49,7 +49,8 @@ beforeAll(() => {
   };
 });
 
-it("shows the agreement line and its dashed kappa line in one legend", () => {
+it("shows agreement first and kappa on its own when picked", async () => {
+  const user = setupUser();
   const { container } = render(
     <AgreementTrendChart
       series={[
@@ -57,7 +58,7 @@ it("shows the agreement line and its dashed kappa line in one legend", () => {
           key: "hh",
           name: "Annotator agreement",
           kappaName: "Annotator agreement",
-          color: "#10b981",
+          color: "var(--chart-1)",
           points: [
             { key: "1", label: "Jan", agreement: 0.8, kappa: -0.5, kappa_type: "fleiss" },
             { key: "2", label: "Feb", agreement: 0.9, kappa: 0.5, kappa_type: "fleiss" },
@@ -66,15 +67,20 @@ it("shows the agreement line and its dashed kappa line in one legend", () => {
       ]}
     />,
   );
-  expect(screen.getByText("Annotator agreement")).toBeInTheDocument();
-  expect(
-    screen.getByText("Annotator agreement (Fleiss' kappa)"),
-  ).toBeInTheDocument();
-  // Each legend entry draws its line's own stroke, so the kappa entry is
-  // dashed and the agreement entry is solid.
+  const legend = () =>
+    [...container.querySelectorAll(".recharts-legend-item-text")].map(
+      (el) => el.textContent,
+    );
+  expect(screen.getByRole("button", { name: "Agreement" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(legend()).toEqual(["Annotator agreement"]);
+
+  await user.click(screen.getByRole("button", { name: "Kappa" }));
+  expect(legend()).toEqual(["Annotator agreement (Fleiss' kappa)"]);
   const icons = [...container.querySelectorAll(".recharts-legend-icon")];
   expect(icons.map((icon) => icon.getAttribute("stroke-dasharray"))).toEqual([
     null,
-    "5 4",
   ]);
 });

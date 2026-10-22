@@ -1,6 +1,7 @@
 import {
   hasReliabilityNumber,
   hasTaskOverviewData,
+  overviewRows,
   taskEvaluatorScoreCards,
 } from "../taskOverviewData";
 
@@ -165,5 +166,31 @@ describe("hasReliabilityNumber", () => {
       true,
     );
     expect(hasReliabilityNumber(null, [{ current: 0 }])).toBe(true);
+  });
+});
+
+describe("overviewRows", () => {
+  const rows = [
+    { key: "human_human", current: null, kappa: {} },
+    { key: "empty", current: null, kappa: { kappa: null } },
+    { key: "agreement-only", current: 0.8, kappa: {} },
+    { key: "kappa-only", current: null, kappa: { kappa: 0 } },
+  ];
+
+  it("leaves out evaluators with nothing to show across all tasks, but keeps the annotator row", () => {
+    expect(overviewRows(rows, true).map((r) => r.key)).toEqual([
+      "human_human",
+      "agreement-only",
+      "kappa-only",
+    ]);
+  });
+
+  it("keeps every evaluator on one task", () => {
+    expect(overviewRows(rows, false).map((r) => r.key)).toEqual([
+      "human_human",
+      "empty",
+      "agreement-only",
+      "kappa-only",
+    ]);
   });
 });

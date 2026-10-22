@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -11,11 +11,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { SegmentedFilter } from "@/components/ui";
 import {
   buildTrendChart,
   formatTrendValue,
   type TrendSeries,
 } from "@/lib/agreementKappa";
+
+const TICK = { fill: "var(--muted-foreground)" };
 
 export function AgreementTrendChart({
   series,
@@ -28,54 +31,68 @@ export function AgreementTrendChart({
   xAxisProps?: Omit<ComponentProps<typeof XAxis>, "dataKey">;
   dotRadius?: number;
 }) {
+  const [view, setView] = useState<"agreement" | "kappa">("agreement");
   const { data, lines, kappaDomain } = buildTrendChart(series);
   const hasKappa = lines.some((line) => line.kappa);
+  const showKappa = hasKappa && view === "kappa";
   return (
-    <div className={className}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="rgba(125,125,125,0.15)"
-          />
-          <XAxis dataKey="label" {...xAxisProps} />
-          <YAxis yAxisId="agreement" domain={[0, 100]} fontSize={11} unit="%" />
-          {hasKappa && (
+    <div>
+      {hasKappa && (
+        <SegmentedFilter
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "agreement", label: "Agreement" },
+            { value: "kappa", label: "Kappa" },
+          ]}
+          ariaLabel="Show agreement or kappa"
+          className="w-fit mb-3"
+        />
+      )}
+      <div className={className}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data}>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="rgba(125,125,125,0.15)"
+            />
+            <XAxis dataKey="label" tick={TICK} {...xAxisProps} />
             <YAxis
-              yAxisId="kappa"
-              orientation="right"
-              domain={kappaDomain}
+              domain={showKappa ? kappaDomain : [0, 100]}
+              unit={showKappa ? undefined : "%"}
               fontSize={11}
+              tick={TICK}
             />
-          )}
-          <Tooltip
-            contentStyle={{
-              background: "var(--background, #fff)",
-              border: "1px solid rgba(125,125,125,0.2)",
-              borderRadius: 8,
-              fontSize: 12,
-            }}
-            formatter={(value, _name, item) =>
-              formatTrendValue(value, item?.dataKey)
-            }
-          />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          {lines.map((line) => (
-            <Line
-              key={line.dataKey}
-              yAxisId={line.kappa ? "kappa" : "agreement"}
-              legendType="plainline"
-              type="monotone"
-              dataKey={line.dataKey}
-              name={line.name}
-              stroke={line.color}
-              strokeWidth={2}
-              strokeDasharray={line.kappa ? "5 4" : undefined}
-              dot={{ r: dotRadius }}
+            <Tooltip
+              contentStyle={{
+                background: "var(--popover)",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                fontSize: 12,
+              }}
+              labelStyle={{ color: "var(--foreground)" }}
+              formatter={(value, _name, item) =>
+                formatTrendValue(value, item?.dataKey)
+              }
             />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            {lines
+              .filter((line) => line.kappa === showKappa)
+              .map((line) => (
+                <Line
+                  key={line.dataKey}
+                  legendType="plainline"
+                  type="monotone"
+                  dataKey={line.dataKey}
+                  name={line.name}
+                  stroke={line.color}
+                  strokeWidth={2}
+                  dot={{ r: dotRadius, fill: "var(--background)" }}
+                />
+              ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

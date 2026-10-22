@@ -1903,7 +1903,7 @@ function AgreementTrendTab({
                 key: "agreement",
                 name: `${trend?.evaluator_name ?? "Evaluator"} agreement with annotators`,
                 kappaName: trend?.evaluator_name ?? "Evaluator",
-                color: "#3b82f6",
+                color: "var(--chart-2)",
                 points,
               },
             ]}

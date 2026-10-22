@@ -472,7 +472,7 @@ function AnnotatorDetailPageInner() {
                           name: "Agreement with other annotators",
                           kappaName: "Agreement with other annotators",
                           oneAgainstOthers: true,
-                          color: "#10b981",
+                          color: "var(--chart-1)",
                           points: series.map((p) => ({
                             ...p,
                             key: p.bucket_end,

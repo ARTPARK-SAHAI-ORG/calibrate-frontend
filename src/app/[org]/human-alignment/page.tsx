@@ -29,6 +29,7 @@ import { taskOptionsWithAgreement } from "./taskOptions";
 import { parseBackendTime } from "@/lib/relativeTime";
 import { kappaText, type KappaFields } from "@/lib/agreementKappa";
 import { KappaCell } from "@/components/human-labelling/KappaCell";
+import { overviewRows } from "@/lib/taskOverviewData";
 
 type Tab = "overview" | "tasks" | "annotators";
 
@@ -1241,13 +1242,13 @@ type SeriesRow = {
 };
 
 const EVAL_COLORS = [
-  "#3b82f6",
-  "#a855f7",
-  "#06b6d4",
-  "#ec4899",
-  "#f59e0b",
-  "#14b8a6",
-  "#6366f1",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
 ];
 
 type SortKey = "name" | "current";
@@ -1335,7 +1336,7 @@ function AgreementOverview({
     out.push({
       key: "human_human",
       name: "Annotator agreement",
-      color: "#10b981",
+      color: "var(--chart-1)",
       current: hh?.current ?? null,
       pairCount: hh?.pair_count ?? 0,
       series: hh?.series ?? [],
@@ -1353,7 +1354,7 @@ function AgreementOverview({
         kappa: ev,
       });
     });
-    return out;
+    return overviewRows(out, selectedTaskId === ALL_TASKS);
   })();
 
   const sorted = [...rows].sort((a, b) => {
