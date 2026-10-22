@@ -19,7 +19,7 @@ import { CreateLabellingTaskDialog } from "@/components/human-labelling/CreateLa
 import { EmptyState } from "@/components/ui/LoadingState";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
-import { StatCard } from "@/components/ui/StatCard";
+import { OverallAgreementCards } from "@/components/human-labelling/AgreementStatCard";
 import { useAccessToken } from "@/hooks";
 import { createAnnotator, renameAnnotator } from "@/lib/annotatorApi";
 import { apiClient, unwrapList } from "@/lib/api";
@@ -1376,28 +1376,10 @@ function AgreementOverview({
       ) : (
         <>
           <div className="flex flex-wrap items-stretch gap-3">
-            {(
-              [
-                ["Inter-annotator agreement", agreement?.human_human],
-                [
-                  "Evaluator agreement with humans",
-                  agreement?.evaluators_with_humans,
-                ],
-              ] as const
-            ).map(([label, group]) => (
-              <StatCard
-                key={label}
-                label={label}
-                value={
-                  group?.current != null
-                    ? `${Math.round(group.current * 100)}%`
-                    : "—"
-                }
-                valueClassName={
-                  group?.current != null ? "" : "text-muted-foreground"
-                }
-              />
-            ))}
+            <OverallAgreementCards
+              interAnnotator={agreement?.human_human}
+              withHumans={agreement?.evaluators_with_humans}
+            />
           </div>
 
           <AgreementOverviewTable

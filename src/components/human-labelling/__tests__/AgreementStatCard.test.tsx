@@ -566,18 +566,24 @@ describe("AgreementStatCard sections", () => {
 });
 
 describe("OverallAgreementCards", () => {
-  it("shows each overall number as its label and a neutral percentage only", () => {
+  it("shows each overall number as a small muted label over a large percentage, with no pill", () => {
     render(
       <OverallAgreementCards
         interAnnotator={{ current: 0.62 }}
         withHumans={{ current: null }}
       />
     );
-    expect(screen.getByText("Inter-annotator agreement")).toBeInTheDocument();
-    expect(screen.getByText("62%").className).toContain("text-foreground");
+    const label = screen.getByText("Inter-annotator agreement");
+    expect(label.className).toContain("uppercase");
+    expect(label.className).toContain("text-muted-foreground");
+    expect(label.className).not.toContain("rounded-md");
+    const number = screen.getByText("62%");
+    expect(number.className).toContain("text-2xl");
+    expect(number.className).not.toMatch(/text-(green|red|yellow)/);
+    expect(label.parentElement).toBe(number.parentElement);
     expect(
-      screen.getByText("Evaluator agreement with humans"),
-    ).toBeInTheDocument();
+      screen.getByText("Evaluator agreement with humans").className,
+    ).toContain("uppercase");
     expect(screen.getByText("—").className).toContain("text-muted-foreground");
     expect(screen.queryByText(/Kappa|Chance/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("agreement-fill")).not.toBeInTheDocument();

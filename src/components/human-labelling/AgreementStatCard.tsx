@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Tooltip } from "@/components/Tooltip";
+import { StatCard } from "@/components/ui/StatCard";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { type KappaFields } from "@/lib/agreementKappa";
@@ -414,8 +415,8 @@ export function AgreementStatCard(
   );
 }
 
-/** The two whole-workspace or whole-task numbers, each a label and a
- * percentage and nothing else. */
+/** The two whole-workspace or whole-task numbers, each a small label over a
+ * large percentage and nothing else. */
 export function OverallAgreementCards({
   interAnnotator,
   withHumans,
@@ -431,10 +432,17 @@ export function OverallAgreementCards({
           ["Evaluator agreement with humans", withHumans],
         ] as const
       ).map(([title, group]) => (
-        <AgreementStatCard
+        <StatCard
           key={title}
-          staticPillText={title}
-          agreement={group?.current}
+          label={title}
+          value={
+            group?.current != null
+              ? `${Math.round(group.current * 100)}%`
+              : "—"
+          }
+          valueClassName={
+            group?.current != null ? "" : "text-muted-foreground"
+          }
         />
       ))}
     </>
