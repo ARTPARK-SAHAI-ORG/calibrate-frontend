@@ -15,8 +15,10 @@ import {
   useSearchParams,
 } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
-import { agreementColor } from "@/components/human-labelling/AgreementStatCard";
-import { AgreementTrendChart } from "@/components/charts/AgreementTrendChart";
+import {
+  AgreementTrendChart,
+  TrendHoverBox,
+} from "@/components/charts/AgreementTrendChart";
 import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { EmptyState } from "@/components/ui/LoadingState";
@@ -28,9 +30,11 @@ import { useSidebarState } from "@/lib/sidebar";
 import { parseBackendTime } from "@/lib/relativeTime";
 import {
   annotatorTrendSeries,
+  type AnswerKind,
   type KappaByKind,
 } from "@/lib/agreementKappa";
-import { KappaByKindList } from "@/components/human-labelling/KappaCell";
+import { KappaCell } from "@/components/human-labelling/KappaCell";
+import { MeasureCell } from "@/components/human-labelling/AgreementOverviewTable";
 
 type Tab = "overview" | "jobs";
 
@@ -56,6 +60,8 @@ type AnnotatorStats = {
 };
 
 type Bucket = "week" | "month" | "year";
+
+const ANSWER_KINDS: AnswerKind[] = ["binary", "rating"];
 
 type AgreementSeriesPoint = {
   bucket_start: string;
@@ -235,10 +241,6 @@ function AnnotatorDetailPageInner() {
     }
   };
 
-  const formatPercent = (value: number | null | undefined): string => {
-    if (value == null) return "—";
-    return `${Math.round(value * 100)}%`;
-  };
 
 
   const jobsCount = stats?.jobs_count ?? jobs.length;
@@ -370,35 +372,6 @@ function AnnotatorDetailPageInner() {
               </div>
             )}
 
-            {/* Stat cards */}
-            <div className="flex flex-wrap items-stretch gap-3">
-              <StatCard
-                label="Latest agreement"
-                value={
-                  detailLoading ? "—" : formatPercent(stats?.current_agreement)
-                }
-                valueClassName={
-                  stats?.current_agreement == null
-                    ? ""
-                    : agreementColor(stats.current_agreement)
-                }
-              />
-              <StatCard
-                label="Latest kappa"
-                value={
-                  detailLoading ? (
-                    "—"
-                  ) : (
-                    <KappaByKindList kinds={stats?.kappa_by_kind} />
-                  )
-                }
-              />
-              <StatCard
-                label="Jobs"
-                value={detailLoading ? "—" : String(jobsCount)}
-              />
-            </div>
-
             {/* Trend chart */}
             {(() => {
               const series = trend?.series ?? [];
@@ -479,6 +452,44 @@ function AnnotatorDetailPageInner() {
                             trend?.bucket ?? DEFAULT_BUCKET,
                           ),
                       )}
+                      renderHover={(bucketEnd, label) => {
+                        const point = series.find(
+                          (p) => p.bucket_end === bucketEnd,
+                        );
+                        if (!point) return null;
+                        return (
+                          <TrendHoverBox label={label}>
+                            <MeasureCell
+                              group={{
+                                current: point.agreement,
+                                pair_count: point.pair_count,
+                              }}
+                              kappa={
+                                <span className="flex flex-col gap-0.5 text-xs text-muted-foreground tabular-nums">
+                                  {ANSWER_KINDS.map((kind) => {
+                                    const entry = point.kappa_by_kind?.find(
+                                      (k) => k.answer_kind === kind,
+                                    );
+                                    return (
+                                      <span
+                                        key={kind}
+                                        className="inline-flex items-center gap-1 whitespace-nowrap"
+                                      >
+                                        Kappa ({kind})
+                                        {entry ? (
+                                          <KappaCell fields={entry} />
+                                        ) : (
+                                          <span>—</span>
+                                        )}
+                                      </span>
+                                    );
+                                  })}
+                                </span>
+                              }
+                            />
+                          </TrendHoverBox>
+                        );
+                      }}
                     />
                   )}
                 </div>
@@ -650,27 +661,6 @@ function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  valueClassName = "",
-}: {
-  label: string;
-  value: ReactNode;
-  valueClassName?: string;
-}) {
-  return (
-    <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[160px]">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className={`text-2xl font-semibold tabular-nums ${valueClassName}`}>
-        {value}
-      </div>
     </div>
   );
 }

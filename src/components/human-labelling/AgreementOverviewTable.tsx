@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import {
@@ -109,8 +109,15 @@ function SortHeader({
 const DASH = <span className="text-sm text-muted-foreground">—</span>;
 
 /** One measure: the agreement and its kappa on one line, a chance bar under
- * them, or a muted dash when there is no agreement. */
-function MeasureCell({ group }: { group: AgreementGroup }) {
+ * them, or a muted dash when there is no agreement. `kappa` replaces the
+ * single kappa, for an annotator whose kappa comes one per kind of answer. */
+export function MeasureCell({
+  group,
+  kappa,
+}: {
+  group: AgreementGroup;
+  kappa?: ReactNode;
+}) {
   if (group.current == null) return DASH;
   return (
     <div className="min-w-0 w-full">
@@ -119,10 +126,12 @@ function MeasureCell({ group }: { group: AgreementGroup }) {
         <span className="text-sm font-semibold tabular-nums text-foreground">
           {Math.round(group.current * 100)}%
         </span>
-        <span className="inline-flex flex-wrap items-center gap-1 min-w-0 text-xs text-muted-foreground tabular-nums">
-          Kappa
-          <KappaCell fields={group} />
-        </span>
+        {kappa ?? (
+          <span className="inline-flex flex-wrap items-center gap-1 min-w-0 text-xs text-muted-foreground tabular-nums">
+            Kappa
+            <KappaCell fields={group} />
+          </span>
+        )}
       </div>
       <ChanceBar
         agreement={group.current}

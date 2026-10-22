@@ -85,6 +85,11 @@ export type TrendSeries = {
    * Falls back to `name`. */
   kappaName?: string;
   color: string;
+  /** Name the kappa line exactly `kappaName`, without its kind, and list it
+   * even before any point has a kappa. */
+  plainKappaLine?: boolean;
+  /** Colour of the kappa line when it differs from the agreement line. */
+  kappaColor?: string;
   /** `key` tells points apart, since two month buckets can share a label. */
   points: ({
     key: string;
@@ -139,11 +144,13 @@ export function buildTrendChart(series: TrendSeries[]): {
         kappa: false,
       });
     }
-    if (types.length > 0) {
+    if (types.length > 0 || s.plainKappaLine) {
       lines.push({
         dataKey: kappaKey,
-        name: `${s.kappaName ?? s.name} (${types.map((t) => kappaLabel(t)).join(" or ")})`,
-        color: s.color,
+        name: s.plainKappaLine
+          ? (s.kappaName ?? s.name)
+          : `${s.kappaName ?? s.name} (${types.map((t) => kappaLabel(t)).join(" or ")})`,
+        color: s.kappaColor ?? s.color,
         kappa: true,
       });
     }

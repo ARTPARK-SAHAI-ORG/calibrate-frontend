@@ -14,7 +14,11 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
-import { AgreementTrendChart } from "@/components/charts/AgreementTrendChart";
+import {
+  AgreementTrendChart,
+  TrendHoverBox,
+} from "@/components/charts/AgreementTrendChart";
+import { MeasureCell } from "@/components/human-labelling/AgreementOverviewTable";
 import { Tooltip } from "@/components/Tooltip";
 import type { KappaFields } from "@/lib/agreementKappa";
 import { NotFoundState, InfoNote } from "@/components/ui";
@@ -1898,15 +1902,40 @@ function AgreementTrendTab({
               ),
               height: 44,
             }}
+            bothAxes
             series={[
               {
                 key: "agreement",
-                name: `${trend?.evaluator_name ?? "Evaluator"} agreement with humans`,
-                kappaName: trend?.evaluator_name ?? "Evaluator",
+                name: "Agreement",
+                kappaName: "Kappa",
+                plainKappaLine: true,
                 color: "var(--chart-2)",
+                kappaColor: "var(--chart-1)",
                 points,
               },
             ]}
+            renderHover={(versionId, label) => {
+              const version = trend?.versions.find(
+                (v) => v.version_id === versionId,
+              );
+              if (!version) return null;
+              return (
+                <TrendHoverBox
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      {label}
+                      {version.is_live && (
+                        <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400 leading-none flex-shrink-0">
+                          Live
+                        </span>
+                      )}
+                    </span>
+                  }
+                >
+                  <MeasureCell group={version} />
+                </TrendHoverBox>
+              );
+            }}
           />
         </div>
       )}
