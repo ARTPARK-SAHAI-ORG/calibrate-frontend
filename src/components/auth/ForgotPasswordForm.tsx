@@ -63,7 +63,7 @@ export function ForgotPasswordForm() {
   if (sentTo) {
     return (
       <AuthCard title="Check your email">
-        <p className="text-center text-gray-600">
+        <p className="text-gray-600">
           If an account exists for {sentTo}, we sent a link to reset your
           password. The link works for 1 hour.
         </p>

@@ -121,7 +121,7 @@ export function VerifyEmail() {
   if (state.kind === "sent") {
     return (
       <AuthCard title="Verification email sent" icon={<SentTick />}>
-        <p className="text-center text-gray-600">
+        <p className="text-gray-600">
           We sent a new link to {state.email}. Click it to verify your email,
           then you can sign in.
         </p>
@@ -139,7 +139,7 @@ export function VerifyEmail() {
           }}
           className="space-y-6"
         >
-          <p className="text-center text-gray-600">{EXPIRED}</p>
+          <p className="text-gray-600">{EXPIRED}</p>
           {resendError && <div className={AUTH_ERROR_CLASS}>{resendError}</div>}
           {/* A link sent before links carried the address has to ask for it */}
           {!linkHasEmail && (
@@ -169,7 +169,7 @@ export function VerifyEmail() {
   return (
     <AuthCard title="Verify your email">
       <div className="space-y-6">
-        <p className="text-center text-gray-600">
+        <p className="text-gray-600">
           {state.kind === "verified" ? "Your email is already verified." : state.message}
         </p>
         {signIn}

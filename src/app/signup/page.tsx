@@ -215,7 +215,7 @@ export default function SignupPage() {
                 <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-4">
                   Check your email
                 </h1>
-                <p className="text-gray-600">
+                <p className="text-left text-gray-600">
                   {verificationSent.alreadyPending
                     ? `This email already has an account that is not verified yet. We sent a link to ${verificationSent.email}. Click it to verify your email, then you can sign in.`
                     : `We sent a link to ${verificationSent.email}. Click it to verify your email, then you can sign in.`}

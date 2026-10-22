@@ -69,7 +69,7 @@ export function ResetPasswordForm() {
     return (
       <AuthCard title="Reset password">
         <div className="space-y-6">
-          <p className="text-center text-gray-600">
+          <p className="text-gray-600">
             This link has expired or was already used.
           </p>
           <Link
