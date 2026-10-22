@@ -40,14 +40,6 @@ export function kappaBlank(
   return KAPPA_BLANK_REASONS[fields.kappa_blank_reason] ?? null;
 }
 
-/** The kappa to two places, the reason it is missing, or null. */
-export function kappaValue(
-  fields: KappaFields | null | undefined,
-): string | null {
-  if (fields?.kappa != null) return formatKappa(fields.kappa);
-  return kappaBlank(fields)?.text ?? null;
-}
-
 const KAPPA_LABELS: Record<KappaType, string> = {
   fleiss: "Fleiss' kappa",
   linear_weighted_fleiss: "Linear weighted Fleiss' kappa",
@@ -73,18 +65,6 @@ export function kappaLabel(
 export function formatKappa(kappa: number): string {
   const text = kappa.toFixed(2);
   return text === "-0.00" ? "0.00" : text;
-}
-
-/** "Fleiss' kappa 0.42", "Fleiss' kappa: Too few items", or null when there
- * is nothing to show. */
-export function kappaText(
-  fields: KappaFields | null | undefined,
-  oneAgainstOthers = false,
-): string | null {
-  const value = kappaValue(fields);
-  if (value == null) return null;
-  const label = kappaLabel(fields?.kappa_type, oneAgainstOthers);
-  return fields?.kappa == null ? `${label}: ${value}` : `${label} ${value}`;
 }
 
 export type TrendSeries = {

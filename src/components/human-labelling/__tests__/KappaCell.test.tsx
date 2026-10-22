@@ -1,5 +1,5 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { KappaCell } from "../KappaCell";
+import { KappaCell, KappaValue } from "../KappaCell";
 
 describe("KappaCell", () => {
   it("shows only the kappa, with its kind on hover of the info icon", async () => {
@@ -35,7 +35,7 @@ describe("KappaCell", () => {
       "Every answer was the same, so chance alone would also agree every time and kappa cannot be worked out",
     ],
   ] as const)(
-    "says why there is no kappa when the reason is %s",
+    "shows a pill saying why there is no kappa when the reason is %s",
     async (reason, text, help) => {
       const user = setupUser();
       render(
@@ -43,14 +43,11 @@ describe("KappaCell", () => {
           fields={{ kappa: null, kappa_type: null, kappa_blank_reason: reason }}
         />,
       );
-      expect(screen.getByText(text).className).toContain(
-        "text-muted-foreground",
-      );
+      expect(screen.getByText(text).className).toContain("rounded-md");
       expect(screen.queryByText("—")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
       expect(screen.queryByText(help)).not.toBeInTheDocument();
-      await user.hover(
-        screen.getByRole("button", { name: "Why there is no kappa" }),
-      );
+      await user.hover(screen.getByText(text));
       expect(await screen.findByText(help)).toBeInTheDocument();
     },
   );
@@ -63,5 +60,24 @@ describe("KappaCell", () => {
     );
     expect(screen.getByText("—")).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("shows a muted dash and no pill when KappaValue has no kappa and no reason", () => {
+    render(<KappaValue fields={{ kappa: null, kappa_blank_reason: null }} />);
+    expect(screen.getByText("—").className).toContain("text-muted-foreground");
+  });
+
+  it("shows the number or the pill in KappaValue", () => {
+    const { rerender } = render(<KappaValue fields={{ kappa: 0.123 }} />);
+    expect(screen.getByText("0.12")).toBeInTheDocument();
+    rerender(
+      <KappaValue
+        fields={{ kappa: null, kappa_blank_reason: "too_few_items" }}
+      />,
+    );
+    expect(screen.getByText("Too few items").className).toContain(
+      "rounded-md",
+    );
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
 });

@@ -327,12 +327,12 @@ describe("AgreementStatCard", () => {
         kappa={{ kappa: -0.125, kappa_type: "linear_weighted_fleiss" }}
       />,
     );
-    // The agreement number keeps the bare look it has on a card with no
-    // kappa, so a row of cards reads the same.
-    expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
+    // Agreement and kappa sit side by side, each named, at the same size.
+    expect(screen.getByText("Agreement")).toBeInTheDocument();
     expect(screen.getByText("82%").className).toContain("text-2xl");
-    expect(screen.getByText("-0.13")).toBeInTheDocument();
-    await user.hover(screen.getByText("Linear weighted Fleiss' kappa"));
+    expect(screen.getByText("-0.13").className).toContain("text-2xl");
+    expect(screen.getByText("Linear weighted Fleiss' kappa")).toBeInTheDocument();
+    await user.hover(screen.getByRole("button", { name: "What kappa means" }));
     expect(
       await screen.findByText(/0 means no better than chance/),
     ).toBeInTheDocument();
@@ -347,13 +347,33 @@ describe("AgreementStatCard", () => {
         kappa={{ kappa: 0.5, kappa_type: "cohen" }}
       />,
     );
-    expect(screen.getByText("Score")).toBeInTheDocument();
-    expect(screen.getByText("Human agreement")).toBeInTheDocument();
-    expect(screen.getByText("Cohen's kappa")).toBeInTheDocument();
-    expect(screen.getByText("0.50")).toBeInTheDocument();
+    const text = document.body.textContent!;
+    expect(text.indexOf("Score")).toBeLessThan(text.indexOf("Human agreement"));
+    expect(text.indexOf("Human agreement")).toBeLessThan(
+      text.indexOf("Cohen's kappa"),
+    );
+    expect(screen.getByText("0.50").className).toContain("text-2xl");
   });
 
-  it("shows nothing for kappa when there is none", () => {
+  it("shows the reason pill as the third number next to the score", () => {
+    render(
+      <AgreementStatCard
+        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
+        value="90%"
+        result={{ label: "Score", value: "75%", ratio: 0.75 }}
+        kappa={{
+          kappa: null,
+          kappa_type: "cohen",
+          kappa_blank_reason: "too_few_items",
+        }}
+      />,
+    );
+    expect(screen.getByText("Cohen's kappa")).toBeInTheDocument();
+    expect(screen.getByText("Too few items")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+  });
+
+  it("shows a big muted dash and no pill when there is no kappa and no reason", () => {
     render(
       <AgreementStatCard
         staticPillText="Annotator agreement"
@@ -361,11 +381,21 @@ describe("AgreementStatCard", () => {
         kappa={{ kappa: null, kappa_type: null }}
       />,
     );
-    expect(screen.queryByText(/kappa/i)).not.toBeInTheDocument();
-    expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
+    expect(screen.getByText("Kappa")).toBeInTheDocument();
+    const dash = screen.getByText("—");
+    expect(dash.className).toContain("text-muted-foreground");
+    expect(dash.parentElement!.className).toContain("text-2xl");
+    expect(screen.queryByText("Too few items")).not.toBeInTheDocument();
+    expect(screen.queryByText("Everyone agreed")).not.toBeInTheDocument();
   });
 
-  it("says why there is no kappa in the place of the number", async () => {
+  it("keeps the old look on a card given no kappa at all", () => {
+    render(<AgreementStatCard staticPillText="Annotator agreement" value="82%" />);
+    expect(screen.queryByText(/kappa/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Agreement")).not.toBeInTheDocument();
+  });
+
+  it("shows a pill saying why there is no kappa in the place of the number", async () => {
     const user = setupUser();
     render(
       <AgreementStatCard
@@ -380,9 +410,10 @@ describe("AgreementStatCard", () => {
     );
     expect(screen.getByText("Fleiss' kappa")).toBeInTheDocument();
     expect(screen.getByText("Everyone agreed").className).toContain(
-      "text-muted-foreground",
+      "rounded-md",
     );
-    await user.hover(screen.getByText("Fleiss' kappa"));
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    await user.hover(screen.getByText("Everyone agreed"));
     expect(
       await screen.findByText(
         "Every answer was the same, so chance alone would also agree every time and kappa cannot be worked out",

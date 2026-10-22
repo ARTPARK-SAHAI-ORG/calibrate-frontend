@@ -5,8 +5,6 @@ import {
   KAPPA_HELP,
   kappaBlank,
   kappaLabel,
-  kappaText,
-  kappaValue,
   type TrendSeries,
 } from "../agreementKappa";
 
@@ -33,9 +31,6 @@ describe("kappaLabel", () => {
       "Cohen's kappa, linear weighted for ratings",
     );
     expect(kappaLabel("cohen", true)).toBe("Cohen's kappa");
-    expect(kappaText({ kappa: 0.3, kappa_type: "mixed" }, true)).toBe(
-      "Cohen's kappa, linear weighted for ratings 0.30",
-    );
   });
 
   it("falls back to a plain name when the kind is missing", () => {
@@ -60,34 +55,7 @@ it("says what a kappa below 0 means", () => {
   expect(KAPPA_HELP).toMatch(/below 0 means worse than chance/);
 });
 
-describe("kappaText", () => {
-  it("names the kind and shows two decimals", () => {
-    expect(kappaText({ kappa: 0.4, kappa_type: "cohen" })).toBe(
-      "Cohen's kappa 0.40",
-    );
-  });
-
-  it("says why there is no kappa after the kind", () => {
-    expect(
-      kappaText({
-        kappa: null,
-        kappa_type: "cohen",
-        kappa_blank_reason: "everyone_agreed",
-      }),
-    ).toBe("Cohen's kappa: Everyone agreed");
-    expect(
-      kappaText({ kappa: null, kappa_blank_reason: "too_few_items" }),
-    ).toBe("Kappa: Too few items");
-  });
-
-  it("is null when there is no kappa", () => {
-    expect(kappaText({ kappa: null, kappa_type: null })).toBeNull();
-    expect(kappaText({})).toBeNull();
-    expect(kappaText(undefined)).toBeNull();
-  });
-});
-
-describe("kappaBlank and kappaValue", () => {
+describe("kappaBlank", () => {
   it("gives the short text and the hover sentence for each reason", () => {
     expect(
       kappaBlank({ kappa: null, kappa_blank_reason: "too_few_items" }),
@@ -101,9 +69,6 @@ describe("kappaBlank and kappaValue", () => {
       text: "Everyone agreed",
       help: "Every answer was the same, so chance alone would also agree every time and kappa cannot be worked out",
     });
-    expect(
-      kappaValue({ kappa: null, kappa_blank_reason: "too_few_items" }),
-    ).toBe("Too few items");
   });
 
   it("has no reason when there is a kappa or no reason was sent", () => {
@@ -113,8 +78,6 @@ describe("kappaBlank and kappaValue", () => {
     expect(kappaBlank({ kappa: null, kappa_blank_reason: null })).toBeNull();
     expect(kappaBlank({})).toBeNull();
     expect(kappaBlank(undefined)).toBeNull();
-    expect(kappaValue({ kappa: 0.2 })).toBe("0.20");
-    expect(kappaValue({ kappa: null })).toBeNull();
   });
 });
 

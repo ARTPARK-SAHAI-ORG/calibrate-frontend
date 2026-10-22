@@ -25,7 +25,8 @@ import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { parseBackendTime } from "@/lib/relativeTime";
-import { kappaLabel, kappaValue, type KappaFields } from "@/lib/agreementKappa";
+import { kappaLabel, type KappaFields } from "@/lib/agreementKappa";
+import { KappaValue } from "@/components/human-labelling/KappaCell";
 
 type Tab = "overview" | "jobs";
 
@@ -378,13 +379,10 @@ function AnnotatorDetailPageInner() {
                 }
                 valueClassName={agreementColor(stats?.current_agreement)}
               />
-              {!detailLoading && kappaValue(stats) != null && (
+              {!detailLoading && stats && (
                 <StatCard
-                  label={`Latest ${kappaLabel(stats?.kappa_type, true)}`}
-                  value={kappaValue(stats)!}
-                  valueClassName={
-                    stats?.kappa == null ? "text-muted-foreground" : ""
-                  }
+                  label={`Latest ${kappaLabel(stats.kappa_type, true)}`}
+                  value={<KappaValue fields={stats} />}
                 />
               )}
               <StatCard
@@ -663,7 +661,7 @@ function StatCard({
   valueClassName = "",
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   valueClassName?: string;
 }) {
   return (

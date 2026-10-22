@@ -27,8 +27,11 @@ import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { taskOptionsWithAgreement } from "./taskOptions";
 import { parseBackendTime } from "@/lib/relativeTime";
-import { kappaText, type KappaFields } from "@/lib/agreementKappa";
-import { KappaCell } from "@/components/human-labelling/KappaCell";
+import { kappaLabel, type KappaFields } from "@/lib/agreementKappa";
+import {
+  KappaCell,
+  KappaValue,
+} from "@/components/human-labelling/KappaCell";
 import { overviewRows } from "@/lib/taskOverviewData";
 
 type Tab = "overview" | "tasks" | "annotators";
@@ -1041,7 +1044,7 @@ function HumanLabellingPageInner() {
                             {annotator.name}
                           </p>
                         )}
-                        <p className="text-xs text-muted-foreground">
+                        <div className="text-xs text-muted-foreground">
                           {annotator.jobs_count ?? 0} job
                           {(annotator.jobs_count ?? 0) === 1 ? "" : "s"}
                           {" · "}
@@ -1052,13 +1055,10 @@ function HumanLabellingPageInner() {
                               ? `${Math.round(agreement * 100)}% agreement`
                               : "No agreement yet"}
                           </span>
-                          {kappaText(annotator, true) && (
-                            <>
-                              {" · "}
-                              {kappaText(annotator, true)}
-                            </>
-                          )}
-                        </p>
+                          {" · "}
+                          {kappaLabel(annotator.kappa_type, true)}{" "}
+                          <KappaValue fields={annotator} />
+                        </div>
                       </>
                     );
                     return (
@@ -1597,11 +1597,10 @@ function AgreementOverview({
                       ? `${Math.round(row.current * 100)}%`
                       : "—"}
                   </span>
-                  {kappaText(row.kappa) && (
-                    <span className="text-xs text-muted-foreground">
-                      {kappaText(row.kappa)}
-                    </span>
-                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {kappaLabel(row.kappa.kappa_type)}{" "}
+                    <KappaValue fields={row.kappa} />
+                  </span>
                 </div>
               </div>
             ))}

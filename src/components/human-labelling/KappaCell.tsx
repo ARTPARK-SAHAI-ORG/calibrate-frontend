@@ -6,7 +6,16 @@ import {
   type KappaFields,
 } from "@/lib/agreementKappa";
 
-function InfoIcon({ content, label }: { content: string; label: string }) {
+export const agreementStatPillBase =
+  "inline-flex items-center max-w-full min-w-0 px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground";
+
+export function KappaInfoIcon({
+  content,
+  label,
+}: {
+  content: string;
+  label: string;
+}) {
   return (
     <Tooltip content={content}>
       <button
@@ -32,7 +41,31 @@ function InfoIcon({ content, label }: { content: string; label: string }) {
   );
 }
 
-/** A table cell: the kappa with its kind on hover, why there is none, or a dash. */
+/** Why there is no kappa, as a pill that explains itself on hover. */
+function KappaReasonPill({ blank }: { blank: { text: string; help: string } }) {
+  return (
+    <Tooltip content={blank.help} className="inline-block align-middle">
+      <span className={`${agreementStatPillBase} cursor-default`}>
+        {blank.text}
+      </span>
+    </Tooltip>
+  );
+}
+
+/** The kappa to two places, the pill saying why there is none, or a muted dash. */
+export function KappaValue({
+  fields,
+}: {
+  fields: KappaFields | null | undefined;
+}) {
+  if (fields?.kappa != null) return <>{formatKappa(fields.kappa)}</>;
+  const blank = kappaBlank(fields);
+  if (blank) return <KappaReasonPill blank={blank} />;
+  return <span className="text-muted-foreground">—</span>;
+}
+
+/** A table cell: the kappa with its kind on hover, the pill saying why there
+ * is none, or a dash. */
 export function KappaCell({
   fields,
   oneAgainstOthers = false,
@@ -44,7 +77,7 @@ export function KappaCell({
     return (
       <div className="flex items-center gap-1.5">
         {formatKappa(fields.kappa)}
-        <InfoIcon
+        <KappaInfoIcon
           content={kappaLabel(fields.kappa_type, oneAgainstOthers)}
           label="Kind of kappa"
         />
@@ -52,11 +85,6 @@ export function KappaCell({
     );
   }
   const blank = kappaBlank(fields);
-  if (!blank) return <span>—</span>;
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-muted-foreground">{blank.text}</span>
-      <InfoIcon content={blank.help} label="Why there is no kappa" />
-    </div>
-  );
+  if (blank) return <KappaReasonPill blank={blank} />;
+  return <span>—</span>;
 }

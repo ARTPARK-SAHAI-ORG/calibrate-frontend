@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import {
   KAPPA_HELP,
-  kappaBlank,
   kappaLabel,
-  kappaValue,
   type KappaFields,
 } from "@/lib/agreementKappa";
+import {
+  agreementStatPillBase,
+  KappaInfoIcon,
+  KappaValue,
+} from "@/components/human-labelling/KappaCell";
 
 export function agreementColor(v: number | null | undefined): string {
   if (v == null) return "text-muted-foreground";
@@ -19,9 +22,6 @@ export function agreementColor(v: number | null | undefined): string {
   if (pct <= 50) return "text-red-600 dark:text-red-400";
   return "text-yellow-600 dark:text-yellow-400";
 }
-
-const agreementStatPillBase =
-  "inline-flex items-center max-w-full min-w-0 px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground";
 
 /** Evaluator name pills should show in full (wrap / grow); avoid min-w-0 + truncate. */
 const evaluatorAgreementPillLink =
@@ -34,8 +34,8 @@ function Stat({
   valueClassName = "",
   title,
 }: {
-  label: string;
-  value: string;
+  label: ReactNode;
+  value: ReactNode;
   valueClassName?: string;
   title?: string;
 }) {
@@ -158,15 +158,18 @@ export function AgreementStatCard(
       {result ? result.value : (value ?? "—")}
     </div>
   );
-  const kappaShown = kappaValue(kappa);
-  const kappaBlankReason = kappaBlank(kappa);
   const kappaStat =
-    value != null && kappaShown != null ? (
+    value != null && kappa != null ? (
       <Stat
-        label={kappaLabel(kappa?.kappa_type)}
-        value={kappaShown}
-        valueClassName={kappaBlankReason ? "text-muted-foreground" : ""}
-        title={kappaBlankReason?.help ?? KAPPA_HELP}
+        label={
+          <span className="inline-flex items-center gap-0.5">
+            {kappaLabel(kappa.kappa_type)}
+            <span className="-my-1 inline-flex">
+              <KappaInfoIcon content={KAPPA_HELP} label="What kappa means" />
+            </span>
+          </span>
+        }
+        value={<KappaValue fields={kappa} />}
       />
     ) : null;
   const warningMark = warning ? (
@@ -262,9 +265,12 @@ export function AgreementStatCard(
             {kappaStat}
           </div>
         ) : !result && kappaStat ? (
-          // Same bare number as a card with no kappa, so a row of cards reads alike.
-          <div className="flex items-end gap-6">
-            {singleNumber}
+          <div className="mt-2 flex items-start gap-6">
+            <Stat
+              label="Agreement"
+              value={value}
+              valueClassName={valueClassName}
+            />
             {kappaStat}
           </div>
         ) : result?.title ? (
