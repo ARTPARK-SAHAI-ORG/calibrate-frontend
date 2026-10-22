@@ -140,6 +140,17 @@ describe("ManageEvaluatorsDialog", () => {
     expect(screen.getAllByText("Made just now").length).toBeGreaterThan(0);
   });
 
+  it("stays open while the new evaluator form is clicked", async () => {
+    const user = setupUser();
+    const { onClose } = renderDialog({ taskType: "llm" });
+    await waitForCatalogueLoaded();
+
+    await user.click(screen.getByRole("button", { name: "New evaluator" }));
+    await user.click(screen.getByTestId("create-evaluator-types"));
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("initializes selection/order from currentEvaluatorIds and shows the count", async () => {
     renderDialog();
     expect(screen.getByText("2 selected")).toBeInTheDocument();

@@ -278,8 +278,10 @@ export function ManageEvaluatorsDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={() => {
-        if (!saving) onClose();
+      onClick={(e) => {
+        // The new evaluator form renders inside this element, so its clicks
+        // bubble here too; only a click on the dark area itself closes.
+        if (e.target === e.currentTarget && !saving) onClose();
       }}
     >
       <div
