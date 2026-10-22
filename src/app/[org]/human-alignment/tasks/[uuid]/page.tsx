@@ -66,11 +66,9 @@ import {
 } from "@/components/human-labelling/JobsCreatedDialog";
 import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvaluatorsDialog";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
+import { TaskAgreementOverview } from "@/components/human-labelling/AgreementOverviewTable";
 import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
-import {
-  ScoreReliabilityCards,
-  type EvaluatorResultStat,
-} from "@/components/human-labelling/AgreementStatCard";
+import type { EvaluatorResultStat } from "@/components/human-labelling/AgreementStatCard";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
@@ -2942,8 +2940,8 @@ function LabellingTaskPageInner() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    How closely annotators agree with each other, and how
-                    closely each evaluator aligns with humans
+                    How often annotators agree with each other, and how often
+                    each evaluator agrees with them
                   </p>
                   {evaluatorsWithoutHumanLabels.length > 0 && (
                     <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2 mt-3">
@@ -2963,7 +2961,7 @@ function LabellingTaskPageInner() {
                       <span>{humanLabelNote}</span>
                     </div>
                   )}
-                  {/* Every linked evaluator has a card here, the tool-call one
+                  {/* Every linked evaluator has a row here, the tool-call one
                       included: its inter-annotator agreement is a real
                       number even though no evaluator judges it, so this
                       reads `agreement.evaluators`, not `judgedEvaluators`. */}
@@ -2971,7 +2969,12 @@ function LabellingTaskPageInner() {
                     agreement.human_human,
                     agreement.evaluators ?? [],
                   ) && (
-                    <ScoreReliabilityCards agreement={agreement} />
+                    <div className="mt-3">
+                      <TaskAgreementOverview
+                        agreement={agreement}
+                        onOpenEvaluator={setPreviewEvaluator}
+                      />
+                    </div>
                   )}
                 </section>
               </div>

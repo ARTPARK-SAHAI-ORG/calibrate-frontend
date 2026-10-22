@@ -1,6 +1,9 @@
 import { render, screen, setupUser, within } from "@/test-utils";
 import { buildOverviewRows } from "@/lib/taskOverviewData";
-import { AgreementOverviewTable } from "../AgreementOverviewTable";
+import {
+  AgreementOverviewTable,
+  TaskAgreementOverview,
+} from "../AgreementOverviewTable";
 
 const rows = buildOverviewRows([
   {
@@ -199,6 +202,96 @@ describe("AgreementOverviewTable", () => {
     expect(
       screen.queryByText("Agreement expected by chance alone"),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("TaskAgreementOverview", () => {
+  const agreement = {
+    human_human: { current: 0.7, pair_count: 6 },
+    evaluators_with_humans: { current: 0.85, pair_count: 8 },
+    evaluators: [
+      {
+        evaluator_id: "ev-low",
+        name: "Clarity",
+        current: 0.4,
+        pair_count: 2,
+        kappa: 0.1,
+        kappa_type: "cohen" as const,
+        chance_agreement: 0.5,
+      },
+      {
+        evaluator_id: "ev-tool",
+        name: "Tool call correctness",
+        current: null,
+        pair_count: 0,
+        inter_annotator: { current: 0.9, pair_count: 3 },
+      },
+      {
+        evaluator_id: "ev-high",
+        name: "Tone",
+        current: 0.95,
+        pair_count: 4,
+        kappa: 0.8,
+        kappa_type: "cohen" as const,
+        chance_agreement: 0.5,
+      },
+      { evaluator_id: "ev-empty", name: "Brevity", current: null, pair_count: 0 },
+    ],
+  };
+  const rowNames = () =>
+    [...table().querySelectorAll(".grid")]
+      .slice(1)
+      .map((r) => within(r as HTMLElement).getAllByRole("button")[0].textContent);
+
+  it("shows the two overall cards, the legend and a row for every linked evaluator", () => {
+    render(
+      <TaskAgreementOverview agreement={agreement} onOpenEvaluator={jest.fn()} />,
+    );
+    const pill = screen
+      .getAllByText("Inter-annotator agreement")
+      .find((el) => el.closest("span.rounded-md"))!;
+    expect(pill.closest(".rounded-lg")).toHaveTextContent(
+      "Inter-annotator agreement70%",
+    );
+    expect(screen.getByText("85%")).toBeInTheDocument();
+    expect(screen.getByText("Better than chance")).toBeInTheDocument();
+    // Highest agreement with humans first; the ones with none sit last.
+    expect(rowNames()).toEqual([
+      "Tone",
+      "Clarity",
+      "Tool call correctness",
+      "Brevity",
+    ]);
+  });
+
+  it("sorts by the clicked column and opens an evaluator", async () => {
+    const user = setupUser();
+    const onOpen = jest.fn();
+    render(
+      <TaskAgreementOverview agreement={agreement} onOpenEvaluator={onOpen} />,
+    );
+    await user.click(
+      within(table()).getByRole("button", {
+        name: /^Evaluator agreement with humans$/,
+      }),
+    );
+    expect(rowNames()).toEqual([
+      "Clarity",
+      "Tone",
+      "Tool call correctness",
+      "Brevity",
+    ]);
+    await user.click(
+      within(table()).getByRole("button", { name: /^Evaluator$/ }),
+    );
+    expect(rowNames()).toEqual([
+      "Brevity",
+      "Clarity",
+      "Tone",
+      "Tool call correctness",
+    ]);
+    await user.click(within(table()).getByRole("button", { name: "Tone" }));
+    expect(onOpen).toHaveBeenCalledWith({ uuid: "ev-high", name: "Tone" });
   });
 });
 

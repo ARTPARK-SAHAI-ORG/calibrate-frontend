@@ -3,7 +3,6 @@ import { render, screen, setupUser, waitFor } from "@/test-utils";
 import {
   AgreementStatCard,
   OverallAgreementCards,
-  ScoreReliabilityCards,
   agreementColor,
 } from "../AgreementStatCard";
 import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
@@ -508,63 +507,6 @@ describe("AgreementStatCard agreement bar", () => {
   });
 });
 
-describe("AgreementStatCard sections", () => {
-  it("shows both titled sections, each with its own bar against chance", () => {
-    render(
-      <AgreementStatCard
-        evaluatorPill={{ uuid: "ev-1", name: "Tone" }}
-        showAlignmentLabel={false}
-        sections={[
-          {
-            title: "Inter-annotator agreement",
-            agreement: 0.7,
-            kappa: { kappa: 0.4, kappa_type: "cohen", chance_agreement: 0.5 },
-          },
-          {
-            title: "Evaluator agreement with humans",
-            agreement: 0.4,
-            kappa: { kappa: -0.1, kappa_type: "cohen", chance_agreement: 0.45 },
-          },
-        ]}
-      />
-    );
-    expect(screen.getByText("Inter-annotator agreement")).toBeInTheDocument();
-    expect(
-      screen.getByText("Evaluator agreement with humans"),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("alignment")).not.toBeInTheDocument();
-    const fills = screen.getAllByTestId("agreement-fill");
-    expect(fills.map((f) => f.style.width)).toEqual(["70%", "40%"]);
-    expect(fills[0].className).toContain("bg-green-500");
-    expect(fills[1].className).toContain("bg-red-500");
-    expect(
-      screen.getAllByTestId("chance-tick").map((t) => t.style.left),
-    ).toEqual(["50%", "45%"]);
-    expect(screen.getByText("70%").className).toContain("text-foreground");
-    expect(screen.getByText("Chance 45%")).toBeInTheDocument();
-    expect(screen.getByText("0.40")).toBeInTheDocument();
-    expect(screen.getByText("-0.10")).toBeInTheDocument();
-  });
-
-  it("shows a muted dash and no bar for a section with no agreement", () => {
-    render(
-      <AgreementStatCard
-        evaluatorPill={{ uuid: "ev-1", name: "Tone" }}
-        sections={[
-          { title: "Inter-annotator agreement", agreement: null, kappa: null },
-          {
-            title: "Evaluator agreement with humans",
-            agreement: 0.9,
-            kappa: { kappa: 0.5, kappa_type: "cohen", chance_agreement: 0.6 },
-          },
-        ]}
-      />
-    );
-    expect(screen.getByText("—").className).toContain("text-muted-foreground");
-    expect(screen.getAllByTestId("agreement-fill")).toHaveLength(1);
-  });
-});
-
 describe("OverallAgreementCards", () => {
   it("draws each overall number as a pill label over a large neutral percentage", () => {
     render(
@@ -604,74 +546,3 @@ describe("OverallAgreementCards", () => {
     );
   });
 });
-
-describe("ScoreReliabilityCards", () => {
-  it("gives every evaluator it is handed a card, even one no evaluator judges", () => {
-    render(
-      <ScoreReliabilityCards
-        agreement={{
-          human_human: { current: 0.7 },
-          evaluators_with_humans: { current: 0.8 },
-          evaluators: [
-            {
-              evaluator_id: "ev-1",
-              name: "Tone",
-              current: 0.8,
-              kappa: 0.5,
-              kappa_type: "cohen",
-              inter_annotator: { current: 0.6, kappa: 0.3, kappa_type: "cohen" },
-            },
-            {
-              evaluator_id: "ev-tool",
-              name: "Tool call correctness",
-              current: null,
-              inter_annotator: { current: 0.9, kappa: 0.7, kappa_type: "cohen" },
-            },
-          ],
-        }}
-      />
-    );
-    expect(screen.getByRole("button", { name: /Tone/ })).toBeInTheDocument();
-    const tool = screen
-      .getByRole("button", { name: /Tool call correctness/ })
-      .closest(".rounded-lg") as HTMLElement;
-    expect(tool).toHaveTextContent("Inter-annotator agreement90%");
-    expect(tool).toHaveTextContent("Evaluator agreement with humans—");
-    // The two overall cards come first, then one card per evaluator.
-    expect(screen.getAllByText("Inter-annotator agreement")).toHaveLength(3);
-  });
-});
-
-describe("ScoreReliabilityCards legend", () => {
-  const ev = (current: number | null) => ({
-    evaluator_id: "ev-1",
-    name: "Tone",
-    current,
-    inter_annotator: { current: null },
-  });
-
-  it("shows the legend above the cards when a card has a bar", () => {
-    render(
-      <ScoreReliabilityCards
-        agreement={{ human_human: { current: 0.7 }, evaluators: [ev(0.8)] }}
-      />
-    );
-    for (const text of [
-      "Agreement expected by chance alone",
-      "Better than chance",
-      "Worse than chance",
-      "Same as chance, or cannot be compared",
-    ])
-      expect(screen.getByText(text)).toBeInTheDocument();
-  });
-
-  it("has no legend when no card has a bar", () => {
-    render(
-      <ScoreReliabilityCards
-        agreement={{ human_human: { current: 0.7 }, evaluators: [ev(null)] }}
-      />
-    );
-    expect(screen.queryByText("Better than chance")).not.toBeInTheDocument();
-  });
-});
-

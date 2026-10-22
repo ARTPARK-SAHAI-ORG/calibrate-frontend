@@ -1,13 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import {
   ChanceBar,
   ChanceLegend,
+  OverallAgreementCards,
 } from "@/components/human-labelling/AgreementStatCard";
 import { KappaCell } from "@/components/human-labelling/KappaCell";
-import type { AgreementGroup, OverviewRow } from "@/lib/taskOverviewData";
+import {
+  buildOverviewRows,
+  sortOverviewRows,
+  type AgreementGroup,
+  type EvaluatorAgreement,
+  type OverviewRow,
+} from "@/lib/taskOverviewData";
 
 export type OverviewSortKey = "name" | "interAnnotator" | "withHumans";
 type SortDirection = "asc" | "desc";
@@ -226,3 +234,53 @@ export function AgreementOverviewTable({
     </>
   );
 }
+
+/**
+ * One task's agreement, laid out like the Overview tab: the two overall
+ * numbers, then every linked evaluator in the sortable table, each listed
+ * even with nothing to show.
+ */
+export function TaskAgreementOverview({
+  agreement,
+  onOpenEvaluator,
+}: {
+  agreement: {
+    human_human?: { current: number | null } | null;
+    evaluators_with_humans?: { current: number | null } | null;
+    evaluators?: EvaluatorAgreement[];
+  };
+  onOpenEvaluator: (evaluator: { uuid: string; name: string }) => void;
+}) {
+  const [sortKey, setSortKey] = useState<OverviewSortKey>("withHumans");
+  const [sortDir, setSortDir] = useState<SortDirection>("desc");
+  const handleSort = (key: OverviewSortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "name" ? "asc" : "desc");
+    }
+  };
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-stretch gap-3">
+        <OverallAgreementCards
+          interAnnotator={agreement.human_human}
+          withHumans={agreement.evaluators_with_humans}
+        />
+      </div>
+      <AgreementOverviewTable
+        rows={sortOverviewRows(
+          buildOverviewRows(agreement.evaluators ?? []),
+          sortKey,
+          sortDir,
+        )}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={handleSort}
+        onOpenEvaluator={onOpenEvaluator}
+      />
+    </div>
+  );
+}
+
