@@ -106,6 +106,10 @@ describe("AgreementOverviewTable", () => {
 
     const inter = cells(tableRow("Tone"))[1];
     expect(inter).toHaveTextContent("40%KappaToo few items");
+    // The line wraps in a narrow column instead of spilling into the next.
+    expect(within(inter).getByText("40%").parentElement!.className).toContain(
+      "flex-wrap",
+    );
     expect(within(inter).getByTestId("agreement-fill").className).toContain(
       "bg-red-500",
     );
@@ -174,7 +178,7 @@ describe("AgreementOverviewTable", () => {
       "Agreement expected by chance alone",
       "Better than chance",
       "Worse than chance",
-      "Cannot be compared with chance",
+      "Same as chance, or cannot be compared",
     ])
       expect(screen.getByText(text)).toBeInTheDocument();
   });

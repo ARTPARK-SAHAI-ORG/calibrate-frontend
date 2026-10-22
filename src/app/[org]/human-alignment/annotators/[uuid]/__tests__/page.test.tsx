@@ -67,6 +67,17 @@ it("shows the Latest kappa card with a dash while the annotator loads", () => {
   expect(within(kappaCard()).getByText("—")).toBeInTheDocument();
 });
 
+it("colours the latest agreement, and leaves its dash in the default colour", async () => {
+  render(<AnnotatorDetailPage />);
+  const agreementCard = () =>
+    screen.getByText("Latest agreement").parentElement as HTMLElement;
+  expect(within(agreementCard()).getByText("—").className).not.toContain(
+    "text-muted-foreground",
+  );
+  resolveDetail(detail([]));
+  expect(await screen.findByText("80%")).toHaveClass("text-green-600");
+});
+
 it("shows one kappa per kind of answer once loaded", async () => {
   render(<AnnotatorDetailPage />);
   resolveDetail(

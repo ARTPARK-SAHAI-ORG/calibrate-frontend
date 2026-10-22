@@ -111,7 +111,7 @@ export function ChanceLegend({ className = "" }: { className?: string }) {
     ["Better than chance", <span key="g" className={`${SWATCH} bg-green-500`} />],
     ["Worse than chance", <span key="r" className={`${SWATCH} bg-red-500`} />],
     [
-      "Cannot be compared with chance",
+      "Same as chance, or cannot be compared",
       <span key="m" className={`${SWATCH} bg-muted-foreground`} />,
     ],
   ];
@@ -158,8 +158,9 @@ function AgreementBar({
 
 /** The evaluator's own summarised result across the run's items. */
 export type EvaluatorResultStat = {
-  /** What the number is, e.g. the "true" label or "Average score". */
-  label: string;
+  /** What the number is, e.g. the "true" label or "Average score". Only
+   * read where the card names the score. */
+  label?: string;
   value: string;
   /** Hover text, e.g. "8 of 10 items". */
   title?: string;
@@ -424,16 +425,17 @@ export function OverallAgreementCards({
         <AgreementStatCard
           key={title}
           staticPillText={title}
-          result={{
-            label: title,
-            value:
-              group?.current != null
-                ? `${Math.round(group.current * 100)}%`
-                : "—",
-            ratio: group?.current ?? null,
-          }}
+          // With no number there is no result, so the card shows the same
+          // muted dash every other empty number does.
+          result={
+            group?.current != null
+              ? {
+                  value: `${Math.round(group.current * 100)}%`,
+                  ratio: group.current,
+                }
+              : null
+          }
           showResultLabel={false}
-          showAlignmentLabel={false}
         />
       ))}
     </>

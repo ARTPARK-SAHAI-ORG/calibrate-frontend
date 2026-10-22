@@ -11,7 +11,7 @@ import {
 export const agreementStatPillBase =
   "inline-flex items-center max-w-full min-w-0 px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground";
 
-/** An (i) button whose hover or focus shows `content`, which is also its
+/** An (i) button whose hover shows `content`, which is also its
  * name for a screen reader. */
 export function KappaInfoIcon({ content }: { content: string }) {
   return (

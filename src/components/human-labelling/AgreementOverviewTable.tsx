@@ -105,11 +105,12 @@ function MeasureCell({ group }: { group: AgreementGroup }) {
   if (group.current == null) return DASH;
   return (
     <div className="min-w-0 w-full">
-      <div className="flex items-center justify-between gap-3">
+      {/* Wraps in a narrow column rather than spilling into the next one. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <span className="text-sm font-semibold tabular-nums text-foreground">
           {Math.round(group.current * 100)}%
         </span>
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
+        <span className="inline-flex flex-wrap items-center gap-1 min-w-0 text-xs text-muted-foreground tabular-nums">
           Kappa
           <KappaCell fields={group} />
         </span>

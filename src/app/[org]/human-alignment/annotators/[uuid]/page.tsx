@@ -15,6 +15,7 @@ import {
   useSearchParams,
 } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
+import { agreementColor } from "@/components/human-labelling/AgreementStatCard";
 import { AgreementTrendChart } from "@/components/charts/AgreementTrendChart";
 import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
@@ -239,13 +240,6 @@ function AnnotatorDetailPageInner() {
     return `${Math.round(value * 100)}%`;
   };
 
-  const agreementColor = (value: number | null | undefined): string => {
-    if (value == null) return "";
-    const pct = value * 100;
-    if (pct >= 75) return "text-green-600 dark:text-green-400";
-    if (pct <= 50) return "text-red-600 dark:text-red-400";
-    return "text-yellow-600 dark:text-yellow-400";
-  };
 
   const jobsCount = stats?.jobs_count ?? jobs.length;
 
@@ -383,7 +377,11 @@ function AnnotatorDetailPageInner() {
                 value={
                   detailLoading ? "—" : formatPercent(stats?.current_agreement)
                 }
-                valueClassName={agreementColor(stats?.current_agreement)}
+                valueClassName={
+                  stats?.current_agreement == null
+                    ? ""
+                    : agreementColor(stats.current_agreement)
+                }
               />
               <StatCard
                 label="Latest kappa"

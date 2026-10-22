@@ -137,3 +137,34 @@ export function buildOverviewRows(
     interAnnotator: ev.inter_annotator ?? EMPTY_GROUP,
   }));
 }
+
+/**
+ * The overview rows in the reader's chosen order. Evaluators of the same type
+ * sit together, typed groups first. Within a group, a row with no agreement
+ * goes last whichever way the column is sorted, since a missing number is
+ * neither high nor low.
+ */
+export function sortOverviewRows<
+  T extends OverviewRow & { evaluatorType?: string },
+>(
+  rows: readonly T[],
+  sortKey: "name" | "interAnnotator" | "withHumans",
+  sortDir: "asc" | "desc",
+): T[] {
+  const dir = sortDir === "desc" ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const aType = a.evaluatorType ?? "";
+    const bType = b.evaluatorType ?? "";
+    if (aType !== bType) {
+      if (!aType) return 1;
+      if (!bType) return -1;
+      return aType.localeCompare(bType);
+    }
+    if (sortKey === "name") return dir * a.name.localeCompare(b.name);
+    const x = a[sortKey].current;
+    const y = b[sortKey].current;
+    if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;
+    return dir * (x - y);
+  });
+}
+

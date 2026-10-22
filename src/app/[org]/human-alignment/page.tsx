@@ -41,6 +41,7 @@ import {
 import {
   buildOverviewRows,
   overviewRows,
+  sortOverviewRows,
   type AgreementGroup,
   type EvaluatorAgreement,
   type OverviewRow,
@@ -1300,28 +1301,7 @@ function AgreementOverview({
       )
     : [];
 
-  const sorted = [...rows].sort((a, b) => {
-    // Group evaluators by type so all of the same type sit together.
-    // Rows missing a type sort after typed groups; within a group the
-    // user's chosen sort applies.
-    const aType = a.evaluatorType ?? "";
-    const bType = b.evaluatorType ?? "";
-    if (aType !== bType) {
-      if (!aType) return 1;
-      if (!bType) return -1;
-      return aType.localeCompare(bType);
-    }
-
-    const dir = sortDir === "desc" ? -1 : 1;
-    const cmp = (x: number | null, y: number | null) => {
-      if (x == null && y == null) return 0;
-      if (x == null) return 1; // nulls last
-      if (y == null) return -1;
-      return x === y ? 0 : x < y ? -1 : 1;
-    };
-    if (sortKey === "name") return dir * a.name.localeCompare(b.name);
-    return dir * cmp(a[sortKey].current, b[sortKey].current);
-  });
+  const sorted = sortOverviewRows(rows, sortKey, sortDir);
 
   const handleSort = (key: OverviewSortKey) => {
     if (sortKey === key) {

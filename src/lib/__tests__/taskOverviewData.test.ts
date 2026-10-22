@@ -3,6 +3,7 @@ import {
   hasTaskOverviewData,
   buildOverviewRows,
   overviewRows,
+  sortOverviewRows,
   taskEvaluatorScoreCards,
 } from "../taskOverviewData";
 
@@ -240,4 +241,58 @@ describe("buildOverviewRows", () => {
   });
 });
 
+describe("sortOverviewRows", () => {
+  const row = (key: string, withHumans: number | null, type?: string) => ({
+    key,
+    name: key,
+    kind: null,
+    withHumans: { current: withHumans, pair_count: 0 },
+    interAnnotator: { current: null, pair_count: 0 },
+    evaluatorType: type,
+  });
+  const rows = [row("b", 0.4), row("none", null), row("a", 0.9), row("c", 0.6)];
+  const keys = (sorted: { key: string }[]) => sorted.map((r) => r.key);
+
+  it("puts a row with no agreement last when sorting highest first", () => {
+    expect(keys(sortOverviewRows(rows, "withHumans", "desc"))).toEqual([
+      "a",
+      "c",
+      "b",
+      "none",
+    ]);
+  });
+
+  it("puts a row with no agreement last when sorting lowest first", () => {
+    expect(keys(sortOverviewRows(rows, "withHumans", "asc"))).toEqual([
+      "b",
+      "c",
+      "a",
+      "none",
+    ]);
+  });
+
+  it("keeps evaluators of one type together, typed groups first", () => {
+    const mixed = [row("x", 0.9), row("y", 0.1, "stt"), row("z", 0.5, "llm")];
+    expect(keys(sortOverviewRows(mixed, "withHumans", "desc"))).toEqual([
+      "z",
+      "y",
+      "x",
+    ]);
+  });
+
+  it("sorts by name in both directions", () => {
+    expect(keys(sortOverviewRows(rows, "name", "asc"))).toEqual([
+      "a",
+      "b",
+      "c",
+      "none",
+    ]);
+    expect(keys(sortOverviewRows(rows, "name", "desc"))).toEqual([
+      "none",
+      "c",
+      "b",
+      "a",
+    ]);
+  });
+});
 

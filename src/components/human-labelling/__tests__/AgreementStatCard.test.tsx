@@ -583,7 +583,7 @@ describe("OverallAgreementCards", () => {
     expect(number.className).toContain("text-2xl");
     expect(number.className).toContain(agreementColor(0.82));
     expect(screen.getByText("Evaluator agreement with humans")).toBeInTheDocument();
-    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.getByText("—").className).toContain("text-muted-foreground");
     expect(screen.queryByText(/Kappa|Chance/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("agreement-fill")).not.toBeInTheDocument();
   });
@@ -655,7 +655,7 @@ describe("ScoreReliabilityCards legend", () => {
       "Agreement expected by chance alone",
       "Better than chance",
       "Worse than chance",
-      "Cannot be compared with chance",
+      "Same as chance, or cannot be compared",
     ])
       expect(screen.getByText(text)).toBeInTheDocument();
   });
