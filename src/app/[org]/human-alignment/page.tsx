@@ -28,6 +28,7 @@ import { useSidebarState } from "@/lib/sidebar";
 import { taskOptionsWithAgreement } from "./taskOptions";
 import { parseBackendTime } from "@/lib/relativeTime";
 import { kappaText, type KappaFields } from "@/lib/agreementKappa";
+import { KappaCell } from "@/components/human-labelling/KappaCell";
 
 type Tab = "overview" | "tasks" | "annotators";
 
@@ -799,7 +800,7 @@ function HumanLabellingPageInner() {
                       : "hidden md:block"
                   } border border-border rounded-xl overflow-hidden`}
                 >
-                  <div className="grid grid-cols-[minmax(0,1fr)_120px_180px_88px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
+                  <div className="grid grid-cols-[minmax(0,1fr)_120px_140px_240px_88px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
                     <div className="text-sm font-medium text-muted-foreground">
                       Name
                     </div>
@@ -808,6 +809,9 @@ function HumanLabellingPageInner() {
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">
                       Current agreement
+                    </div>
+                    <div className="text-sm font-medium text-muted-foreground">
+                      Kappa
                     </div>
                     <div />
                   </div>
@@ -831,7 +835,7 @@ function HumanLabellingPageInner() {
                     return (
                       <div
                         key={annotator.uuid}
-                        className={`grid grid-cols-[minmax(0,1fr)_120px_180px_88px] gap-4 px-4 border-b border-border last:border-b-0 transition-colors items-stretch ${
+                        className={`grid grid-cols-[minmax(0,1fr)_120px_140px_240px_88px] gap-4 px-4 border-b border-border last:border-b-0 transition-colors items-stretch ${
                           isEditing ? "bg-muted/20" : "hover:bg-muted/20"
                         }`}
                       >
@@ -880,12 +884,11 @@ function HumanLabellingPageInner() {
                             {agreement != null
                               ? `${Math.round(agreement * 100)}%`
                               : "—"}
-                            {kappaText(annotator, true) && (
-                              <span className="block text-xs font-normal text-muted-foreground">
-                                {kappaText(annotator, true)}
-                              </span>
-                            )}
                           </span>,
+                        )}
+                        {cell(
+                          "flex items-center py-3 text-sm font-semibold tabular-nums text-foreground",
+                          <KappaCell fields={annotator} oneAgainstOthers />,
                         )}
                         <div className="flex items-center justify-end gap-1">
                           {isEditing ? (
@@ -1496,7 +1499,7 @@ function AgreementOverview({
 
           {/* Desktop table */}
           <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-4 px-4 py-2 border-b border-border bg-muted/30 items-center">
               <SortHeader
                 label="Name"
                 active={sortKey === "name"}
@@ -1509,11 +1512,14 @@ function AgreementOverview({
                 dir={sortDir}
                 onClick={() => handleSort("current")}
               />
+              <div className="text-sm font-medium text-muted-foreground">
+                Kappa
+              </div>
             </div>
             {sorted.map((row) => (
               <div
                 key={row.key}
-                className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 px-4 py-3 border-b border-border last:border-b-0 items-center"
+                className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-4 px-4 py-3 border-b border-border last:border-b-0 items-center"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   {row.key === "human_human" ? (
@@ -1544,11 +1550,9 @@ function AgreementOverview({
                   {row.current != null
                     ? `${Math.round(row.current * 100)}%`
                     : "—"}
-                  {kappaText(row.kappa) && (
-                    <span className="block text-xs font-normal text-muted-foreground">
-                      {kappaText(row.kappa)}
-                    </span>
-                  )}
+                </div>
+                <div className="text-sm font-semibold tabular-nums text-foreground">
+                  <KappaCell fields={row.kappa} />
                 </div>
               </div>
             ))}
