@@ -1058,7 +1058,22 @@ describe("AgentDetail", () => {
     );
     await clickLastSaveButton(user);
     await waitFor(() =>
-      expect(alertSpy).toHaveBeenCalledWith("Failed to save agent"),
+      expect(alertSpy).toHaveBeenCalledWith(
+        "Something went wrong on our end. Please try again in a moment.",
+      ),
+    );
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      jsonResponse(
+        { detail: "agent_url must not point to localhost" },
+        { ok: false, status: 400 },
+      ),
+    );
+    await clickLastSaveButton(user);
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith(
+        "This URL points to a private or internal network address. Use a public URL that can be reached from the internet.",
+      ),
     );
 
     (global.fetch as jest.Mock).mockResolvedValueOnce(

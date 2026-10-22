@@ -17,7 +17,11 @@ import {
 } from "@/components/ui";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { useAccessToken, useAgentDeletion } from "@/hooks";
-import { readNameConflictMessage } from "@/lib/parseBackendError";
+import {
+  parseBackendErrorResponse,
+  readNameConflictMessage,
+} from "@/lib/parseBackendError";
+import { friendlyUrlError } from "@/lib/urlErrorMessage";
 
 type Agent = {
   uuid: string;
@@ -832,7 +836,11 @@ function NewAgentDialog({
           setStep(1);
           return;
         }
-        throw new Error("Failed to create agent");
+        throw new Error(
+          friendlyUrlError(
+            await parseBackendErrorResponse(response, "Error creating agent"),
+          ),
+        );
       }
 
       const data = await response.json();
