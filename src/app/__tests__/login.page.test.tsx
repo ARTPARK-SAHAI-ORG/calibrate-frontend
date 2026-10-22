@@ -21,7 +21,7 @@ describe("LoginPage", () => {
 
     expect(
       await screen.findByText(
-        "Your email is not confirmed yet. We sent a link to asha@example.com. Click it, then sign in.",
+        "Your email is not verified yet. We sent a verification link to asha@example.com. Verify to sign in!",
       ),
     ).toBeInTheDocument();
     expect(localStorage.getItem("access_token")).toBeNull();
