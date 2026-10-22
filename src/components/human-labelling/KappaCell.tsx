@@ -13,7 +13,7 @@ export const agreementStatPillBase =
 
 /** An (i) button whose hover or focus shows `content`, which is also its
  * name for a screen reader. */
-function KappaInfoIcon({ content }: { content: string }) {
+export function KappaInfoIcon({ content }: { content: string }) {
   return (
     <Tooltip content={content}>
       <button

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   Suspense,
   useEffect,
   useState,
@@ -25,8 +26,14 @@ import { createAnnotator, renameAnnotator } from "@/lib/annotatorApi";
 import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { taskOptionsWithAgreement } from "./taskOptions";
-import { type KappaByKind } from "@/lib/agreementKappa";
-import { KappaByKindList } from "@/components/human-labelling/KappaCell";
+import {
+  type AnswerKind,
+  type KappaByKind,
+} from "@/lib/agreementKappa";
+import {
+  KappaCell,
+  KappaInfoIcon,
+} from "@/components/human-labelling/KappaCell";
 import {
   AgreementOverviewTable,
   type OverviewSortKey,
@@ -114,15 +121,23 @@ const ALL_TASKS = "all";
 
 const taskHref = (uuid: string) => `/human-alignment/tasks/${uuid}`;
 
-function agreementColor(fraction: number | null | undefined): string {
-  if (fraction == null) return "";
-  const pct = fraction * 100;
-  if (pct >= 75) return "text-green-600 dark:text-green-400";
-  if (pct <= 50) return "text-red-600 dark:text-red-400";
-  return "text-yellow-600 dark:text-yellow-400";
-}
-
 const TABS: Tab[] = ["overview", "tasks", "annotators"];
+
+const ANNOTATOR_GRID =
+  "grid grid-cols-[minmax(0,1fr)_80px_170px_minmax(0,1fr)_minmax(0,1fr)_88px] gap-4 px-4";
+const ANSWER_KINDS: AnswerKind[] = ["binary", "rating"];
+const KIND_KAPPA_COLUMNS: Record<AnswerKind, { title: string; help: string }> =
+  {
+    binary: {
+      title: "Kappa (binary)",
+      help: "Agreement with the other annotators on pass or fail answers, after removing what chance alone would produce. 1 is full agreement, 0 is no better than chance, below 0 is worse than chance",
+    },
+    rating: {
+      title: "Kappa (rating)",
+      help: "Agreement with the other annotators on rating answers, after removing what chance alone would produce. Close ratings get partial credit. 1 is full agreement, 0 is no better than chance, below 0 is worse than chance",
+    },
+  };
+const MUTED_DASH = <span className="text-sm text-muted-foreground">—</span>;
 
 function isTab(value: string | null): value is Tab {
   return !!value && (TABS as string[]).includes(value);
@@ -776,19 +791,28 @@ function HumanLabellingPageInner() {
                       : "hidden md:block"
                   } border border-border rounded-xl overflow-hidden`}
                 >
-                  <div className="grid grid-cols-[minmax(0,1fr)_120px_140px_240px_88px] gap-4 px-4 py-2 border-b border-border bg-muted/30">
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Name
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Jobs
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Current agreement
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      Kappa
-                    </div>
+                  <div
+                    className={`${ANNOTATOR_GRID} py-2 border-b border-border bg-muted/30 items-center`}
+                  >
+                    {["Name", "Jobs", "Agreement with others"].map(
+                      (heading) => (
+                        <div
+                          key={heading}
+                          className="text-sm font-medium text-muted-foreground"
+                        >
+                          {heading}
+                        </div>
+                      ),
+                    )}
+                    {ANSWER_KINDS.map((kind) => (
+                      <div
+                        key={kind}
+                        className="flex items-center gap-1 text-sm font-medium text-muted-foreground"
+                      >
+                        {KIND_KAPPA_COLUMNS[kind].title}
+                        <KappaInfoIcon content={KIND_KAPPA_COLUMNS[kind].help} />
+                      </div>
+                    ))}
                     <div />
                   </div>
                   {visibleAnnotators.map((annotator) => {
@@ -811,7 +835,7 @@ function HumanLabellingPageInner() {
                     return (
                       <div
                         key={annotator.uuid}
-                        className={`grid grid-cols-[minmax(0,1fr)_120px_140px_240px_88px] gap-4 px-4 border-b border-border last:border-b-0 transition-colors items-stretch ${
+                        className={`${ANNOTATOR_GRID} min-h-12 border-b border-border last:border-b-0 transition-colors items-stretch ${
                           isEditing ? "bg-muted/20" : "hover:bg-muted/20"
                         }`}
                       >
@@ -855,17 +879,30 @@ function HumanLabellingPageInner() {
                           annotator.jobs_count ?? 0,
                         )}
                         {cell(
-                          `flex items-center py-3 text-sm font-semibold tabular-nums ${agreementColor(agreement)}`,
-                          <span>
-                            {agreement != null
-                              ? `${Math.round(agreement * 100)}%`
-                              : "—"}
-                          </span>,
-                        )}
-                        {cell(
                           "flex items-center py-3 text-sm font-semibold tabular-nums text-foreground",
-                          <KappaByKindList kinds={annotator.kappa_by_kind} />,
+                          agreement != null ? (
+                            <span>{Math.round(agreement * 100)}%</span>
+                          ) : (
+                            MUTED_DASH
+                          ),
                         )}
+                        {ANSWER_KINDS.map((kind) => {
+                          const entry = annotator.kappa_by_kind?.find(
+                            (k) => k.answer_kind === kind,
+                          );
+                          return (
+                            <Fragment key={kind}>
+                              {cell(
+                                "flex items-center py-3 text-sm font-semibold tabular-nums text-foreground whitespace-nowrap",
+                                entry ? (
+                                  <KappaCell fields={entry} />
+                                ) : (
+                                  MUTED_DASH
+                                ),
+                              )}
+                            </Fragment>
+                          );
+                        })}
                         <div className="flex items-center justify-end gap-1">
                           {isEditing ? (
                             <>
@@ -1020,17 +1057,29 @@ function HumanLabellingPageInner() {
                           {annotator.jobs_count ?? 0} job
                           {(annotator.jobs_count ?? 0) === 1 ? "" : "s"}
                           {" · "}
-                          <span
-                            className={`font-semibold tabular-nums ${agreementColor(agreement)}`}
-                          >
-                            {agreement != null
-                              ? `${Math.round(agreement * 100)}% agreement`
-                              : "No agreement yet"}
-                          </span>
-                          {" · "}
-                          Kappa{" "}
-                          <KappaByKindList kinds={annotator.kappa_by_kind} />
+                          {agreement != null ? (
+                            <span className="font-semibold tabular-nums text-foreground">
+                              {Math.round(agreement * 100)}% agreement with
+                              others
+                            </span>
+                          ) : (
+                            "No agreement yet"
+                          )}
                         </div>
+                        {ANSWER_KINDS.map((kind) => {
+                          const entry = annotator.kappa_by_kind?.find(
+                            (k) => k.answer_kind === kind,
+                          );
+                          return (
+                            <div
+                              key={kind}
+                              className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap"
+                            >
+                              {KIND_KAPPA_COLUMNS[kind].title}{" "}
+                              {entry ? <KappaCell fields={entry} /> : "—"}
+                            </div>
+                          );
+                        })}
                       </>
                     );
                     return (

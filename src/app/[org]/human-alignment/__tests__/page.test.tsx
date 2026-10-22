@@ -3,13 +3,15 @@
  * title, and the table of evaluators. The page chrome is stubbed.
  */
 import React from "react";
-import { render, screen } from "@/test-utils";
+import { render, screen, within } from "@/test-utils";
+
+let mockTab = "overview";
 
 jest.mock("next/navigation", () => ({
   __esModule: true,
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   usePathname: () => "/human-alignment",
-  useSearchParams: () => new URLSearchParams("tab=overview"),
+  useSearchParams: () => new URLSearchParams(`tab=${mockTab}`),
   useParams: () => ({}),
   redirect: jest.fn(),
   notFound: jest.fn(),
@@ -41,10 +43,44 @@ const AGREEMENT = {
   ],
 };
 
+const ANNOTATORS = [
+  {
+    uuid: "a-1",
+    name: "Asha",
+    jobs_count: 3,
+    current_agreement: 0.42,
+    kappa_by_kind: [
+      { answer_kind: "binary", kappa: 0.31, kappa_type: "cohen" },
+    ],
+  },
+  {
+    uuid: "a-2",
+    name: "Bilal",
+    jobs_count: 1,
+    current_agreement: 0.9,
+    kappa_by_kind: [
+      {
+        answer_kind: "rating",
+        kappa: null,
+        kappa_type: "linear_weighted_cohen",
+        kappa_blank_reason: "everyone_agreed",
+      },
+    ],
+  },
+  { uuid: "a-3", name: "Chen", jobs_count: 0, current_agreement: null },
+  { uuid: "a-4", name: "Dana", jobs_count: 0, current_agreement: null },
+];
+
 jest.mock("../../../../lib/api", () => ({
   ...jest.requireActual("../../../../lib/api"),
   apiClient: (endpoint: string) =>
-    Promise.resolve(endpoint.startsWith("/annotation-agreement") ? AGREEMENT : []),
+    Promise.resolve(
+      endpoint.startsWith("/annotation-agreement")
+        ? AGREEMENT
+        : endpoint === "/annotators"
+          ? ANNOTATORS
+          : [],
+    ),
 }));
 
 import HumanLabellingPage from "../page";
@@ -73,3 +109,95 @@ it("shows the overall numbers like the score cards, and the plain-words subtitle
   expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "Tone" }).length).toBeGreaterThan(0);
 });
+
+describe("the Annotators tab", () => {
+  beforeEach(() => {
+    mockTab = "annotators";
+  });
+  afterEach(() => {
+    mockTab = "overview";
+  });
+
+  // The table and the cards are both on the page; the screen width picks one.
+  const table = () =>
+    screen
+      .getByText("Agreement with others")
+      .closest(".md\\:block") as HTMLElement;
+  const row = (name: string) =>
+    within(table()).getByText(name).closest(".grid") as HTMLElement;
+  const cells = (el: HTMLElement) =>
+    [...el.children].map((c) => c as HTMLElement);
+
+  it("has a column for agreement and one kappa column per kind of answer", async () => {
+    render(<HumanLabellingPage />);
+    await screen.findAllByText("Asha");
+    const header = cells(
+      screen.getByText("Agreement with others").parentElement as HTMLElement,
+    ).map((c) => c.textContent);
+    // Each kappa heading says what it measures on hover of its (i).
+    expect(
+      screen.getByRole("button", {
+        name: /^Agreement with the other annotators on pass or fail answers/,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Close ratings get partial credit/ }),
+    ).toBeInTheDocument();
+    expect(header).toEqual([
+      "Name",
+      "Jobs",
+      "Agreement with others",
+      "Kappa (binary)",
+      "Kappa (rating)",
+      "",
+    ]);
+  });
+
+  it("shows agreement in a neutral colour and each kappa on one line", async () => {
+    render(<HumanLabellingPage />);
+    await screen.findAllByText("Asha");
+    const asha = cells(row("Asha"));
+    // Rows keep one height whether a cell holds a number, a pill or a dash.
+    expect(row("Asha").className).toContain("min-h-12");
+    expect(asha[2].textContent).toBe("42%");
+    expect(asha[2].className).toContain("text-foreground");
+    expect(asha[2].className).not.toMatch(/text-(green|red|yellow)/);
+    expect(asha[3].textContent).toBe("0.31");
+    expect(asha[3].className).toContain("whitespace-nowrap");
+    // No rating kappa for Asha, so a muted dash.
+    expect(within(asha[4]).getByText("—").className).toContain(
+      "text-muted-foreground",
+    );
+    const bilal = cells(row("Bilal"));
+    expect(within(bilal[3]).getByText("—")).toBeInTheDocument();
+    expect(bilal[4].textContent).toBe("Everyone agreed");
+    expect(bilal[4].className).toContain("whitespace-nowrap");
+  });
+
+  it("shows every annotator as a normal row, including ones with nothing compared", async () => {
+    render(<HumanLabellingPage />);
+    await screen.findAllByText("Asha");
+    const chen = cells(row("Chen"));
+    expect(chen[2].textContent).toBe("—");
+    expect(chen[3].textContent).toBe("—");
+    expect(chen[4].textContent).toBe("—");
+    expect(within(table()).getByText("Dana")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/have not labelled anything yet/),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show" })).not.toBeInTheDocument();
+  });
+
+  it("names the kappa columns on the cards the same way", async () => {
+    render(<HumanLabellingPage />);
+    await screen.findAllByText("Asha");
+    const card = screen
+      .getAllByText("Asha")
+      .find((el) => !table().contains(el))!
+      .closest(".rounded-xl") as HTMLElement;
+    expect(card).toHaveTextContent("Kappa (binary) 0.31");
+    expect(card).toHaveTextContent("Kappa (rating) —");
+    expect(card).toHaveTextContent("42% agreement with others");
+  });
+});
+
