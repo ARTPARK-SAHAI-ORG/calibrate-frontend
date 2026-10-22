@@ -6,6 +6,7 @@ import {
   isWorkspaceFreePath,
 } from "@/lib/orgs";
 import { clearOrgsCache } from "@/hooks/useOrganizations";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/reportError";
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -135,7 +136,7 @@ export async function apiClient<T>(
     // Sign out via NextAuth, remembering the page they were on so signing in
     // again brings them back to it.
     await signOut({ callbackUrl: loginPathAfterSignOut() });
-    throw new Error("Unauthorized - session expired");
+    throw new Error(SESSION_EXPIRED_MESSAGE);
   }
 
   // Handle non-2xx responses

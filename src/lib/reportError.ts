@@ -1,5 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 
+export const SESSION_EXPIRED_MESSAGE = "Unauthorized - session expired";
+
 /**
  * Report an error to Sentry — the single place catch blocks should funnel
  * failures through instead of `console.error`.
@@ -21,6 +23,8 @@ export function reportError(message: string, ...details: unknown[]): void {
   // Prefer a real Error from the args as the captured exception so Sentry
   // keeps the original stack trace; otherwise synthesize one from the message.
   const error = details.find((d) => d instanceof Error);
+  // The user has already been sent to sign in; nothing went wrong.
+  if (error?.message === SESSION_EXPIRED_MESSAGE) return;
   Sentry.captureException(error ?? new Error(message), {
     extra: { message, details },
   });
