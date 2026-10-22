@@ -384,7 +384,54 @@ describe("AddToolDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "Add tool" }));
 
-    expect(await screen.findByText("Failed to create tool")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Something went wrong on our end. Please try again in a moment.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the backend's reason at the top of the form and scrolls up to it", async () => {
+    const user = setupUser();
+    const scrollTo = window.HTMLElement.prototype.scrollTo as jest.Mock;
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      clone() {
+        return this;
+      },
+      json: async () => ({
+        detail: [
+          {
+            type: "value_error",
+            loc: ["body"],
+            msg: "Value error, webhook url must not resolve to a private or reserved network address",
+          },
+        ],
+      }),
+    });
+
+    render(<AddToolDialog {...baseProps} toolType="structured_output" />);
+    await user.type(
+      screen.getByPlaceholderText(
+        "An informative name for the tool that reflects its purpose",
+      ),
+      "Bad",
+    );
+    const paramNameInput = screen
+      .getAllByRole("textbox")
+      .find(
+        (el) =>
+          el.tagName === "INPUT" &&
+          (el as HTMLInputElement).placeholder === "",
+      ) as HTMLInputElement;
+    if (paramNameInput) await user.type(paramNameInput, "p");
+    await user.click(screen.getByRole("button", { name: "Add tool" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This URL points to a private or internal network address. Use a public URL that can be reached from the internet.",
+    );
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
   });
 
   it("surfaces a network error thrown during create", async () => {
@@ -1108,7 +1155,9 @@ describe("AddToolDialog", () => {
     await screen.findByDisplayValue("Upd Fail");
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(
-      await screen.findByText("Failed to update tool"),
+      await screen.findByText(
+        "Something went wrong on our end. Please try again in a moment.",
+      ),
     ).toBeInTheDocument();
   });
 

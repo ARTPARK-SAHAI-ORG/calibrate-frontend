@@ -10,7 +10,11 @@ import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
 import { useAgentTraceScoring } from "@/hooks/useAgentTraceScoring";
 import { configWithTraceScoring, traceScoringEnabled } from "@/lib/tracesApi";
-import { readNameConflictMessage } from "@/lib/parseBackendError";
+import {
+  parseBackendErrorResponse,
+  readNameConflictMessage,
+} from "@/lib/parseBackendError";
+import { friendlyUrlError } from "@/lib/urlErrorMessage";
 import {
   AgentTabContent,
   AgentConnectionTabContent,
@@ -766,7 +770,11 @@ export function AgentDetail({
         }
 
         if (!response.ok) {
-          throw new Error("Failed to save agent");
+          throw new Error(
+            friendlyUrlError(
+              await parseBackendErrorResponse(response, "Error saving agent"),
+            ),
+          );
         }
 
         const savedAgent = await response.json();

@@ -42,3 +42,4 @@ export {
 } from "./InteractionTypeChooser";
 export { MetadataTable, type MetadataEntry } from "./MetadataTable";
 export { InfoNote } from "./InfoNote";
+export { ErrorNote } from "./ErrorNote";

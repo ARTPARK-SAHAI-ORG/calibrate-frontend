@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { SpinnerIcon } from "@/components/icons";
-import { CopyCodeButton } from "@/components/ui";
+import { CopyCodeButton, ErrorNote } from "@/components/ui";
 import {
   CustomFieldsEditor,
   deriveInputs,
@@ -277,8 +277,8 @@ export function VerifyRequestPreviewDialog({
         </div>
 
         {verifyError && !isVerifying && (
-          <div className="space-y-2 rounded-lg border border-red-500/20 bg-red-500/5 p-3 mb-4">
-            <p className="text-xs text-red-400">{verifyError}</p>
+          <ErrorNote className="space-y-2 mb-4">
+            <p>{verifyError}</p>
             {verifySampleResponse && (
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground">
@@ -295,7 +295,7 @@ export function VerifyRequestPreviewDialog({
                 </div>
               </div>
             )}
-          </div>
+          </ErrorNote>
         )}
 
         <div className="flex items-center justify-end gap-2 md:gap-3">
