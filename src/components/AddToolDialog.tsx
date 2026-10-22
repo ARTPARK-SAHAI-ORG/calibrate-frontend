@@ -13,6 +13,7 @@ import {
   readNameConflictMessage,
 } from "@/lib/parseBackendError";
 import { friendlyUrlError } from "@/lib/urlErrorMessage";
+import { ErrorNote } from "@/components/ui";
 import { parseSchemaNode, NormalizedToolParam } from "@/lib/toolParams";
 
 export type ToolData = {
@@ -1451,14 +1452,9 @@ export function AddToolDialog({
           ) : (
             <>
               {createError && (
-                <div
-                  role="alert"
-                  className="rounded-md border border-red-500 bg-red-500/10 px-4 py-3"
-                >
-                  <p className="text-sm text-red-500 whitespace-pre-line">
-                    {createError}
-                  </p>
-                </div>
+                <ErrorNote className="whitespace-pre-line">
+                  {createError}
+                </ErrorNote>
               )}
 
               {/* Helper Callout — shown at the top in both Form and JSON views */}
@@ -1512,11 +1508,9 @@ export function AddToolDialog({
               {viewMode === "json" ? (
                 <div className="space-y-2">
                   {(jsonError || submitError) && (
-                    <div className="rounded-md border border-red-500 bg-red-500/10 px-4 py-3">
-                      <p className="text-sm text-red-500 whitespace-pre-line">
-                        {jsonError || submitError}
-                      </p>
-                    </div>
+                    <ErrorNote className="whitespace-pre-line">
+                      {jsonError || submitError}
+                    </ErrorNote>
                   )}
                   <textarea
                     value={jsonText}

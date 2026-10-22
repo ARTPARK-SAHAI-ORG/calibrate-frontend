@@ -3,6 +3,7 @@
 import React from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { SpinnerIcon } from "@/components/icons";
+import { ErrorNote } from "@/components/ui";
 import { useVerifyConnection } from "@/hooks/useVerifyConnection";
 
 type VerifyConnectionDialogProps = {
@@ -86,13 +87,9 @@ export function VerifyConnectionDialog({
 
           {/* Failure: error + the agent's own response */}
           {hasFailed && (
-            <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 md:px-4 py-2.5 md:py-3 space-y-2">
-              <p className="text-xs md:text-sm font-medium text-red-700 dark:text-red-400">
-                Could not reach the agent
-              </p>
-              <p className="text-xs md:text-sm text-red-700/90 dark:text-red-300 break-words">
-                {verify.verifyError}
-              </p>
+            <ErrorNote className="space-y-2">
+              <p className="font-medium">Could not reach the agent</p>
+              <p>{verify.verifyError}</p>
               {verify.verifySampleResponse && (
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">
@@ -103,7 +100,7 @@ export function VerifyConnectionDialog({
                   </pre>
                 </div>
               )}
-            </div>
+            </ErrorNote>
           )}
         </div>
 
