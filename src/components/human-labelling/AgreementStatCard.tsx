@@ -36,7 +36,7 @@ function Stat({
 }) {
   const body = (
     <div className="min-w-0">
-      <div className="text-[11px] text-muted-foreground whitespace-nowrap">
+      <div className="text-sm font-medium text-muted-foreground whitespace-nowrap">
         {label}
       </div>
       <div
