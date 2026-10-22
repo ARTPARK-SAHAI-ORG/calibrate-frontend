@@ -1,5 +1,6 @@
 ## October 2026
 
+- Fixed a problem where some people were stuck on a loading spinner after opening Calibrate and can now reach the login page and sign in again ([#763](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/763))
 - Creating a new evaluator from Manage evaluators no longer closes the window and the form when you click inside the form ([#760](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/760))
 - Confirm email at signup and add password reset ([#753](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/753))
 - Error messages across the app now share one red box with the same spacing and darker, easier to read text in light mode ([#755](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/755))
