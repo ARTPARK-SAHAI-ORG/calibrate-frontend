@@ -9,7 +9,6 @@ import {
 } from "react";
 import { Link, replaceUrl, useRouter, useSearchParams } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
-import { AgreementTrendChart } from "@/components/charts/AgreementTrendChart";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { EvaluatorTypePill } from "@/components/EvaluatorPills";
@@ -20,22 +19,20 @@ import { CreateLabellingTaskDialog } from "@/components/human-labelling/CreateLa
 import { EmptyState } from "@/components/ui/LoadingState";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
+import { StatCard } from "@/components/ui/StatCard";
 import { useAccessToken } from "@/hooks";
 import { createAnnotator, renameAnnotator } from "@/lib/annotatorApi";
 import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { taskOptionsWithAgreement } from "./taskOptions";
-import { parseBackendTime } from "@/lib/relativeTime";
 import { type KappaByKind } from "@/lib/agreementKappa";
 import { KappaByKindList } from "@/components/human-labelling/KappaCell";
-import { OverallAgreementCards } from "@/components/human-labelling/AgreementStatCard";
 import {
   AgreementOverviewTable,
   type OverviewSortKey,
 } from "@/components/human-labelling/AgreementOverviewTable";
 import {
   buildOverviewRows,
-  overviewChartSeries,
   overviewRows,
   type AgreementGroup,
   type EvaluatorAgreement,
@@ -96,7 +93,7 @@ type LabellingTask = {
   evaluators?: LabellingTaskEvaluator[];
   /**
    * True when the task has at least one comparable pair (human-human or any
-   * human-evaluator). All-time / unfiltered — independent of `bucket`/`days`.
+   * human-evaluator). All-time and unfiltered.
    * Used to filter the Overview task-selector dropdown.
    */
   has_agreement?: boolean;
@@ -105,8 +102,6 @@ type LabellingTask = {
 type SortDirection = "asc" | "desc";
 
 type AgreementResponse = {
-  bucket: string;
-  days: number;
   task_id?: string;
   /** Overall agreement between annotators. */
   human_human: AgreementGroup;
@@ -115,13 +110,9 @@ type AgreementResponse = {
   evaluators: EvaluatorAgreement[];
 };
 
-type Bucket = "week" | "month" | "year";
-
 const ALL_TASKS = "all";
 
 const taskHref = (uuid: string) => `/human-alignment/tasks/${uuid}`;
-const DEFAULT_BUCKET: Bucket = "month";
-const DEFAULT_DAYS = 180;
 
 function agreementColor(fraction: number | null | undefined): string {
   if (fraction == null) return "";
@@ -129,16 +120,6 @@ function agreementColor(fraction: number | null | undefined): string {
   if (pct >= 75) return "text-green-600 dark:text-green-400";
   if (pct <= 50) return "text-red-600 dark:text-red-400";
   return "text-yellow-600 dark:text-yellow-400";
-}
-
-function formatBucketLabel(iso: string, bucket: Bucket): string {
-  const d = parseBackendTime(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  if (bucket === "year") return d.getUTCFullYear().toString();
-  return d.toLocaleString("en-US", {
-    month: "short",
-    timeZone: "UTC",
-  });
 }
 
 const TABS: Tab[] = ["overview", "tasks", "annotators"];
@@ -215,8 +196,6 @@ function HumanLabellingPageInner() {
   const sortedTasks = [...tasks].sort((a, b) => a.name.localeCompare(b.name));
 
   const [selectedTaskId, setSelectedTaskId] = useState<string>(ALL_TASKS);
-  const [bucket] = useState<Bucket>(DEFAULT_BUCKET);
-  const [days] = useState<number>(DEFAULT_DAYS);
 
   // The dropdown only lists tasks with at least one comparable pair. The task
   // list now carries an all-time `has_agreement` flag, so we filter in memory
@@ -274,11 +253,10 @@ function HumanLabellingPageInner() {
     setAgreementLoading(true);
     setAgreementError(null);
     try {
-      const query = `?bucket=${bucket}&days=${days}`;
       const endpoint =
         selectedTaskId === ALL_TASKS
-          ? `/annotation-agreement/trend${query}`
-          : `/annotation-tasks/${encodeURIComponent(selectedTaskId)}/agreement${query}`;
+          ? "/annotation-agreement/trend"
+          : `/annotation-tasks/${encodeURIComponent(selectedTaskId)}/agreement`;
       const data = await apiClient<AgreementResponse>(endpoint, accessToken);
       setAgreement(data);
     } catch (err) {
@@ -287,7 +265,7 @@ function HumanLabellingPageInner() {
       setAgreementLoading(false);
       setAgreementFetchCompleted(true);
     }
-  }, [accessToken, selectedTaskId, bucket, days]);
+  }, [accessToken, selectedTaskId]);
 
   useEffect(() => {
     if (activeTab === "overview") {
@@ -495,7 +473,6 @@ function HumanLabellingPageInner() {
             agreement={agreement}
             agreementLoading={agreementLoading || !agreementFetchCompleted}
             agreementError={agreementError}
-            bucket={bucket}
             selectedTaskId={selectedTaskId}
             onSelectTask={setSelectedTaskId}
             taskOptions={taskOptions}
@@ -1229,7 +1206,6 @@ function AgreementOverview({
   agreement,
   agreementLoading,
   agreementError,
-  bucket,
   selectedTaskId,
   onSelectTask,
   taskOptions,
@@ -1238,7 +1214,6 @@ function AgreementOverview({
   agreement: AgreementResponse | null;
   agreementLoading: boolean;
   agreementError: string | null;
-  bucket: Bucket;
   selectedTaskId: string;
   onSelectTask: (id: string) => void;
   taskOptions: LabellingTaskSummary[];
@@ -1299,12 +1274,6 @@ function AgreementOverview({
     return dir * cmp(a[sortKey].current, b[sortKey].current);
   });
 
-  const chartSeries = agreement
-    ? overviewChartSeries(agreement, rows, (iso) =>
-        formatBucketLabel(iso, bucket),
-      )
-    : [];
-
   const handleSort = (key: OverviewSortKey) => {
     if (sortKey === key) {
       setSortDir((d) => (d === "desc" ? "asc" : "desc"));
@@ -1338,8 +1307,8 @@ function AgreementOverview({
           <div>
             <h2 className="text-sm font-semibold">Agreement summary</h2>
             <p className="text-xs text-muted-foreground">
-              Agreement between annotators, and how closely each evaluator
-              aligns with the annotators
+              How often annotators agree with each other, and how often each
+              evaluator agrees with them
             </p>
           </div>
           <Select
@@ -1407,14 +1376,28 @@ function AgreementOverview({
       ) : (
         <>
           <div className="flex flex-wrap items-stretch gap-3">
-            <OverallAgreementCards
-              interAnnotator={agreement?.human_human}
-              withHumans={agreement?.evaluators_with_humans}
-            />
-          </div>
-
-          <div className="border border-border rounded-xl p-4 md:p-6">
-            <AgreementTrendChart series={chartSeries} />
+            {(
+              [
+                ["Inter-annotator agreement", agreement?.human_human],
+                [
+                  "Evaluator agreement with humans",
+                  agreement?.evaluators_with_humans,
+                ],
+              ] as const
+            ).map(([label, group]) => (
+              <StatCard
+                key={label}
+                label={label}
+                value={
+                  group?.current != null
+                    ? `${Math.round(group.current * 100)}%`
+                    : "—"
+                }
+                valueClassName={
+                  group?.current != null ? "" : "text-muted-foreground"
+                }
+              />
+            ))}
           </div>
 
           <AgreementOverviewTable

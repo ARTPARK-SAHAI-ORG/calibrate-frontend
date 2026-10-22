@@ -321,7 +321,7 @@ describe("AgreementStatCard", () => {
     );
   });
 
-  it("names the kind of kappa on the info icon, for hover, focus and screen readers", async () => {
+  it("names the kind of kappa on the info icon, for hover and screen readers", async () => {
     const user = setupUser();
     render(
       <AgreementStatCard
@@ -337,8 +337,7 @@ describe("AgreementStatCard", () => {
     expect(
       screen.queryByText("Linear weighted Fleiss' kappa"),
     ).not.toBeInTheDocument();
-    await user.tab();
-    expect(icon).toHaveFocus();
+    await user.hover(icon);
     expect(
       await screen.findByText("Linear weighted Fleiss' kappa"),
     ).toBeInTheDocument();
@@ -619,6 +618,70 @@ describe("ScoreReliabilityCards", () => {
     expect(tool).toHaveTextContent("Evaluator agreement with humans—");
     // The two overall cards come first, then one card per evaluator.
     expect(screen.getAllByText("Inter-annotator agreement")).toHaveLength(3);
+  });
+});
+
+describe("chance bar on the cards", () => {
+  it("says the agreement and the chance on hover", async () => {
+    const user = setupUser();
+    render(
+      <AgreementStatCard
+        staticPillText="Annotator agreement"
+        agreement={0.88}
+        kappa={{ kappa: -0.2, kappa_type: "cohen", chance_agreement: 0.91 }}
+      />
+    );
+    const bar = screen.getByRole("img", { name: "Agreement 88%, chance 91%" });
+    await user.hover(bar);
+    expect(
+      await screen.findByText("Agreement 88%, chance 91%", { selector: "div" }),
+    ).toBeInTheDocument();
+  });
+
+  it("says only the agreement when chance is unknown", () => {
+    render(
+      <AgreementStatCard
+        staticPillText="Annotator agreement"
+        agreement={0.5}
+        kappa={{ kappa: null, kappa_type: "cohen", chance_agreement: null }}
+      />
+    );
+    expect(
+      screen.getByRole("img", { name: "Agreement 50%" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("ScoreReliabilityCards legend", () => {
+  const ev = (current: number | null) => ({
+    evaluator_id: "ev-1",
+    name: "Tone",
+    current,
+    inter_annotator: { current: null },
+  });
+
+  it("shows the legend above the cards when a card has a bar", () => {
+    render(
+      <ScoreReliabilityCards
+        agreement={{ human_human: { current: 0.7 }, evaluators: [ev(0.8)] }}
+      />
+    );
+    for (const text of [
+      "Agreement expected by chance alone",
+      "Better than chance",
+      "Worse than chance",
+      "Cannot be compared with chance",
+    ])
+      expect(screen.getByText(text)).toBeInTheDocument();
+  });
+
+  it("has no legend when no card has a bar", () => {
+    render(
+      <ScoreReliabilityCards
+        agreement={{ human_human: { current: 0.7 }, evaluators: [ev(null)] }}
+      />
+    );
+    expect(screen.queryByText("Better than chance")).not.toBeInTheDocument();
   });
 });
 

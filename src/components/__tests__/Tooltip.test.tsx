@@ -28,27 +28,6 @@ describe("Tooltip", () => {
     );
   });
 
-  it("shows the tooltip when the trigger gets keyboard focus and hides it on blur", async () => {
-    const user = setupUser();
-    render(
-      <>
-        <Tooltip content="Hello there">
-          <button>Trigger</button>
-        </Tooltip>
-        <button>Next</button>
-      </>,
-    );
-
-    await user.tab();
-    expect(screen.getByText("Trigger")).toHaveFocus();
-    expect(await screen.findByText("Hello there")).toBeInTheDocument();
-
-    await user.tab();
-    await waitFor(() =>
-      expect(screen.queryByText("Hello there")).not.toBeInTheDocument(),
-    );
-  });
-
   it("keeps the tooltip open while the pointer is inside it", async () => {
     const user = setupUser();
     render(

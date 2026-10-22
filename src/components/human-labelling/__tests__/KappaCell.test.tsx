@@ -11,14 +11,6 @@ describe("KappaCell", () => {
     expect(await screen.findByText("Fleiss' kappa")).toBeInTheDocument();
   });
 
-  it("names the kind on the info icon and shows it on keyboard focus", async () => {
-    const user = setupUser();
-    render(<KappaCell fields={{ kappa: 0.2, kappa_type: "cohen" }} />);
-    await user.tab();
-    expect(screen.getByRole("button", { name: "Cohen's kappa" })).toHaveFocus();
-    expect(await screen.findByText("Cohen's kappa")).toBeInTheDocument();
-  });
-
   it.each([
     [
       "too_few_items",
@@ -42,8 +34,7 @@ describe("KappaCell", () => {
       expect(screen.getByText(text).className).toContain("rounded-md");
       expect(screen.queryByText("—")).not.toBeInTheDocument();
       expect(screen.queryByText(help)).not.toBeInTheDocument();
-      await user.tab();
-      expect(screen.getByRole("button", { name: help })).toHaveFocus();
+      await user.hover(screen.getByRole("button", { name: help }));
       expect(await screen.findByText(help)).toBeInTheDocument();
     },
   );

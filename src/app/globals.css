@@ -14,16 +14,6 @@
   --popover: #ffffff;
   --tour-link: #4f46e5;
   --sidebar-width: 260px;
-  /* Line colours for charts. Each reads at 4.5:1 or more on the page
-     background, in both themes, so a line's name can be written in it. */
-  --chart-1: #047857;
-  --chart-2: #2563eb;
-  --chart-3: #9333ea;
-  --chart-4: #0e7490;
-  --chart-5: #be185d;
-  --chart-6: #b45309;
-  --chart-7: #b91c1c;
-  --chart-8: #4f46e5;
 }
 
 @theme inline {
@@ -51,14 +41,6 @@
   --accent-foreground: #fafafa;
   --popover: #1a1a1a;
   --tour-link: #a5b4fc;
-  --chart-1: #34d399;
-  --chart-2: #60a5fa;
-  --chart-3: #c084fc;
-  --chart-4: #22d3ee;
-  --chart-5: #f472b6;
-  --chart-6: #fbbf24;
-  --chart-7: #f87171;
-  --chart-8: #818cf8;
 }
 
 * {

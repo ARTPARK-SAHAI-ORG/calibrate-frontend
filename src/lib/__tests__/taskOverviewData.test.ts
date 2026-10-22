@@ -2,11 +2,9 @@ import {
   hasReliabilityNumber,
   hasTaskOverviewData,
   buildOverviewRows,
-  overviewChartSeries,
   overviewRows,
   taskEvaluatorScoreCards,
 } from "../taskOverviewData";
-import { buildTrendChart } from "../agreementKappa";
 
 describe("hasTaskOverviewData", () => {
   it("is false with no agreement response", () => {
@@ -202,26 +200,18 @@ describe("overviewRows", () => {
   });
 });
 
-describe("buildOverviewRows and overviewChartSeries", () => {
-  const point = (agreement: number) => ({
-    bucket_start: "2026-01-01",
-    bucket_end: "2026-01-31",
-    agreement,
-    pair_count: 2,
-  });
+describe("buildOverviewRows", () => {
   const evaluators = [
     {
       evaluator_id: "ev-1",
       name: "Tone",
       current: 0.9,
       pair_count: 4,
-      series: [point(0.9)],
       kappa: 0.5,
       kappa_type: "cohen" as const,
       inter_annotator: {
         current: 0.7,
         pair_count: 3,
-        series: [point(0.7)],
         kappa: 0.4,
         kappa_type: "cohen" as const,
       },
@@ -231,97 +221,23 @@ describe("buildOverviewRows and overviewChartSeries", () => {
       name: "Clarity",
       current: null,
       pair_count: 0,
-      series: [],
       kappa: null,
       kappa_type: "linear_weighted_cohen" as const,
     },
-    {
-      evaluator_id: "ev-3",
-      name: "Unknown",
-      current: null,
-      pair_count: 0,
-      series: [],
-    },
+    { evaluator_id: "ev-3", name: "Unknown", current: null, pair_count: 0 },
   ];
 
-  it("gives each evaluator its colour, its kind of answer and both groups", () => {
+  it("gives each evaluator its kind of answer and both measures", () => {
     const rows = buildOverviewRows(evaluators);
-    expect(rows.map((r) => [r.key, r.color, r.kind])).toEqual([
-      ["ev-1", "var(--chart-1)", "binary"],
-      ["ev-2", "var(--chart-2)", "rating"],
-      ["ev-3", "var(--chart-3)", null],
+    expect(rows.map((r) => [r.key, r.name, r.kind])).toEqual([
+      ["ev-1", "Tone", "binary"],
+      ["ev-2", "Clarity", "rating"],
+      ["ev-3", "Unknown", null],
     ]);
     expect(rows[0].interAnnotator.current).toBe(0.7);
     expect(rows[0].withHumans.current).toBe(0.9);
-    expect(rows[1].interAnnotator).toEqual({
-      current: null,
-      pair_count: 0,
-      series: [],
-    });
-  });
-
-  it("puts the two overall lines first, then each evaluator's dashed and solid lines", () => {
-    const series = overviewChartSeries(
-      {
-        human_human: { current: 0.6, pair_count: 3, series: [point(0.6)] },
-        evaluators_with_humans: {
-          current: 0.8,
-          pair_count: 4,
-          series: [point(0.8)],
-        },
-      },
-      buildOverviewRows(evaluators.slice(0, 1)),
-      () => "Jan",
-    );
-    expect(
-      series.map((s) => [s.key, s.name, s.color, !!s.dashed, !!s.overall]),
-    ).toEqual([
-      [
-        "overall_inter_annotator",
-        "Overall inter-annotator agreement",
-        "var(--foreground)",
-        true,
-        true,
-      ],
-      [
-        "overall_with_humans",
-        "Overall evaluator agreement with humans",
-        "var(--foreground)",
-        false,
-        true,
-      ],
-      [
-        "ev-1__inter_annotator",
-        "Tone inter-annotator agreement",
-        "var(--chart-1)",
-        true,
-        false,
-      ],
-      ["ev-1", "Tone agreement with humans", "var(--chart-1)", false, false],
-    ]);
-    // The kappa view names each kappa line as a kappa, not as agreement,
-    // and the overall lines have no kappa line.
-    const withKappa = series.map((one) => ({
-      ...one,
-      points: one.points.map((p) => ({
-        ...p,
-        kappa: 0.3,
-        kappa_type: "cohen" as const,
-      })),
-    }));
-    expect(
-      buildTrendChart(withKappa)
-        .lines.filter((l) => l.kappa)
-        .map((l) => l.name),
-    ).toEqual([
-      "Tone inter-annotator kappa (Cohen's kappa)",
-      "Tone kappa with humans (Cohen's kappa)",
-    ]);
-    expect(series[2].points[0]).toMatchObject({
-      key: "2026-01-31",
-      label: "Jan",
-      agreement: 0.7,
-    });
+    expect(rows[1].interAnnotator).toEqual({ current: null, pair_count: 0 });
   });
 });
+
 

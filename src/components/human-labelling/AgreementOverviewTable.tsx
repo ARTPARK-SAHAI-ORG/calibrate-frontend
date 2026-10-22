@@ -2,7 +2,10 @@
 
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
-import { agreementColor } from "@/components/human-labelling/AgreementStatCard";
+import {
+  ChanceBar,
+  ChanceLegend,
+} from "@/components/human-labelling/AgreementStatCard";
 import { KappaCell } from "@/components/human-labelling/KappaCell";
 import type { AgreementGroup, OverviewRow } from "@/lib/taskOverviewData";
 
@@ -10,7 +13,9 @@ export type OverviewSortKey = "name" | "interAnnotator" | "withHumans";
 type SortDirection = "asc" | "desc";
 
 const GRID =
-  "grid grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))] gap-4 px-4";
+  "grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-4 px-4";
+// A thin line before each measure column.
+const DIVIDER = "border-l border-border pl-4 min-w-0 self-stretch flex items-center";
 
 /**
  * One evaluator's name, as a pill that opens how that evaluator judges. The
@@ -33,7 +38,7 @@ function EvaluatorNamePill({
     <button
       type="button"
       onClick={onOpen}
-      className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate w-full"
+      className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate max-w-full"
     >
       <span ref={ref} className="truncate">
         {name}
@@ -92,11 +97,32 @@ function SortHeader({
   );
 }
 
-function percent(group: AgreementGroup): string {
-  return group.current != null ? `${Math.round(group.current * 100)}%` : "—";
+const DASH = <span className="text-sm text-muted-foreground">—</span>;
+
+/** One measure: the agreement and its kappa on one line, a chance bar under
+ * them, or a muted dash when there is no agreement. */
+function MeasureCell({ group }: { group: AgreementGroup }) {
+  if (group.current == null) return DASH;
+  return (
+    <div className="min-w-0 w-full">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold tabular-nums text-foreground">
+          {Math.round(group.current * 100)}%
+        </span>
+        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
+          Kappa
+          <KappaCell fields={group} />
+        </span>
+      </div>
+      <ChanceBar
+        agreement={group.current}
+        chanceAgreement={group.chance_agreement}
+      />
+    </div>
+  );
 }
 
-const GROUPS = [
+const MEASURES = [
   {
     title: "Inter-annotator agreement",
     sortKey: "interAnnotator",
@@ -124,81 +150,57 @@ export function AgreementOverviewTable({
   onSort: (key: OverviewSortKey) => void;
   onOpenEvaluator: (evaluator: { uuid: string; name: string }) => void;
 }) {
-  const name = (row: OverviewRow, fitClassName: string) => (
-    <div className="min-w-0 flex-1">
+  const name = (row: OverviewRow) => (
+    <div className="flex items-center gap-2 min-w-0">
       <EvaluatorNamePill
         name={row.name}
-        fitClassName={fitClassName}
+        fitClassName="min-w-0 max-w-full"
         onOpen={() => onOpenEvaluator({ uuid: row.key, name: row.name })}
       />
       {row.kind && (
-        <p className="text-xs text-muted-foreground mt-1">{row.kind}</p>
+        <span className="text-xs text-muted-foreground shrink-0">
+          {row.kind}
+        </span>
       )}
     </div>
   );
+  const hasBar = rows.some(
+    (r) => r.interAnnotator.current != null || r.withHumans.current != null,
+  );
   return (
     <>
+      {hasBar && <ChanceLegend />}
       {/* Desktop table */}
       <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-        <div className="border-b border-border bg-muted/30 py-2 space-y-1">
-          <div className={`${GRID} items-center`}>
-            <div />
-            {GROUPS.map((g) => (
-              <div
-                key={g.title}
-                className="col-span-2 text-sm font-medium text-foreground"
-              >
-                {g.title}
-              </div>
-            ))}
-          </div>
-          <div className={`${GRID} items-center`}>
-            <SortHeader
-              label="Name"
-              active={sortKey === "name"}
-              dir={sortDir}
-              onClick={() => onSort("name")}
-            />
-            {GROUPS.map((g) => [
+        <div className={`${GRID} py-2 border-b border-border bg-muted/30 items-center`}>
+          <SortHeader
+            label="Evaluator"
+            active={sortKey === "name"}
+            dir={sortDir}
+            onClick={() => onSort("name")}
+          />
+          {MEASURES.map((m) => (
+            <div key={m.sortKey} className={DIVIDER}>
               <SortHeader
-                key={`${g.sortKey}-agreement`}
-                label="Agreement"
-                active={sortKey === g.sortKey}
+                label={m.title}
+                active={sortKey === m.sortKey}
                 dir={sortDir}
-                onClick={() => onSort(g.sortKey)}
-              />,
-              <div
-                key={`${g.sortKey}-kappa`}
-                className="text-sm font-medium text-muted-foreground"
-              >
-                Kappa
-              </div>,
-            ])}
-          </div>
+                onClick={() => onSort(m.sortKey)}
+              />
+            </div>
+          ))}
         </div>
         {rows.map((row) => (
           <div
             key={row.key}
             className={`${GRID} py-3 border-b border-border last:border-b-0 items-center`}
           >
-            {name(row, "max-w-full min-w-0")}
-            {GROUPS.map((g) => {
-              const group = g.pick(row);
-              return [
-                <div
-                  key={`${g.title}-agreement`}
-                  className={`text-sm font-semibold tabular-nums ${agreementColor(group.current)}`}
-                >
-                  {percent(group)}
-                </div>,
-                <div
-                  key={`${g.title}-kappa`}
-                  className="text-sm font-semibold tabular-nums text-foreground"
-                >
-                  <KappaCell fields={group} />
-                </div>,
-              ];
-            })}
+            {name(row)}
+            {MEASURES.map((m) => (
+              <div key={m.sortKey} className={DIVIDER}>
+                <MeasureCell group={m.pick(row)} />
+              </div>
+            ))}
           </div>
         ))}
       </div>
@@ -208,29 +210,15 @@ export function AgreementOverviewTable({
         {rows.map((row) => (
           <div
             key={row.key}
-            className="border border-border rounded-xl overflow-hidden p-4 space-y-2"
+            className="border border-border rounded-xl overflow-hidden p-4 space-y-3"
           >
-            <div className="flex items-center gap-2">
-              {name(row, "flex-1 min-w-0")}
-            </div>
-            {GROUPS.map((g) => {
-              const group = g.pick(row);
-              return (
-                <div key={g.title}>
-                  <p className="text-xs text-muted-foreground">{g.title}</p>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span
-                      className={`text-base font-semibold tabular-nums ${agreementColor(group.current)}`}
-                    >
-                      {percent(group)}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      Kappa <KappaCell fields={group} />
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+            {name(row)}
+            {MEASURES.map((m) => (
+              <div key={m.sortKey}>
+                <p className="text-xs text-muted-foreground mb-1">{m.title}</p>
+                <MeasureCell group={m.pick(row)} />
+              </div>
+            ))}
           </div>
         ))}
       </div>

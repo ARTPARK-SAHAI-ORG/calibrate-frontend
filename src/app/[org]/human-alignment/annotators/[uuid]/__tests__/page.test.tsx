@@ -1,7 +1,7 @@
 /**
  * The stat cards at the top of one annotator's page: the latest agreement,
  * the latest kappa for each kind of answer, and the number of jobs. The page
- * chrome and the trend chart are stubbed so only the cards run.
+ * chrome is stubbed so only the cards run.
  */
 import React from "react";
 import { render, screen, within } from "@/test-utils";
@@ -19,10 +19,6 @@ jest.mock("next/navigation", () => ({
 jest.mock("../../../../../../components/AppLayout", () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useHideFloatingButton: () => {},
-}));
-
-jest.mock("../../../../../../components/charts/AgreementTrendChart", () => ({
-  AgreementTrendChart: () => null,
 }));
 
 jest.mock("../../../../../../hooks", () => ({
@@ -49,7 +45,6 @@ const detail = (kappa_by_kind: unknown[]) => ({
     jobs_count: 2,
     kappa_by_kind,
   },
-  trend: { bucket: "month", days: 365, series: [] },
   jobs: [],
 });
 

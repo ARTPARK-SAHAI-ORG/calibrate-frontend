@@ -2971,9 +2971,7 @@ function LabellingTaskPageInner() {
                     agreement.human_human,
                     agreement.evaluators ?? [],
                   ) && (
-                    <div className="flex flex-wrap items-stretch gap-3 mt-3">
-                      <ScoreReliabilityCards agreement={agreement} />
-                    </div>
+                    <ScoreReliabilityCards agreement={agreement} />
                   )}
                 </section>
               </div>

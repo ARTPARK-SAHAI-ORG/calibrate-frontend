@@ -60,31 +60,37 @@ function Stat({
   );
 }
 
-/** A bar filled to the agreement, a tick at what chance alone would agree,
- * and under it the chance and the kappa. The fill is green when agreement
- * beats chance and red when it falls short, compared as the whole percents
- * shown, so the colour never contradicts the numbers. */
-function AgreementBar({
+/** A thin bar filled to the agreement, with a tick at what chance alone
+ * would agree. The fill is green when agreement beats chance, red when it
+ * falls short, and muted when they are equal or chance is unknown, compared
+ * as the whole percents shown so the colour never contradicts the numbers. */
+export function ChanceBar({
   agreement,
-  kappa,
+  chanceAgreement,
 }: {
   agreement: number;
-  kappa: KappaFields;
+  chanceAgreement: number | null | undefined;
 }) {
   const pct = Math.round(agreement * 100);
   const chance =
-    kappa.chance_agreement == null
-      ? null
-      : Math.round(kappa.chance_agreement * 100);
+    chanceAgreement == null ? null : Math.round(chanceAgreement * 100);
   const fill =
     chance == null || pct === chance
       ? "bg-muted-foreground"
       : pct > chance
         ? "bg-green-500"
         : "bg-red-500";
+  const label =
+    chance == null
+      ? `Agreement ${pct}%`
+      : `Agreement ${pct}%, chance ${chance}%`;
   return (
-    <>
-      <div className="relative mt-2 h-2 rounded-full bg-muted">
+    <Tooltip content={label} className="mt-2">
+      <div
+        role="img"
+        aria-label={label}
+        className="relative h-2 rounded-full bg-muted"
+      >
         <div
           data-testid="agreement-fill"
           className={`h-full rounded-full ${fill}`}
@@ -93,13 +99,64 @@ function AgreementBar({
         {chance != null && (
           <div
             data-testid="chance-tick"
-            className="absolute -top-1 -bottom-1 w-0.5 -ml-px bg-foreground"
+            className={`absolute -top-1 -bottom-1 -ml-px ${TICK}`}
             style={{ left: `${chance}%` }}
           />
         )}
       </div>
+    </Tooltip>
+  );
+}
+
+const TICK = "w-0.5 bg-foreground";
+const SWATCH = "inline-block h-2 w-4 rounded-full";
+
+/** What the marks on a chance bar mean, drawn with the bar's own classes. */
+export function ChanceLegend({ className = "" }: { className?: string }) {
+  const items: [string, ReactNode][] = [
+    [
+      "Agreement expected by chance alone",
+      <span key="tick" className={`inline-block h-3 ${TICK}`} />,
+    ],
+    ["Better than chance", <span key="g" className={`${SWATCH} bg-green-500`} />],
+    ["Worse than chance", <span key="r" className={`${SWATCH} bg-red-500`} />],
+    [
+      "Cannot be compared with chance",
+      <span key="m" className={`${SWATCH} bg-muted-foreground`} />,
+    ],
+  ];
+  return (
+    <div
+      className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground ${className}`}
+    >
+      {items.map(([text, swatch]) => (
+        <span key={text} className="inline-flex items-center gap-1.5">
+          {swatch}
+          {text}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The chance bar, and under it the chance and the kappa. */
+function AgreementBar({
+  agreement,
+  kappa,
+}: {
+  agreement: number;
+  kappa: KappaFields;
+}) {
+  const chance = kappa.chance_agreement;
+  return (
+    <>
+      <ChanceBar agreement={agreement} chanceAgreement={chance} />
       <div className="flex items-center justify-between gap-4 mt-1.5 text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">
-        {chance != null ? <span>Chance {chance}%</span> : <span />}
+        {chance != null ? (
+          <span>Chance {Math.round(chance * 100)}%</span>
+        ) : (
+          <span />
+        )}
         <span className="inline-flex items-center gap-1">
           Kappa
           <KappaCell fields={kappa} />
@@ -402,31 +459,38 @@ export function ScoreReliabilityCards({
     })[];
   };
 }) {
+  const evaluators = agreement.evaluators ?? [];
+  const hasBar = evaluators.some(
+    (ev) => ev.current != null || ev.inter_annotator?.current != null,
+  );
   return (
     <>
-      <OverallAgreementCards
-        interAnnotator={agreement.human_human}
-        withHumans={agreement.evaluators_with_humans}
-      />
-      {(agreement.evaluators ?? []).map((ev) => (
-        <AgreementStatCard
-          key={ev.evaluator_id}
-          evaluatorPill={{ uuid: ev.evaluator_id, name: ev.name }}
-          showAlignmentLabel={false}
-          sections={[
-            {
-              title: "Inter-annotator agreement",
-              agreement: ev.inter_annotator?.current ?? null,
-              kappa: ev.inter_annotator,
-            },
-            {
-              title: "Evaluator agreement with humans",
-              agreement: ev.current,
-              kappa: ev,
-            },
-          ]}
+      {hasBar && <ChanceLegend className="mt-3" />}
+      <div className="flex flex-wrap items-stretch gap-3 mt-3">
+        <OverallAgreementCards
+          interAnnotator={agreement.human_human}
+          withHumans={agreement.evaluators_with_humans}
         />
-      ))}
+        {evaluators.map((ev) => (
+          <AgreementStatCard
+            key={ev.evaluator_id}
+            evaluatorPill={{ uuid: ev.evaluator_id, name: ev.name }}
+            showAlignmentLabel={false}
+            sections={[
+              {
+                title: "Inter-annotator agreement",
+                agreement: ev.inter_annotator?.current ?? null,
+                kappa: ev.inter_annotator,
+              },
+              {
+                title: "Evaluator agreement with humans",
+                agreement: ev.current,
+                kappa: ev,
+              },
+            ]}
+          />
+        ))}
+      </div>
     </>
   );
 }

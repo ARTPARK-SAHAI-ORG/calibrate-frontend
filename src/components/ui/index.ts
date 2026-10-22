@@ -13,6 +13,7 @@ export {
 } from "./LoadingState";
 export { Breadcrumbs, type Crumb } from "./Breadcrumbs";
 export { StatusBadge } from "./StatusBadge";
+export { StatCard } from "./StatCard";
 export { NestedContainer } from "./NestedContainer";
 export { RetryIcon } from "./RetryIcon";
 export { DeleteIconButton } from "./DeleteIconButton";
