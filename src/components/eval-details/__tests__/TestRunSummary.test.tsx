@@ -593,3 +593,80 @@ describe("a run that failed after finishing some tests", () => {
     expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
   });
 });
+
+describe("likely ranges", () => {
+  const evaluators: BenchmarkEvaluatorSummaryEntry[] = [
+    {
+      metric_key: "c",
+      name: "Correctness",
+      type: "binary",
+      passed: 15,
+      total: 20,
+      pass_rate: 75,
+      ci: { low: 53.1, high: 88.8 },
+    },
+    {
+      metric_key: "h",
+      name: "Helpfulness",
+      type: "rating",
+      mean: 4,
+      min: 3,
+      max: 5,
+      count: 20,
+      scale_min: 1,
+      scale_max: 5,
+      ci: { low: 3.5, high: 4.25 },
+    },
+  ];
+  const props = {
+    passed: 19,
+    total: 20,
+    passRateRange: { low: 76.4, high: 99.1 },
+    evaluatorSummary: evaluators,
+  };
+
+  it("shows each range when the workspace shows them", () => {
+    render(<TestRunSummary {...props} likelyRanges />);
+    expect(screen.getByText("Likely range 76% to 99%")).toBeInTheDocument();
+    expect(screen.getByText("Likely range 53% to 89%")).toBeInTheDocument();
+    expect(screen.getByText("Likely range 3.5 to 4.25")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Workspace settings" })).toHaveAttribute(
+      "href",
+      "/workspace-settings?tab=general",
+    );
+  });
+
+  it("hides every range when the workspace does not, but still says where to turn them on", () => {
+    render(<TestRunSummary {...props} likelyRanges={false} />);
+    expect(screen.queryByText(/Likely range/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Show or hide likely ranges in/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows nothing for a number the backend sent no range for", () => {
+    render(
+      <TestRunSummary
+        passed={19}
+        total={20}
+        passRateRange={null}
+        evaluatorSummary={[{ ...evaluators[0], ci: null }]}
+        likelyRanges
+      />,
+    );
+    expect(screen.queryByText(/Likely range/)).not.toBeInTheDocument();
+  });
+
+  it("shows neither the ranges nor the line on a shared page", () => {
+    render(<TestRunSummary {...props} />);
+    expect(screen.queryByText(/Likely range/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Show or hide likely ranges/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("reads the pass rate the backend sends over counting it", () => {
+    render(<TestRunSummary passed={1} total={2} passRate={80} />);
+    expect(screen.getByText("80%")).toBeInTheDocument();
+  });
+});

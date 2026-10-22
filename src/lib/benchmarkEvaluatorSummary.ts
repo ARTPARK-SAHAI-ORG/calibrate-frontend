@@ -12,7 +12,25 @@ import {
   formatPercent,
   formatRating,
 } from "@/lib/llmMetrics";
-import { isUnanswered } from "./testTypes";
+import { answeredCounts, passRateOf } from "./testTypes";
+import { toolCallPassFail } from "./testRunSummary";
+
+/** Where the true value is likely to fall, 95% of the time. A pass rate's is
+ * out of 100; a rating's is on the evaluator's own scale. */
+export type LikelyRange = { low: number; high: number };
+
+/** "Likely range 76% to 99%", or null when there is no range to show. */
+export function likelyRangeText(
+  range: unknown,
+  scale: "percent" | "rating",
+): string | null {
+  if (!range || typeof range !== "object") return null;
+  const { low, high } = range as Partial<LikelyRange>;
+  if (!Number.isFinite(low) || !Number.isFinite(high)) return null;
+  const format = (v: number) =>
+    scale === "percent" ? formatPercent(v, 0) : formatRating(v);
+  return `Likely range ${format(low as number)} to ${format(high as number)}`;
+}
 
 export type BenchmarkEvaluatorSummaryBinary = {
   metric_key: string;
@@ -24,6 +42,7 @@ export type BenchmarkEvaluatorSummaryBinary = {
   total: number;
   /** 0–100 */
   pass_rate: number;
+  ci?: LikelyRange | null;
 };
 
 export type BenchmarkEvaluatorSummaryRating = {
@@ -38,6 +57,7 @@ export type BenchmarkEvaluatorSummaryRating = {
   count: number;
   scale_min: number;
   scale_max: number;
+  ci?: LikelyRange | null;
 };
 
 export type BenchmarkEvaluatorSummaryEntry =
@@ -48,6 +68,7 @@ export type BenchmarkToolCallTestLike = {
   passed?: boolean | null;
   /** True when the test produced no answer, so it was never judged. */
   unanswered?: boolean;
+  test_type?: string | null;
   test_case?: { evaluation?: { type?: string } | null } | null;
 };
 
@@ -60,66 +81,11 @@ export type BenchmarkModelLike = {
   /** How many tests this model was given. Used to say how far a stopped run
    * got. Optional — older payloads may omit it. */
   total_tests?: number | null;
+  /** This model's pass rate over the tests it answered, out of 100. Null
+   * when it answered none; absent from older payloads. */
+  pass_rate?: number | null;
+  pass_rate_ci?: LikelyRange | null;
 };
-
-/**
- * How many of a model's tests produced no answer, and how many it was given.
- * The backend's leaderboard row counts a test that never answered as a
- * failure, so the pass rate on screen is worked out from these instead.
- *
- * `runOver` says the run has ended, whichever way it ended. A row left with no
- * verdict then produced no answer either, rather than still being on its way,
- * which is the rule the marks and the test rows read.
- */
-export function benchmarkAnsweredPassFail(
-  model: BenchmarkModelLike,
-  runOver = false,
-): {
-  passed: number;
-  answered: number;
-  unanswered: number;
-} | null {
-  const results = model.test_results;
-  if (!results || results.length === 0) return null;
-  let passed = 0;
-  let answered = 0;
-  let unanswered = 0;
-  for (const tr of results) {
-    if (isUnanswered(tr)) {
-      unanswered++;
-      continue;
-    }
-    if (tr.passed === null || tr.passed === undefined) {
-      if (runOver) unanswered++;
-      continue;
-    }
-    answered++;
-    if (tr.passed) passed++;
-  }
-  return { passed, answered, unanswered };
-}
-
-/**
- * Pass/total for the tool-call subset of a model's tests. A test counts toward
- * the total only when it's a tool-call test that finished scoring (it answered,
- * and it is not still running). Returns `{passed: 0, total: 0}` when the model
- * has no tool-call tests or no `test_results`.
- */
-export function benchmarkToolCallPassFail(model: BenchmarkModelLike): {
-  passed: number;
-  total: number;
-} {
-  let passed = 0;
-  let total = 0;
-  for (const tr of model.test_results ?? []) {
-    if (tr.test_case?.evaluation?.type !== "tool_call") continue;
-    if (isUnanswered(tr)) continue;
-    if (tr.passed === null || tr.passed === undefined) continue;
-    total++;
-    if (tr.passed) passed++;
-  }
-  return { passed, total };
-}
 
 export type BenchmarkLeaderboardSummaryRow = {
   model: string;
@@ -197,6 +163,12 @@ export function benchmarkEvaluatorColumnKey(metric_key: string): string {
   const safe =
     metric_key.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_|_$/g, "") || "metric";
   return `ev_${safe}`;
+}
+
+/** The row key holding the likely range for the value under `dataKey`. The
+ * colon keeps it apart from every evaluator column, which never has one. */
+export function benchmarkRangeKey(dataKey: string): string {
+  return `range:${dataKey}`;
 }
 
 /** Collect ordered metric keys from first-seen order across models. */
@@ -286,22 +258,22 @@ export function buildBenchmarkCombinedLeaderboardPayload(
   leaderboardSummary: BenchmarkLeaderboardSummaryRow[] | undefined,
   modelResults: BenchmarkModelLike[],
   benchmarkScoreLabel: string,
-  countFromRows = false,
+  runOver = false,
 ): BenchmarkCombinedLeaderboardPayload | null {
   const keys = benchmarkMetricKeyOrder(modelResults);
   // A run that did not finish normally, because it broke or someone stopped
   // it, has no summary from the backend, so count the tests each model did
   // finish, the same numbers the table works out anyway.
-  if (countFromRows && !leaderboardSummary?.length) {
+  if (runOver && !leaderboardSummary?.length) {
     leaderboardSummary = modelResults.flatMap((m) => {
-      const c = benchmarkAnsweredPassFail(m);
-      if (!c || c.answered === 0) return [];
+      const c = answeredCounts(m.test_results ?? [], runOver);
+      if (c.answered === 0) return [];
       return [
         {
           model: m.model,
           passed: String(c.passed),
           total: String(c.answered),
-          pass_rate: String((c.passed / c.answered) * 100),
+          pass_rate: String(passRateOf(c.passed, c.answered)),
         },
       ];
     });
@@ -362,21 +334,24 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     if (lbRow) {
       // The backend counts a test that never answered as a failure. Work the
       // pass rate out from the cases instead, so it covers only the tests the
-      // model actually answered, and matches the single-run summary.
-      const answered = mr ? benchmarkAnsweredPassFail(mr) : null;
-      if (answered && answered.unanswered > 0) {
+      // model actually answered, and matches the single-run summary. Once the
+      // run is over, a row with no verdict never answered either.
+      const answered = answeredCounts(mr?.test_results ?? [], runOver);
+      if (answered.unanswered > 0) {
         row.passed = String(answered.passed);
         row.total = String(answered.answered);
         row.pass_rate =
-          answered.answered > 0
-            ? (answered.passed / answered.answered) * 100
-            : undefined;
+          passRateOf(answered.passed, answered.answered) ?? undefined;
       } else {
         row.passed = lbRow.passed;
         row.total = lbRow.total;
         const pr = parseFloat(lbRow.pass_rate);
         row.pass_rate = Number.isFinite(pr) ? pr : undefined;
       }
+      // The backend works this out over the answered tests too; when it sends
+      // one, it is the number shown.
+      if (typeof mr?.pass_rate === "number") row.pass_rate = mr.pass_rate;
+      row[benchmarkRangeKey("pass_rate")] = mr?.pass_rate_ci ?? undefined;
       // p50 is the new headline latency; fall back to the legacy mean column
       // for runs generated before the percentile switch.
       const latency = toFiniteNumber(lbRow.latency_p50 ?? lbRow.latency_ms);
@@ -397,9 +372,9 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     }
 
     if (mr) {
-      const tc = benchmarkToolCallPassFail(mr);
+      const tc = toolCallPassFail(mr.test_results ?? []);
       if (tc.total > 0) {
-        row.tool_call_pass_rate = (tc.passed / tc.total) * 100;
+        row.tool_call_pass_rate = passRateOf(tc.passed, tc.total);
         showToolCallPassRate = true;
       }
     }
@@ -410,10 +385,10 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       );
       if (!entry) {
         row[ev.dataKey] = undefined;
-      } else if (entry.type === "binary") {
-        row[ev.dataKey] = entry.pass_rate;
       } else {
-        row[ev.dataKey] = entry.mean;
+        row[ev.dataKey] =
+          entry.type === "binary" ? entry.pass_rate : entry.mean;
+        row[benchmarkRangeKey(ev.dataKey)] = entry.ci ?? undefined;
       }
     }
 
@@ -426,6 +401,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
     allCharts.push({
       title: benchmarkScoreLabel,
       dataKey: "pass_rate",
+      rangeKey: benchmarkRangeKey("pass_rate"),
       yDomain: [0, 100],
       formatTooltip: (v) => formatPercent(v),
     });
@@ -472,6 +448,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       allCharts.push({
         title: ev.label,
         dataKey: ev.dataKey,
+        rangeKey: benchmarkRangeKey(ev.dataKey),
         yDomain: [0, 100],
         formatTooltip: (v) => formatPercent(v),
       });
@@ -485,6 +462,7 @@ export function buildBenchmarkCombinedLeaderboardPayload(
       allCharts.push({
         title: benchmarkRatingEvaluatorCaption(ev.label, sm, sx),
         dataKey: ev.dataKey,
+        rangeKey: benchmarkRangeKey(ev.dataKey),
         yDomain,
         formatTooltip: (v) => formatRating(v),
       });
@@ -517,15 +495,8 @@ export function buildBenchmarkCombinedLeaderboardPayload(
  * Used to decide whether to show the Top picks tab at all.
  */
 export function hasBenchmarkTopPicks(
-  leaderboardSummary: BenchmarkLeaderboardSummaryRow[] | undefined,
-  modelResults: BenchmarkModelLike[],
-  benchmarkScoreLabel = "Test pass rate (%)",
+  payload: BenchmarkCombinedLeaderboardPayload | null,
 ): boolean {
-  const payload = buildBenchmarkCombinedLeaderboardPayload(
-    leaderboardSummary,
-    modelResults,
-    benchmarkScoreLabel,
-  );
   return (
     !!payload &&
     payload.rows.length > 0 &&

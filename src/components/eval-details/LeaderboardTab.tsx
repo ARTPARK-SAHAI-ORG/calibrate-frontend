@@ -1,12 +1,11 @@
 import React from "react";
 import { LeaderboardBarChart, getColorMap } from "@/components/charts/LeaderboardBarChart";
-import { DownloadableTable } from "@/components/DownloadableTable";
+import {
+  DownloadableTable,
+  type TableColumn,
+} from "@/components/DownloadableTable";
 
-export type LeaderboardColumn = {
-  key: string;
-  header: string;
-  render?: (value: any) => React.ReactNode;
-};
+export type LeaderboardColumn = TableColumn;
 
 export type ChartConfig = {
   title: string;
@@ -15,6 +14,9 @@ export type ChartConfig = {
   formatTooltip?: (value: number) => string;
   /** Optional y-axis tick formatter (e.g. `(v) => `${Math.round(v*100)}%`` for binary success rates). */
   yTickFormatter?: (value: number) => string;
+  /** Row key holding each bar's likely range (`{low, high}`), drawn as an
+   * error bar when the tab is asked to show ranges. */
+  rangeKey?: string;
 };
 
 type LeaderboardTabProps = {
@@ -28,6 +30,8 @@ type LeaderboardTabProps = {
   className?: string;
   /** Optional content rendered between the table and the chart grid. */
   afterTable?: React.ReactNode;
+  /** Draws each chart's likely ranges as error bars. */
+  showRanges?: boolean;
 };
 
 export function LeaderboardTab({
@@ -39,6 +43,7 @@ export function LeaderboardTab({
   nameKey = "run",
   className,
   afterTable,
+  showRanges = false,
 }: LeaderboardTabProps) {
   if (!data || data.length === 0) return null;
 
@@ -59,6 +64,8 @@ export function LeaderboardTab({
                 label: getLabel(s[nameKey]),
                 value: s[chart.dataKey],
                 colorKey: s[nameKey],
+                range:
+                  showRanges && chart.rangeKey ? s[chart.rangeKey] : undefined,
               }))
               .filter(
                 (d) =>

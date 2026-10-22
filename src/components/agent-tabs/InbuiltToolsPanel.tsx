@@ -2,6 +2,7 @@
 
 import React from "react";
 import { INBUILT_TOOLS, getInbuiltToolIcon } from "@/constants/inbuilt-tools";
+import { Switch } from "@/components/ui";
 
 type InbuiltToolsPanelProps = {
   endConversationEnabled: boolean;
@@ -55,28 +56,15 @@ export function InbuiltToolsPanel({
                 {tool.name}
               </span>
             </div>
-            {/* Toggle Switch */}
-            <button
-              hidden
-              onClick={() => {
-                if (tool.id === "end_call") {
-                  setEndConversationEnabled(!endConversationEnabled);
-                }
-              }}
-              className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
-                tool.id === "end_call" && endConversationEnabled
-                  ? "bg-foreground"
-                  : "bg-muted"
-              }`}
-            >
-              <div
-                className={`absolute top-0.5 w-5 h-5 rounded-full bg-background transition-transform ${
-                  tool.id === "end_call" && endConversationEnabled
-                    ? "translate-x-5"
-                    : "translate-x-0.5"
-                }`}
+            <div hidden>
+              <Switch
+                checked={tool.id === "end_call" && endConversationEnabled}
+                onChange={(next) => {
+                  if (tool.id === "end_call") setEndConversationEnabled(next);
+                }}
+                label={tool.name}
               />
-            </button>
+            </div>
           </div>
         ))}
       </div>
