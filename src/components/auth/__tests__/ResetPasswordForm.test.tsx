@@ -20,7 +20,7 @@ function mockBackend(check: Answer, save: Answer = [200, LOGIN]) {
           status: answer[0],
           json: async () => answer[1],
         });
-  const fetchMock = jest.fn((url: string) =>
+  const fetchMock = jest.fn<Promise<unknown>, [string, RequestInit?]>((url) =>
     reply(url.endsWith("/auth/check-reset-link") ? check : save),
   );
   global.fetch = fetchMock as unknown as typeof fetch;
@@ -51,7 +51,7 @@ describe("ResetPasswordForm", () => {
     expect(
       screen.getByRole("link", { name: "Get a new reset link" }),
     ).toHaveAttribute("href", "/forgot-password?callbackUrl=%2Fpersonas");
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ token: "old" });
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ token: "old" });
   });
 
   it("says the same for an address with no token, and asks nothing", async () => {
@@ -103,7 +103,7 @@ describe("ResetPasswordForm", () => {
     const fetchMock = mockBackend([200, { valid: true }]);
     await submit("secret1", "secret1");
     await waitFor(() => expect(window.location.href).toBe("/personas"));
-    expect(JSON.parse(saveCalls(fetchMock)[0][1].body)).toEqual({
+    expect(JSON.parse(String(saveCalls(fetchMock)[0][1]?.body))).toEqual({
       token: "tok",
       password: "secret1",
     });
