@@ -18,7 +18,7 @@ describe("ForgotPasswordForm", () => {
 
     expect(
       await screen.findByText(
-        "If an account exists for a@b.co, we sent a link to reset your password. The link works for 1 hour.",
+        "If an account exists for a@b.co, we sent a link to reset your password.",
       ),
     ).toBeInTheDocument();
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/auth\/forgot-password$/);
