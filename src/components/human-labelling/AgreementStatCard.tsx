@@ -4,15 +4,10 @@ import { useState, type ReactNode } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
-import {
-  KAPPA_HELP,
-  kappaLabel,
-  type KappaFields,
-} from "@/lib/agreementKappa";
+import { type KappaFields } from "@/lib/agreementKappa";
 import {
   agreementStatPillBase,
-  KappaInfoIcon,
-  KappaValue,
+  KappaCell,
 } from "@/components/human-labelling/KappaCell";
 
 export function agreementColor(v: number | null | undefined): string {
@@ -161,15 +156,9 @@ export function AgreementStatCard(
   const kappaStat =
     value != null && kappa != null ? (
       <Stat
-        label={
-          <span className="inline-flex items-center gap-0.5">
-            {kappaLabel(kappa.kappa_type)}
-            <span className="-my-1 inline-flex">
-              <KappaInfoIcon content={KAPPA_HELP} label="What kappa means" />
-            </span>
-          </span>
-        }
-        value={<KappaValue fields={kappa} />}
+        label="Kappa"
+        value={<KappaCell fields={kappa} />}
+        valueClassName={kappa.kappa == null ? "text-muted-foreground" : ""}
       />
     ) : null;
   const warningMark = warning ? (

@@ -25,8 +25,8 @@ import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { parseBackendTime } from "@/lib/relativeTime";
-import { kappaLabel, type KappaFields } from "@/lib/agreementKappa";
-import { KappaValue } from "@/components/human-labelling/KappaCell";
+import { type KappaFields } from "@/lib/agreementKappa";
+import { KappaCell } from "@/components/human-labelling/KappaCell";
 
 type Tab = "overview" | "jobs";
 
@@ -381,8 +381,8 @@ function AnnotatorDetailPageInner() {
               />
               {!detailLoading && stats && (
                 <StatCard
-                  label={`Latest ${kappaLabel(stats.kappa_type, true)}`}
-                  value={<KappaValue fields={stats} />}
+                  label="Latest kappa"
+                  value={<KappaCell fields={stats} oneAgainstOthers />}
                 />
               )}
               <StatCard

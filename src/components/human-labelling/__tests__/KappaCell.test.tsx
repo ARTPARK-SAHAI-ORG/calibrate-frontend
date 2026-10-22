@@ -1,5 +1,5 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { KappaCell, KappaValue } from "../KappaCell";
+import { KappaCell } from "../KappaCell";
 
 describe("KappaCell", () => {
   it("shows only the kappa, with its kind on hover of the info icon", async () => {
@@ -61,24 +61,5 @@ describe("KappaCell", () => {
     );
     expect(screen.getByText("—")).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
-  });
-
-  it("shows a muted dash and no pill when KappaValue has no kappa and no reason", () => {
-    render(<KappaValue fields={{ kappa: null, kappa_blank_reason: null }} />);
-    expect(screen.getByText("—").className).toContain("text-muted-foreground");
-  });
-
-  it("shows the number or the pill in KappaValue", () => {
-    const { rerender } = render(<KappaValue fields={{ kappa: 0.123 }} />);
-    expect(screen.getByText("0.12")).toBeInTheDocument();
-    rerender(
-      <KappaValue
-        fields={{ kappa: null, kappa_blank_reason: "too_few_items" }}
-      />,
-    );
-    expect(screen.getByText("Too few items").className).toContain(
-      "rounded-md",
-    );
-    expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
 });

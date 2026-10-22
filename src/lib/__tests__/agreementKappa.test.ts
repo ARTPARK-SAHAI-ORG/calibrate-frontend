@@ -2,7 +2,6 @@ import {
   buildTrendChart,
   formatKappa,
   formatTrendValue,
-  KAPPA_HELP,
   kappaBlank,
   kappaLabel,
   type TrendSeries,
@@ -49,10 +48,6 @@ describe("formatKappa", () => {
     expect(formatKappa(-0.004)).toBe("0.00");
     expect(formatKappa(-0)).toBe("0.00");
   });
-});
-
-it("says what a kappa below 0 means", () => {
-  expect(KAPPA_HELP).toMatch(/below 0 means worse than chance/);
 });
 
 describe("kappaBlank", () => {

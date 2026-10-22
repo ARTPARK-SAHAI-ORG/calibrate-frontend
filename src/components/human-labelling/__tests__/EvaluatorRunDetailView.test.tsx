@@ -1727,7 +1727,7 @@ describe("EvaluatorRunDetailView", () => {
     );
     expect(screen.getByText("Human agreement")).toBeInTheDocument();
     expect(screen.getByText("80%")).toBeInTheDocument();
-    expect(screen.getByText("Cohen's kappa")).toBeInTheDocument();
+    expect(screen.getByText("Kappa")).toBeInTheDocument();
     expect(screen.getByText("0.40")).toBeInTheDocument();
   });
 

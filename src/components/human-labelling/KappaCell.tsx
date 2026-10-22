@@ -53,18 +53,6 @@ function KappaReasonPill({ blank }: { blank: { text: string; help: string } }) {
   );
 }
 
-/** The kappa to two places, the pill saying why there is none, or a muted dash. */
-export function KappaValue({
-  fields,
-}: {
-  fields: KappaFields | null | undefined;
-}) {
-  if (fields?.kappa != null) return <>{formatKappa(fields.kappa)}</>;
-  const blank = kappaBlank(fields);
-  if (blank) return <KappaReasonPill blank={blank} />;
-  return <span className="text-muted-foreground">—</span>;
-}
-
 /** A table cell: the kappa with its kind on hover, the pill saying why there
  * is none, or a dash. */
 export function KappaCell({
@@ -76,13 +64,13 @@ export function KappaCell({
 }) {
   if (fields?.kappa != null) {
     return (
-      <div className="flex items-center gap-1.5">
+      <span className="inline-flex items-center gap-1.5">
         {formatKappa(fields.kappa)}
         <KappaInfoIcon
           content={kappaLabel(fields.kappa_type, oneAgainstOthers)}
           label="Kind of kappa"
         />
-      </div>
+      </span>
     );
   }
   const blank = kappaBlank(fields);

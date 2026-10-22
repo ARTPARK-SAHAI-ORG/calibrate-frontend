@@ -27,10 +27,9 @@ import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { taskOptionsWithAgreement } from "./taskOptions";
 import { parseBackendTime } from "@/lib/relativeTime";
-import { kappaLabel, type KappaFields } from "@/lib/agreementKappa";
+import { type KappaFields } from "@/lib/agreementKappa";
 import {
   KappaCell,
-  KappaValue,
 } from "@/components/human-labelling/KappaCell";
 import { overviewRows } from "@/lib/taskOverviewData";
 
@@ -1056,8 +1055,8 @@ function HumanLabellingPageInner() {
                               : "No agreement yet"}
                           </span>
                           {" · "}
-                          {kappaLabel(annotator.kappa_type, true)}{" "}
-                          <KappaValue fields={annotator} />
+                          Kappa{" "}
+                          <KappaCell fields={annotator} oneAgainstOthers />
                         </div>
                       </>
                     );
@@ -1598,8 +1597,7 @@ function AgreementOverview({
                       : "—"}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {kappaLabel(row.kappa.kappa_type)}{" "}
-                    <KappaValue fields={row.kappa} />
+                    Kappa <KappaCell fields={row.kappa} />
                   </span>
                 </div>
               </div>

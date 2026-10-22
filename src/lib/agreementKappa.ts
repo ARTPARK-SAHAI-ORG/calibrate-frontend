@@ -48,9 +48,6 @@ const KAPPA_LABELS: Record<KappaType, string> = {
   mixed: "Fleiss' kappa, linear weighted for ratings",
 };
 
-export const KAPPA_HELP =
-  "Kappa is agreement after removing what chance alone would produce. 1 means full agreement, 0 means no better than chance, and below 0 means worse than chance";
-
 /** `oneAgainstOthers`: the number compares one annotator with the others,
  * which is Cohen's kappa, so a `mixed` one is named Cohen's, not Fleiss'. */
 export function kappaLabel(

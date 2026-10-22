@@ -318,7 +318,7 @@ describe("AgreementStatCard", () => {
     );
   });
 
-  it("shows kappa beside the agreement number, with its kind named", async () => {
+  it("shows kappa beside the agreement number, with its kind on hover", async () => {
     const user = setupUser();
     render(
       <AgreementStatCard
@@ -330,11 +330,16 @@ describe("AgreementStatCard", () => {
     // Agreement and kappa sit side by side, each named, at the same size.
     expect(screen.getByText("Agreement")).toBeInTheDocument();
     expect(screen.getByText("82%").className).toContain("text-2xl");
-    expect(screen.getByText("-0.13").className).toContain("text-2xl");
-    expect(screen.getByText("Linear weighted Fleiss' kappa")).toBeInTheDocument();
-    await user.hover(screen.getByRole("button", { name: "What kappa means" }));
+    expect(screen.getByText("-0.13").closest("div")!.className).toContain(
+      "text-2xl",
+    );
+    expect(screen.getByText("Kappa")).toBeInTheDocument();
     expect(
-      await screen.findByText(/0 means no better than chance/),
+      screen.queryByText("Linear weighted Fleiss' kappa"),
+    ).not.toBeInTheDocument();
+    await user.hover(screen.getByRole("button", { name: "Kind of kappa" }));
+    expect(
+      await screen.findByText("Linear weighted Fleiss' kappa"),
     ).toBeInTheDocument();
   });
 
@@ -350,9 +355,11 @@ describe("AgreementStatCard", () => {
     const text = document.body.textContent!;
     expect(text.indexOf("Score")).toBeLessThan(text.indexOf("Human agreement"));
     expect(text.indexOf("Human agreement")).toBeLessThan(
-      text.indexOf("Cohen's kappa"),
+      text.indexOf("Kappa"),
     );
-    expect(screen.getByText("0.50").className).toContain("text-2xl");
+    expect(screen.getByText("0.50").closest("div")!.className).toContain(
+      "text-2xl",
+    );
   });
 
   it("shows the reason pill as the third number next to the score", () => {
@@ -368,7 +375,7 @@ describe("AgreementStatCard", () => {
         }}
       />,
     );
-    expect(screen.getByText("Cohen's kappa")).toBeInTheDocument();
+    expect(screen.getByText("Kappa")).toBeInTheDocument();
     expect(screen.getByText("Too few items")).toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
@@ -382,9 +389,9 @@ describe("AgreementStatCard", () => {
       />,
     );
     expect(screen.getByText("Kappa")).toBeInTheDocument();
-    const dash = screen.getByText("—");
-    expect(dash.className).toContain("text-muted-foreground");
-    expect(dash.parentElement!.className).toContain("text-2xl");
+    const dashValue = screen.getByText("—").closest("div")!;
+    expect(dashValue.className).toContain("text-muted-foreground");
+    expect(dashValue.className).toContain("text-2xl");
     expect(screen.queryByText("Too few items")).not.toBeInTheDocument();
     expect(screen.queryByText("Everyone agreed")).not.toBeInTheDocument();
   });
@@ -408,7 +415,7 @@ describe("AgreementStatCard", () => {
         }}
       />,
     );
-    expect(screen.getByText("Fleiss' kappa")).toBeInTheDocument();
+    expect(screen.getByText("Kappa")).toBeInTheDocument();
     expect(screen.getByText("Everyone agreed").className).toContain(
       "rounded-md",
     );
@@ -435,7 +442,7 @@ describe("AgreementStatCard", () => {
         kappa={{ kappa: 0.5, kappa_type: "cohen" }}
       />,
     );
-    expect(screen.queryByText("Cohen's kappa")).not.toBeInTheDocument();
+    expect(screen.queryByText("Kappa")).not.toBeInTheDocument();
   });
 
   it("renders the evaluator pill variant without a version label", () => {
