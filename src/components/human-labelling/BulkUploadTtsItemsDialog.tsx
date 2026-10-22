@@ -5,7 +5,7 @@ import JSZip from "jszip";
 import { apiClient } from "@/lib/api";
 import { LIMITS, showLimitToast } from "@/constants/limits";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { ClippedText } from "@/components/ui";
+import { ClippedText, ErrorNote } from "@/components/ui";
 import { LazyAudioPlayer } from "@/components/evaluations/LazyAudioPlayer";
 import {
   createToneWav,
@@ -509,9 +509,9 @@ export function BulkUploadTtsItemsDialog({
           </div>
 
           {error && (
-            <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">
+            <ErrorNote>
               {error}
-            </div>
+            </ErrorNote>
           )}
 
           {rows.length > 0 && (

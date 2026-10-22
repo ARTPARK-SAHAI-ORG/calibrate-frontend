@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
+import { ErrorNote } from "@/components/ui";
 import {
   nextForBackend,
   storeLoginAndRedirect,
@@ -11,7 +12,6 @@ import {
 import {
   AUTH_BUTTON_CLASS,
   AUTH_BUTTON_LINK_CLASS,
-  AUTH_ERROR_CLASS,
   AuthCard,
   ButtonLoading,
   CONNECTION_ERROR,
@@ -139,7 +139,7 @@ export function VerifyEmail() {
           className="space-y-6"
         >
           <p className="text-gray-600">{EXPIRED}</p>
-          {resendError && <div className={AUTH_ERROR_CLASS}>{resendError}</div>}
+          {resendError && <ErrorNote>{resendError}</ErrorNote>}
           {/* Every link carries its address; only one sent before that did not */}
           {email ? (
             <button type="submit" disabled={resending} className={AUTH_BUTTON_CLASS}>

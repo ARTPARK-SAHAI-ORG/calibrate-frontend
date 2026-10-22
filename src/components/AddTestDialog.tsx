@@ -20,7 +20,7 @@ import {
   isDefaultLLMNextReplyEvaluator,
   matchesDefaultSlug,
 } from "@/lib/defaultEvaluators";
-import { DialogNavRow, showsDialogNav } from "@/components/ui";
+import { DialogNavRow, ErrorNote, showsDialogNav } from "@/components/ui";
 import { ViewItemButton } from "@/components/human-labelling/unsavedCloseGuard";
 import {
   MetadataFieldsEditor,
@@ -4718,11 +4718,11 @@ export function AddTestDialog({
                                       {jsonModeToolIds.has(tool.id) ? (
                                         <div className="space-y-2">
                                           {toolJsonError[tool.id] && (
-                                            <div className="rounded-md border border-red-500 bg-red-500/10 px-4 py-3">
-                                              <p className="text-sm text-red-500 whitespace-pre-line">
+                                            <ErrorNote>
+                                              <p className="whitespace-pre-line">
                                                 {toolJsonError[tool.id]}
                                               </p>
-                                            </div>
+                                            </ErrorNote>
                                           )}
                                           <textarea
                                             value={toolJsonText[tool.id] ?? ""}

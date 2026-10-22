@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
+import { ErrorNote } from "@/components/ui";
 import { nextForBackend, withCallback } from "@/lib/postLoginRedirect";
 import {
   AUTH_BUTTON_CLASS,
-  AUTH_ERROR_CLASS,
   AUTH_INPUT_CLASS,
   AUTH_LABEL_CLASS,
   AUTH_SECONDARY_BUTTON_CLASS,
@@ -78,7 +78,7 @@ export function ForgotPasswordForm() {
   return (
     <AuthCard title="Forgot password">
       <form onSubmit={handleSubmit} className="space-y-5">
-        {error && <div className={AUTH_ERROR_CLASS}>{error}</div>}
+        {error && <ErrorNote>{error}</ErrorNote>}
         <div>
           <label htmlFor="email" className={AUTH_LABEL_CLASS}>
             Email

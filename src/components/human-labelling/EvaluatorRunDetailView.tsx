@@ -46,7 +46,7 @@ import {
   writeUrlParam,
 } from "@/components/human-labelling/valueFilterUrl";
 import { ExpectedToolCalls } from "@/components/human-labelling/item-panes/ExpectedToolCalls";
-import { type MetadataEntry } from "@/components/ui";
+import { ErrorNote, type MetadataEntry } from "@/components/ui";
 import { hasItemDetails, ItemDetailsBlock } from "./ItemDetailsBlock";
 import type { ReviewItem } from "./SendForReviewFlow";
 
@@ -2051,9 +2051,9 @@ export function EvaluatorRunDetailView({
         </div>
       )}
       {topError && (
-        <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
+        <ErrorNote>
           {topError}
-        </div>
+        </ErrorNote>
       )}
 
       <EvaluatorSummary
@@ -2235,14 +2235,14 @@ export function EvaluatorRunDetailView({
       </div>
 
       {job.status === "failed" && job.error && (
-        <div className="border border-red-500/30 bg-red-500/10 rounded-xl p-4">
-          <h2 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-2">
+        <ErrorNote>
+          <h2 className="font-semibold mb-2">
             Run failed
           </h2>
-          <pre className="text-xs font-mono text-red-700 dark:text-red-300 whitespace-pre-wrap break-words">
+          <pre className="font-mono whitespace-pre-wrap break-words">
             {job.error}
           </pre>
-        </div>
+        </ErrorNote>
       )}
 
       {linkEvaluators && (

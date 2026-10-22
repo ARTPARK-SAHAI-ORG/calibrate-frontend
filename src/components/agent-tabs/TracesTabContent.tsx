@@ -35,6 +35,7 @@ import { CodeIcon, SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
   Button,
+  ErrorNote,
   LoadingState,
   SearchInput,
   SegmentedFilter,
@@ -757,7 +758,7 @@ export function TracesTabContent({
   if (error) {
     return (
       <div className="flex flex-col space-y-4 md:space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">
+        <ErrorNote className="flex flex-wrap items-center justify-between gap-3">
           <span>{error}</span>
           {/* The same arrow RunFailureBox uses, so a retry looks the same
               wherever something failed. It stays in its waiting state until
@@ -783,7 +784,7 @@ export function TracesTabContent({
             </svg>
             {isRefreshing ? "Trying again" : "Try again"}
           </button>
-        </div>
+        </ErrorNote>
         {showEmptyState && emptyState}
       </div>
     );

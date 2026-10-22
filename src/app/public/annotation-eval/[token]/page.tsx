@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { ErrorNote } from "@/components/ui";
 import {
   PublicPageLayout,
   PublicNotFound,
@@ -99,9 +100,7 @@ export default function PublicEvaluatorRunPage() {
   if (error || !job || !task) {
     return (
       <PublicPageLayout title="Evaluation run">
-        <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-500">
-          {error ?? "Failed to load run"}
-        </div>
+        <ErrorNote>{error ?? "Failed to load run"}</ErrorNote>
       </PublicPageLayout>
     );
   }

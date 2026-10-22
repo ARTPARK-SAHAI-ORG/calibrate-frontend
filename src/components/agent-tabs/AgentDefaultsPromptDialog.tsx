@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { ErrorNote } from "@/components/ui";
 
 export type AgentDefaultsPromptEvaluator = {
   uuid: string;
@@ -93,18 +94,13 @@ export function AgentDefaultsPromptDialog({
           ))}
         </ul>
         {error && (
-          <div
-            role="alert"
-            className="mb-4 rounded-lg border border-red-500/40 bg-red-500/5 px-3 py-2.5"
-          >
-            <p className="text-sm font-medium text-red-600 dark:text-red-400">
+          <ErrorNote className="mb-4">
+            <p className="font-medium">
               {isOne ? "Could not attach the evaluator" : "Could not attach the evaluators"}
             </p>
-            <p className="text-sm text-red-600/90 dark:text-red-400/90 mt-1">
-              {error}
-            </p>
+            <p className="mt-1">{error}</p>
             <p className="text-xs text-muted-foreground mt-2">{savedNote}</p>
-          </div>
+          </ErrorNote>
         )}
         <div className="flex items-center justify-end gap-3">
           <button

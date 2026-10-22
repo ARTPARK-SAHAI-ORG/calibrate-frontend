@@ -217,7 +217,9 @@ describe("useVerifyConnection", () => {
       });
 
       expect(success).toBe(false);
-      expect(result.current.verifyError).toBe("Verification request failed");
+      expect(result.current.verifyError).toBe(
+        "Something went wrong on our end. Please try again in a moment.",
+      );
     });
 
     it("sets generic error when fetch rejects with a non-Error", async () => {
@@ -471,6 +473,21 @@ describe("useVerifyConnection", () => {
       expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
     });
 
+    it("shows the backend's reason in plain words when the address is refused", async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ detail: "agent_url must not point to localhost" }, 400),
+      );
+      const { result } = renderHook(() => useVerifyConnection());
+
+      await act(async () => {
+        await result.current.verifyAdHoc("http://localhost:8080");
+      });
+
+      expect(result.current.verifyError).toBe(
+        "This URL points to a private or internal network address. Use a public URL that can be reached from the internet.",
+      );
+    });
+
     it("sets generic error when response not ok (non-401)", async () => {
       fetchMock.mockResolvedValueOnce(jsonResponse({}, 500));
       const { result } = renderHook(() => useVerifyConnection());
@@ -481,7 +498,9 @@ describe("useVerifyConnection", () => {
       });
 
       expect(success).toBe(false);
-      expect(result.current.verifyError).toBe("Verification request failed");
+      expect(result.current.verifyError).toBe(
+        "Something went wrong on our end. Please try again in a moment.",
+      );
     });
 
     it("sets generic error when fetch throws a non-Error", async () => {

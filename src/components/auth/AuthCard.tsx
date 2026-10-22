@@ -10,8 +10,6 @@ export const AUTH_INPUT_CLASS =
 export const AUTH_LABEL_CLASS = "block text-sm font-medium text-gray-700 mb-2";
 export const AUTH_BUTTON_CLASS =
   "w-full py-3 px-4 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
-export const AUTH_ERROR_CLASS =
-  "p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm";
 // The login page's "Continue with Google" button, for the second action on a card
 export const AUTH_SECONDARY_BUTTON_CLASS =
   "w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 cursor-pointer";

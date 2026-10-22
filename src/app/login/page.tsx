@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
+import { ErrorNote } from "@/components/ui";
 import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
 import {
@@ -187,9 +188,9 @@ export default function LoginPage() {
             {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
-                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                <ErrorNote>
                   <TextWithEmail text={error} email={email.trim()} />
-                </div>
+                </ErrorNote>
               )}
 
               <div>

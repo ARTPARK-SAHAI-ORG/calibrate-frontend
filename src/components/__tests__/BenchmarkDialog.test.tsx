@@ -600,6 +600,34 @@ describe("BenchmarkDialog", () => {
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
   });
 
+  it("connection agent: a refused address shows the backend's reason in plain words", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      status: 400,
+      ok: false,
+      json: async () => ({
+        detail:
+          "agent_url must not resolve to a private or reserved network address",
+      }),
+    });
+    const user = setupUser();
+    render(<BenchmarkDialog {...baseProps({ agentType: "connection" })} />);
+
+    await user.click(screen.getByText("Select a model"));
+    await user.click(screen.getByText("select-openai/gpt-4o"));
+    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Start the comparison" }),
+    );
+    await user.click(screen.getByText("Confirm"));
+
+    await user.click(await screen.findByRole("button", { name: /see why/i }));
+    expect(
+      screen.getByText(
+        "This URL points to a private or internal network address. Use a public URL that can be reached from the internet.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("401 response triggers signOut and treats model as not verified", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       status: 401,

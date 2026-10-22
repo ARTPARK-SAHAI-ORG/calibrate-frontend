@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
+import { ErrorNote } from "@/components/ui";
 import {
   nextForBackend,
   storeLoginAndRedirect,
@@ -10,7 +11,6 @@ import {
 } from "@/lib/postLoginRedirect";
 import {
   AUTH_BUTTON_CLASS,
-  AUTH_ERROR_CLASS,
   AUTH_BUTTON_LINK_CLASS,
   AuthCard,
   ButtonLoading,
@@ -146,7 +146,7 @@ export function ResetPasswordForm() {
           <p className="text-gray-600">
             This link has expired. Request a new password verification link.
           </p>
-          {resendError && <div className={AUTH_ERROR_CLASS}>{resendError}</div>}
+          {resendError && <ErrorNote>{resendError}</ErrorNote>}
           {email ? (
             <button
               type="button"
@@ -172,7 +172,7 @@ export function ResetPasswordForm() {
   return (
     <AuthCard title="Reset password">
       <form onSubmit={handleSubmit} className="space-y-5">
-        {error && <div className={AUTH_ERROR_CLASS}>{error}</div>}
+        {error && <ErrorNote>{error}</ErrorNote>}
         <NewPasswordFields
           password={password}
           onPasswordChange={setPassword}

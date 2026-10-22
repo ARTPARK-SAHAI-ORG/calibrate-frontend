@@ -535,7 +535,43 @@ describe("Agents", () => {
     await user.click(screen.getByText("Create"));
 
     await waitFor(() =>
-      expect(screen.getByText("Failed to create agent")).toBeInTheDocument(),
+      expect(
+        screen.getByText("Something went wrong on our end. Please try again in a moment."),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("shows the backend's reason in plain words when the agent's address is refused", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce(jsonResponse([]));
+    const user = setupUser();
+    render(<Agents />);
+    await waitFor(() =>
+      expect(screen.getByText("No agents found")).toBeInTheDocument(),
+    );
+    await user.click(screen.getAllByText("New agent")[0]);
+    await typeAgentName(user, "Agent Z");
+    await user.click(screen.getByText("Next"));
+    await user.click(screen.getByText("Conversation"));
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      clone() {
+        return this;
+      },
+      json: async () => ({
+        detail:
+          "agent_url must not resolve to a private or reserved network address",
+      }),
+    });
+    await user.click(screen.getByText("Create"));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "This URL points to a private or internal network address. Use a public URL that can be reached from the internet.",
+        ),
+      ).toBeInTheDocument(),
     );
   });
 

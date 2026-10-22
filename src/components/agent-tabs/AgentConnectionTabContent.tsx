@@ -12,7 +12,7 @@ import {
   VerifyRequestPreviewDialog,
   type MessageRow,
 } from "@/components/VerifyRequestPreviewDialog";
-import { CopyCodeButton } from "@/components/ui";
+import { CopyCodeButton, ErrorNote } from "@/components/ui";
 import {
   CustomFieldsEditor,
   deriveInputs,
@@ -702,10 +702,8 @@ export function AgentConnectionTabContent({
 
           {verifyStatus === "failed" &&
             (verifyError || verify.verifySampleResponse) && (
-              <div className="space-y-2 rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-                {verifyError && (
-                  <p className="text-xs text-red-400">{verifyError}</p>
-                )}
+              <ErrorNote className="space-y-2">
+                {verifyError && <p>{verifyError}</p>}
                 {verify.verifySampleResponse && (
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-muted-foreground">
@@ -726,7 +724,7 @@ export function AgentConnectionTabContent({
                     </div>
                   </div>
                 )}
-              </div>
+              </ErrorNote>
             )}
         </div>
 

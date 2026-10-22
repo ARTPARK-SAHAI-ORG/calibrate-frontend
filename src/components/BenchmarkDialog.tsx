@@ -16,6 +16,8 @@ import {
 import { workspaceRunModelsInParallel } from "@/lib/orgs";
 import { overEvalLimit } from "@/lib/evalLimit";
 import { reportError } from "@/lib/reportError";
+import { parseBackendErrorResponse } from "@/lib/parseBackendError";
+import { friendlyUrlError } from "@/lib/urlErrorMessage";
 import { getDefaultHeaders } from "@/lib/api";
 import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
 import type { SelectedTest } from "@/components/eval-details/SelectedTestsStrip";
@@ -27,7 +29,7 @@ import {
   TrashIcon,
   PlayIcon,
 } from "@/components/icons";
-import { Button, ConfirmDialog } from "@/components/ui";
+import { Button, ConfirmDialog, ErrorNote } from "@/components/ui";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import {
   VerifyRequestPreviewDialog,
@@ -240,7 +242,13 @@ export function BenchmarkDialog({
         return { verified: false, error: "Unauthorized" };
       }
 
-      if (!response.ok) throw new Error("Verification request failed");
+      if (!response.ok) {
+        throw new Error(
+          friendlyUrlError(
+            await parseBackendErrorResponse(response, "Error verifying model"),
+          ),
+        );
+      }
 
       const result = await response.json();
       const verified: boolean = result.success ?? false;
@@ -692,9 +700,9 @@ export function BenchmarkDialog({
                   expandedModelError === selectedModel.id &&
                   benchmarkModelsVerified[selectedModel.id] &&
                   !benchmarkModelsVerified[selectedModel.id].verified && (
-                    <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-2 space-y-1 md:absolute md:left-full md:top-0 md:ml-9 md:w-80 md:max-h-80 md:overflow-y-auto md:rounded-xl md:border-0 md:bg-background md:p-4 md:shadow-2xl">
+                    <ErrorNote className="space-y-1 md:absolute md:left-full md:top-0 md:ml-9 md:w-80 md:max-h-80 md:overflow-y-auto md:rounded-xl md:border-0 md:bg-background md:p-4 md:shadow-2xl">
                       {benchmarkModelsVerified[selectedModel.id]?.error && (
-                        <p className="text-xs text-red-400 break-words">
+                        <p className="break-words">
                           {benchmarkModelsVerified[selectedModel.id].error}
                         </p>
                       )}
@@ -712,7 +720,7 @@ export function BenchmarkDialog({
                           </pre>
                         </div>
                       )}
-                    </div>
+                    </ErrorNote>
                   )}
               </div>
             ))}

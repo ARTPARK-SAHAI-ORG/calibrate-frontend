@@ -11,13 +11,18 @@ import { DuplicateAgentDialog } from "@/components/DuplicateAgentDialog";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
 import { Tooltip } from "@/components/Tooltip";
 import {
+  ErrorNote,
   InteractionTypePill,
   InteractionTypeChooser,
   type InteractionType,
 } from "@/components/ui";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { useAccessToken, useAgentDeletion } from "@/hooks";
-import { readNameConflictMessage } from "@/lib/parseBackendError";
+import {
+  parseBackendErrorResponse,
+  readNameConflictMessage,
+} from "@/lib/parseBackendError";
+import { friendlyUrlError } from "@/lib/urlErrorMessage";
 
 type Agent = {
   uuid: string;
@@ -832,7 +837,11 @@ function NewAgentDialog({
           setStep(1);
           return;
         }
-        throw new Error("Failed to create agent");
+        throw new Error(
+          friendlyUrlError(
+            await parseBackendErrorResponse(response, "Error creating agent"),
+          ),
+        );
       }
 
       const data = await response.json();
@@ -1022,9 +1031,7 @@ function NewAgentDialog({
 
             {/* Error Message */}
             {error && (
-              <div className="mb-5 p-3 rounded-md bg-red-500/10 border border-red-500/20">
-                <p className="text-[13px] text-red-500">{error}</p>
-              </div>
+              <ErrorNote className="mb-5">{error}</ErrorNote>
             )}
 
             {/* Footer Buttons */}
