@@ -41,7 +41,7 @@ jest.mock("../../hooks/useOrganizations", () => ({
 }));
 
 import { signOut } from "next-auth/react";
-import OpeningPage from "../opening/page";
+import OpeningPage from "../OpeningWorkspace";
 
 const PERSONAL = "8f3c1a2b-4d5e-4f6a-8b9c-0d1e2f3a4b5c";
 const TEAM = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
