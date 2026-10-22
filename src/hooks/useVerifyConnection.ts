@@ -1,5 +1,7 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import { parseBackendErrorResponse } from "@/lib/parseBackendError";
+import { friendlyUrlError } from "@/lib/urlErrorMessage";
 
 import { useState, useCallback } from "react";
 import { signOut } from "next-auth/react";
@@ -52,7 +54,13 @@ export function useVerifyConnection(): VerifyConnectionResult {
       return false;
     }
 
-    if (!response.ok) throw new Error("Verification request failed");
+    if (!response.ok) {
+      throw new Error(
+        friendlyUrlError(
+          await parseBackendErrorResponse(response, "Error verifying connection"),
+        ),
+      );
+    }
 
     const result = await response.json();
     const success: boolean = result.success ?? false;

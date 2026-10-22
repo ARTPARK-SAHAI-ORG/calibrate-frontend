@@ -16,6 +16,8 @@ import {
 import { workspaceRunModelsInParallel } from "@/lib/orgs";
 import { overEvalLimit } from "@/lib/evalLimit";
 import { reportError } from "@/lib/reportError";
+import { parseBackendErrorResponse } from "@/lib/parseBackendError";
+import { friendlyUrlError } from "@/lib/urlErrorMessage";
 import { getDefaultHeaders } from "@/lib/api";
 import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
 import type { SelectedTest } from "@/components/eval-details/SelectedTestsStrip";
@@ -240,7 +242,13 @@ export function BenchmarkDialog({
         return { verified: false, error: "Unauthorized" };
       }
 
-      if (!response.ok) throw new Error("Verification request failed");
+      if (!response.ok) {
+        throw new Error(
+          friendlyUrlError(
+            await parseBackendErrorResponse(response, "Error verifying model"),
+          ),
+        );
+      }
 
       const result = await response.json();
       const verified: boolean = result.success ?? false;
