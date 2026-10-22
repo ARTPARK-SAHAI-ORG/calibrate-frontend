@@ -41,14 +41,15 @@ export function KappaInfoIcon({
   );
 }
 
-/** Why there is no kappa, as a pill that explains itself on hover. */
+/** Why there is no kappa: a pill, and an info icon that explains it on hover. */
 function KappaReasonPill({ blank }: { blank: { text: string; help: string } }) {
   return (
-    <Tooltip content={blank.help} className="inline-block align-middle">
+    <span className="inline-flex items-center gap-1.5 align-middle">
       <span className={`${agreementStatPillBase} cursor-default`}>
         {blank.text}
       </span>
-    </Tooltip>
+      <KappaInfoIcon content={blank.help} label="Why there is no kappa" />
+    </span>
   );
 }
 

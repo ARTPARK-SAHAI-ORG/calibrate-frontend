@@ -413,7 +413,9 @@ describe("AgreementStatCard", () => {
       "rounded-md",
     );
     expect(screen.queryByText("—")).not.toBeInTheDocument();
-    await user.hover(screen.getByText("Everyone agreed"));
+    await user.hover(
+      screen.getByRole("button", { name: "Why there is no kappa" }),
+    );
     expect(
       await screen.findByText(
         "Every answer was the same, so chance alone would also agree every time and kappa cannot be worked out",

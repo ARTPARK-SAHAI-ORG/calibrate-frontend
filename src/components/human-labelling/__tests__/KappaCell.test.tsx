@@ -45,9 +45,10 @@ describe("KappaCell", () => {
       );
       expect(screen.getByText(text).className).toContain("rounded-md");
       expect(screen.queryByText("—")).not.toBeInTheDocument();
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
       expect(screen.queryByText(help)).not.toBeInTheDocument();
-      await user.hover(screen.getByText(text));
+      await user.hover(
+        screen.getByRole("button", { name: "Why there is no kappa" }),
+      );
       expect(await screen.findByText(help)).toBeInTheDocument();
     },
   );
