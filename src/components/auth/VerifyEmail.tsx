@@ -12,8 +12,6 @@ import {
   AUTH_BUTTON_CLASS,
   AUTH_BUTTON_LINK_CLASS,
   AUTH_ERROR_CLASS,
-  AUTH_INPUT_CLASS,
-  AUTH_LABEL_CLASS,
   AuthCard,
   ButtonLoading,
   CONNECTION_ERROR,
@@ -38,7 +36,6 @@ export function VerifyEmail() {
   const [search, setSearch] = useState("");
   // The address the link was sent to, which a new link is sent to
   const [email, setEmail] = useState("");
-  const [linkHasEmail, setLinkHasEmail] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendError, setResendError] = useState("");
   // The link works once, so a second request (React runs effects twice in
@@ -54,7 +51,6 @@ export function VerifyEmail() {
     const token = params.get("token");
     const address = params.get("email") ?? "";
     setEmail(address);
-    setLinkHasEmail(Boolean(address));
     if (!token) {
       setState({ kind: "expired" });
       return;
@@ -86,7 +82,7 @@ export function VerifyEmail() {
       const response = await fetch(`${getBackendUrl()}/auth/resend-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), next: nextForBackend(search) }),
+        body: JSON.stringify({ email, next: nextForBackend(search) }),
       });
       if (!response.ok) {
         setResendError("Could not send a new link. Please try again.");
@@ -144,26 +140,14 @@ export function VerifyEmail() {
         >
           <p className="text-gray-600">{EXPIRED}</p>
           {resendError && <div className={AUTH_ERROR_CLASS}>{resendError}</div>}
-          {/* A link sent before links carried the address has to ask for it */}
-          {!linkHasEmail && (
-            <div>
-              <label htmlFor="email" className={AUTH_LABEL_CLASS}>
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                required
-                className={AUTH_INPUT_CLASS}
-              />
-            </div>
+          {/* Every link carries its address; only one sent before that did not */}
+          {email ? (
+            <button type="submit" disabled={resending} className={AUTH_BUTTON_CLASS}>
+              {resending ? <ButtonLoading text="Sending..." /> : "Send verification email"}
+            </button>
+          ) : (
+            signIn
           )}
-          <button type="submit" disabled={resending} className={AUTH_BUTTON_CLASS}>
-            {resending ? <ButtonLoading text="Sending..." /> : "Send verification email"}
-          </button>
         </form>
       </AuthCard>
     );

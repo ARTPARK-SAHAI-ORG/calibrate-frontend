@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBackendUrl } from "@/lib/api";
-import { storeLoginAndRedirect, withCallback } from "@/lib/postLoginRedirect";
+import {
+  nextForBackend,
+  storeLoginAndRedirect,
+  withCallback,
+} from "@/lib/postLoginRedirect";
 import {
   AUTH_BUTTON_CLASS,
   AUTH_ERROR_CLASS,
@@ -11,6 +15,8 @@ import {
   AuthCard,
   ButtonLoading,
   CONNECTION_ERROR,
+  SentTick,
+  TextWithEmail,
   useAuthSearch,
 } from "./AuthCard";
 import { NewPasswordFields } from "./PasswordFields";
@@ -44,6 +50,27 @@ export function ResetPasswordForm() {
       .finally(() => setChecking(false));
   }, []);
   const [isLoading, setIsLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendError, setResendError] = useState("");
+  const [sentTo, setSentTo] = useState("");
+
+  const resend = async (email: string) => {
+    setResendError("");
+    setResending(true);
+    try {
+      const response = await fetch(`${getBackendUrl()}/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, next: nextForBackend(search) }),
+      });
+      if (response.ok) setSentTo(email);
+      else setResendError("Could not send a new link. Please try again.");
+    } catch {
+      setResendError(CONNECTION_ERROR);
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,19 +124,46 @@ export function ResetPasswordForm() {
     );
   }
 
+  if (sentTo) {
+    return (
+      <AuthCard title="Reset email sent" icon={<SentTick />}>
+        <p className="text-gray-600">
+          <TextWithEmail
+            text={`We sent a new link to ${sentTo}. Click it to choose a new password.`}
+            email={sentTo}
+          />
+        </p>
+      </AuthCard>
+    );
+  }
+
   if (expired) {
+    // A link carries its address, so a new one is sent without typing it
+    const email = new URLSearchParams(search).get("email");
     return (
       <AuthCard title="Reset password">
         <div className="space-y-6">
           <p className="text-gray-600">
             This link has expired. Request a new password verification link.
           </p>
-          <Link
-            href={withCallback("/forgot-password", search)}
-            className={AUTH_BUTTON_LINK_CLASS}
-          >
-            Get a new reset link
-          </Link>
+          {resendError && <div className={AUTH_ERROR_CLASS}>{resendError}</div>}
+          {email ? (
+            <button
+              type="button"
+              onClick={() => resend(email)}
+              disabled={resending}
+              className={AUTH_BUTTON_CLASS}
+            >
+              {resending ? <ButtonLoading text="Sending..." /> : "Send reset link"}
+            </button>
+          ) : (
+            <Link
+              href={withCallback("/forgot-password", search)}
+              className={AUTH_BUTTON_LINK_CLASS}
+            >
+              Send reset link
+            </Link>
+          )}
         </div>
       </AuthCard>
     );

@@ -1,5 +1,5 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { LOGIN, setLocation } from "@/test-utils/auth";
+import { LOGIN, fullText, setLocation } from "@/test-utils/auth";
 import { waitFor } from "@testing-library/react";
 import { ResetPasswordForm } from "../ResetPasswordForm";
 
@@ -48,10 +48,55 @@ describe("ResetPasswordForm", () => {
 
     expect(await screen.findByText(EXPIRED)).toBeInTheDocument();
     expect(screen.queryByLabelText("Password")).toBeNull();
+    // No address in this link, so it can only go to the forgot password page
     expect(
-      screen.getByRole("link", { name: "Get a new reset link" }),
+      screen.getByRole("link", { name: "Send reset link" }),
     ).toHaveAttribute("href", "/forgot-password?callbackUrl=%2Fpersonas");
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ token: "old" });
+  });
+
+  it("sends a new reset link straight away to the address the link carries", async () => {
+    setLocation("?token=old&email=a%40b.co&callbackUrl=%2Fpersonas");
+    const fetchMock = mockBackend(
+      [400, { detail: "invalid_or_expired_token" }],
+      [202, { status: "sent" }],
+    );
+    const user = setupUser();
+    render(<ResetPasswordForm />);
+
+    await user.click(await screen.findByRole("button", { name: "Send reset link" }));
+    expect(await screen.findByText("Reset email sent")).toBeInTheDocument();
+    expect(
+      screen.getByText(fullText("We sent a new link to a@b.co. Click it to choose a new password.")),
+    ).toBeInTheDocument();
+    const [url, init] = fetchMock.mock.calls[1];
+    expect(url).toMatch(/\/auth\/forgot-password$/);
+    expect(JSON.parse(String(init?.body))).toEqual({ email: "a@b.co", next: "/personas" });
+  });
+
+  it("says so and keeps the button when sending a new link fails", async () => {
+    setLocation("?token=old&email=a%40b.co");
+    mockBackend([400, { detail: "invalid_or_expired_token" }], [500, {}]);
+    const user = setupUser();
+    render(<ResetPasswordForm />);
+
+    await user.click(await screen.findByRole("button", { name: "Send reset link" }));
+    expect(
+      await screen.findByText("Could not send a new link. Please try again."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send reset link" })).toBeEnabled();
+  });
+
+  it("says when sending a new link cannot reach the server", async () => {
+    setLocation("?token=old&email=a%40b.co");
+    mockBackend([400, { detail: "invalid_or_expired_token" }], "unreachable");
+    const user = setupUser();
+    render(<ResetPasswordForm />);
+
+    await user.click(await screen.findByRole("button", { name: "Send reset link" }));
+    expect(
+      await screen.findByText("Unable to connect to server. Please try again later."),
+    ).toBeInTheDocument();
   });
 
   it("says the same for an address with no token, and asks nothing", async () => {

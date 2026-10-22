@@ -75,22 +75,18 @@ describe("VerifyEmail", () => {
     expect(localStorage.getItem("access_token")).toBeNull();
   });
 
-  it("asks for the address when the link does not carry one", async () => {
-    setLocation("?token=old");
-    const fetchMock = mockFetchSequence(
-      [400, { detail: "expired_token" }],
-      [202, { status: "sent", email: "a@b.co" }],
-    );
-    const user = setupUser();
+  it("offers sign in for a link that does not carry its address", async () => {
+    setLocation("?token=old&callbackUrl=%2Finvite%2Ftok");
+    const fetchMock = mockFetchOnce(400, { detail: "expired_token" });
     render(<VerifyEmail />);
 
     expect(await screen.findByText(EXPIRED)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Email")).toBeNull();
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      "/login?callbackUrl=%2Finvite%2Ftok",
+    );
     expect(sentBody(fetchMock)).toEqual({ token: "old" });
-    await user.type(screen.getByLabelText("Email"), " a@b.co ");
-    await user.click(screen.getByRole("button", { name: "Send verification email" }));
-
-    expect(await screen.findByText("Verification email sent")).toBeInTheDocument();
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ email: "a@b.co" });
   });
 
   it("asks nothing when the address has no token", async () => {
