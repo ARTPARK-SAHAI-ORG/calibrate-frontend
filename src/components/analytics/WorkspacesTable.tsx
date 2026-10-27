@@ -7,8 +7,8 @@ import { CARD_GROUPS, formatCost, formatCount, formatWhen } from "./format";
 
 type Key = Exclude<keyof AnalyticsWorkspaceRow, "owner">;
 
-function ownerName(row: AnalyticsWorkspaceRow): string {
-  return `${row.owner?.first_name ?? ""} ${row.owner?.last_name ?? ""}`.trim();
+function ownerName(owner: NonNullable<AnalyticsWorkspaceRow["owner"]>): string {
+  return `${owner.first_name} ${owner.last_name}`.trim();
 }
 
 // The same counts, labels and order as the cards above the table.
@@ -100,7 +100,7 @@ export function WorkspacesTable({ rows }: { rows: AnalyticsWorkspaceRow[] }) {
                           <Tooltip
                             content={
                               <>
-                                {ownerName(row) && <div>{ownerName(row)}</div>}
+                                {ownerName(row.owner) && <div>{ownerName(row.owner)}</div>}
                                 <div>{row.owner.email}</div>
                               </>
                             }
@@ -124,7 +124,7 @@ export function WorkspacesTable({ rows }: { rows: AnalyticsWorkspaceRow[] }) {
                 <p className={`text-[14px] font-medium ${row.owner ? "" : "mb-2"}`}>{row.name}</p>
                 {row.owner && (
                   <p className="text-[12px] text-muted-foreground mb-2">
-                    {[ownerName(row), row.owner.email].filter(Boolean).join(" · ")}
+                    {[ownerName(row.owner), row.owner.email].filter(Boolean).join(" · ")}
                   </p>
                 )}
                 <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
