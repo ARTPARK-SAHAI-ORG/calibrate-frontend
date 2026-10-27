@@ -2,9 +2,14 @@
 
 import { useState } from "react";
 import type { AnalyticsWorkspaceRow } from "@/lib/analyticsApi";
+import { Tooltip } from "@/components/Tooltip";
 import { CARD_GROUPS, formatCost, formatCount, formatWhen } from "./format";
 
-type Key = keyof AnalyticsWorkspaceRow;
+type Key = Exclude<keyof AnalyticsWorkspaceRow, "owner">;
+
+function ownerName(row: AnalyticsWorkspaceRow): string {
+  return `${row.owner?.first_name ?? ""} ${row.owner?.last_name ?? ""}`.trim();
+}
 
 // The same counts, labels and order as the cards above the table.
 const COLUMNS: { key: Key; label: string }[] = [
@@ -91,7 +96,20 @@ export function WorkspacesTable({ rows }: { rows: AnalyticsWorkspaceRow[] }) {
                             : "whitespace-nowrap"
                         }`}
                       >
-                        {cell(row, col.key)}
+                        {i === 0 && row.owner ? (
+                          <Tooltip
+                            content={
+                              <>
+                                {ownerName(row) && <div>{ownerName(row)}</div>}
+                                <div>{row.owner.email}</div>
+                              </>
+                            }
+                          >
+                            {row.name}
+                          </Tooltip>
+                        ) : (
+                          cell(row, col.key)
+                        )}
                       </td>
                     ))}
                   </tr>
@@ -103,7 +121,12 @@ export function WorkspacesTable({ rows }: { rows: AnalyticsWorkspaceRow[] }) {
           <div className="md:hidden space-y-3">
             {sorted.map((row) => (
               <div key={row.org_uuid} className="border rounded-xl p-4 bg-muted/10">
-                <p className="text-[14px] font-medium mb-2">{row.name}</p>
+                <p className={`text-[14px] font-medium ${row.owner ? "" : "mb-2"}`}>{row.name}</p>
+                {row.owner && (
+                  <p className="text-[12px] text-muted-foreground mb-2">
+                    {[ownerName(row), row.owner.email].filter(Boolean).join(" · ")}
+                  </p>
+                )}
                 <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
                   {COLUMNS.slice(1).map((col) => (
                     <div key={col.key}>
