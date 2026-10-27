@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import {
@@ -109,67 +109,118 @@ function SortHeader({
 
 const DASH = <span className="text-sm text-muted-foreground">—</span>;
 
-/** One measure: the agreement and its kappa on one line, a chance bar under
- * them, or a muted dash when there is no agreement. `roomy` gives a hover box
- * a larger number and more space above the bar than a table cell has. */
+/**
+ * One measure's agreement, kappa and chance bar, laid out three ways:
+ * - `table`: agreement and kappa on one line over the bar, for a table cell.
+ * - `hover`: the same with a larger number and more room, for a hover box.
+ * - `card`: a large number, the bar, then the chance and the kappa on one
+ *   line, for a column of a card.
+ * With no agreement it is a muted dash, large in a card.
+ */
 export function MeasureCell({
   group,
-  roomy = false,
+  variant = "table",
 }: {
   group: AgreementGroup;
-  roomy?: boolean;
+  variant?: "table" | "hover" | "card";
 }) {
-  if (group.current == null) return DASH;
+  if (group.current == null)
+    return variant === "card" ? (
+      <div className="text-2xl font-semibold text-muted-foreground">—</div>
+    ) : (
+      DASH
+    );
+  const percent = `${Math.round(group.current * 100)}%`;
+  const kappa = (
+    <span className="inline-flex flex-wrap items-center gap-1 min-w-0 text-xs text-muted-foreground tabular-nums">
+      Kappa
+      <KappaCell fields={group} />
+    </span>
+  );
+  // pt-1 on top of the bar's own 8px gives 12px above it.
+  const bar = (
+    <div className={variant === "table" ? "" : "pt-1"}>
+      <ChanceBar
+        agreement={group.current}
+        chanceAgreement={group.chance_agreement}
+      />
+    </div>
+  );
+  if (variant === "card") {
+    const chance = group.chance_agreement;
+    return (
+      <div className="min-w-0 w-full">
+        <div className="text-2xl font-semibold tabular-nums text-foreground">
+          {percent}
+        </div>
+        {bar}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
+          <span>{chance != null ? `Chance ${Math.round(chance * 100)}%` : ""}</span>
+          {kappa}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-w-0 w-full">
       {/* Wraps in a narrow column rather than spilling into the next one. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <span
-          className={`${roomy ? "text-base" : "text-sm"} font-semibold tabular-nums text-foreground`}
+          className={`${variant === "hover" ? "text-base" : "text-sm"} font-semibold tabular-nums text-foreground`}
         >
-          {Math.round(group.current * 100)}%
+          {percent}
         </span>
-        <span className="inline-flex flex-wrap items-center gap-1 min-w-0 text-xs text-muted-foreground tabular-nums">
-          Kappa
-          <KappaCell fields={group} />
-        </span>
+        {kappa}
       </div>
-      <div className={roomy ? "pt-1" : ""}>
-        <ChanceBar
-          agreement={group.current}
-          chanceAgreement={group.chance_agreement}
-        />
-      </div>
+      {bar}
     </div>
   );
 }
 
 const ANSWER_KINDS: AnswerKind[] = ["binary", "rating"];
 
-/** One line per kind of answer: its label at one width so the values line
- * up, then that kind's agreement, kappa and chance bar, or a muted dash. */
-export function AnswerKindLines({
+/**
+ * An annotator's agreement with the others in one card of three equal
+ * columns: overall, then binary and rating labels each with its own bar.
+ * The columns stack on a narrow screen.
+ */
+export function AgreementByKindCard({
+  overall,
   kinds,
 }: {
+  overall: number | null | undefined;
   kinds: readonly KappaByKind[] | null | undefined;
 }) {
+  const column = (title: string, content: ReactNode) => (
+    <div key={title} className="p-6 min-w-0">
+      <div className="text-sm font-medium text-foreground mb-3">{title}</div>
+      {content}
+    </div>
+  );
   return (
-    <div className="space-y-3">
+    <div className="border border-border rounded-xl bg-background grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border">
+      {column(
+        "Overall",
+        overall != null ? (
+          <div className="text-2xl font-semibold tabular-nums text-foreground">
+            {Math.round(overall * 100)}%
+          </div>
+        ) : (
+          <div className="text-2xl font-semibold text-muted-foreground">—</div>
+        ),
+      )}
       {ANSWER_KINDS.map((kind) => {
         const entry = kinds?.find((k) => k.answer_kind === kind);
-        return (
-          <div key={kind} className="flex items-start gap-3">
-            <span className="w-28 shrink-0 text-sm font-medium text-foreground">
-              {kind === "binary" ? "Binary labels" : "Rating labels"}
-            </span>
-            <MeasureCell
-              group={{
-                ...entry,
-                current: entry?.agreement ?? null,
-                pair_count: entry?.pair_count ?? 0,
-              }}
-            />
-          </div>
+        return column(
+          kind === "binary" ? "Binary labels" : "Rating labels",
+          <MeasureCell
+            variant="card"
+            group={{
+              ...entry,
+              current: entry?.agreement ?? null,
+              pair_count: entry?.pair_count ?? 0,
+            }}
+          />,
         );
       })}
     </div>

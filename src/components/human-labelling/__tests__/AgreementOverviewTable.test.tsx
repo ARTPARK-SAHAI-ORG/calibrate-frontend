@@ -341,12 +341,35 @@ describe("MeasureCell", () => {
     ).toBeNull();
   });
 
-  it("has a larger number and more space above the bar when roomy", () => {
-    render(<MeasureCell group={group} roomy />);
+  it("has a larger number and more space above the bar in a hover box", () => {
+    render(<MeasureCell group={group} variant="hover" />);
     expect(screen.getByText("55%").className).toContain("text-base");
     expect(
       screen.getByTestId("agreement-fill").closest(".pt-1"),
     ).not.toBeNull();
+  });
+
+  it("lays out a card column: large number, bar, then chance and kappa", () => {
+    render(<MeasureCell group={group} variant="card" />);
+    const number = screen.getByText("55%");
+    expect(number.className).toContain("text-2xl");
+    const cell = number.parentElement!;
+    const [, barWrap, bottom] = [...cell.children] as HTMLElement[];
+    expect(within(barWrap).getByTestId("agreement-fill").style.width).toBe(
+      "55%",
+    );
+    expect(bottom).toHaveTextContent("Chance 60%Kappa-0.05");
+    expect(bottom.className).toContain("justify-between");
+  });
+
+  it("shows a large muted dash and no bar in a card column with no agreement", () => {
+    render(
+      <MeasureCell group={{ current: null, pair_count: 0 }} variant="card" />,
+    );
+    const dash = screen.getByText("—");
+    expect(dash.className).toContain("text-2xl");
+    expect(dash.className).toContain("text-muted-foreground");
+    expect(screen.queryByTestId("agreement-fill")).not.toBeInTheDocument();
   });
 });
 

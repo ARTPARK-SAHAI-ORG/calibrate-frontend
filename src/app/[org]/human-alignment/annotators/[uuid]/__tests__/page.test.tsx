@@ -48,11 +48,11 @@ const detail = (
   jobs: [],
 });
 
-// The one card on the Overview tab.
-const card = () =>
-  screen.getByText("Agreement with others").closest(".rounded-lg") as HTMLElement;
+// The three columns of the card on the Overview tab, by their titles.
+const column = (title: string) =>
+  screen.getByText(title).parentElement as HTMLElement;
 
-it("shows agreement with others, then each kind's agreement, kappa and bar, in one card", async () => {
+it("shows overall, binary and rating agreement side by side in one card", async () => {
   render(<AnnotatorDetailPage />);
   expect(requested).toBe("/annotators/ann-1");
   resolveDetail(
@@ -77,36 +77,54 @@ it("shows agreement with others, then each kind's agreement, kappa and bar, in o
     ]),
   );
   expect(await screen.findByText("62%")).toBeInTheDocument();
-  // The large number on top, then the binary line, then the rating line.
-  expect(card()).toHaveTextContent(
-    /^Agreement with others62%Binary labels75%Kappa0\.31Rating labels40%KappaEveryone agreed$/,
-  );
-  expect(card().className).toContain("w-full");
+  expect(screen.getByText("Agreement with other annotators").tagName).toBe("H3");
+  expect(
+    screen.getByText(
+      "How often this annotator's labels match other annotators' labels on the same items",
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Agreement with others")).toBeNull();
+
+  const card = column("Overall").parentElement as HTMLElement;
+  expect(card.className).toContain("md:grid-cols-3");
+  expect(card.className).toContain("md:divide-x");
+  expect([...card.children].map((c) => c.firstChild!.textContent)).toEqual([
+    "Overall",
+    "Binary labels",
+    "Rating labels",
+  ]);
+  for (const title of ["Overall", "Binary labels", "Rating labels"]) {
+    const heading = screen.getByText(title);
+    expect(heading.className).toContain("text-foreground");
+    expect(heading.className).toContain("font-medium");
+    expect(heading.closest("span.rounded-md")).toBeNull();
+  }
+
+  expect(column("Overall")).toHaveTextContent(/^Overall62%$/);
+  expect(screen.getByText("62%").className).toContain("text-2xl");
   expect(screen.getByText("62%").className).toContain("text-foreground");
-  const fills = within(card()).getAllByTestId("agreement-fill");
+  expect(screen.getByText("62%").className).not.toMatch(
+    /text-(green|red|yellow)/,
+  );
+  expect(column("Binary labels")).toHaveTextContent(
+    /^Binary labels75%Chance 60%Kappa0\.31$/,
+  );
+  expect(screen.getByText("75%").className).toContain("text-2xl");
+  expect(column("Rating labels")).toHaveTextContent(
+    /^Rating labels40%Chance 55%KappaEveryone agreed$/,
+  );
+  const fills = within(card).getAllByTestId("agreement-fill");
   expect(fills.map((f) => f.style.width)).toEqual(["75%", "40%"]);
   expect(fills[0].className).toContain("bg-green-500");
   expect(fills[1].className).toContain("bg-red-500");
   expect(
-    within(card()).getAllByTestId("chance-tick").map((t) => t.style.left),
+    within(card).getAllByTestId("chance-tick").map((t) => t.style.left),
   ).toEqual(["60%", "55%"]);
-  // Both labels share one width, so the values line up.
-  expect(screen.getByText("Binary labels").className).toContain("w-28");
-  expect(screen.getByText("Rating labels").className).toContain("w-28");
-  // The labels are readable text; only the dashes are muted.
-  expect(screen.getByText("Binary labels").className).toContain(
-    "text-foreground",
-  );
-  expect(screen.getByText("Binary labels").className).toContain("font-medium");
-  expect(screen.getByText("Binary labels").className).not.toContain(
-    "text-muted-foreground",
-  );
-  // The legend explains the bars, as on the Overview tab.
   expect(screen.getByText("Agreement expected by chance alone")).toBeInTheDocument();
   expect(screen.getByText("Jobs (2)")).toBeInTheDocument();
 });
 
-it("shows a muted dash and no bar for a kind with nothing compared", async () => {
+it("shows a large muted dash and no bar for a kind with nothing compared", async () => {
   render(<AnnotatorDetailPage />);
   resolveDetail(
     detail(0.7, [
@@ -121,21 +139,21 @@ it("shows a muted dash and no bar for a kind with nothing compared", async () =>
     ]),
   );
   expect(await screen.findByText("Jobs (2)")).toBeInTheDocument();
-  const rating = screen.getByText("Rating labels").parentElement as HTMLElement;
-  expect(within(rating).getByText("—").className).toContain(
-    "text-muted-foreground",
-  );
+  const rating = column("Rating labels");
+  const dash = within(rating).getByText("—");
+  expect(dash.className).toContain("text-muted-foreground");
+  expect(dash.className).toContain("text-2xl");
   expect(within(rating).queryByTestId("agreement-fill")).not.toBeInTheDocument();
-  expect(within(card()).getAllByTestId("agreement-fill")).toHaveLength(1);
+  expect(within(column("Binary labels")).getByTestId("agreement-fill")).toBeInTheDocument();
 });
 
 it("shows muted dashes and no legend when nothing has been compared", async () => {
   render(<AnnotatorDetailPage />);
   resolveDetail(detail(null, []));
   expect(await screen.findByText("Jobs (2)")).toBeInTheDocument();
-  const dashes = within(card()).getAllByText("—");
-  expect(dashes).toHaveLength(3);
-  for (const dash of dashes)
-    expect(dash.className).toContain("text-muted-foreground");
+  for (const title of ["Overall", "Binary labels", "Rating labels"])
+    expect(within(column(title)).getByText("—").className).toContain(
+      "text-muted-foreground",
+    );
   expect(screen.queryByText("Better than chance")).not.toBeInTheDocument();
 });

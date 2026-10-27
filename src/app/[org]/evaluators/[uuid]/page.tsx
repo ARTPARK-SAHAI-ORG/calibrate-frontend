@@ -1932,7 +1932,7 @@ function AgreementTrendTab({
                     </span>
                   }
                 >
-                  <MeasureCell group={version} roomy />
+                  <MeasureCell group={version} variant="hover" />
                 </TrendHoverBox>
               );
             }}

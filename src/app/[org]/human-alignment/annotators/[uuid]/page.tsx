@@ -24,11 +24,8 @@ import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import type { KappaByKind } from "@/lib/agreementKappa";
-import { AnswerKindLines } from "@/components/human-labelling/AgreementOverviewTable";
-import {
-  AgreementStatCard,
-  ChanceLegend,
-} from "@/components/human-labelling/AgreementStatCard";
+import { AgreementByKindCard } from "@/components/human-labelling/AgreementOverviewTable";
+import { ChanceLegend } from "@/components/human-labelling/AgreementStatCard";
 
 type Tab = "overview" | "jobs";
 
@@ -335,18 +332,22 @@ function AnnotatorDetailPageInner() {
               </div>
             )}
 
+            <div>
+              <h3 className="text-sm font-semibold">
+                Agreement with other annotators
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                How often this annotator&apos;s labels match other
+                annotators&apos; labels on the same items
+              </p>
+            </div>
             {stats?.kappa_by_kind?.some((k) => k.agreement != null) && (
               <ChanceLegend />
             )}
-            <AgreementStatCard
-              staticPillText="Agreement with others"
-              agreement={stats?.current_agreement}
-              fullWidth
-            >
-              <div className="mt-3">
-                <AnswerKindLines kinds={stats?.kappa_by_kind} />
-              </div>
-            </AgreementStatCard>
+            <AgreementByKindCard
+              overall={stats?.current_agreement}
+              kinds={stats?.kappa_by_kind}
+            />
           </div>
         )}
 
