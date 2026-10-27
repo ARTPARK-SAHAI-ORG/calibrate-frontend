@@ -7,6 +7,9 @@ export type TableColumn = {
   header: string;
   // Optional render function for custom cell rendering
   render?: (value: any, row: Record<string, any>) => React.ReactNode;
+  /** Makes this a CSV-only column: left out of the table on screen, its CSV
+   * cell takes this value. */
+  csvOnlyValue?: (row: Record<string, unknown>) => unknown;
 };
 
 type DownloadableTableProps = {
@@ -30,7 +33,7 @@ export function DownloadableTable({
     // Add data rows
     data.forEach((row) => {
       const values = columns.map((col) => {
-        const value = row[col.key];
+        const value = col.csvOnlyValue ? col.csvOnlyValue(row) : row[col.key];
         // Handle values that might contain commas or quotes
         if (value === null || value === undefined) return "";
         const stringValue = String(value);
@@ -64,6 +67,8 @@ export function DownloadableTable({
   if (data.length === 0) {
     return null;
   }
+
+  const shownColumns = columns.filter((col) => !col.csvOnlyValue);
 
   return (
     <div className="space-y-2">
@@ -99,7 +104,7 @@ export function DownloadableTable({
         <table className="w-full">
           <thead className="bg-muted/50 border-b border-border">
             <tr>
-              {columns.map((col) => (
+              {shownColumns.map((col) => (
                 <th
                   key={col.key}
                   className="px-4 py-3 text-left text-sm font-medium text-foreground whitespace-nowrap"
@@ -115,7 +120,7 @@ export function DownloadableTable({
                 key={rowIndex}
                 className="border-b border-border last:border-b-0"
               >
-                {columns.map((col) => (
+                {shownColumns.map((col) => (
                   <td
                     key={col.key}
                     className="px-4 py-3 text-sm text-foreground whitespace-nowrap"

@@ -5,7 +5,10 @@ import { getDefaultHeaders } from "./api";
 import { overEvalLimit } from "./evalLimit";
 import { reportError } from "./reportError";
 import type { AggStat, LatencyStat } from "./llmMetrics";
-import type { BenchmarkEvaluatorSummaryEntry } from "./benchmarkEvaluatorSummary";
+import type {
+  BenchmarkEvaluatorSummaryEntry,
+  LikelyRange,
+} from "./benchmarkEvaluatorSummary";
 import type {
   TestCaseOutput,
   TestCaseData,
@@ -94,9 +97,13 @@ export type TestRunStatusResponse = {
    * so it is there for runs made before this existed. An evaluator that has
    * judged nothing yet is left out rather than shown as a zero.
    *
-   * Read it through `runEvaluatorSummary`, so a missing list reads as none.
    * `pass_rate` is out of 100, the same as a benchmark's. */
   evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
+  /** The run's pass rate over the tests that were answered, out of 100. Null
+   * when none was; absent from an older backend. */
+  pass_rate?: number | null;
+  /** Where the true pass rate is likely to fall, 95% of the time. */
+  pass_rate_ci?: LikelyRange | null;
   /** Why the run could not be carried out, as text. Older runs carry true or
    * false instead. */
   error?: string | boolean | null;

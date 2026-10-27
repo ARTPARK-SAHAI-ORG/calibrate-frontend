@@ -38,6 +38,7 @@ export type { PageErrorCode, PageErrorState } from "./usePageErrorState";
 export {
   useOrganizations,
   useActiveOrgUuid,
+  useShowLikelyRanges,
   useOrgMembers,
   useOrgInviteLink,
   useWorkspaceApiKeys,

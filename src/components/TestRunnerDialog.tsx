@@ -2,6 +2,7 @@
 import { reportError } from "@/lib/reportError";
 import { Tooltip } from "@/components/Tooltip";
 import {
+  answeredCounts,
   isRunStopped,
   isUnanswered,
   rowVerdict,
@@ -13,7 +14,11 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
-import { useAccessToken, useDialogNavKeys } from "@/hooks";
+import {
+  useAccessToken,
+  useDialogNavKeys,
+  useShowLikelyRanges,
+} from "@/hooks";
 import {
   TestCaseOutput,
   TestCaseData,
@@ -50,7 +55,6 @@ import {
   isToolCallRow,
   rowTestType,
   rowTestUuid,
-  runEvaluatorSummary,
   toolCallPassFail,
 } from "@/lib/testRunSummary";
 import {
@@ -183,6 +187,7 @@ export function TestRunnerDialog({
   useHideFloatingButton(isOpen);
 
   const backendAccessToken = useAccessToken();
+  const showLikelyRanges = useShowLikelyRanges();
   // The last server response. The only source of truth for run content.
   const [run, setRun] = useState<TestRunStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -419,12 +424,8 @@ export function TestRunnerDialog({
     }
   }, [rows]);
 
-  const passedTests = rows.filter((r) => r.status === "passed");
-  // Tests that produced no answer are their own category in the list; keep
-  // them out of the "failed" count so the header matches.
-  const failedTests = rows.filter(
-    (r) => r.status === "failed" && !r.unanswered,
-  );
+  // The pass rate's counts: a test that produced no answer is left out.
+  const answered = answeredCounts(run?.results ?? [], runOver);
   // How many produced no answer, and whether the run gave up before starting
   // every test. Both come off the run itself rather than being counted here.
   const unansweredCount = run?.unanswered_tests ?? 0;
@@ -440,13 +441,7 @@ export function TestRunnerDialog({
   const stoppedEarly = run?.stopped_early === true;
   // Tool-call pass/fail split for the Results tab's dedicated card. Keyed off
   // the kind of test the row itself reports.
-  const toolCall = toolCallPassFail(
-    rows.map((r) => ({
-      toolCall: r.testType === "tool_call",
-      passed: r.status === "passed",
-      failed: r.status === "failed" && !r.unanswered,
-    })),
-  );
+  const toolCall = toolCallPassFail(run?.results ?? []);
   const hasLabellingEligibleTests = rows.some(
     (r) => r.testType !== null && LABELLABLE_TEST_TYPES.has(r.testType),
   );
@@ -463,10 +458,7 @@ export function TestRunnerDialog({
 
   // Per-evaluator totals for the Results tab. The run counts these itself, so
   // nothing here has to add up each case's verdicts.
-  const evaluatorSummary = useMemo(
-    () => runEvaluatorSummary(run?.evaluator_summary),
-    [run],
-  );
+  const evaluatorSummary = run?.evaluator_summary ?? [];
 
   // The evaluator that judged this run's tool-call tests, when it has any.
   // The run's own evaluator list does not say which one that is, and its name
@@ -914,8 +906,8 @@ export function TestRunnerDialog({
                 data-tour="test-run-summary"
               >
                 <TestRunSummary
-                  passed={passedTests.length}
-                  total={passedTests.length + failedTests.length}
+                  passed={answered.passed}
+                  total={answered.answered}
                   unanswered={unansweredCount}
                   notRun={couldNotRunCount - unansweredCount}
                   stoppedEarly={stoppedEarly}
@@ -931,6 +923,9 @@ export function TestRunnerDialog({
                   toolCall={toolCall}
                   toolCallEvaluatorUuid={toolCallEvaluatorUuid}
                   evaluatorSummary={evaluatorSummary}
+                  passRate={run?.pass_rate}
+                  passRateRange={run?.pass_rate_ci}
+                  likelyRanges={showLikelyRanges}
                 />
               </div>
             ) : isFinished && activeTab === "about" ? (
