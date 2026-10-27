@@ -58,6 +58,8 @@ export type AnalyticsWorkspaceRow = Omit<
   is_personal: boolean;
   members: number;
   last_active_at: string | null;
+  /** Left out by older backends; null when the workspace has no owner. */
+  owner?: { email: string; first_name: string; last_name: string } | null;
 };
 
 export type AnalyticsFailure = {
