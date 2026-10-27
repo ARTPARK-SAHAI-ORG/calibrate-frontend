@@ -53,7 +53,7 @@ function token(): string {
   return state.cookies!.find((c) => c.name === "access_token")!.value;
 }
 
-async function api<T>(
+export async function api<T>(
   request: APIRequestContext,
   urlPath: string,
   body?: unknown,
@@ -115,6 +115,18 @@ export async function seed(request: APIRequestContext, d: Demo) {
   // The backend has no call that renames a user, so only the workspace is named.
   const [org] = await api<{ uuid: string }[]>(request, "/organizations");
   await api(request, `/organizations/${org.uuid}`, { name: "Maths tutor team" }, "PATCH");
+  // A second member, so the Members tab shows a Remove button. Added the way
+  // the Invite dialog's By email option adds someone.
+  const kabir = "kabir@example.org";
+  await api(request, "/auth/signup", {
+    email: kabir,
+    password: "test123456",
+    first_name: "Kabir",
+    last_name: "Rao",
+  });
+  await api(request, `/organizations/${org.uuid}/members`, { email: kabir });
+  // A second workspace, so the workspace menu lists more than one.
+  await api(request, "/organizations", { name: "English tutor team" });
 
   // Agent built in Calibrate, plus a connected one for the Connection pictures.
   const { uuid: agentId } = await api<{ uuid: string }>(request, "/agents", {
@@ -208,7 +220,8 @@ export async function seed(request: APIRequestContext, d: Demo) {
   const toolTests = d.tests.filter((t) => t.kind === "tool_call");
   await api(request, "/tests/bulk", {
     type: "response",
-    agent_uuids: [agentId],
+    // The connected agent gets them too, so its Tests tab offers Compare models.
+    agent_uuids: [agentId, connectionAgentId],
     tests: responseTests.map((t) => ({
       name: t.name,
       conversation_history: history(t),
@@ -380,8 +393,17 @@ export async function seed(request: APIRequestContext, d: Demo) {
     { evaluators: [{ evaluator_id: evaluatorId }], select_all: true },
   );
   await waitFor(request, `/annotation-tasks/${taskId}/evaluator-runs/${evaluatorRunId}`);
+  // A run on version 1 as well, so the evaluator's Agreement tab has a trend.
+  const versions = await api<{ uuid: string; version_number: number }[]>(request, `/evaluators/${evaluatorId}/versions`);
+  const v1 = versions.find((v) => v.version_number === 1)!;
+  const { job_uuid: v1RunId } = await api<{ job_uuid: string }>(request, `/annotation-tasks/${taskId}/evaluator-runs`, {
+    evaluators: [{ evaluator_id: evaluatorId, evaluator_version_id: v1.uuid }],
+    select_all: true,
+  });
+  await waitFor(request, `/annotation-tasks/${taskId}/evaluator-runs/${v1RunId}`);
 
   return {
+    workspaceId: org.uuid,
     agentId,
     connectionAgentId,
     testRunId,
@@ -394,6 +416,9 @@ export async function seed(request: APIRequestContext, d: Demo) {
     ttsTaskId,
     taskId,
     evaluatorRunId,
+    annotatorIds,
+    sttDatasetId: stt.uuid,
+    ttsDatasetId: tts.uuid,
     jobTokens: jobs.map((j) => j.public_token),
   };
 }
