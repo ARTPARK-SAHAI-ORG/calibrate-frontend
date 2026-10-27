@@ -1,5 +1,6 @@
 ## October 2026
 
+- The analytics page now shows who owns a workspace, with their name and email, when you hover over the workspace name ([#768](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/768))
 - Fixed a problem where some people were stuck on a loading spinner after opening Calibrate and can now reach the login page and sign in again ([#763](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/763))
 - Creating a new evaluator from Manage evaluators no longer closes the window and the form when you click inside the form ([#760](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/760))
 - Confirm email at signup and add password reset ([#753](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/753))
