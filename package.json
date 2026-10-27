@@ -17,6 +17,7 @@
     "coverage": "npm run test:coverage && npm run test:e2e:coverage",
     "test:e2e:integration": "scripts/e2e-fake-backend.sh npm run test:e2e:authenticated",
     "test:e2e:integration:coverage": "scripts/e2e-fake-backend.sh npm run test:e2e:authenticated:coverage",
+    "docs:screenshots": "E2E_EMAIL=priya@example.org E2E_FIRST_NAME=Priya E2E_LAST_NAME=Sharma AUTH_SECRET=ci-placeholder-secret-not-used OBJECT_STORAGE_MODE=local MAX_CONCURRENT_JOBS=2 TRACE_SCORING_WAIT_SECONDS=1 FAKE_BACKEND_PORT=28431 LOCAL_ARTIFACT_BASE_URL=http://localhost:28431 E2E_PORT=3117 FAKE_AI_DEMO=1 scripts/e2e-fake-backend.sh playwright test --project=docs-screenshots",
     "test:e2e:authenticated": "playwright test --project=authenticated --workers=1",
     "test:e2e:authenticated:coverage": "E2E_COVERAGE=1 playwright test --project=authenticated --workers=1 && node scripts/clean-e2e-lcov.mjs"
   },
