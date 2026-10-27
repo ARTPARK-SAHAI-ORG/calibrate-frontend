@@ -1,6 +1,8 @@
 import {
   hasReliabilityNumber,
   hasTaskOverviewData,
+  buildOverviewRows,
+  sortOverviewRows,
   taskEvaluatorScoreCards,
 } from "../taskOverviewData";
 
@@ -167,3 +169,135 @@ describe("hasReliabilityNumber", () => {
     expect(hasReliabilityNumber(null, [{ current: 0 }])).toBe(true);
   });
 });
+
+describe("buildOverviewRows", () => {
+  const evaluators = [
+    {
+      evaluator_id: "ev-1",
+      name: "Tone",
+      current: 0.9,
+      pair_count: 4,
+      kappa: 0.5,
+      kappa_type: "cohen" as const,
+      inter_annotator: {
+        current: 0.7,
+        pair_count: 3,
+        kappa: 0.4,
+        kappa_type: "cohen" as const,
+      },
+    },
+    {
+      evaluator_id: "ev-2",
+      name: "Clarity",
+      current: null,
+      pair_count: 0,
+      kappa: null,
+      kappa_type: "linear_weighted_cohen" as const,
+    },
+    { evaluator_id: "ev-3", name: "Unknown", current: null, pair_count: 0 },
+  ];
+
+  it("gives each evaluator both measures", () => {
+    const rows = buildOverviewRows(evaluators);
+    expect(rows.map((r) => [r.key, r.name])).toEqual([
+      ["ev-1", "Tone"],
+      ["ev-2", "Clarity"],
+      ["ev-3", "Unknown"],
+    ]);
+    expect(rows[0].interAnnotator.current).toBe(0.7);
+    expect(rows[0].withHumans.current).toBe(0.9);
+    expect(rows[1].interAnnotator).toEqual({ current: null, pair_count: 0 });
+  });
+
+  const ev = (
+    evaluator_id: string,
+    current: number | null,
+    kappa: number | null,
+    inter: { current: number | null; kappa?: number | null } | null,
+  ) => ({
+    evaluator_id,
+    name: evaluator_id,
+    current,
+    pair_count: 0,
+    kappa,
+    inter_annotator: inter && { ...inter, pair_count: 0 },
+  });
+  const mixed = [
+    ev("empty", null, null, null),
+    ev("with-humans", 0.8, null, null),
+    ev("inter-only", null, null, { current: 0.6 }),
+    ev("kappa-only", null, null, { current: null, kappa: 0 }),
+  ];
+
+  it("leaves out evaluators with nothing in either measure across all tasks", () => {
+    expect(buildOverviewRows(mixed, true).map((r) => r.key)).toEqual([
+      "with-humans",
+      "inter-only",
+      "kappa-only",
+    ]);
+  });
+
+  it("keeps every evaluator on one task", () => {
+    expect(buildOverviewRows(mixed).map((r) => r.key)).toEqual([
+      "empty",
+      "with-humans",
+      "inter-only",
+      "kappa-only",
+    ]);
+  });
+});
+
+describe("sortOverviewRows", () => {
+  const row = (key: string, withHumans: number | null, type?: string) => ({
+    key,
+    name: key,
+    withHumans: { current: withHumans, pair_count: 0 },
+    interAnnotator: { current: null, pair_count: 0 },
+    evaluatorType: type,
+  });
+  const rows = [row("b", 0.4), row("none", null), row("a", 0.9), row("c", 0.6)];
+  const keys = (sorted: { key: string }[]) => sorted.map((r) => r.key);
+
+  it("puts a row with no agreement last when sorting highest first", () => {
+    expect(keys(sortOverviewRows(rows, "withHumans", "desc"))).toEqual([
+      "a",
+      "c",
+      "b",
+      "none",
+    ]);
+  });
+
+  it("puts a row with no agreement last when sorting lowest first", () => {
+    expect(keys(sortOverviewRows(rows, "withHumans", "asc"))).toEqual([
+      "b",
+      "c",
+      "a",
+      "none",
+    ]);
+  });
+
+  it("keeps evaluators of one type together, typed groups first", () => {
+    const mixed = [row("x", 0.9), row("y", 0.1, "stt"), row("z", 0.5, "llm")];
+    expect(keys(sortOverviewRows(mixed, "withHumans", "desc"))).toEqual([
+      "z",
+      "y",
+      "x",
+    ]);
+  });
+
+  it("sorts by name in both directions", () => {
+    expect(keys(sortOverviewRows(rows, "name", "asc"))).toEqual([
+      "a",
+      "b",
+      "c",
+      "none",
+    ]);
+    expect(keys(sortOverviewRows(rows, "name", "desc"))).toEqual([
+      "none",
+      "c",
+      "b",
+      "a",
+    ]);
+  });
+});
+

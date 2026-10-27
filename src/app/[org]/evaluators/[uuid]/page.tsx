@@ -12,20 +12,16 @@ import {
 import { useParams, useRouter, useSearchParams } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { AppLayout } from "@/components/AppLayout";
-// The chart on this page already has a `Tooltip` of its own, so the app's
-// hover text comes in under a second name.
-import { Tooltip as HoverText } from "@/components/Tooltip";
+import {
+  AgreementTrendChart,
+  TrendHoverBox,
+} from "@/components/charts/AgreementTrendChart";
+import { MeasureCell } from "@/components/human-labelling/AgreementOverviewTable";
+import { VersionLabel } from "@/components/human-labelling/RunEvaluatorsDialog";
+import { Tooltip } from "@/components/Tooltip";
+import type { KappaFields } from "@/lib/agreementKappa";
 import { NotFoundState, InfoNote } from "@/components/ui";
 import { useSidebarState } from "@/lib/sidebar";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
@@ -132,20 +128,12 @@ type EvaluatorDetail = {
   evaluator_type?: EvaluatorType;
 };
 
-type TrendSeriesPoint = {
-  bucket_start: string;
-  bucket_end: string;
-  agreement: number | null;
-  pair_count: number;
-};
-
-type TrendVersion = {
+type TrendVersion = KappaFields & {
   version_id: string;
   version_number: number;
   is_live: boolean;
   current: number | null;
   pair_count: number;
-  series: TrendSeriesPoint[];
 };
 
 type TrendTask = {
@@ -153,20 +141,12 @@ type TrendTask = {
   task_name: string;
   current: number | null;
   pair_count: number;
-  series: TrendSeriesPoint[];
 };
 
 type EvaluatorTrendResponse = {
   evaluator_id: string;
   evaluator_name: string;
-  bucket: string;
-  days: number;
   filters: { task_id: string | null; version_id: string | null };
-  overall: {
-    current: number | null;
-    pair_count: number;
-    series: TrendSeriesPoint[];
-  };
   versions: TrendVersion[];
   tasks: TrendTask[];
 };
@@ -758,7 +738,7 @@ function EvaluatorDetailPageInner() {
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) throw new Error("BACKEND_URL is not set");
-      const params = new URLSearchParams({ bucket: "week", days: "90" });
+      const params = new URLSearchParams();
       if (trendTaskId !== "all") params.set("task_id", trendTaskId);
       const res = await fetch(
         `${backendUrl}/annotation-agreement/evaluator/${uuid}/trend?${params}`,
@@ -886,7 +866,7 @@ function EvaluatorDetailPageInner() {
                   <h1 className="text-xl md:text-2xl font-semibold text-foreground">
                     {evaluator.name}
                   </h1>
-                  <HoverText content="Edit name and description" position="top">
+                  <Tooltip content="Edit name and description" position="top">
                     <button
                       onClick={openEditDialog}
                       aria-label="Edit name and description"
@@ -906,7 +886,7 @@ function EvaluatorDetailPageInner() {
                         />
                       </svg>
                     </button>
-                  </HoverText>
+                  </Tooltip>
                 </div>
                 {evaluator.description && (
                   <p className="text-muted-foreground text-sm md:text-base leading-relaxed mt-2">
@@ -947,7 +927,7 @@ function EvaluatorDetailPageInner() {
                   }
                 />
                 {canDeleteEvaluator(evaluator) && (
-                  <HoverText content="Delete evaluator" position="top">
+                  <Tooltip content="Delete evaluator" position="top">
                     <button
                       onClick={() => setDeleteOpen(true)}
                       aria-label="Delete evaluator"
@@ -967,7 +947,7 @@ function EvaluatorDetailPageInner() {
                         />
                       </svg>
                     </button>
-                  </HoverText>
+                  </Tooltip>
                 )}
               </div>
             </div>
@@ -1036,7 +1016,7 @@ function EvaluatorDetailPageInner() {
                           </button>
 
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <HoverText
+                            <Tooltip
                               content={`Edit, starting from v${v.version_number}`}
                               position="top"
                             >
@@ -1064,9 +1044,9 @@ function EvaluatorDetailPageInner() {
                                   />
                                 </svg>
                               </button>
-                            </HoverText>
+                            </Tooltip>
                             {!isCurrent && (
-                              <HoverText
+                              <Tooltip
                                 content="Mark as current"
                                 position="top"
                               >
@@ -1090,10 +1070,10 @@ function EvaluatorDetailPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
+                              </Tooltip>
                             )}
                             {!isCurrent && (
-                              <HoverText
+                              <Tooltip
                                 content={`Delete v${v.version_number}`}
                                 position="top"
                               >
@@ -1116,7 +1096,7 @@ function EvaluatorDetailPageInner() {
                                     />
                                   </svg>
                                 </button>
-                              </HoverText>
+                              </Tooltip>
                             )}
                           </div>
                         </div>
@@ -1725,67 +1705,6 @@ function EvaluatorDetailPageInner() {
   );
 }
 
-function averageSeriesAgreement(series: TrendSeriesPoint[]): number | null {
-  const values = series
-    .map((p) => p.agreement)
-    .filter((v): v is number => v != null);
-  if (values.length === 0) return null;
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
-
-function VersionAxisTick({
-  x,
-  y,
-  payload,
-  liveLabels,
-}: {
-  x?: number;
-  y?: number;
-  payload?: { value: string };
-  liveLabels: Set<string>;
-}) {
-  const cx = x ?? 0;
-  const cy = y ?? 0;
-  const label = payload?.value ?? "";
-  const isLive = liveLabels.has(label);
-  return (
-    <g transform={`translate(${cx},${cy})`}>
-      <text
-        x={0}
-        y={0}
-        dy={12}
-        textAnchor="middle"
-        fontSize={11}
-        fill="currentColor"
-      >
-        {label}
-      </text>
-      {isLive && (
-        <>
-          <rect
-            x={-17}
-            y={18}
-            width={34}
-            height={14}
-            rx={3}
-            className="fill-green-500/10"
-          />
-          <text
-            x={0}
-            y={29}
-            textAnchor="middle"
-            fontSize={9}
-            fontWeight={600}
-            className="fill-green-600 dark:fill-green-400"
-          >
-            Live
-          </text>
-        </>
-      )}
-    </g>
-  );
-}
-
 function AgreementTrendTab({
   trend,
   trendLoading,
@@ -1801,29 +1720,21 @@ function AgreementTrendTab({
   onSelectTask: (id: string) => void;
   allTasks: TrendTask[];
 }) {
-  const { chartData, liveLabels } = useMemo(() => {
-    if (!trend?.versions?.length)
-      return { chartData: [], liveLabels: new Set<string>() };
-    const sorted = [...trend.versions].sort(
-      (a, b) => a.version_number - b.version_number,
-    );
-    const liveSet = new Set(
-      sorted.filter((v) => v.is_live).map((v) => `v${v.version_number}`),
-    );
-    return {
-      chartData: sorted.map((v) => ({
-        version: `v${v.version_number}`,
-        agreement: (() => {
-          const avg = averageSeriesAgreement(v.series);
-          return avg == null ? null : Math.round(avg * 100);
-        })(),
-      })),
-      liveLabels: liveSet,
-    };
-  }, [trend]);
+  const points = useMemo(
+    () =>
+      [...(trend?.versions ?? [])]
+        .sort((a, b) => a.version_number - b.version_number)
+        .map((v) => ({
+          ...v,
+          key: v.version_id,
+          label: `v${v.version_number}`,
+          agreement: v.current,
+          live: v.is_live,
+        })),
+    [trend],
+  );
 
-  const hasData =
-    chartData.length > 0 && chartData.some((p) => p.agreement != null);
+  const hasData = points.some((p) => p.agreement != null);
 
   type TaskOption = { id: string; name: string };
   const ALL_TASKS_OPTION: TaskOption = { id: "all", name: "All tasks" };
@@ -1919,44 +1830,31 @@ function AgreementTrendTab({
           </p>
         </div>
       ) : (
-        <div className="border border-border rounded-xl p-4 md:p-6">
-          <div className="w-full h-64 md:h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="rgba(125,125,125,0.15)"
-                />
-                <XAxis
-                  dataKey="version"
-                  padding={{ left: 40, right: 40 }}
-                  tick={(props) => (
-                    <VersionAxisTick {...props} liveLabels={liveLabels} />
-                  )}
-                  height={44}
-                />
-                <YAxis domain={[0, 100]} fontSize={11} unit="%" />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--background, #fff)",
-                    border: "1px solid rgba(125,125,125,0.2)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  formatter={(value) => (value == null ? "—" : `${value}%`)}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="agreement"
-                  name="Agreement"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  dot={{ r: 4 }}
-                  connectNulls={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="border border-border rounded-xl p-4 md:p-6 space-y-3">
+          <AgreementTrendChart
+            points={points}
+            renderHover={(versionId) => {
+              const version = trend?.versions.find(
+                (v) => v.version_id === versionId,
+              );
+              if (!version) return null;
+              return (
+                <TrendHoverBox
+                  label={
+                    <VersionLabel
+                      version={{
+                        uuid: version.version_id,
+                        version_number: version.version_number,
+                      }}
+                      liveVersionId={version.is_live ? version.version_id : null}
+                    />
+                  }
+                >
+                  <MeasureCell group={version} size="detailed" />
+                </TrendHoverBox>
+              );
+            }}
+          />
         </div>
       )}
     </div>

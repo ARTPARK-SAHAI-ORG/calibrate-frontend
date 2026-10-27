@@ -84,7 +84,7 @@ function EvaluatorName({ name }: { name: string }) {
   return clipped ? <Tooltip content={name}>{label}</Tooltip> : label;
 }
 
-function VersionLabel({
+export function VersionLabel({
   version,
   liveVersionId,
 }: {

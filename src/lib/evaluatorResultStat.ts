@@ -78,6 +78,7 @@ export function formatEvaluatorResultStat(
     value: formatPercent((trueCount / counts.count) * 100, 0),
     title: `${trueLabel} on ${trueCount} of ${countWord(counts.count, unit)}`,
     ratio: trueCount / counts.count,
+    passLabel: trueLabel,
   };
 }
 

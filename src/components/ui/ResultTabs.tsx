@@ -1,5 +1,7 @@
 "use client";
 
+import { TabButtons } from "./TabRow";
+
 /**
  * The tabs on every page and window that shows the results of a run: the test
  * run and model comparison windows, the Speech-to-Text and Text-to-Speech
@@ -49,26 +51,12 @@ export function ResultTabs<T extends ResultTabId>({
   tourPrefix?: string;
 }) {
   return (
-    <>
-      {tabs.map((tab) => (
-        <button
-          key={tab}
-          type="button"
-          data-tour={tourPrefix ? `${tourPrefix}-${tab}` : undefined}
-          onClick={() => onChange(tab)}
-          className={`${
-            size === "window"
-              ? "pb-3 px-1 text-sm md:text-base whitespace-nowrap flex-shrink-0"
-              : "px-4 py-2 text-[13px]"
-          } font-medium border-b-2 transition-colors cursor-pointer ${
-            activeTab === tab
-              ? "border-foreground text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {RESULT_TAB_LABELS[tab]}
-        </button>
-      ))}
-    </>
+    <TabButtons
+      tabs={tabs.map((id) => ({ id, label: RESULT_TAB_LABELS[id] }))}
+      active={activeTab}
+      onChange={onChange}
+      size={size}
+      tourPrefix={tourPrefix}
+    />
   );
 }

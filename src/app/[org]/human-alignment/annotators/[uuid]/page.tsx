@@ -14,27 +14,19 @@ import {
   useRouter,
   useSearchParams,
 } from "@/lib/nav";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { AppLayout } from "@/components/AppLayout";
-// The chart on this page already has a `Tooltip` of its own, so the app's
-// hover text comes in under a second name.
-import { Tooltip as HoverText } from "@/components/Tooltip";
+import { TabRow } from "@/components/ui/TabRow";
+import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { EmptyState } from "@/components/ui/LoadingState";
+import { SpinnerIcon } from "@/components/icons";
 import { Breadcrumbs, CopyLinkButton, type Crumb } from "@/components/ui";
 import { useAccessToken, usePageErrorState } from "@/hooks";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
-import { parseBackendTime } from "@/lib/relativeTime";
+import type { KappaByKindFields } from "@/lib/agreementKappa";
+import { AgreementByKindCard } from "@/components/human-labelling/AgreementOverviewTable";
 
 type Tab = "overview" | "jobs";
 
@@ -51,25 +43,10 @@ type Annotator = {
   updated_at?: string;
 };
 
-type AnnotatorStats = {
+type AnnotatorStats = KappaByKindFields & {
   current_agreement: number | null;
   pair_count: number;
   jobs_count: number;
-};
-
-type Bucket = "week" | "month" | "year";
-
-type AgreementSeriesPoint = {
-  bucket_start: string;
-  bucket_end: string;
-  agreement: number | null;
-  pair_count: number;
-};
-
-type AnnotatorTrend = {
-  bucket: Bucket;
-  days: number;
-  series: AgreementSeriesPoint[];
 };
 
 type AnnotatorJob = {
@@ -87,19 +64,8 @@ type AnnotatorJob = {
 type AnnotatorDetailResponse = {
   annotator: Annotator;
   stats: AnnotatorStats;
-  trend: AnnotatorTrend;
   jobs: AnnotatorJob[];
 };
-
-const DEFAULT_BUCKET: Bucket = "month";
-const DEFAULT_DAYS = 365;
-
-function formatBucketLabel(iso: string, bucket: Bucket): string {
-  const d = parseBackendTime(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  if (bucket === "year") return d.getUTCFullYear().toString();
-  return d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
-}
 
 function parseApiError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
@@ -114,6 +80,16 @@ function parseApiError(err: unknown, fallback: string): string {
     return match[1];
   }
   return err.message || fallback;
+}
+
+/** The spinner both tabs show while the annotator loads. */
+function loadingRow(text: string) {
+  return (
+    <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+      <SpinnerIcon className="w-4 h-4 animate-spin" />
+      {text}
+    </div>
+  );
 }
 
 export default function AnnotatorDetailPage() {
@@ -161,7 +137,6 @@ function AnnotatorDetailPageInner() {
 
   const annotator = detail?.annotator ?? null;
   const stats = detail?.stats;
-  const trend = detail?.trend;
   const jobs = detail?.jobs ?? [];
 
   useEffect(() => {
@@ -176,9 +151,8 @@ function AnnotatorDetailPageInner() {
     setDetailError(null);
     resetErrorCode();
     try {
-      const query = `?bucket=${DEFAULT_BUCKET}&days=${DEFAULT_DAYS}`;
       const data = await apiClient<AnnotatorDetailResponse>(
-        `/annotators/${uuid}${query}`,
+        `/annotators/${uuid}`,
         accessToken,
       );
       setDetail(data);
@@ -236,18 +210,7 @@ function AnnotatorDetailPageInner() {
     }
   };
 
-  const formatPercent = (value: number | null | undefined): string => {
-    if (value == null) return "—";
-    return `${Math.round(value * 100)}%`;
-  };
 
-  const agreementColor = (value: number | null | undefined): string => {
-    if (value == null) return "";
-    const pct = value * 100;
-    if (pct >= 75) return "text-green-600 dark:text-green-400";
-    if (pct <= 50) return "text-red-600 dark:text-red-400";
-    return "text-yellow-600 dark:text-yellow-400";
-  };
 
   const jobsCount = stats?.jobs_count ?? jobs.length;
 
@@ -321,7 +284,7 @@ function AnnotatorDetailPageInner() {
                 {annotator?.name ?? "—"}
               </h1>
               {annotator && (
-                <HoverText content="Rename" position="top">
+                <Tooltip content="Rename" position="top">
                   <button
                     onClick={startEditName}
                     aria-label="Rename annotator"
@@ -341,34 +304,24 @@ function AnnotatorDetailPageInner() {
                       />
                     </svg>
                   </button>
-                </HoverText>
+                </Tooltip>
               )}
             </div>
           )}
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-border flex items-center gap-1">
-          {[
-            { id: "overview" as Tab, label: "Overview" },
+        <TabRow<Tab>
+          tabs={[
+            { id: "overview", label: "Overview" },
             {
-              id: "jobs" as Tab,
+              id: "jobs",
               label: jobsCount > 0 ? `Jobs (${jobsCount})` : "Jobs",
             },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => handleTabChange(t.id)}
-              className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors cursor-pointer ${
-                activeTab === t.id
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+          ]}
+          active={activeTab}
+          onChange={handleTabChange}
+        />
 
         {activeTab === "overview" && (
           <div className="space-y-4 md:space-y-6">
@@ -378,163 +331,54 @@ function AnnotatorDetailPageInner() {
               </div>
             )}
 
-            {/* Stat cards */}
-            <div className="flex flex-wrap items-stretch gap-3">
-              <StatCard
-                label="Latest agreement"
-                value={
-                  detailLoading ? "—" : formatPercent(stats?.current_agreement)
-                }
-                valueClassName={agreementColor(stats?.current_agreement)}
-              />
-              <StatCard
-                label="Jobs"
-                value={detailLoading ? "—" : String(jobsCount)}
-              />
-            </div>
-
-            {/* Trend chart */}
-            {(() => {
-              const series = trend?.series ?? [];
-              const hasTrend =
-                !detailLoading &&
-                detailFetchCompleted &&
-                series.length > 0 &&
-                series.some((p) => p.agreement != null);
-              return (
-                <div className="border border-border rounded-xl bg-background p-4 md:p-5">
-                  <div className="mb-4">
-                    <h3 className="text-sm font-semibold">
-                      Agreement with other annotators
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Monthly % of overlapping rows where this annotator agreed
-                      with the others.
-                    </p>
-                  </div>
-
-                  {detailLoading || !detailFetchCompleted ? (
-                    <div className="flex items-center justify-center gap-2 h-56 md:h-64 text-sm text-muted-foreground">
-                      <svg
-                        className="w-4 h-4 animate-spin"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                      Loading trend
-                    </div>
-                  ) : !hasTrend ? (
-                    <EmptyState
-                      icon={
-                        <svg
-                          className="w-7 h-7 text-muted-foreground"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={1.5}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"
-                          />
-                        </svg>
-                      }
-                      title="Not enough overlap yet"
-                      description={
-                        <>
-                          This chart will populate once this annotator and at
-                          <br />
-                          least one other annotator label one or more of the
-                          same items
-                        </>
-                      }
+            {detailLoading || !detailFetchCompleted ? (
+              loadingRow("Loading agreement")
+            ) : detailError ? null : stats?.current_agreement == null &&
+              !stats?.kappa_by_kind?.some(
+                (k) => k.agreement != null || k.kappa != null,
+              ) ? (
+              <EmptyState
+                icon={
+                  <svg
+                    className="w-7 h-7 text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"
                     />
-                  ) : (
-                    <div className="w-full h-56 md:h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={series.map((p) => ({
-                            month: formatBucketLabel(
-                              p.bucket_end,
-                              trend?.bucket ?? DEFAULT_BUCKET,
-                            ),
-                            agreement:
-                              p.agreement == null
-                                ? null
-                                : Math.round(p.agreement * 100),
-                          }))}
-                        >
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke="rgba(125,125,125,0.15)"
-                          />
-                          <XAxis dataKey="month" fontSize={11} />
-                          <YAxis domain={[0, 100]} fontSize={11} unit="%" />
-                          <Tooltip
-                            contentStyle={{
-                              background: "var(--background, #fff)",
-                              border: "1px solid rgba(125,125,125,0.2)",
-                              borderRadius: 8,
-                              fontSize: 12,
-                            }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="agreement"
-                            name="Agreement %"
-                            stroke="#10b981"
-                            strokeWidth={2}
-                            dot={{ r: 3 }}
-                            connectNulls={false}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
+                  </svg>
+                }
+                title="No agreement yet"
+                description="Agreement appears once another annotator labels the same items as this annotator"
+              />
+            ) : (
+              <>
+                <div>
+                  <h3 className="text-sm font-semibold">
+                    Agreement with other annotators
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    How often this annotator&apos;s labels match other
+                    annotators&apos; labels on the same items
+                  </p>
                 </div>
-              );
-            })()}
+                <AgreementByKindCard
+                  overall={stats?.current_agreement}
+                  kinds={stats?.kappa_by_kind}
+                />
+              </>
+            )}
           </div>
         )}
 
         {activeTab === "jobs" &&
           (detailLoading || !detailFetchCompleted ? (
-            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-              <svg
-                className="w-4 h-4 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Loading jobs
-            </div>
+            loadingRow("Loading jobs")
           ) : jobs.length === 0 ? (
             <EmptyState
               icon={
@@ -598,7 +442,7 @@ function JobTaskName({ name }: { name: string }) {
       {name}
     </div>
   );
-  return clipped ? <HoverText content={name}>{cell}</HoverText> : cell;
+  return clipped ? <Tooltip content={name}>{cell}</Tooltip> : cell;
 }
 
 function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
@@ -674,27 +518,6 @@ function AnnotatorJobsList({ jobs }: { jobs: AnnotatorJob[] }) {
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  valueClassName = "",
-}: {
-  label: string;
-  value: string;
-  valueClassName?: string;
-}) {
-  return (
-    <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[160px]">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className={`text-2xl font-semibold tabular-nums ${valueClassName}`}>
-        {value}
-      </div>
     </div>
   );
 }

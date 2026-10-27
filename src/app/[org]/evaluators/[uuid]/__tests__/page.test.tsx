@@ -8,7 +8,7 @@
  * and its dialogs run.
  */
 import React from "react";
-import { render, screen, waitFor, setupUser } from "@/test-utils";
+import { render, screen, waitFor, setupUser, within } from "@/test-utils";
 
 const push = jest.fn();
 let searchParams = new URLSearchParams();
@@ -72,6 +72,43 @@ jest.mock(
     ),
   }),
 );
+
+// The trend chart cannot be laid out in jsdom; a stand-in shows which lines
+// the Agreement tab asks it to draw.
+jest.mock("../../../../../components/charts/AgreementTrendChart", () => ({
+  AgreementTrendChart: ({
+    points,
+    renderHover,
+  }: {
+    points: { key: string; label: string; agreement: number | null; live?: boolean }[];
+    renderHover?: (key: string, label: string) => React.ReactNode;
+  }) => (
+    <div data-testid="trend-chart">
+      <span data-testid="trend-points">
+        {points
+          .map((p) => `${p.label} ${p.agreement}${p.live ? " live" : ""}`)
+          .join("; ")}
+      </span>
+      {points.map((p) => (
+        <div key={p.key} data-testid={`hover-${p.key}`}>
+          {renderHover?.(p.key, p.label)}
+        </div>
+      ))}
+    </div>
+  ),
+  TrendHoverBox: ({
+    label,
+    children,
+  }: {
+    label: React.ReactNode;
+    children: React.ReactNode;
+  }) => (
+    <div>
+      <div data-testid="hover-label">{label}</div>
+      {children}
+    </div>
+  ),
+}));
 
 import EvaluatorDetailPage from "../page";
 
@@ -542,3 +579,98 @@ describe("after creating a version", () => {
     expect(screen.queryByText("Grade the reply strictly")).toBeNull();
   });
 });
+
+describe("the Agreement tab", () => {
+  it("draws the agreement trend across versions", async () => {
+    searchParams = new URLSearchParams("tab=agreement");
+    const trend = {
+      evaluator_id: "eval-1",
+      evaluator_name: "Refund policy",
+      bucket: "week",
+      days: 90,
+      filters: { task_id: null, version_id: null },
+      versions: [
+        {
+          version_id: "ver-1",
+          version_number: 1,
+          is_live: true,
+          current: 0.8,
+          pair_count: 4,
+          kappa: 0.5,
+          kappa_type: "cohen",
+        },
+      ],
+      tasks: [],
+    };
+    global.fetch = jest.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => (String(url).includes("/trend") ? trend : EVALUATOR),
+      }),
+    ) as unknown as typeof fetch;
+    render(<EvaluatorDetailPage />);
+    expect(await screen.findByTestId("trend-points")).toHaveTextContent(
+      /^v1 0.8 live$/,
+    );
+    const hover = screen.getByTestId("hover-ver-1");
+    expect(within(hover).getByTestId("hover-label")).toHaveTextContent("v1Live");
+    expect(hover).toHaveTextContent("80%Kappa0.50");
+    // The hover uses the roomier cell, with a larger number than the table.
+    expect(within(hover).getByText("80%").className).toContain("text-base");
+    // No chance number for this version, so no chance line.
+    expect(within(hover).queryByText(/^Chance/)).not.toBeInTheDocument();
+    // The chart has no chance marks of its own, so no key explains them.
+    expect(
+      screen.queryByText("Agreement expected by chance alone"),
+    ).not.toBeInTheDocument();
+    expect(within(hover).getByTestId("agreement-fill").style.width).toBe("80%");
+    expect(
+      (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+        /\/trend\?$/.test(String(url)),
+      ),
+    ).toBe(true);
+  });
+
+  it("shows the reason in the hover when a version has no kappa", async () => {
+    searchParams = new URLSearchParams("tab=agreement");
+    const trend = {
+      evaluator_id: "eval-1",
+      evaluator_name: "Refund policy",
+      bucket: "week",
+      days: 90,
+      filters: { task_id: null, version_id: null },
+      versions: [
+        {
+          version_id: "ver-2",
+          version_number: 2,
+          is_live: false,
+          current: 0.5,
+          pair_count: 1,
+          kappa: null,
+          kappa_type: "cohen",
+          kappa_blank_reason: "too_few_items",
+          chance_agreement: 0.5,
+        },
+      ],
+      tasks: [],
+    };
+    global.fetch = jest.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => (String(url).includes("/trend") ? trend : EVALUATOR),
+      }),
+    ) as unknown as typeof fetch;
+    render(<EvaluatorDetailPage />);
+    const hover = await screen.findByTestId("hover-ver-2");
+    expect(hover).toHaveTextContent("50%KappaToo few items");
+    // The chance is spelled out under the bar.
+    expect(within(hover).getByText("Chance 50%")).toBeInTheDocument();
+    expect(within(hover).getByTestId("hover-label").textContent).toBe("v2");
+    expect(within(hover).getByTestId("chance-tick").style.left).toBe("50%");
+  });
+});
+

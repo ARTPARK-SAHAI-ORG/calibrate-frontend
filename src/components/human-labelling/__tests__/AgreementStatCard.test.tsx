@@ -1,6 +1,9 @@
 import React from "react";
 import { render, screen, setupUser, waitFor } from "@/test-utils";
-import { AgreementStatCard, agreementColor } from "../AgreementStatCard";
+import {
+  AgreementStatCard,
+  agreementColor,
+} from "../AgreementStatCard";
 import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
 
 jest.mock("../../../hooks", () => ({
@@ -89,7 +92,7 @@ describe("agreementColor", () => {
 
 describe("AgreementStatCard", () => {
   it("renders the static pill variant", () => {
-    render(<AgreementStatCard staticPillText="Overall" value="82%" />);
+    render(<AgreementStatCard staticPillText="Overall" agreement={0.82} />);
     expect(screen.getByText("Overall")).toBeInTheDocument();
     expect(screen.getByText("Overall")).not.toHaveAttribute("title");
     expect(screen.getByText("82%")).toBeInTheDocument();
@@ -97,7 +100,7 @@ describe("AgreementStatCard", () => {
 
   it("does not repeat the pill's text when the card shows it in full", async () => {
     const user = setupUser();
-    render(<AgreementStatCard staticPillText="Overall" value="82%" />);
+    render(<AgreementStatCard staticPillText="Overall" agreement={0.82} />);
 
     await user.hover(screen.getByText("Overall"));
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -109,7 +112,7 @@ describe("AgreementStatCard", () => {
     const user = setupUser();
     const restore = mockWidths(300, 80);
     const name = "A very long evaluator name indeed";
-    render(<AgreementStatCard staticPillText={name} value="82%" />);
+    render(<AgreementStatCard staticPillText={name} agreement={0.82} />);
 
     await user.hover(screen.getByText(name));
     await waitFor(() =>
@@ -118,15 +121,16 @@ describe("AgreementStatCard", () => {
     restore();
   });
 
-  it("applies a custom valueClassName in the static pill variant", () => {
-    render(
-      <AgreementStatCard
-        staticPillText="Overall"
-        value="82%"
-        valueClassName="text-green-600"
-      />
-    );
-    expect(screen.getByText("82%").className).toContain("text-green-600");
+  it("shows the percentage worked out from the agreement in a neutral colour", () => {
+    render(<AgreementStatCard staticPillText="Overall" agreement={0.816} />);
+    const number = screen.getByText("82%");
+    expect(number.className).toContain("text-foreground");
+    expect(number.className).not.toMatch(/text-(green|red|yellow)/);
+  });
+
+  it("shows a muted dash when there is no agreement number", () => {
+    render(<AgreementStatCard staticPillText="Overall" agreement={null} />);
+    expect(screen.getByText("—").className).toContain("text-muted-foreground");
   });
 
   it("renders the evaluator pill variant with a version label", () => {
@@ -137,13 +141,12 @@ describe("AgreementStatCard", () => {
           name: "Correctness",
           versionLabel: "v2",
         }}
-        value="90%"
+        agreement={0.9}
       />
     );
     const button = screen.getByRole("button", { name: /Correctness/ });
     expect(button).not.toHaveAttribute("title");
     expect(screen.getByText("v2")).toBeInTheDocument();
-    expect(screen.getByText("alignment")).toBeInTheDocument();
     expect(screen.getByText("90%")).toBeInTheDocument();
   });
 
@@ -152,7 +155,7 @@ describe("AgreementStatCard", () => {
     render(
       <AgreementStatCard
         evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        value="90%"
+        agreement={0.9}
       />,
     );
 
@@ -160,38 +163,17 @@ describe("AgreementStatCard", () => {
     expect(screen.queryByText("Open Correctness")).toBeNull();
   });
 
-  it("says on hover how many items the score counts", async () => {
-    const user = setupUser();
-    render(
-      <AgreementStatCard
-        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        value="90%"
-        result={{
-          label: "Correct",
-          value: "75%",
-          title: "3 of 4 items",
-          ratio: 0.75,
-        }}
-      />,
-    );
-
-    await user.hover(screen.getByText("Correct"));
-    expect(await screen.findByText("3 of 4 items")).toBeInTheDocument();
-  });
-
   it("says on hover how many items the score counts when it is the only number", async () => {
     const user = setupUser();
     render(
       <AgreementStatCard
         evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        value={null}
         result={{
           label: "Score",
           value: "75%",
           title: "3 of 4 items",
           ratio: 0.75,
         }}
-        showResultLabel={false}
       />,
     );
 
@@ -204,7 +186,7 @@ describe("AgreementStatCard", () => {
     render(
       <AgreementStatCard
         evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        value="90%"
+        agreement={0.9}
       />
     );
     expect(mockFetch).not.toHaveBeenCalled();
@@ -219,67 +201,16 @@ describe("AgreementStatCard", () => {
     expect(mockFetch).toHaveBeenCalledWith("ev-1", "tok");
   });
 
-  it("shows the evaluator's own result next to the agreement number", () => {
-    render(
-      <AgreementStatCard
-        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        value="90%"
-        result={{
-          label: "Correct",
-          value: "75%",
-          title: "3 of 4 items",
-          ratio: 0.75,
-        }}
-      />
-    );
-    const stat = screen.getByText("Correct").parentElement!;
-    expect(stat).toHaveTextContent("Correct");
-    expect(stat).toHaveTextContent("75%");
-    expect(stat).not.toHaveAttribute("title");
-    // Coloured on the same thresholds as the agreement number.
-    expect(screen.getByText("75%").className).toContain("text-green-600");
-    expect(screen.getByText("Human agreement")).toBeInTheDocument();
-    expect(screen.getByText("90%")).toBeInTheDocument();
-    // The word "alignment" is dropped once each number carries its own label.
-    expect(screen.queryByText("alignment")).not.toBeInTheDocument();
-  });
-
-  it("shows the result on its own when agreement belongs to another section", () => {
-    render(
-      <AgreementStatCard
-        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        value={null}
-        result={{
-          label: "Score",
-          value: "75%",
-          title: "3 of 4 items",
-          ratio: 0.75,
-        }}
-      />
-    );
-    const number = screen.getByText("75%");
-    expect(number).not.toHaveAttribute("title");
-    expect(number.className).toContain("text-green-600");
-    // The score keeps its own label, exactly as it has when the agreement
-    // number sits next to it. Only the agreement number is left out.
-    expect(screen.getByText("Score")).toBeInTheDocument();
-    expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
-    expect(screen.queryByText("alignment")).not.toBeInTheDocument();
-    expect(screen.queryByText("—")).not.toBeInTheDocument();
-  });
-
   it("drops the score's label when the section heading already names it", () => {
     render(
       <AgreementStatCard
         evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        value={null}
         result={{
           label: "Score",
           value: "75%",
           title: "3 of 4 items",
           ratio: 0.75,
         }}
-        showResultLabel={false}
       />,
     );
     const number = screen.getByText("75%");
@@ -290,28 +221,16 @@ describe("AgreementStatCard", () => {
     expect(screen.queryByText("alignment")).not.toBeInTheDocument();
   });
 
-  it("keeps both labels when the agreement number is on the card too", () => {
-    render(
-      <AgreementStatCard
-        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        value="90%"
-        result={{ label: "Score", value: "75%", ratio: 0.75 }}
-        showResultLabel={false}
-      />,
-    );
-    expect(screen.getByText("Score")).toBeInTheDocument();
-    expect(screen.getByText("Human agreement")).toBeInTheDocument();
-  });
-
   it("renders the static pill variant with a result", () => {
     render(
       <AgreementStatCard
         staticPillText="Correctness v2"
-        value="—"
+        agreement={null}
         result={{ label: "Average score", value: "3.5 / 5", ratio: null }}
       />
     );
-    expect(screen.getByText("Average score")).toBeInTheDocument();
+    // The number alone: the section heading says what it is.
+    expect(screen.queryByText("Average score")).not.toBeInTheDocument();
     // No ratio, so the number keeps the default text colour.
     expect(screen.getByText("3.5 / 5").className).not.toMatch(
       /text-(green|red|yellow)/,
@@ -322,7 +241,7 @@ describe("AgreementStatCard", () => {
     render(
       <AgreementStatCard
         evaluatorPill={{ uuid: "ev-2", name: "Tone" }}
-        value="70%"
+        agreement={0.7}
       />
     );
     expect(screen.getByText("Tone")).toBeInTheDocument();
@@ -337,7 +256,7 @@ describe("AgreementStatCard", () => {
           name: "Safety",
           versionLabel: null,
         }}
-        value="55%"
+        agreement={0.55}
       />
     );
     expect(screen.getByText("Safety")).toBeInTheDocument();

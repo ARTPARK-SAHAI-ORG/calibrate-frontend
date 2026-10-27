@@ -27,6 +27,7 @@ import {
   type TestConfig,
 } from "@/components/AddTestDialog";
 import { AppLayout } from "@/components/AppLayout";
+import { TabRow } from "@/components/ui/TabRow";
 import {
   ExportResultsButton,
   type ExportColumn,
@@ -66,15 +67,13 @@ import {
 } from "@/components/human-labelling/JobsCreatedDialog";
 import { ManageEvaluatorsDialog } from "@/components/human-labelling/ManageEvaluatorsDialog";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
+import { AgreementOverviewSection } from "@/components/human-labelling/AgreementOverviewTable";
 import { RunEvaluatorsDialog } from "@/components/human-labelling/RunEvaluatorsDialog";
-import {
-  AgreementStatCard,
-  agreementColor,
-  type EvaluatorResultStat,
-} from "@/components/human-labelling/AgreementStatCard";
+import type { EvaluatorResultStat } from "@/components/human-labelling/AgreementStatCard";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
+  type TaskAgreementResponse,
   hasTaskOverviewData,
   hasReliabilityNumber,
   taskEvaluatorScoreCards,
@@ -112,36 +111,6 @@ import {
 import { parseBackendTime } from "@/lib/relativeTime";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
-
-type AgreementBlock = {
-  current: number | null;
-  pair_count: number;
-};
-
-type TaskAgreementResponse = {
-  human_human: AgreementBlock;
-  evaluators: (AgreementBlock & {
-    evaluator_id: string;
-    name: string;
-    /** The evaluator's own rolled-up output across every item in the task,
-     * independent of any human labels. `count` is the number of items it
-     * produced a value for; a binary evaluator fills `true_count`, a rating
-     * evaluator fills `mean`. Absent when it has not run on anything. */
-    result?: {
-      count: number;
-      true_count?: number | null;
-      mean?: number | null;
-    } | null;
-    /** The same rolled-up numbers, taken from the labels annotators gave on
-     * this evaluator instead of from the evaluator's own output. Absent when
-     * nobody has labelled for it yet. */
-    human_result?: {
-      count: number;
-      true_count?: number | null;
-      mean?: number | null;
-    } | null;
-  })[];
-};
 
 // Denormalized one-row-per-(item × linked evaluator) view from
 // /annotation-tasks/{uuid}/summary. `annotators[]` provides the column
@@ -1462,7 +1431,7 @@ function LabellingTaskPageInner() {
     setAgreementError(null);
     try {
       const data = await apiClient<TaskAgreementResponse>(
-        `/annotation-tasks/${uuid}/agreement?bucket=month&days=180`,
+        `/annotation-tasks/${uuid}/agreement`,
         accessToken,
       );
       setAgreement(data);
@@ -2806,43 +2775,33 @@ function LabellingTaskPageInner() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-border flex items-center gap-1">
-          {[
-            { id: "overview" as Tab, label: "Overview" },
+        <TabRow<Tab>
+          tabs={[
+            { id: "overview", label: "Overview" },
             {
-              id: "items" as Tab,
+              id: "items",
               // No count here: "Dataset (42)" reads as 42 datasets. The number
               // sits above the rows instead, where it says what it counts.
               label: "Dataset",
             },
             {
-              id: "jobs" as Tab,
+              id: "jobs",
               label:
                 jobsCount > 0
                   ? `Labelling jobs (${jobsCount})`
                   : "Labelling jobs",
             },
             {
-              id: "runs" as Tab,
+              id: "runs",
               label:
                 runs.length > 0
                   ? `Evaluation runs (${runs.length})`
                   : "Evaluation runs",
             },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => handleTabChange(t.id)}
-              className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors cursor-pointer ${
-                activeTab === t.id
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+          ]}
+          active={activeTab}
+          onChange={handleTabChange}
+        />
 
         {activeTab === "overview" && (
           <div className="space-y-4 md:space-y-6">
@@ -2936,8 +2895,8 @@ function LabellingTaskPageInner() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    How closely annotators agree with each other, and how
-                    closely each evaluator aligns with humans
+                    How often annotators agree with each other, and how often
+                    each evaluator agrees with them
                   </p>
                   {evaluatorsWithoutHumanLabels.length > 0 && (
                     <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200 flex items-start gap-2 mt-3">
@@ -2957,37 +2916,19 @@ function LabellingTaskPageInner() {
                       <span>{humanLabelNote}</span>
                     </div>
                   )}
+                  {/* Every linked evaluator has a row here, the tool-call one
+                      included: its inter-annotator agreement is a real
+                      number even though no evaluator judges it, so this
+                      reads `agreement.evaluators`, not `judgedEvaluators`. */}
                   {hasReliabilityNumber(
                     agreement.human_human,
-                    judgedEvaluators,
+                    agreement.evaluators ?? [],
                   ) && (
-                    <div className="flex flex-wrap items-stretch gap-3 mt-3">
-                      <AgreementStatCard
-                        staticPillText="Annotator agreement"
-                        value={
-                          agreement.human_human?.current != null
-                            ? `${Math.round(agreement.human_human.current * 100)}%`
-                            : "—"
-                        }
-                        valueClassName={agreementColor(
-                          agreement.human_human?.current,
-                        )}
+                    <div className="mt-3 space-y-4">
+                      <AgreementOverviewSection
+                        agreement={agreement}
+                        onOpenEvaluator={setPreviewEvaluator}
                       />
-                      {judgedEvaluators.map((ev) => (
-                        <AgreementStatCard
-                          key={ev.evaluator_id}
-                          evaluatorPill={{
-                            uuid: ev.evaluator_id,
-                            name: ev.name,
-                          }}
-                          value={
-                            ev.current != null
-                              ? `${Math.round(ev.current * 100)}%`
-                              : "—"
-                          }
-                          valueClassName={agreementColor(ev.current)}
-                        />
-                      ))}
                     </div>
                   )}
                 </section>
