@@ -62,6 +62,19 @@ describe("LandingHeader", () => {
     );
   });
 
+  it("shows Go to app instead of Get started when signed in", () => {
+    localStorage.setItem("access_token", "token");
+    render(<LandingHeader />);
+    expect(screen.getByRole("link", { name: "Go to app" })).toHaveAttribute(
+      "href",
+      "/agents",
+    );
+    expect(
+      screen.queryByRole("link", { name: "Get started" }),
+    ).not.toBeInTheDocument();
+    localStorage.removeItem("access_token");
+  });
+
   it("does not render a GitHub link", () => {
     render(<LandingHeader />);
     expect(
