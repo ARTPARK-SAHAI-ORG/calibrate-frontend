@@ -1,5 +1,6 @@
 ## October 2026
 
+- The Agreement with humans column on an evaluation run's Summary tab now shows just "No human labels yet" for an evaluator with no human labels, without a dash in front ([#776](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/776))
 - A labelling task with no agreement numbers yet now shows "No agreement yet" under Score reliability and says what is needed for each number, instead of showing only the heading ([#774](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/774))
 - The button in the landing page header now says Go to app and opens Agents when you are already signed in, instead of sending you to the login page ([#772](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/772))
 - Agreement between annotators, and between evaluators and annotators, now comes with a second measure that allows for chance, shown on the human alignment pages, the annotator and evaluator pages, and a new Summary tab on finished evaluation runs ([#758](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/758))
