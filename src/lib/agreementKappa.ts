@@ -113,10 +113,8 @@ export function buildTrendChart(points: readonly TrendPoint[]): {
     key: p.key,
     label: p.label,
     agreement: p.agreement == null ? null : percentOf(p.agreement),
-    kappa: p.kappa ?? null,
+    kappa: p.kappa == null ? null : Number(formatKappa(p.kappa)),
   }));
-  const negative = points.some(
-    (p) => p.kappa != null && Number(formatKappa(p.kappa)) < 0,
-  );
+  const negative = data.some((p) => p.kappa != null && p.kappa < 0);
   return { data, kappaDomain: [negative ? -1 : 0, 1] };
 }

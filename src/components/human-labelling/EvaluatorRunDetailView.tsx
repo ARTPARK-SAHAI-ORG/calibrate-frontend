@@ -1688,9 +1688,13 @@ export function EvaluatorRunDetailView({
   }, [job?.evaluators]);
 
   // The summary is ready once the run has finished. Opening a finished run
-  // starts on it; a run that finishes while open keeps the reader on Items.
+  // starts on it, unless the link narrows the items, which live on Items; a
+  // run that finishes while open keeps the reader on Items.
   const [tab, setTab] = useState<"summary" | "items">(() =>
-    job?.status === "completed" && (job.evaluators?.length ?? 0) > 0
+    job?.status === "completed" &&
+    (job.evaluators?.length ?? 0) > 0 &&
+    !filterDisagreements &&
+    valueFilters.length === 0
       ? "summary"
       : "items",
   );

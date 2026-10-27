@@ -94,6 +94,11 @@ describe("buildTrendChart", () => {
     expect(buildTrendChart([point(1, 0.4, -0.2)]).kappaDomain).toEqual([-1, 1]);
     expect(buildTrendChart([point(1, 0.4, -0.004)]).kappaDomain).toEqual([0, 1]);
   });
+
+  it("draws each kappa at the two decimals it shows, so -0.004 sits on 0", () => {
+    expect(buildTrendChart([point(1, 0.4, -0.004)]).data[0].kappa).toBe(0);
+    expect(buildTrendChart([point(1, 0.4, 0.4667)]).data[0].kappa).toBe(0.47);
+  });
 });
 
 describe("formatAgreement", () => {

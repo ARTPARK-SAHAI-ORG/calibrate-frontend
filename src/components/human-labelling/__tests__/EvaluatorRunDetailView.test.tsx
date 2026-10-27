@@ -2919,6 +2919,23 @@ describe("EvaluatorRunDetailView summary", () => {
     expect(screen.queryByText("Item One")).toBeNull();
   });
 
+  it.each(["/run?disagreements=1", "/run?scores=ev-bin:true"])(
+    "opens a finished run on its items when the link %s narrows them",
+    (url) => {
+      window.history.replaceState(null, "", url);
+      render(
+        <EvaluatorRunDetailView
+          job={finished()}
+          task={makeTask()}
+          versionLabels={{ "v-bin-1": "v1" }}
+        />,
+      );
+      expect(selected(tab(/^Items \(2\)$/))).toBe(true);
+      expect(selected(tab(/^Summary$/))).toBe(false);
+      window.history.replaceState(null, "", "/");
+    },
+  );
+
   it("lists each evaluator with its score and its agreement with humans", () => {
     render(
       <EvaluatorRunDetailView
