@@ -77,6 +77,7 @@ echo "    dir=${BACKEND_DIR}  db=${DB_DIR}"
 (
   cd "${BACKEND_DIR}/src"
   FAKE_AI_PROVIDERS=1 \
+  FAKE_AI_DEMO="${FAKE_AI_DEMO:-}" \
   RESEND_API_KEY= \
   CORS_ALLOWED_ORIGINS="http://localhost:${DEV_PORT}" \
   DB_ROOT_DIR="${DB_DIR}" \
@@ -111,6 +112,8 @@ done
 # --- Only now start the E2E run -----------------------------------------------
 export E2E_FAKE_AI=1
 export NEXT_PUBLIC_BACKEND_URL="http://localhost:${PORT}"
+# e2e/docs-screenshots reads the example data from the backend checkout.
+export CALIBRATE_BACKEND_DIR="${BACKEND_DIR}"
 echo "==> Running E2E against ${NEXT_PUBLIC_BACKEND_URL} (E2E_FAKE_AI=1)"
 
 if [[ "$#" -gt 0 ]]; then
