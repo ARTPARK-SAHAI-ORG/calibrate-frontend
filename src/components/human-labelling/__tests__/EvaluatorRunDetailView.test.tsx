@@ -1,5 +1,12 @@
 import React from "react";
-import { cleanup, render, screen, setupUser, within } from "@/test-utils";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  setupUser,
+  within,
+} from "@/test-utils";
 
 // AnnotationJobView pulls in canvas-confetti and backend API helpers that
 // are irrelevant to this presentational view; stub ItemPane with a simple
@@ -748,13 +755,22 @@ function makeRun(overrides: Partial<EvaluatorRunRow> = {}): EvaluatorRunRow {
   };
 }
 
+// A finished run opens on its Summary tab. Most tests here look at the item
+// review, so they switch to the Items tab when there is one.
+function renderOnItems(ui: React.ReactElement) {
+  const result = render(ui);
+  const items = screen.queryByRole("button", { name: /^Items \(\d+\)$/ });
+  if (items) fireEvent.click(items);
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // EvaluatorRunDetailView
 // ---------------------------------------------------------------------------
 
 describe("EvaluatorRunDetailView", () => {
   it("returns null for an unsupported task type", () => {
-    const { container } = render(
+    const { container } = renderOnItems(
       <EvaluatorRunDetailView
         job={makeJob()}
         task={makeTask({ type: "mystery" as never })}
@@ -765,7 +781,7 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("renders the status pill and item counter, no items case", () => {
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeJob({ items: [], runs: [] })}
         task={makeTask()}
@@ -777,7 +793,7 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("hides the status pill when hideStatusPill is set and no slots given", () => {
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeJob({ items: [], runs: [] })}
         task={makeTask()}
@@ -789,7 +805,7 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("still renders the header row when hideStatusPill is set but a slot is given", () => {
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeJob({ items: [], runs: [] })}
         task={makeTask()}
@@ -803,7 +819,7 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("counts the items already scored while the run is still going", () => {
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeJob({
           status: "in_progress",
@@ -824,7 +840,7 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("hides the scored count once the run is completed", () => {
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeJob({ runs: [makeRun({ item_id: "item-1" })] })}
         task={makeTask()}
@@ -835,7 +851,7 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("renders topError banner", () => {
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeJob({ items: [], runs: [] })}
         task={makeTask()}
@@ -847,7 +863,7 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("renders actionsSlot on the header row", () => {
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeJob({ items: [], runs: [] })}
         task={makeTask()}
@@ -859,7 +875,7 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("renders the failed banner with the job error when status is failed", () => {
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeJob({ status: "failed", error: "boom", items: [], runs: [] })}
         task={makeTask()}
@@ -877,7 +893,7 @@ describe("EvaluatorRunDetailView", () => {
         makeRun({ uuid: "run-2", item_id: "item-2" }),
       ],
     });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     expect(screen.getByText("Item One")).toBeInTheDocument();
@@ -896,7 +912,7 @@ describe("EvaluatorRunDetailView", () => {
         makeRun({ uuid: "run-2", item_id: "item-2" }),
       ],
     });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -910,7 +926,7 @@ describe("EvaluatorRunDetailView", () => {
   it("selecting an item from the desktop sidebar grid updates the current item", async () => {
     const user = setupUser();
     const job = makeJob();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     // Two "Item 2" buttons exist (mobile grid + desktop grid); click the last.
@@ -925,7 +941,7 @@ describe("EvaluatorRunDetailView", () => {
       evaluators: [evaluatorBinary],
       runs: [makeRun({ item_id: "item-1", status: "completed" })],
     });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
 
@@ -942,7 +958,7 @@ describe("EvaluatorRunDetailView", () => {
       evaluators: [evaluatorBinary],
       runs: [makeRun({ item_id: "item-1", status: "completed" })],
     });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     const doneButtons = screen.getAllByLabelText("Item 1 (completed)");
@@ -995,7 +1011,7 @@ describe("EvaluatorRunDetailView", () => {
         ],
       },
     });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     const toggle = screen.getByRole("button", {
@@ -1012,7 +1028,7 @@ describe("EvaluatorRunDetailView", () => {
     const job = makeJob({
       runs: [makeRun({ item_id: "item-1" })],
     });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     expect(
@@ -1087,7 +1103,7 @@ describe("EvaluatorRunDetailView", () => {
     // filter picked on a finished run can arrive at one still running.
     // With no bar to clear it, it must not keep hiding items.
     const user = setupUser();
-    const { rerender } = render(
+    const { rerender } = renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1112,7 +1128,7 @@ describe("EvaluatorRunDetailView", () => {
     // Same carry-over, but between two finished runs with different
     // evaluators. An unusable filter draws no tag, so it must not filter.
     const user = setupUser();
-    const { rerender } = render(
+    const { rerender } = renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1136,7 +1152,7 @@ describe("EvaluatorRunDetailView", () => {
   it("does not offer the filter while the run is still going", () => {
     // Scores arrive as the run works through the items, so there is
     // nothing to filter by yet.
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob({ status: "in_progress" })}
         task={makeTask()}
@@ -1148,7 +1164,7 @@ describe("EvaluatorRunDetailView", () => {
 
   it("narrows the items to those a rating evaluator scored at the picked level", async () => {
     const user = setupUser();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1166,7 +1182,7 @@ describe("EvaluatorRunDetailView", () => {
 
   it("keeps each item's original number when the value filter hides earlier items", async () => {
     const user = setupUser();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1182,7 +1198,7 @@ describe("EvaluatorRunDetailView", () => {
 
   it("shows a plain message when no item matches the value filter", async () => {
     const user = setupUser();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1195,7 +1211,7 @@ describe("EvaluatorRunDetailView", () => {
 
   it("keeps only the items that satisfy both of two active filters", async () => {
     const user = setupUser();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1211,7 +1227,7 @@ describe("EvaluatorRunDetailView", () => {
 
   it("drops every item when the two active filters point at different items", async () => {
     const user = setupUser();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1228,7 +1244,7 @@ describe("EvaluatorRunDetailView", () => {
 
   it("widens the list again when one of two tags is removed", async () => {
     const user = setupUser();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1251,7 +1267,7 @@ describe("EvaluatorRunDetailView", () => {
 
   it("offers Clear all only once two tags are active, and it removes both", async () => {
     const user = setupUser();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1275,7 +1291,7 @@ describe("EvaluatorRunDetailView", () => {
 
   it("reads 'or' on a tag with two values and a count past that", async () => {
     const user = setupUser();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1340,7 +1356,7 @@ describe("EvaluatorRunDetailView", () => {
         ],
       },
     });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     await user.click(
@@ -1360,7 +1376,7 @@ describe("EvaluatorRunDetailView", () => {
 
   it("puts both filters in the address bar and reopens with them on", async () => {
     const user = setupUser();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1374,7 +1390,7 @@ describe("EvaluatorRunDetailView", () => {
 
     // Same address, opened fresh: the filter is still on.
     cleanup();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1415,7 +1431,7 @@ describe("EvaluatorRunDetailView", () => {
         ],
       },
     });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     await user.click(
@@ -1424,7 +1440,7 @@ describe("EvaluatorRunDetailView", () => {
     expect(window.location.search).toBe("?disagreements=1");
 
     cleanup();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     expect(
@@ -1442,7 +1458,7 @@ describe("EvaluatorRunDetailView", () => {
     // No button to turn it off here, so it must not hide the items or the
     // evaluator cards inside them.
     window.history.replaceState(null, "", "/run?disagreements=1");
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeValueFilterJob()}
         task={makeTask()}
@@ -1466,7 +1482,7 @@ describe("EvaluatorRunDetailView", () => {
       evaluators: [{ ...evaluatorRating, scale_min: null, scale_max: null }],
       runs: [],
     });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     expect(
@@ -1475,8 +1491,8 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("renders the top-level evaluator pill row as a button (linked) when no agreement cards will render", () => {
-    const job = makeJob({ runs: [], items: [] });
-    render(
+    const job = makeJob({ status: "in_progress", runs: [], items: [] });
+    renderOnItems(
       <EvaluatorRunDetailView
         job={job}
         task={makeTask()}
@@ -1495,8 +1511,8 @@ describe("EvaluatorRunDetailView", () => {
 
   it("shows no hover text on the linked pill, which already names the evaluator", async () => {
     const user = setupUser();
-    const job = makeJob({ runs: [], items: [] });
-    render(
+    const job = makeJob({ status: "in_progress", runs: [], items: [] });
+    renderOnItems(
       <EvaluatorRunDetailView
         job={job}
         task={makeTask()}
@@ -1532,8 +1548,8 @@ describe("EvaluatorRunDetailView", () => {
       ],
     });
     const user = setupUser();
-    const job = makeJob({ runs: [], items: [] });
-    render(
+    const job = makeJob({ status: "in_progress", runs: [], items: [] });
+    renderOnItems(
       <EvaluatorRunDetailView
         job={job}
         task={makeTask()}
@@ -1553,8 +1569,8 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("renders the top-level evaluator pill row as plain text (no button, no modal) when linkEvaluators=false", () => {
-    const job = makeJob({ runs: [], items: [] });
-    render(
+    const job = makeJob({ status: "in_progress", runs: [], items: [] });
+    renderOnItems(
       <EvaluatorRunDetailView
         job={job}
         task={makeTask()}
@@ -1590,7 +1606,7 @@ describe("EvaluatorRunDetailView", () => {
       ],
     });
     const user = setupUser();
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeJob({ status: "in_progress", runs: [], items: [] })}
         task={makeTask()}
@@ -1609,7 +1625,7 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("names the evaluator as plain text above a run that is still going when the pill does not link", () => {
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeJob({ status: "in_progress", runs: [], items: [] })}
         task={makeTask()}
@@ -1625,7 +1641,7 @@ describe("EvaluatorRunDetailView", () => {
   });
 
   it("shows no version label above a run that is still going when the evaluator is not pinned to a version", () => {
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={makeJob({
           status: "in_progress",
@@ -1644,7 +1660,7 @@ describe("EvaluatorRunDetailView", () => {
 
   it("shows an em dash placeholder when there are no evaluators at all", () => {
     const job = makeJob({ evaluators: [], runs: [] });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView
         job={job}
         task={makeTask({ evaluators: [] })}
@@ -1654,163 +1670,10 @@ describe("EvaluatorRunDetailView", () => {
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 
-  it("marks each evaluator that has no human labels yet", () => {
-    const job = makeJob({
-      runs: [makeRun()],
-      human_agreement: {
-        evaluators: [
-          {
-            evaluator_id: "ev-bin",
-            evaluator_version_id: "v-bin-1",
-            agreement: null,
-            pair_count: 0,
-            item_count: 0,
-          },
-        ],
-        items: [],
-      },
-    });
-    render(
-      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
-    );
-    expect(
-      screen.getAllByLabelText(/No human labels for this evaluator yet/).length,
-    ).toBeGreaterThan(0);
-  });
 
-  it("renders human agreement stat cards when agreement data is present", () => {
-    const job = makeJob({
-      runs: [makeRun()],
-      human_agreement: {
-        evaluators: [
-          {
-            evaluator_id: "ev-bin",
-            evaluator_version_id: "v-bin-1",
-            agreement: 0.8,
-            pair_count: 2,
-            item_count: 1,
-            kappa: 0.4,
-            kappa_type: "cohen",
-            chance_agreement: 0.5,
-          },
-        ],
-        items: [
-          {
-            item_id: "item-1",
-            annotator_count: 1,
-            evaluators: [
-              {
-                evaluator_id: "ev-bin",
-                agreement: 0.8,
-                pair_count: 2,
-                human_annotations: [
-                  {
-                    annotation_id: "a1",
-                    annotator_id: "ann1",
-                    annotator_name: "Ann",
-                    job_id: "job-1",
-                    value: { value: true },
-                    updated_at: "",
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-    });
-    render(
-      <EvaluatorRunDetailView
-        job={job}
-        task={makeTask()}
-        versionLabels={{ "v-bin-1": "v1" }}
-      />,
-    );
-    expect(screen.getByText("Human agreement")).toBeInTheDocument();
-    expect(screen.getByText("80%").className).toContain("text-foreground");
-    expect(screen.getByText("80%").className).not.toMatch(
-      /text-(green|red|yellow)/,
-    );
-    const fill = screen.getByTestId("agreement-fill");
-    expect(fill.style.width).toBe("80%");
-    expect(fill.className).toContain("bg-green-500");
-    expect(screen.getByTestId("chance-tick").style.left).toBe("50%");
-    expect(screen.getByText("Chance 50%")).toBeInTheDocument();
-    expect(screen.getByText("Kappa")).toBeInTheDocument();
-    expect(screen.getByText("0.40")).toBeInTheDocument();
-  });
 
-  it("shows each evaluator's summarised value across the items", () => {
-    const job = makeJob({
-      runs: [
-        makeRun({ uuid: "r1", item_id: "item-1", value: { value: true } }),
-        makeRun({ uuid: "r2", item_id: "item-2", value: { value: false } }),
-      ],
-    });
-    render(
-      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
-    );
-    const stat = screen.getByText("Score").parentElement!;
-    expect(stat).toHaveTextContent("Score");
-    expect(stat).toHaveTextContent("50%");
-    expect(stat).not.toHaveAttribute("title");
-  });
 
-  it("shows the summarised value even when there are no human labels yet", () => {
-    const job = makeJob({
-      human_agreement: undefined,
-      runs: [makeRun({ value: { value: true } })],
-    });
-    render(
-      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
-    );
-    expect(screen.getByText("100%")).toBeInTheDocument();
-    expect(
-      screen.getAllByLabelText(/No human labels for this evaluator yet/).length,
-    ).toBeGreaterThan(0);
-    // Nothing to compare against yet, so the card leaves the human agreement
-    // column out instead of showing an empty one.
-    expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
-    expect(screen.queryByText("—")).not.toBeInTheDocument();
-  });
 
-  it("marks only the evaluators that have no human labels yet", () => {
-    const job = makeJob({
-      evaluators: [
-        evaluatorBinary,
-        { ...evaluatorRating, uuid: "ev-rate", name: "Rating Evaluator" },
-      ],
-      runs: [makeRun({ value: { value: true } })],
-      human_agreement: {
-        evaluators: [
-          {
-            evaluator_id: "ev-bin",
-            evaluator_version_id: "v-bin-1",
-            agreement: 0.9,
-            pair_count: 2,
-            item_count: 1,
-          },
-          {
-            evaluator_id: "ev-rate",
-            evaluator_version_id: "v-rate-1",
-            agreement: null,
-            pair_count: 0,
-            item_count: 0,
-          },
-        ],
-        items: [],
-      },
-    });
-    render(
-      <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
-    );
-    // Exactly one of the two evaluators is unlabelled, so exactly one mark.
-    expect(
-      screen.getAllByLabelText(/No human labels for this evaluator yet/),
-    ).toHaveLength(1);
-    // The labelled evaluator still shows its agreement number.
-    expect(screen.getByText("90%")).toBeInTheDocument();
-  });
 
   it("shows no mark once every evaluator has human labels", () => {
     const job = makeJob({
@@ -1828,7 +1691,7 @@ describe("EvaluatorRunDetailView", () => {
         items: [],
       },
     });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     expect(
@@ -1852,7 +1715,7 @@ describe("EvaluatorRunDetailView", () => {
         items: [],
       },
     });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
@@ -1860,7 +1723,7 @@ describe("EvaluatorRunDetailView", () => {
 
   it("shows a spinner for evaluators that haven't produced a run yet while job is running", () => {
     const job = makeJob({ status: "in_progress", runs: [] });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     expect(screen.getByText("Running evaluator")).toBeInTheDocument();
@@ -1868,7 +1731,7 @@ describe("EvaluatorRunDetailView", () => {
 
   it("shows a 'no result recorded' error when the job is completed but an evaluator has no run for the item", () => {
     const job = makeJob({ status: "completed", runs: [] });
-    render(
+    renderOnItems(
       <EvaluatorRunDetailView job={job} task={makeTask()} versionLabels={{}} />,
     );
     expect(
@@ -1902,7 +1765,7 @@ describe("EvaluatorRunDetailView", () => {
         },
       ],
     });
-    render(<EvaluatorRunDetailView job={job} task={task} versionLabels={{}} />);
+    renderOnItems(<EvaluatorRunDetailView job={job} task={task} versionLabels={{}} />);
     expect(screen.getByText("Task Item 2")).toBeInTheDocument();
   });
 
@@ -1932,7 +1795,7 @@ describe("EvaluatorRunDetailView", () => {
         },
       ],
     });
-    render(<EvaluatorRunDetailView job={job} task={task} versionLabels={{}} />);
+    renderOnItems(<EvaluatorRunDetailView job={job} task={task} versionLabels={{}} />);
     expect(screen.getByText("Task Item 1")).toBeInTheDocument();
     expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
   });
@@ -1963,60 +1826,11 @@ describe("EvaluatorRunDetailView", () => {
         },
       ],
     });
-    render(<EvaluatorRunDetailView job={job} task={task} versionLabels={{}} />);
+    renderOnItems(<EvaluatorRunDetailView job={job} task={task} versionLabels={{}} />);
     expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
     expect(screen.getByText("Only Item")).toBeInTheDocument();
   });
 
-  it("renders human agreement stat cards as plain (unlinked) pills when linkEvaluators is false", () => {
-    const job = makeJob({
-      runs: [makeRun()],
-      human_agreement: {
-        evaluators: [
-          {
-            evaluator_id: "ev-bin",
-            evaluator_version_id: "v-bin-1",
-            agreement: 0.8,
-            pair_count: 2,
-            item_count: 1,
-          },
-        ],
-        items: [
-          {
-            item_id: "item-1",
-            annotator_count: 1,
-            evaluators: [
-              {
-                evaluator_id: "ev-bin",
-                agreement: 0.8,
-                pair_count: 2,
-                human_annotations: [
-                  {
-                    annotation_id: "a1",
-                    annotator_id: "ann1",
-                    annotator_name: "Ann",
-                    job_id: "job-1",
-                    value: { value: true },
-                    updated_at: "",
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-    });
-    render(
-      <EvaluatorRunDetailView
-        job={job}
-        task={makeTask()}
-        versionLabels={{ "v-bin-1": "v1" }}
-        linkEvaluators={false}
-      />,
-    );
-    expect(screen.getByText("Binary Evaluator v1")).toBeInTheDocument();
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
-  });
 
   describe("reporting the items on screen", () => {
     // The disagreement toggle and the filter share one strip. Its own class
@@ -2037,7 +1851,7 @@ describe("EvaluatorRunDetailView", () => {
 
     it("reports every item when nothing is filtered out", () => {
       const onVisibleItemsChange = jest.fn();
-      render(
+      renderOnItems(
         <EvaluatorRunDetailView
           job={jobWithNoFilters()}
           task={makeTask()}
@@ -2054,7 +1868,7 @@ describe("EvaluatorRunDetailView", () => {
     it("reports the narrowed list when a value filter is applied", async () => {
       const user = setupUser();
       const onVisibleItemsChange = jest.fn();
-      render(
+      renderOnItems(
         <EvaluatorRunDetailView
           job={makeValueFilterJob()}
           task={makeTask()}
@@ -2074,7 +1888,7 @@ describe("EvaluatorRunDetailView", () => {
     });
 
     it("draws no filter strip when there is nothing to filter on", () => {
-      render(
+      renderOnItems(
         <EvaluatorRunDetailView
           job={jobWithNoFilters()}
           task={makeTask()}
@@ -3030,3 +2844,144 @@ describe("ItemDetailPane about column", () => {
     expect(screen.getAllByText("Metadata")).toHaveLength(1);
   });
 });
+
+describe("EvaluatorRunDetailView summary", () => {
+  const labelled = {
+    evaluators: [
+      {
+        evaluator_id: "ev-bin",
+        evaluator_version_id: "v-bin-1",
+        agreement: 0.8,
+        pair_count: 2,
+        item_count: 1,
+        kappa: 0.4,
+        kappa_type: "cohen" as const,
+        chance_agreement: 0.5,
+      },
+    ],
+    items: [],
+  };
+  const finished = () =>
+    makeJob({
+      runs: [
+        makeRun({ uuid: "r1", item_id: "item-1", value: { value: true } }),
+        makeRun({ uuid: "r2", item_id: "item-2", value: { value: false } }),
+      ],
+      human_agreement: labelled,
+    });
+  const tab = (name: RegExp) => screen.queryByRole("button", { name });
+  const selected = (el: HTMLElement | null) =>
+    el?.className.includes("border-foreground");
+
+  it("shows no tabs before the run has finished, only the item review", () => {
+    render(
+      <EvaluatorRunDetailView
+        job={makeJob({ status: "in_progress" })}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(tab(/^Summary$/)).toBeNull();
+    expect(tab(/^Items/)).toBeNull();
+    expect(screen.getByText("Item One")).toBeInTheDocument();
+  });
+
+  it("adds the tabs when the run finishes, but stays on the items", () => {
+    const { rerender } = render(
+      <EvaluatorRunDetailView
+        job={makeJob({ status: "in_progress" })}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    rerender(
+      <EvaluatorRunDetailView job={finished()} task={makeTask()} versionLabels={{}} />,
+    );
+    expect(tab(/^Summary$/)).toBeInTheDocument();
+    expect(selected(tab(/^Items \(2\)$/))).toBe(true);
+    expect(selected(tab(/^Summary$/))).toBe(false);
+    expect(screen.getByText("Item One")).toBeInTheDocument();
+    expect(screen.queryByText("Agreement with humans")).toBeNull();
+  });
+
+  it("opens a finished run on its summary", () => {
+    render(
+      <EvaluatorRunDetailView
+        job={finished()}
+        task={makeTask()}
+        versionLabels={{ "v-bin-1": "v1" }}
+      />,
+    );
+    expect(screen.getByText("Evaluator results")).toBeInTheDocument();
+    expect(selected(tab(/^Summary$/))).toBe(true);
+    expect(tab(/^Items \(2\)$/)).toBeInTheDocument();
+    expect(screen.queryByText("Item One")).toBeNull();
+  });
+
+  it("lists each evaluator with its score and its agreement with humans", () => {
+    render(
+      <EvaluatorRunDetailView
+        job={finished()}
+        task={makeTask()}
+        versionLabels={{ "v-bin-1": "v1" }}
+      />,
+    );
+    expect(
+      screen.getByText("Agreement expected by chance alone"),
+    ).toBeInTheDocument();
+    const table = screen
+      .getAllByText("Agreement with humans")[0]
+      .closest(".md\\:block") as HTMLElement;
+    const row = within(table)
+      .getByRole("button", { name: "Binary Evaluator" })
+      .closest(".grid") as HTMLElement;
+    const cells = [...row.children] as HTMLElement[];
+    expect(cells[0]).toHaveTextContent("Binary Evaluatorv1");
+    // Only the value: the column heading already says it is the score.
+    expect(cells[1].textContent).toBe("50%");
+    expect(within(cells[1]).getByText("50%").className).toContain(
+      "text-foreground",
+    );
+    expect(cells[2]).toHaveTextContent("80%Kappa0.40");
+    expect(within(cells[2]).getByText("Chance 50%")).toBeInTheDocument();
+    expect(
+      within(cells[2]).getByTestId("agreement-fill").style.width,
+    ).toBe("80%");
+  });
+
+  it("says when an evaluator has no human labels yet", () => {
+    render(
+      <EvaluatorRunDetailView
+        job={makeJob({ runs: [makeRun()], human_agreement: undefined })}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(screen.getAllByText("No human labels yet").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("agreement-fill")).toBeNull();
+    expect(screen.queryByText("Better than chance")).toBeNull();
+  });
+
+  it("shows plain names, not buttons, on a shared page", () => {
+    render(
+      <EvaluatorRunDetailView
+        job={finished()}
+        task={makeTask()}
+        versionLabels={{}}
+        linkEvaluators={false}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Binary Evaluator" })).toBeNull();
+    expect(screen.getAllByText("Binary Evaluator").length).toBeGreaterThan(0);
+  });
+
+  it("shows the item review exactly as before on the Items tab", () => {
+    render(
+      <EvaluatorRunDetailView job={finished()} task={makeTask()} versionLabels={{}} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Items \(2\)$/ }));
+    expect(screen.getByText("Item One")).toBeInTheDocument();
+    expect(screen.queryByText("Agreement expected by chance alone")).toBeNull();
+  });
+});
+

@@ -1934,7 +1934,7 @@ function AgreementTrendTab({
                     </span>
                   }
                 >
-                  <MeasureCell group={version} variant="hover" />
+                  <MeasureCell group={version} variant="detailed" />
                 </TrendHoverBox>
               );
             }}

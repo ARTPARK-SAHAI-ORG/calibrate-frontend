@@ -17,10 +17,11 @@ import {
   getBinaryLabel,
   toRatingScale,
 } from "@/lib/binaryLabels";
+import type { EvaluatorResultStat } from "@/components/human-labelling/AgreementStatCard";
 import {
-  AgreementStatCard,
-  type EvaluatorResultStat,
-} from "@/components/human-labelling/AgreementStatCard";
+  EvaluatorRunSummaryTable,
+  type RunSummaryRow,
+} from "@/components/human-labelling/AgreementOverviewTable";
 import { summariseValues } from "@/lib/evaluatorResultStat";
 import { payloadHasVersions, textOf } from "@/lib/messageVersions";
 import {
@@ -1547,122 +1548,31 @@ export function ItemDetailPane({
   );
 }
 
-function EvaluatorSummary({
-  jobStatus,
-  agreement,
-  evaluators,
-  evaluatorNamesById,
-  versionLabels,
-  linkEvaluators,
+/** The "Evaluator results" heading, with the run's status beside it and the
+ * page's buttons on the right. */
+function EvaluatorResultsHeading({
   headerActions,
   statusPill,
-  runs,
-  getJobEvaluator,
 }: {
-  jobStatus: EvaluatorRunJob["status"];
-  agreement: HumanAgreement | undefined;
-  /** Every run row in the job, used for the per-evaluator summarised value. */
-  runs: EvaluatorRunRow[];
-  getJobEvaluator: (key: {
-    evaluator_id: string;
-    evaluator_version_id?: string;
-  }) => JobEvaluator | null;
-  evaluators: {
-    evaluator_id: string;
-    evaluator_version_id?: string;
-    name?: string;
-    /** Named here so anyone rebuilding this list can see the flag exists.
-     * Rebuilding it without this drops the hiding rule silently. */
-    is_optional?: boolean;
-  }[];
-  evaluatorNamesById: Record<string, string>;
-  versionLabels: Record<string, string>;
-  linkEvaluators: boolean;
-  /** Action buttons, rendered right-aligned on the heading row when the
-   * agreement cards show (so they don't sit on their own line above). */
   headerActions?: React.ReactNode;
-  /** Run status, shown beside the heading rather than among the buttons: it
-   * is something you read, not something you click. */
   statusPill?: React.ReactNode;
 }) {
-  if (jobStatus !== "completed") return null;
-  if (evaluators.length === 0) return null;
-
-  const agreementById = new Map(
-    (agreement?.evaluators ?? []).map((e) => [e.evaluator_id, e]),
-  );
   return (
-    <div className="space-y-2">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        {/* Shrinks rather than pushing the buttons onto their own row. The
-            buttons keep themselves right-aligned, so this does not need to
-            grow, which would squeeze the heading off narrow screens. */}
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-sm font-semibold">Evaluator results</h2>
-            {statusPill}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-            What each evaluator scored, and how often it matched the people who
-            labelled the same items
-          </p>
+    <div className="flex items-start justify-between gap-3 flex-wrap">
+      {/* Shrinks rather than pushing the buttons onto their own row. The
+          buttons keep themselves right-aligned, so this does not need to
+          grow, which would squeeze the heading off narrow screens. */}
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h2 className="text-sm font-semibold">Evaluator results</h2>
+          {statusPill}
         </div>
-        {headerActions}
+        <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+          What each evaluator scored, and how often it matched the people who
+          labelled the same items
+        </p>
       </div>
-      <div className="flex items-stretch gap-3 overflow-x-auto pb-1">
-        {evaluators.map((ev) => {
-          const row = agreementById.get(ev.evaluator_id);
-          const name = evaluatorDisplayName(ev, evaluatorNamesById);
-          const version = row?.evaluator_version_id
-            ? (versionLabels[row.evaluator_version_id] ?? null)
-            : ev.evaluator_version_id
-              ? (versionLabels[ev.evaluator_version_id] ?? null)
-              : null;
-          // No human labels on these items means there is nothing to put in
-          // the human agreement column, so the card leaves it out entirely
-          // rather than showing a dash. The mark on the card says why.
-          // Said on the card itself, on hover, rather than in a banner above
-          // every card: this way it names which evaluator is missing labels.
-          const warning =
-            row?.agreement == null
-              ? "No human labels for this evaluator yet. Agreement will show once they are added."
-              : null;
-          const result = summariseEvaluatorRuns(
-            runs,
-            ev,
-            getJobEvaluator(ev),
-          );
-          const key = `${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`;
-          if (linkEvaluators) {
-            return (
-              <AgreementStatCard
-                key={key}
-                evaluatorPill={{
-                  uuid: ev.evaluator_id,
-                  name,
-                  versionLabel: version,
-                }}
-                agreement={row?.agreement}
-                result={result}
-                warning={warning}
-                kappa={row}
-              />
-            );
-          }
-          return (
-            <AgreementStatCard
-              key={key}
-              staticPillText={
-                version ? `${name} ${version}` : name
-              }
-              agreement={row?.agreement}
-              result={result}
-              warning={warning}
-              kappa={row}
-            />
-          );
-        })}
-      </div>
+      {headerActions}
     </div>
   );
 }
@@ -1779,6 +1689,13 @@ export function EvaluatorRunDetailView({
   // Shim that matches the legacy `details.evaluators` shape the rest of
   // this file consumes — `{ evaluator_id, evaluator_version_id?, name? }`.
   // Built from the new top-level `job.evaluators[]` payload.
+  // The summary is ready once the run has finished. Opening a finished run
+  // starts on it; a run that finishes while open keeps the reader on Items.
+  const [tab, setTab] = useState<"summary" | "items">(() =>
+    job?.status === "completed" && (job.evaluators?.length ?? 0) > 0
+      ? "summary"
+      : "items",
+  );
   const detailsEvaluators = useMemo(
     () =>
       (job?.evaluators ?? []).map((e) => ({
@@ -1956,6 +1873,28 @@ export function EvaluatorRunDetailView({
   const cardsWillRender =
     job.status === "completed" && detailsEvaluators.length > 0;
 
+  const agreementByEvaluator = new Map(
+    (job.human_agreement?.evaluators ?? []).map((e) => [e.evaluator_id, e]),
+  );
+  const summaryRows: RunSummaryRow[] = cardsWillRender
+    ? detailsEvaluators.map((ev) => {
+        const row = agreementByEvaluator.get(ev.evaluator_id);
+        const versionId = row?.evaluator_version_id ?? ev.evaluator_version_id;
+        return {
+          key: `${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`,
+          evaluatorId: ev.evaluator_id,
+          name: evaluatorDisplayName(ev, evaluatorNamesById),
+          versionLabel: versionId ? (versionLabels[versionId] ?? null) : null,
+          score: summariseEvaluatorRuns(
+            job.runs ?? [],
+            ev,
+            getJobEvaluator(ev),
+          ),
+          agreement: row ? { ...row, current: row.agreement ?? null } : null,
+        };
+      })
+    : [];
+
   const doneCount = itemsForRun.filter((it) => itemDone(it.uuid)).length;
   const showDoneCount =
     (job.status === "in_progress" || job.status === "queued") &&
@@ -2051,116 +1990,111 @@ export function EvaluatorRunDetailView({
         </ErrorNote>
       )}
 
-      <EvaluatorSummary
-        jobStatus={job.status}
-        agreement={job.human_agreement}
-        runs={job.runs ?? []}
-        getJobEvaluator={getJobEvaluator}
-        evaluators={detailsEvaluators}
-        evaluatorNamesById={evaluatorNamesById}
-        versionLabels={versionLabels}
-        linkEvaluators={linkEvaluators}
-        headerActions={cardsWillRender ? headerActions : null}
-        statusPill={cardsWillRender ? statusPill : null}
-      />
-
-      <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
-        <div className="flex flex-col flex-1 min-h-0">
-          {(hasDisagreements || canFilterByValue) && (
-            <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
-              {hasDisagreements && (
-                <button
-                  onClick={toggleDisagreements}
-                  className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                    filterDisagreements
-                      ? "border-red-400 bg-red-500/10 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-400"
-                      : "border-foreground/20 bg-muted/60 text-foreground hover:bg-muted hover:border-foreground/30"
-                  }`}
-                >
-                  {filterDisagreements
-                    ? "Showing disagreements only"
-                    : "Show disagreements only"}
-                </button>
-              )}
-              {canFilterByValue && (
-                <ItemValueFilter
-                  evaluators={jobEvaluators}
-                  filters={valueFilters}
-                  onChange={setValueFilters}
-                />
-              )}
-            </div>
-          )}
-          <header className="border-b border-border px-4 md:px-6 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            <h2 className="text-sm font-semibold text-foreground truncate min-w-0">
-              {(() => {
-                const p =
-                  currentItem?.payload &&
-                  typeof currentItem.payload === "object"
-                    ? (currentItem.payload as Record<string, unknown>)
-                    : null;
-                const name =
-                  p && typeof p.name === "string" ? p.name.trim() : "";
-                return name || "Item";
-              })()}
-            </h2>
-            <div className="flex items-center gap-2 justify-self-center">
+      {cardsWillRender && (
+        <>
+          <EvaluatorResultsHeading
+            headerActions={headerActions}
+            statusPill={statusPill}
+          />
+          <div className="border-b border-border flex items-center gap-1">
+            {[
+              { id: "summary" as const, label: "Summary" },
+              { id: "items" as const, label: `Items (${itemsForRun.length})` },
+            ].map((t) => (
               <button
-                onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
-                disabled={currentIndex === 0 || total === 0}
-                className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors cursor-pointer ${
+                  tab === t.id
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
               >
-                Previous
+                {t.label}
               </button>
-              <span className="text-sm text-muted-foreground tabular-nums px-2">
-                Item {Math.min(safeIndex + 1, Math.max(total, 1))} of {total}
-              </span>
-              <button
-                onClick={() =>
-                  setCurrentIndex(Math.min(total - 1, currentIndex + 1))
-                }
-                disabled={currentIndex >= total - 1 || total === 0}
-                className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
-            <div />
-          </header>
+            ))}
+          </div>
+        </>
+      )}
 
-          <div className="flex flex-col md:flex-row flex-1 min-h-0">
-            <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
-              <div className="p-2 grid grid-cols-8 gap-2">
-                {filteredItemsForRun.map((it, i) => {
-                  const done = itemDone(it.uuid);
-                  const isCurrent = i === safeIndex;
-                  const label = originalIndexByUuid.get(it.uuid) ?? i + 1;
-                  return (
-                    <Tooltip
-                      key={it.uuid}
-                      content={`Item ${label}${done ? " (completed)" : ""}`}
-                    >
-                      <button
-                        onClick={() => setCurrentIndex(i)}
-                        aria-label={`Item ${label}${done ? " (completed)" : ""}`}
-                        className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
-                          isCurrent
-                            ? "border-foreground bg-foreground text-background"
-                            : done
-                              ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
-                              : "border-border bg-background text-foreground hover:bg-muted/50"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    </Tooltip>
-                  );
-                })}
+      {cardsWillRender && tab === "summary" ? (
+        <div className="space-y-4">
+          <EvaluatorRunSummaryTable
+            rows={summaryRows}
+            onOpenEvaluator={
+              linkEvaluators ? (ev) => setPreviewEvaluator(ev) : undefined
+            }
+          />
+        </div>
+      ) : (
+        <div className="border border-border rounded-xl [overflow:clip] flex flex-col flex-1 min-h-0">
+          <div className="flex flex-col flex-1 min-h-0">
+            {(hasDisagreements || canFilterByValue) && (
+              <div className="border-b border-border px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
+                {hasDisagreements && (
+                  <button
+                    onClick={toggleDisagreements}
+                    className={`h-8 px-3 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
+                      filterDisagreements
+                        ? "border-red-400 bg-red-500/10 text-red-700 dark:border-red-500/50 dark:bg-red-500/20 dark:text-red-400"
+                        : "border-foreground/20 bg-muted/60 text-foreground hover:bg-muted hover:border-foreground/30"
+                    }`}
+                  >
+                    {filterDisagreements
+                      ? "Showing disagreements only"
+                      : "Show disagreements only"}
+                  </button>
+                )}
+                {canFilterByValue && (
+                  <ItemValueFilter
+                    evaluators={jobEvaluators}
+                    filters={valueFilters}
+                    onChange={setValueFilters}
+                  />
+                )}
               </div>
-            </div>
-            <div className="hidden md:block relative w-20 flex-shrink-0 border-r border-border bg-muted/20">
-              <div className="absolute inset-0 overflow-y-auto">
-                <div className="p-3 grid grid-cols-1 gap-2">
+            )}
+            <header className="border-b border-border px-4 md:px-6 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <h2 className="text-sm font-semibold text-foreground truncate min-w-0">
+                {(() => {
+                  const p =
+                    currentItem?.payload &&
+                    typeof currentItem.payload === "object"
+                      ? (currentItem.payload as Record<string, unknown>)
+                      : null;
+                  const name =
+                    p && typeof p.name === "string" ? p.name.trim() : "";
+                  return name || "Item";
+                })()}
+              </h2>
+              <div className="flex items-center gap-2 justify-self-center">
+                <button
+                  onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+                  disabled={currentIndex === 0 || total === 0}
+                  className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-muted-foreground tabular-nums px-2">
+                  Item {Math.min(safeIndex + 1, Math.max(total, 1))} of {total}
+                </span>
+                <button
+                  onClick={() =>
+                    setCurrentIndex(Math.min(total - 1, currentIndex + 1))
+                  }
+                  disabled={currentIndex >= total - 1 || total === 0}
+                  className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+              <div />
+            </header>
+
+            <div className="flex flex-col md:flex-row flex-1 min-h-0">
+              <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
+                <div className="p-2 grid grid-cols-8 gap-2">
                   {filteredItemsForRun.map((it, i) => {
                     const done = itemDone(it.uuid);
                     const isCurrent = i === safeIndex;
@@ -2169,7 +2103,6 @@ export function EvaluatorRunDetailView({
                       <Tooltip
                         key={it.uuid}
                         content={`Item ${label}${done ? " (completed)" : ""}`}
-                        position="right"
                       >
                         <button
                           onClick={() => setCurrentIndex(i)}
@@ -2189,45 +2122,77 @@ export function EvaluatorRunDetailView({
                   })}
                 </div>
               </div>
-            </div>
-
-            <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
-              {!currentItem ? (
-                <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground">
-                  {(canFilterByValue &&
-                    usableValueFilters(valueFilters, jobEvaluators).length >
-                      0) ||
-                  showDisagreementsOnly
-                    ? "No items match this filter."
-                    : "No items in this run."}
+              <div className="hidden md:block relative w-20 flex-shrink-0 border-r border-border bg-muted/20">
+                <div className="absolute inset-0 overflow-y-auto">
+                  <div className="p-3 grid grid-cols-1 gap-2">
+                    {filteredItemsForRun.map((it, i) => {
+                      const done = itemDone(it.uuid);
+                      const isCurrent = i === safeIndex;
+                      const label = originalIndexByUuid.get(it.uuid) ?? i + 1;
+                      return (
+                        <Tooltip
+                          key={it.uuid}
+                          content={`Item ${label}${done ? " (completed)" : ""}`}
+                          position="right"
+                        >
+                          <button
+                            onClick={() => setCurrentIndex(i)}
+                            aria-label={`Item ${label}${done ? " (completed)" : ""}`}
+                            className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                              isCurrent
+                                ? "border-foreground bg-foreground text-background"
+                                : done
+                                  ? "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400"
+                                  : "border-border bg-background text-foreground hover:bg-muted/50"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
                 </div>
-              ) : (
-                <ItemDetailPane
-                  showJudgeNote
-                  item={currentItem}
-                  taskType={task.type}
-                  evaluators={detailsEvaluators}
-                  evaluatorNamesById={evaluatorNamesById}
-                  getJobEvaluator={getJobEvaluator}
-                  runs={runsByItem[currentItem.uuid] ?? []}
-                  versionLabels={versionLabels}
-                  jobStatus={job.status}
-                  humanAgreementForItem={
-                    job.human_agreement?.items.find(
-                      (i) => i.item_id === currentItem.uuid,
-                    ) ?? null
-                  }
-                  evaluatorVariablesByEvaluatorId={extractEvaluatorVariables(
-                    currentItem.payload,
-                  )}
-                  filterDisagreements={showDisagreementsOnly}
-                  linkEvaluators={linkEvaluators}
-                />
-              )}
-            </main>
+              </div>
+
+              <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
+                {!currentItem ? (
+                  <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground">
+                    {(canFilterByValue &&
+                      usableValueFilters(valueFilters, jobEvaluators).length >
+                        0) ||
+                    showDisagreementsOnly
+                      ? "No items match this filter."
+                      : "No items in this run."}
+                  </div>
+                ) : (
+                  <ItemDetailPane
+                    showJudgeNote
+                    item={currentItem}
+                    taskType={task.type}
+                    evaluators={detailsEvaluators}
+                    evaluatorNamesById={evaluatorNamesById}
+                    getJobEvaluator={getJobEvaluator}
+                    runs={runsByItem[currentItem.uuid] ?? []}
+                    versionLabels={versionLabels}
+                    jobStatus={job.status}
+                    humanAgreementForItem={
+                      job.human_agreement?.items.find(
+                        (i) => i.item_id === currentItem.uuid,
+                      ) ?? null
+                    }
+                    evaluatorVariablesByEvaluatorId={extractEvaluatorVariables(
+                      currentItem.payload,
+                    )}
+                    filterDisagreements={showDisagreementsOnly}
+                    linkEvaluators={linkEvaluators}
+                  />
+                )}
+              </main>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {job.status === "failed" && job.error && (
         <ErrorNote>

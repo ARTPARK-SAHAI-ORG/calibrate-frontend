@@ -342,7 +342,7 @@ describe("MeasureCell", () => {
   });
 
   it("has a larger number and more space above the bar in a hover box", () => {
-    render(<MeasureCell group={group} variant="hover" />);
+    render(<MeasureCell group={group} variant="detailed" />);
     expect(screen.getByText("55%").className).toContain("text-base");
     expect(
       screen.getByTestId("agreement-fill").closest(".pt-1"),

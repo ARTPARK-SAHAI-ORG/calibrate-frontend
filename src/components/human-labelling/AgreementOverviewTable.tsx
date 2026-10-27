@@ -7,6 +7,7 @@ import {
   ChanceBar,
   ChanceLegend,
   OverallAgreementCards,
+  type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
 import { KappaCell } from "@/components/human-labelling/KappaCell";
 import type { AnswerKind, KappaByKind } from "@/lib/agreementKappa";
@@ -39,21 +40,29 @@ function EvaluatorNamePill({
   fitClassName,
 }: {
   name: string;
-  onOpen: () => void;
+  /** Without it the pill is plain text, as on a shared page. */
+  onOpen?: () => void;
   /** Sizing for the row this pill sits in, on whatever wraps the pill. */
   fitClassName: string;
 }) {
   const { ref, clipped } = useIsNameClipped(name);
-  const pill = (
+  const base =
+    "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground truncate max-w-full";
+  const text = (
+    <span ref={ref} className="truncate">
+      {name}
+    </span>
+  );
+  const pill = onOpen ? (
     <button
       type="button"
       onClick={onOpen}
-      className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer truncate max-w-full"
+      className={`${base} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
     >
-      <span ref={ref} className="truncate">
-        {name}
-      </span>
+      {text}
     </button>
+  ) : (
+    <span className={`${base} cursor-default`}>{text}</span>
   );
   return clipped ? (
     <Tooltip content={name} className={fitClassName}>
@@ -112,8 +121,8 @@ const DASH = <span className="text-sm text-muted-foreground">—</span>;
 /**
  * One measure's agreement, kappa and chance bar, laid out three ways:
  * - `table`: agreement and kappa on one line over the bar, for a table cell.
- * - `hover`: the same with a larger number, more room, and the chance under
- *   the bar, for a hover box.
+ * - `detailed`: the same with a larger number, more room, and the chance
+ *   under the bar, for a hover box or a summary table.
  * - `card`: a large number, the bar, then the chance and the kappa on one
  *   line, for a column of a card.
  * With no agreement it is a muted dash, large in a card.
@@ -123,7 +132,7 @@ export function MeasureCell({
   variant = "table",
 }: {
   group: AgreementGroup;
-  variant?: "table" | "hover" | "card";
+  variant?: "table" | "detailed" | "card";
 }) {
   if (group.current == null)
     return variant === "card" ? (
@@ -167,14 +176,14 @@ export function MeasureCell({
       {/* Wraps in a narrow column rather than spilling into the next one. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <span
-          className={`${variant === "hover" ? "text-base" : "text-sm"} font-semibold tabular-nums text-foreground`}
+          className={`${variant === "detailed" ? "text-base" : "text-sm"} font-semibold tabular-nums text-foreground`}
         >
           {percent}
         </span>
         {kappa}
       </div>
       {bar}
-      {variant === "hover" && group.chance_agreement != null && (
+      {variant === "detailed" && group.chance_agreement != null && (
         <div className="mt-1.5 text-[11px] text-muted-foreground tabular-nums">
           Chance {Math.round(group.chance_agreement * 100)}%
         </div>
@@ -394,3 +403,122 @@ export function AgreementOverviewSection({
     </>
   );
 }
+
+/** One evaluator's row in an evaluation run's summary. */
+export type RunSummaryRow = {
+  key: string;
+  evaluatorId: string;
+  name: string;
+  versionLabel: string | null;
+  score: EvaluatorResultStat | null;
+  agreement: AgreementGroup | null;
+};
+
+const RUN_GRID =
+  "grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.7fr)_minmax(0,1.3fr)] gap-4 px-4";
+
+/**
+ * An evaluation run's summary, in the Overview table's style: each
+ * evaluator's score for the run, and its agreement with humans with the
+ * kappa, the bar against chance and the chance, under the chance legend.
+ */
+export function EvaluatorRunSummaryTable({
+  rows,
+  onOpenEvaluator,
+}: {
+  rows: readonly RunSummaryRow[];
+  /** Opens how an evaluator judges; left out on a shared page. */
+  onOpenEvaluator?: (evaluator: { uuid: string; name: string }) => void;
+}) {
+  const name = (row: RunSummaryRow) => (
+    <div className="flex items-center gap-2 min-w-0">
+      <EvaluatorNamePill
+        name={row.name}
+        fitClassName="min-w-0 max-w-full"
+        onOpen={
+          onOpenEvaluator
+            ? () => onOpenEvaluator({ uuid: row.evaluatorId, name: row.name })
+            : undefined
+        }
+      />
+      {row.versionLabel && (
+        <span className="font-mono text-[11px] text-muted-foreground shrink-0">
+          {row.versionLabel}
+        </span>
+      )}
+    </div>
+  );
+  const score = (row: RunSummaryRow) =>
+    row.score ? (
+      <span className="text-sm font-semibold tabular-nums text-foreground">
+        {row.score.value}
+      </span>
+    ) : (
+      DASH
+    );
+  const agreement = (row: RunSummaryRow) =>
+    row.agreement?.current != null ? (
+      <MeasureCell group={row.agreement} variant="detailed" />
+    ) : (
+      <span className="inline-flex items-center gap-2">
+        {DASH}
+        <span className="text-xs text-muted-foreground">
+          No human labels yet
+        </span>
+      </span>
+    );
+  return (
+    <>
+      {rows.some((r) => r.agreement?.current != null) && <ChanceLegend />}
+      {/* Desktop table */}
+      <div className="hidden md:block border border-border rounded-xl overflow-hidden">
+        <div
+          className={`${RUN_GRID} py-2 border-b border-border bg-muted/30 items-center`}
+        >
+          <div className="text-sm font-medium text-muted-foreground">
+            Evaluator
+          </div>
+          <div className={`${DIVIDER} text-sm font-medium text-muted-foreground`}>
+            Score
+          </div>
+          <div className={`${DIVIDER} text-sm font-medium text-muted-foreground`}>
+            Agreement with humans
+          </div>
+        </div>
+        {rows.map((row) => (
+          <div
+            key={row.key}
+            className={`${RUN_GRID} py-3 border-b border-border last:border-b-0 items-center`}
+          >
+            {name(row)}
+            <div className={DIVIDER}>{score(row)}</div>
+            <div className={DIVIDER}>{agreement(row)}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-2">
+        {rows.map((row) => (
+          <div
+            key={row.key}
+            className="border border-border rounded-xl overflow-hidden p-4 space-y-2"
+          >
+            {name(row)}
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Score</p>
+              {score(row)}
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">
+                Agreement with humans
+              </p>
+              {agreement(row)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
