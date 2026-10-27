@@ -475,11 +475,8 @@ export function EvaluatorRunSummaryTable({
             row.agreement?.current != null ? (
               <MeasureCell group={row.agreement} size="detailed" />
             ) : (
-              <span className="inline-flex items-center gap-2">
-                {DASH}
-                <span className="text-xs text-muted-foreground">
-                  No human labels yet
-                </span>
+              <span className="text-xs text-muted-foreground">
+                No human labels yet
               </span>
             ),
         },

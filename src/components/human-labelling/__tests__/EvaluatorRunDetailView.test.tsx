@@ -2975,7 +2975,12 @@ describe("EvaluatorRunDetailView summary", () => {
         versionLabels={{}}
       />,
     );
-    expect(screen.getAllByText("No human labels yet").length).toBeGreaterThan(0);
+    const notes = screen.getAllByText("No human labels yet");
+    expect(notes.length).toBeGreaterThan(0);
+    // The words alone, with no dash in front of them.
+    for (const note of notes) {
+      expect(note.parentElement?.textContent).not.toContain("—");
+    }
     expect(screen.queryByTestId("agreement-fill")).toBeNull();
     expect(screen.queryByText("Better than chance")).toBeNull();
   });
