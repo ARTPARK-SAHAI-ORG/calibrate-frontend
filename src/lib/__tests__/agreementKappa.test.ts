@@ -1,5 +1,4 @@
 import {
-  answerKindOf,
   buildTrendChart,
   formatKappa,
   kappaBlank,
@@ -114,13 +113,3 @@ describe("kappaForKind", () => {
   });
 });
 
-describe("answerKindOf", () => {
-  it("reads a linear weighted kappa as rating answers and a plain one as binary", () => {
-    expect(answerKindOf("linear_weighted_cohen")).toBe("rating");
-    expect(answerKindOf("linear_weighted_fleiss")).toBe("rating");
-    expect(answerKindOf("cohen")).toBe("binary");
-    expect(answerKindOf("fleiss")).toBe("binary");
-    expect(answerKindOf(null)).toBeNull();
-    expect(answerKindOf(undefined)).toBeNull();
-  });
-});

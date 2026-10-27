@@ -621,10 +621,10 @@ describe("the Agreement tab", () => {
     expect(within(hover).getByText("80%").className).toContain("text-base");
     // No chance number for this version, so no chance line.
     expect(within(hover).queryByText(/^Chance/)).not.toBeInTheDocument();
-    // The legend explains the bar, as on the Overview tab.
+    // The chart has no chance marks of its own, so no key explains them.
     expect(
-      screen.getByText("Agreement expected by chance alone"),
-    ).toBeInTheDocument();
+      screen.queryByText("Agreement expected by chance alone"),
+    ).not.toBeInTheDocument();
     expect(within(hover).getByTestId("agreement-fill").style.width).toBe("80%");
     expect(
       (global.fetch as jest.Mock).mock.calls.some(([url]) =>

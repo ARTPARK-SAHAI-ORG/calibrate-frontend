@@ -87,14 +87,10 @@ describe("AgreementOverviewTable", () => {
     expect(cells(tableRow("Tone"))[1].className).toContain("border-l");
   });
 
-  it("puts the kind of answer beside the name, on the same line", () => {
+  it("shows only the evaluator's name in the name column, with no binary or rating tag", () => {
     renderTable();
-    const nameCell = cells(tableRow("Tone"))[0];
-    expect(nameCell.className).toContain("flex");
-    expect(within(nameCell).getByText("binary")).toBeInTheDocument();
-    expect(
-      within(cells(tableRow("Clarity"))[0]).getByText("rating"),
-    ).toBeInTheDocument();
+    expect(cells(tableRow("Tone"))[0]).toHaveTextContent(/^Tone$/);
+    expect(cells(tableRow("Clarity"))[0]).toHaveTextContent(/^Clarity$/);
   });
 
   it("shows the agreement, the kappa and a bar against chance in each measure", () => {

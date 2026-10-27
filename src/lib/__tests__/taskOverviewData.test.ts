@@ -228,12 +228,12 @@ describe("buildOverviewRows", () => {
     { evaluator_id: "ev-3", name: "Unknown", current: null, pair_count: 0 },
   ];
 
-  it("gives each evaluator its kind of answer and both measures", () => {
+  it("gives each evaluator both measures", () => {
     const rows = buildOverviewRows(evaluators);
-    expect(rows.map((r) => [r.key, r.name, r.kind])).toEqual([
-      ["ev-1", "Tone", "binary"],
-      ["ev-2", "Clarity", "rating"],
-      ["ev-3", "Unknown", null],
+    expect(rows.map((r) => [r.key, r.name])).toEqual([
+      ["ev-1", "Tone"],
+      ["ev-2", "Clarity"],
+      ["ev-3", "Unknown"],
     ]);
     expect(rows[0].interAnnotator.current).toBe(0.7);
     expect(rows[0].withHumans.current).toBe(0.9);
@@ -245,7 +245,6 @@ describe("sortOverviewRows", () => {
   const row = (key: string, withHumans: number | null, type?: string) => ({
     key,
     name: key,
-    kind: null,
     withHumans: { current: withHumans, pair_count: 0 },
     interAnnotator: { current: null, pair_count: 0 },
     evaluatorType: type,

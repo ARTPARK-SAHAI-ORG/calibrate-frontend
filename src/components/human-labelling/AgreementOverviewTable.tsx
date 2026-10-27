@@ -332,13 +332,6 @@ export function AgreementOverviewTable({
         <NameCell
           name={row.name}
           onOpen={() => onOpenEvaluator({ uuid: row.key, name: row.name })}
-          tag={
-            row.kind && (
-              <span className="text-xs text-muted-foreground shrink-0">
-                {row.kind}
-              </span>
-            )
-          }
         />
       )}
       columns={[

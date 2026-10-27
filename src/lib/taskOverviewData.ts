@@ -4,8 +4,6 @@ import {
   type SortDirection,
 } from "@/components/eval-details/tableSort";
 import {
-  answerKindOf,
-  type AnswerKind,
   type KappaFields,
 } from "@/lib/agreementKappa";
 
@@ -174,21 +172,19 @@ export type OverviewSortKey = "name" | "interAnnotator" | "withHumans";
 export type OverviewRow = {
   key: string;
   name: string;
-  kind: AnswerKind | null;
   withHumans: AgreementGroup;
   interAnnotator: AgreementGroup;
 };
 
 const EMPTY_GROUP: AgreementGroup = { current: null, pair_count: 0 };
 
-/** One row per evaluator, with its kind of answer and both measures. */
+/** One row per evaluator, with both measures. */
 export function buildOverviewRows(
   evaluators: readonly EvaluatorAgreement[],
 ): OverviewRow[] {
   return evaluators.map((ev) => ({
     key: ev.evaluator_id,
     name: ev.name,
-    kind: answerKindOf(ev.kappa_type ?? ev.inter_annotator?.kappa_type),
     withHumans: ev,
     interAnnotator: ev.inter_annotator ?? EMPTY_GROUP,
   }));

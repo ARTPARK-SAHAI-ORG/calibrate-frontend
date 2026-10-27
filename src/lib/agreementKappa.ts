@@ -37,15 +37,6 @@ export function kappaForKind(
   return kinds?.find((k) => k.answer_kind === kind);
 }
 
-/** Rating answers are compared with a linear weighted kappa, pass/fail
- * answers with a plain one. Null when there is no kind to go by. */
-export function answerKindOf(
-  type: KappaType | null | undefined,
-): AnswerKind | null {
-  if (!type) return null;
-  return type.startsWith("linear_weighted") ? "rating" : "binary";
-}
-
 /** Sent beside an agreement number that covers many items. Both are absent
  * on responses from before kappa existed, and null when there is too little
  * overlap to compute one. */
