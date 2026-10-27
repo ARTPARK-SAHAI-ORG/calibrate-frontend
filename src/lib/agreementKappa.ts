@@ -6,11 +6,6 @@ type KappaType =
 
 export type AnswerKind = "binary" | "rating";
 
-export const ANSWER_KIND_LABELS: Record<AnswerKind, string> = {
-  binary: "Binary",
-  rating: "Rating",
-};
-
 /** One kind of answer's kappa, for a number that covers both kinds. */
 export type KappaByKind = KappaFields & { answer_kind: AnswerKind };
 
@@ -81,16 +76,11 @@ export type TrendSeries = {
   key: string;
   /** Legend name of the agreement line. */
   name: string;
-  /** Legend name of the kappa line, before the kind of kappa in brackets.
-   * Falls back to `name`. */
-  kappaName?: string;
+  /** Legend name of the kappa line. */
+  kappaName: string;
   color: string;
-  /** Name the kappa line exactly `kappaName`, without its kind, and list it
-   * even before any point has a kappa. */
-  plainKappaLine?: boolean;
-  /** Colour of the kappa line when it differs from the agreement line. */
-  kappaColor?: string;
-  /** `key` tells points apart, since two month buckets can share a label. */
+  kappaColor: string;
+  /** `key` tells points apart, since two points can share a label. */
   points: ({
     key: string;
     label: string;
@@ -105,21 +95,11 @@ type TrendLine = {
   kappa: boolean;
 };
 
-const KAPPA_KEY_SUFFIX = "__kappa";
-
-/** Hover text for one point: agreement as a percentage, kappa to two places. */
-export function formatTrendValue(value: unknown, dataKey: unknown): string {
-  if (typeof value !== "number") return "—";
-  return String(dataKey).endsWith(KAPPA_KEY_SUFFIX)
-    ? formatKappa(value)
-    : `${value}%`;
-}
-
 /**
- * Every agreement number and its kappa as lines for one chart, which shows
- * either the agreement lines or the kappa lines. Agreement is a percentage;
- * kappa keeps its own -1 to 1 scale, which drops below 0 only when some
- * kappa does.
+ * Every agreement number and its kappa as lines for one chart. Agreement is
+ * a percentage; kappa keeps its own -1 to 1 scale, which drops below 0 only
+ * when some kappa does. The kappa line is listed even before any point has
+ * a kappa, and a point with no kappa has no kappa dot.
  */
 export function buildTrendChart(series: TrendSeries[]): {
   data: Record<string, string | number | null>[];
@@ -130,30 +110,16 @@ export function buildTrendChart(series: TrendSeries[]): {
   const lines: TrendLine[] = [];
   let negative = false;
   for (const s of series) {
-    const kappaKey = `${s.key}${KAPPA_KEY_SUFFIX}`;
-    const types = [
-      ...new Set(
-        s.points.filter((p) => p.kappa != null).map((p) => p.kappa_type),
-      ),
-    ];
+    const kappaKey = `${s.key}__kappa`;
     if (s.points.some((p) => p.agreement != null)) {
-      lines.push({
-        dataKey: s.key,
-        name: s.name,
-        color: s.color,
-        kappa: false,
-      });
+      lines.push({ dataKey: s.key, name: s.name, color: s.color, kappa: false });
     }
-    if (types.length > 0 || s.plainKappaLine) {
-      lines.push({
-        dataKey: kappaKey,
-        name: s.plainKappaLine
-          ? (s.kappaName ?? s.name)
-          : `${s.kappaName ?? s.name} (${types.map((t) => kappaLabel(t)).join(" or ")})`,
-        color: s.kappaColor ?? s.color,
-        kappa: true,
-      });
-    }
+    lines.push({
+      dataKey: kappaKey,
+      name: s.kappaName,
+      color: s.kappaColor,
+      kappa: true,
+    });
     for (const p of s.points) {
       const row = rows.get(p.key) ?? { key: p.key, label: p.label };
       rows.set(p.key, row);
@@ -168,55 +134,3 @@ export function buildTrendChart(series: TrendSeries[]): {
     kappaDomain: [negative ? -1 : 0, 1],
   };
 }
-
-const KIND_COLORS: Record<AnswerKind, string> = {
-  binary: "var(--chart-1)",
-  rating: "var(--chart-2)",
-};
-
-/**
- * One annotator's trend: a single agreement line, and in the kappa view one
- * line per kind of answer, since kappas of different kinds are never merged.
- */
-export function annotatorTrendSeries(
-  points: readonly {
-    bucket_end: string;
-    agreement: number | null;
-    kappa_by_kind?: KappaByKind[];
-  }[],
-  label: (bucketEnd: string) => string,
-): TrendSeries[] {
-  const kinds = [
-    ...new Set(
-      points.flatMap((p) => (p.kappa_by_kind ?? []).map((k) => k.answer_kind)),
-    ),
-  ].sort((a, b) => (a === b ? 0 : a === "binary" ? -1 : 1));
-  return [
-    {
-      key: "agreement",
-      name: "Agreement with other annotators",
-      color: "var(--chart-1)",
-      points: points.map((p) => ({
-        key: p.bucket_end,
-        label: label(p.bucket_end),
-        agreement: p.agreement,
-      })),
-    },
-    ...kinds.map((kind) => ({
-      key: kind,
-      name: `${ANSWER_KIND_LABELS[kind]} answers`,
-      color: KIND_COLORS[kind],
-      points: points.map((p) => {
-        const entry = p.kappa_by_kind?.find((k) => k.answer_kind === kind);
-        return {
-          key: p.bucket_end,
-          label: label(p.bucket_end),
-          agreement: null,
-          kappa: entry?.kappa ?? null,
-          kappa_type: entry?.kappa_type ?? null,
-        };
-      }),
-    })),
-  ];
-}
-

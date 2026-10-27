@@ -160,7 +160,7 @@ function AgreementBar({
 export type EvaluatorResultStat = {
   /** What the number is, e.g. the "true" label or "Average score". */
   label: string;
-  value: string;
+  value: ReactNode;
   /** Hover text, e.g. "8 of 10 items". */
   title?: string;
   /** 0–1 position of the value on its own scale. Colours the number on the

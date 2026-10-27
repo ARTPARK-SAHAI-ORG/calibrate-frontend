@@ -1902,13 +1902,11 @@ function AgreementTrendTab({
               ),
               height: 44,
             }}
-            bothAxes
             series={[
               {
                 key: "agreement",
                 name: "Agreement",
                 kappaName: "Kappa",
-                plainKappaLine: true,
                 color: "var(--chart-2)",
                 kappaColor: "var(--chart-1)",
                 points,

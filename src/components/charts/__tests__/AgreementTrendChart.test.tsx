@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, setupUser } from "@/test-utils";
+import { render, screen } from "@/test-utils";
 import { AgreementTrendChart } from "../AgreementTrendChart";
 
 // jsdom has no layout, so recharts' ResponsiveContainer is given a fixed size.
@@ -49,38 +49,28 @@ beforeAll(() => {
   };
 });
 
-it("shows agreement first and kappa on its own when picked", async () => {
-  const user = setupUser();
+it("names the two lines Agreement and Kappa in the legend", () => {
   const { container } = render(
     <AgreementTrendChart
       series={[
         {
-          key: "hh",
-          name: "Annotator agreement",
-          kappaName: "Annotator agreement",
-          color: "var(--chart-1)",
+          key: "agreement",
+          name: "Agreement",
+          kappaName: "Kappa",
+          color: "var(--chart-2)",
+          kappaColor: "var(--chart-1)",
           points: [
-            { key: "1", label: "Jan", agreement: 0.8, kappa: -0.5, kappa_type: "fleiss" },
-            { key: "2", label: "Feb", agreement: 0.9, kappa: 0.5, kappa_type: "fleiss" },
+            { key: "1", label: "v1", agreement: 0.8, kappa: -0.5, kappa_type: "cohen" },
+            { key: "2", label: "v2", agreement: 0.9, kappa: 0.5, kappa_type: "cohen" },
           ],
         },
       ]}
+      renderHover={() => null}
     />,
   );
-  const legend = () =>
-    [...container.querySelectorAll(".recharts-legend-item-text")].map(
-      (el) => el.textContent,
-    );
-  expect(screen.getByRole("button", { name: "Agreement" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
+  const legend = [...container.querySelectorAll(".recharts-legend-item-text")].map(
+    (el) => el.textContent,
   );
-  expect(legend()).toEqual(["Annotator agreement"]);
-
-  await user.click(screen.getByRole("button", { name: "Kappa" }));
-  expect(legend()).toEqual(["Annotator agreement (Fleiss' kappa)"]);
-  const icons = [...container.querySelectorAll(".recharts-legend-icon")];
-  expect(icons.map((icon) => icon.getAttribute("stroke-dasharray"))).toEqual([
-    null,
-  ]);
+  expect(legend).toEqual(["Agreement", "Kappa"]);
+  expect(screen.queryByRole("button", { name: "Kappa" })).not.toBeInTheDocument();
 });

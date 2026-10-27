@@ -1,7 +1,7 @@
 /**
- * The stat cards at the top of one annotator's page: the latest agreement,
- * the latest kappa for each kind of answer, and the number of jobs. The page
- * chrome and the trend chart are stubbed so only the cards run.
+ * The Overview tab of one annotator's page: agreement with the other
+ * annotators and a kappa for each kind of answer, as cards. The page chrome
+ * is stubbed so only the cards run.
  */
 import React from "react";
 import { render, screen, within } from "@/test-utils";
@@ -19,45 +19,6 @@ jest.mock("next/navigation", () => ({
 jest.mock("../../../../../../components/AppLayout", () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useHideFloatingButton: () => {},
-}));
-
-// The trend chart cannot be laid out in jsdom; a stand-in shows which lines
-// the page asks it to draw.
-jest.mock("../../../../../../components/charts/AgreementTrendChart", () => ({
-  AgreementTrendChart: ({
-    series,
-    renderHover,
-  }: {
-    series: {
-      name: string;
-      kappaName?: string;
-      points: { key: string; label: string }[];
-    }[];
-    renderHover?: (key: string, label: string) => React.ReactNode;
-  }) => (
-    <div data-testid="trend-chart">
-      <span data-testid="line-names">
-        {series.map((s) => [s.name, s.kappaName].filter(Boolean).join(", ")).join("; ")}
-      </span>
-      {series[0].points.map((p) => (
-        <div key={p.key} data-testid={`hover-${p.key}`}>
-          {renderHover?.(p.key, p.label)}
-        </div>
-      ))}
-    </div>
-  ),
-  TrendHoverBox: ({
-    label,
-    children,
-  }: {
-    label: React.ReactNode;
-    children: React.ReactNode;
-  }) => (
-    <div>
-      <div data-testid="hover-label">{label}</div>
-      {children}
-    </div>
-  ),
 }));
 
 jest.mock("../../../../../../hooks", () => ({
@@ -78,96 +39,70 @@ jest.mock("../../../../../../lib/api", () => ({
 
 import AnnotatorDetailPage from "../page";
 
-const detail = (kappa_by_kind: unknown[]) => ({
+const detail = (
+  current_agreement: number | null,
+  kappa_by_kind: unknown[],
+) => ({
   annotator: { uuid: "ann-1", name: "Asha" },
-  stats: {
-    current_agreement: 0.8,
-    pair_count: 5,
-    jobs_count: 2,
-    kappa_by_kind,
-  },
-  trend: { bucket: "month", days: 365, series: [] },
+  stats: { current_agreement, pair_count: 5, jobs_count: 2, kappa_by_kind },
   jobs: [],
 });
 
-const point = (
-  bucket_end: string,
-  agreement: number | null,
-  kappa_by_kind: unknown[],
-) => ({
-  bucket_start: "2026-01-01",
-  bucket_end,
-  agreement,
-  pair_count: 3,
-  kappa_by_kind,
-});
+// The card whose pill reads `label`.
+const card = (label: string) =>
+  screen.getByText(label).closest(".rounded-lg") as HTMLElement;
 
-it("shows only the trend chart on the Overview tab, with no stat cards", async () => {
+it("shows agreement with others and one kappa card per kind of answer", async () => {
   render(<AnnotatorDetailPage />);
-  resolveDetail({
-    ...detail([]),
-    trend: {
-      bucket: "month",
-      days: 365,
-      series: [point("2026-01-31", 0.8, [])],
-    },
-  });
-  expect(await screen.findByTestId("trend-chart")).toBeInTheDocument();
-  expect(screen.queryByText("Latest agreement")).not.toBeInTheDocument();
-  expect(screen.queryByText("Latest kappa")).not.toBeInTheDocument();
+  expect(requested).toBe("/annotators/ann-1");
+  resolveDetail(
+    detail(0.62, [
+      { answer_kind: "binary", kappa: 0.31, kappa_type: "cohen" },
+      {
+        answer_kind: "rating",
+        kappa: null,
+        kappa_type: "linear_weighted_cohen",
+        kappa_blank_reason: "everyone_agreed",
+      },
+    ]),
+  );
+  expect(await screen.findByText("62%")).toBeInTheDocument();
+  expect(card("Agreement with others")).toHaveTextContent(
+    "Agreement with others62%",
+  );
+  // The same neutral percentage as the overall cards elsewhere.
+  expect(screen.getByText("62%").className).toContain("text-foreground");
+  expect(screen.getByText("62%").className).not.toMatch(
+    /text-(green|red|yellow)/,
+  );
+  expect(card("Kappa (binary)")).toHaveTextContent("Kappa (binary)0.31");
+  expect(
+    within(card("Kappa (binary)")).getByRole("button", {
+      name: "Cohen's kappa",
+    }),
+  ).toBeInTheDocument();
+  expect(card("Kappa (rating)")).toHaveTextContent(
+    "Kappa (rating)Everyone agreed",
+  );
+  // The pill label is the same pill the overall cards use.
+  expect(
+    screen.getByText("Kappa (rating)").closest("span.rounded-md"),
+  ).not.toBeNull();
+  expect(screen.queryByText(/Agreement with other annotators/)).toBeNull();
   // The job count stays on the Jobs tab.
   expect(screen.getByText("Jobs (2)")).toBeInTheDocument();
 });
 
-it("draws the agreement trend, with one kappa line per kind of answer", async () => {
+it("shows muted dashes when nothing has been compared", async () => {
   render(<AnnotatorDetailPage />);
-  expect(requested).toBe("/annotators/ann-1?bucket=month&days=365");
-  resolveDetail({
-    ...detail([]),
-    trend: {
-      bucket: "month",
-      days: 365,
-      series: [
-        point("2026-01-31", 0.8, [
-          { answer_kind: "binary", kappa: 0.3, kappa_type: "cohen" },
-          { answer_kind: "rating", kappa: 0.6, kappa_type: "linear_weighted_cohen" },
-        ]),
-      ],
-    },
-  });
-  expect(await screen.findByTestId("line-names")).toHaveTextContent(
-    "Agreement with other annotators; Binary answers; Rating answers",
-  );
-});
-
-it("shows a point's agreement, both kappas and its bar on hover", async () => {
-  render(<AnnotatorDetailPage />);
-  resolveDetail({
-    ...detail([]),
-    trend: {
-      bucket: "month",
-      days: 365,
-      series: [
-        point("2026-01-31", 0.8, [
-          { answer_kind: "binary", kappa: 0.3, kappa_type: "cohen" },
-          {
-            answer_kind: "rating",
-            kappa: null,
-            kappa_type: "linear_weighted_cohen",
-            kappa_blank_reason: "everyone_agreed",
-          },
-        ]),
-        point("2026-02-28", 0.6, []),
-      ],
-    },
-  });
-  const jan = await screen.findByTestId("hover-2026-01-31");
-  expect(within(jan).getByText("80%")).toBeInTheDocument();
-  expect(jan).toHaveTextContent("Kappa (binary)0.30");
-  expect(jan).toHaveTextContent("Kappa (rating)Everyone agreed");
-  expect(within(jan).getByTestId("agreement-fill").style.width).toBe("80%");
-  const feb = screen.getByTestId("hover-2026-02-28");
-  expect(feb).toHaveTextContent("60%");
-  expect(feb).toHaveTextContent("Kappa (binary)—");
-  expect(feb).toHaveTextContent("Kappa (rating)—");
+  resolveDetail(detail(null, []));
+  expect(await screen.findByText("Jobs (2)")).toBeInTheDocument();
+  for (const label of [
+    "Agreement with others",
+    "Kappa (binary)",
+    "Kappa (rating)",
+  ]) {
+    const dash = within(card(label)).getByText("—");
+    expect(dash.className).toContain("text-muted-foreground");
+  }
 });

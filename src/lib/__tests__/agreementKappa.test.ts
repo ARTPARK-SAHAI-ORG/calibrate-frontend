@@ -1,9 +1,7 @@
 import {
-  annotatorTrendSeries,
   answerKindOf,
   buildTrendChart,
   formatKappa,
-  formatTrendValue,
   kappaBlank,
   kappaLabel,
   type TrendSeries,
@@ -65,181 +63,64 @@ describe("kappaBlank", () => {
   });
 });
 
-describe("formatTrendValue", () => {
-  it("shows agreement as a percentage and kappa to two places", () => {
-    expect(formatTrendValue(80, "hh")).toBe("80%");
-    expect(formatTrendValue(-0.42, "hh__kappa")).toBe("-0.42");
-    expect(formatTrendValue(undefined, "hh")).toBe("—");
-  });
-});
-
-const one = (points: TrendSeries["points"]): TrendSeries[] => [
-  { key: "a", name: "A", kappaName: "A", color: "#000", points },
+const versions = (
+  points: { agreement: number | null; kappa?: number | null }[],
+): TrendSeries[] => [
+  {
+    key: "agreement",
+    name: "Agreement",
+    kappaName: "Kappa",
+    color: "#111",
+    kappaColor: "#222",
+    points: points.map((p, i) => ({
+      key: `v${i + 1}`,
+      label: `v${i + 1}`,
+      agreement: p.agreement,
+      kappa: p.kappa ?? null,
+      kappa_type: "cohen" as const,
+    })),
+  },
 ];
 
 describe("buildTrendChart", () => {
-  it("puts every agreement number and its kappa on one chart", () => {
-    const { data, lines, kappaDomain } = buildTrendChart([
-      {
-        key: "hh",
-        name: "Annotator agreement",
-        kappaName: "Annotator agreement",
-        color: "#10b981",
-        points: [
-          {
-            key: "b1",
-            label: "Jan",
-            agreement: 0.8,
-            kappa: 0.5,
-            kappa_type: "fleiss",
-          },
-          {
-            key: "b2",
-            label: "Feb",
-            agreement: null,
-            kappa: null,
-            kappa_type: null,
-          },
-        ],
-      },
-      {
-        key: "ev",
-        name: "Tone agreement with annotators",
-        kappaName: "Tone",
-        color: "#3b82f6",
-        points: [
-          {
-            key: "b1",
-            label: "Jan",
-            agreement: 0.6,
-            kappa: 0.2,
-            kappa_type: "cohen",
-          },
-          {
-            key: "b2",
-            label: "Feb",
-            agreement: 0.7,
-            kappa: 0.3,
-            kappa_type: "cohen",
-          },
-        ],
-      },
+  it("puts agreement as a percentage and kappa beside it for each point", () => {
+    const { data, lines, kappaDomain } = buildTrendChart(
+      versions([
+        { agreement: 0.8, kappa: 0.5 },
+        { agreement: 0.6, kappa: null },
+      ]),
+    );
+    expect(lines).toEqual([
+      { dataKey: "agreement", name: "Agreement", color: "#111", kappa: false },
+      { dataKey: "agreement__kappa", name: "Kappa", color: "#222", kappa: true },
     ]);
-    expect(lines.map((l) => l.name)).toEqual([
-      "Annotator agreement",
-      "Annotator agreement (Fleiss' kappa)",
-      "Tone agreement with annotators",
-      "Tone (Cohen's kappa)",
-    ]);
-    expect(lines.map((l) => l.kappa)).toEqual([false, true, false, true]);
     expect(data).toEqual([
-      {
-        key: "b1",
-        label: "Jan",
-        hh: 80,
-        hh__kappa: 0.5,
-        ev: 60,
-        ev__kappa: 0.2,
-      },
-      {
-        key: "b2",
-        label: "Feb",
-        hh: null,
-        hh__kappa: null,
-        ev: 70,
-        ev__kappa: 0.3,
-      },
+      { key: "v1", label: "v1", agreement: 80, agreement__kappa: 0.5 },
+      { key: "v2", label: "v2", agreement: 60, agreement__kappa: null },
     ]);
     expect(kappaDomain).toEqual([0, 1]);
   });
 
-  it("names the kappa line after the agreement line when no kappa name is given", () => {
-    const { lines } = buildTrendChart([
-      {
-        key: "a",
-        name: "Tone kappa",
-        color: "#000",
-        points: [
-          { key: "1", label: "Jan", agreement: 0.4, kappa: 0.1, kappa_type: "cohen" },
-        ],
-      },
-    ]);
-    expect(lines.map((l) => l.name)).toEqual([
-      "Tone kappa",
-      "Tone kappa (Cohen's kappa)",
-    ]);
+  it("lists the kappa line even before any point has a kappa", () => {
+    expect(
+      buildTrendChart(versions([{ agreement: 0.5 }])).lines.map((l) => l.name),
+    ).toEqual(["Agreement", "Kappa"]);
   });
 
-  it("keeps two buckets that share a label as two points", () => {
-    const { data } = buildTrendChart(
-      one([
-        { key: "2025-12-01", label: "Dec", agreement: 0.4 },
-        { key: "2025-12-31", label: "Dec", agreement: 0.6 },
-      ]),
-    );
-    expect(data.map((d) => [d.label, d.a])).toEqual([
-      ["Dec", 40],
-      ["Dec", 60],
-    ]);
+  it("leaves out the agreement line when no point has agreement", () => {
+    expect(
+      buildTrendChart(versions([{ agreement: null }])).lines.map((l) => l.name),
+    ).toEqual(["Kappa"]);
   });
 
   it("takes the kappa axis below 0 only when a kappa shows as below 0", () => {
     expect(
-      buildTrendChart(
-        one([
-          {
-            key: "1",
-            label: "Jan",
-            agreement: 0.4,
-            kappa: -0.2,
-            kappa_type: "cohen",
-          },
-        ]),
-      ).kappaDomain,
+      buildTrendChart(versions([{ agreement: 0.4, kappa: -0.2 }])).kappaDomain,
     ).toEqual([-1, 1]);
     expect(
-      buildTrendChart(
-        one([
-          {
-            key: "1",
-            label: "Jan",
-            agreement: 0.4,
-            kappa: -0.004,
-            kappa_type: "cohen",
-          },
-        ]),
-      ).kappaDomain,
+      buildTrendChart(versions([{ agreement: 0.4, kappa: -0.004 }]))
+        .kappaDomain,
     ).toEqual([0, 1]);
-  });
-
-  it("names both kinds when the kind changes along the line", () => {
-    const { lines } = buildTrendChart(
-      one([
-        {
-          key: "1",
-          label: "Jan",
-          agreement: 0.4,
-          kappa: 0.1,
-          kappa_type: "cohen",
-        },
-        {
-          key: "2",
-          label: "Feb",
-          agreement: 0.5,
-          kappa: 0.2,
-          kappa_type: "fleiss",
-        },
-      ]),
-    );
-    expect(lines[1].name).toBe("A (Cohen's kappa or Fleiss' kappa)");
-  });
-
-  it("leaves out lines with nothing to draw, as on older responses", () => {
-    const { lines, data } = buildTrendChart(
-      one([{ key: "1", label: "Jan", agreement: null }]),
-    );
-    expect(lines).toEqual([]);
-    expect(data).toEqual([{ key: "1", label: "Jan", a: null, a__kappa: null }]);
   });
 });
 
@@ -253,73 +134,3 @@ describe("answerKindOf", () => {
     expect(answerKindOf(undefined)).toBeNull();
   });
 });
-
-describe("annotatorTrendSeries", () => {
-  const k = (
-    answer_kind: "binary" | "rating",
-    kappa: number,
-    kappa_type: "cohen" | "linear_weighted_cohen",
-  ) => ({ answer_kind, kappa, kappa_type });
-
-  it("draws one agreement line and one kappa line per kind, binary first", () => {
-    const series = annotatorTrendSeries(
-      [
-        {
-          bucket_end: "2026-01-31",
-          agreement: 0.8,
-          kappa_by_kind: [k("rating", 0.6, "linear_weighted_cohen")],
-        },
-        {
-          bucket_end: "2026-02-28",
-          agreement: 0.7,
-          kappa_by_kind: [
-            k("binary", 0.2, "cohen"),
-            k("rating", 0.5, "linear_weighted_cohen"),
-          ],
-        },
-      ],
-      (iso) => iso.slice(5, 7),
-    );
-    const { lines, data } = buildTrendChart(series);
-    expect(lines.map((l) => [l.name, l.kappa])).toEqual([
-      ["Agreement with other annotators", false],
-      ["Binary answers (Cohen's kappa)", true],
-      ["Rating answers (Linear weighted Cohen's kappa)", true],
-    ]);
-    expect(data).toEqual([
-      {
-        key: "2026-01-31",
-        label: "01",
-        agreement: 80,
-        agreement__kappa: null,
-        binary: null,
-        binary__kappa: null,
-        rating: null,
-        rating__kappa: 0.6,
-      },
-      {
-        key: "2026-02-28",
-        label: "02",
-        agreement: 70,
-        agreement__kappa: null,
-        binary: null,
-        binary__kappa: 0.2,
-        rating: null,
-        rating__kappa: 0.5,
-      },
-    ]);
-  });
-
-  it("draws only the agreement line when no kappa came back", () => {
-    const { lines } = buildTrendChart(
-      annotatorTrendSeries(
-        [{ bucket_end: "2026-01-31", agreement: 0.8 }],
-        (iso) => iso,
-      ),
-    );
-    expect(lines.map((l) => l.name)).toEqual([
-      "Agreement with other annotators",
-    ]);
-  });
-});
-

@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, setupUser } from "@/test-utils";
+import { render, screen } from "@/test-utils";
 import { AgreementTrendChart } from "../AgreementTrendChart";
 
 // jsdom cannot lay out the chart, so the axes and lines are never drawn.
@@ -63,53 +63,8 @@ jest.mock("recharts", () => {
   };
 });
 
-const series = (kappa: number | null) => [
-  {
-    key: "hh",
-    name: "Annotator agreement",
-    kappaName: "Annotator agreement",
-    color: "var(--chart-1)",
-    points: [{ key: "1", label: "Jan", agreement: 0.8, kappa, kappa_type: kappa == null ? null : ("fleiss" as const) }],
-  },
-];
-
 const lineNames = () =>
   screen.getAllByTestId("line").map((l) => l.dataset.name);
-
-it("shows only agreement lines on the percent axis at first", () => {
-  render(<AgreementTrendChart series={series(-0.2)} />);
-  expect(screen.getAllByTestId("axis")).toHaveLength(1);
-  const axis = screen.getByTestId("axis");
-  expect(axis.dataset.domain).toBe("[0,100]");
-  expect(axis.dataset.unit).toBe("%");
-  expect(lineNames()).toEqual(["Annotator agreement"]);
-});
-
-it("shows only kappa lines on a kappa axis from -1 to 1 when a kappa is below 0", async () => {
-  const user = setupUser();
-  render(<AgreementTrendChart series={series(-0.2)} />);
-  await user.click(screen.getByRole("button", { name: "Kappa" }));
-  const axis = screen.getByTestId("axis");
-  expect(axis.dataset.domain).toBe("[-1,1]");
-  expect(axis.dataset.unit).toBe("");
-  expect(lineNames()).toEqual(["Annotator agreement (Fleiss' kappa)"]);
-  expect(screen.getByTestId("line").dataset.dash).toBe("");
-});
-
-it("keeps the kappa axis at 0 to 1 when no kappa is below 0", async () => {
-  const user = setupUser();
-  render(<AgreementTrendChart series={series(0.3)} />);
-  await user.click(screen.getByRole("button", { name: "Kappa" }));
-  expect(screen.getByTestId("axis").dataset.domain).toBe("[0,1]");
-});
-
-it("hides the agreement or kappa control when there is no kappa", () => {
-  render(<AgreementTrendChart series={series(null)} />);
-  expect(
-    screen.queryByRole("button", { name: "Kappa" }),
-  ).not.toBeInTheDocument();
-  expect(lineNames()).toEqual(["Annotator agreement"]);
-});
 
 describe("agreement and kappa drawn together", () => {
   const versions = (kappas: (number | null)[]) => [
@@ -117,7 +72,6 @@ describe("agreement and kappa drawn together", () => {
       key: "agreement",
       name: "Agreement",
       kappaName: "Kappa",
-      plainKappaLine: true,
       color: "var(--chart-2)",
       kappaColor: "var(--chart-1)",
       points: kappas.map((kappa, i) => ({
@@ -131,7 +85,7 @@ describe("agreement and kappa drawn together", () => {
   ];
 
   it("draws both lines, kappa on a right axis without a percent sign, and no switch", () => {
-    render(<AgreementTrendChart series={versions([0.4, 0.6])} bothAxes />);
+    render(<AgreementTrendChart series={versions([0.4, 0.6])} renderHover={() => null} />);
     expect(
       screen.queryByRole("button", { name: "Kappa" }),
     ).not.toBeInTheDocument();
@@ -150,12 +104,12 @@ describe("agreement and kappa drawn together", () => {
   });
 
   it("takes the kappa axis below 0 when a kappa is below 0", () => {
-    render(<AgreementTrendChart series={versions([-0.3, 0.6])} bothAxes />);
+    render(<AgreementTrendChart series={versions([-0.3, 0.6])} renderHover={() => null} />);
     expect(screen.getAllByTestId("axis")[1].dataset.domain).toBe("[-1,1]");
   });
 
   it("still lists the kappa line before any version has a kappa", () => {
-    render(<AgreementTrendChart series={versions([null])} bothAxes />);
+    render(<AgreementTrendChart series={versions([null])} renderHover={() => null} />);
     expect(lineNames()).toEqual(["Agreement", "Kappa"]);
   });
 
@@ -163,7 +117,6 @@ describe("agreement and kappa drawn together", () => {
     render(
       <AgreementTrendChart
         series={versions([0.4])}
-        bothAxes
         renderHover={(key, label) => (
           <span>
             point {key} {label}

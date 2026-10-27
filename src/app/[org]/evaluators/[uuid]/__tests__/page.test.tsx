@@ -79,7 +79,6 @@ jest.mock("../../../../../components/charts/AgreementTrendChart", () => ({
   AgreementTrendChart: ({
     series,
     renderHover,
-    bothAxes,
   }: {
     series: {
       name: string;
@@ -87,9 +86,8 @@ jest.mock("../../../../../components/charts/AgreementTrendChart", () => ({
       points: { key: string; label: string }[];
     }[];
     renderHover?: (key: string, label: string) => React.ReactNode;
-    bothAxes?: boolean;
   }) => (
-    <div data-testid="trend-chart" data-both-axes={String(!!bothAxes)}>
+    <div data-testid="trend-chart">
       <span data-testid="line-names">
         {series.map((s) => [s.name, s.kappaName].filter(Boolean).join(", ")).join("; ")}
       </span>
@@ -619,8 +617,6 @@ describe("the Agreement tab", () => {
     expect(await screen.findByTestId("line-names")).toHaveTextContent(
       /^Agreement, Kappa$/,
     );
-    // Agreement and kappa share the chart, with no switch between them.
-    expect(screen.getByTestId("trend-chart").dataset.bothAxes).toBe("true");
     const hover = screen.getByTestId("hover-ver-1");
     expect(within(hover).getByTestId("hover-label")).toHaveTextContent("v1Live");
     expect(hover).toHaveTextContent("80%Kappa0.50");

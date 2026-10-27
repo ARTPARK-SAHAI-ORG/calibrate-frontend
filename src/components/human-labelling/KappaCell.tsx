@@ -1,10 +1,8 @@
 import { Tooltip } from "@/components/Tooltip";
 import {
-  ANSWER_KIND_LABELS,
   formatKappa,
   kappaBlank,
   kappaLabel,
-  type KappaByKind,
   type KappaFields,
 } from "@/lib/agreementKappa";
 
@@ -69,26 +67,4 @@ export function KappaCell({
   const blank = kappaBlank(fields);
   if (blank) return <KappaReasonPill blank={blank} />;
   return <span>—</span>;
-}
-
-/** One kappa per kind of answer, each on its own line after a small "Binary"
- * or "Rating", or a dash when nothing was compared. */
-export function KappaByKindList({
-  kinds,
-}: {
-  kinds: readonly KappaByKind[] | null | undefined;
-}) {
-  if (!kinds?.length) return <span>—</span>;
-  return (
-    <span className="inline-flex flex-col gap-1">
-      {kinds.map((entry) => (
-        <span key={entry.answer_kind} className="flex items-center gap-2">
-          <span className="text-xs font-normal text-muted-foreground">
-            {ANSWER_KIND_LABELS[entry.answer_kind]}
-          </span>
-          <KappaCell fields={entry} />
-        </span>
-      ))}
-    </span>
-  );
 }
