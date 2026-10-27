@@ -65,6 +65,8 @@ const AGREEMENT = {
   ],
 };
 
+let mockAgreement: unknown = AGREEMENT;
+
 jest.mock("../../../../../../lib/api", () => ({
   ...jest.requireActual("../../../../../../lib/api"),
   apiClient: (endpoint: string) =>
@@ -72,7 +74,7 @@ jest.mock("../../../../../../lib/api", () => ({
       endpoint === "/annotation-tasks/t-1"
         ? TASK
         : endpoint === "/annotation-tasks/t-1/agreement"
-          ? AGREEMENT
+          ? mockAgreement
           : endpoint.startsWith("/annotation-tasks/t-1/summary")
             ? { items: [], rows: [], evaluators: [], annotators: [], pagination: { total: 0, limit: 50, offset: 0 } }
             : endpoint === "/annotation-tasks/t-1/evaluator-runs"
@@ -110,4 +112,35 @@ it("shows Score reliability as the Overview's cards and table, one row per linke
   ]);
   expect(rows[0]).toHaveTextContent("75%");
   expect(rows[0]).toHaveTextContent("90%");
+});
+
+it("says what is missing when Score reliability has no number yet", async () => {
+  // One annotator, and no score from the evaluator's live version.
+  mockAgreement = {
+    human_human: { current: null, pair_count: 0 },
+    evaluators_with_humans: { current: null, pair_count: 0 },
+    evaluators: [
+      {
+        evaluator_id: "ev-1",
+        name: "Tone",
+        current: null,
+        pair_count: 0,
+        inter_annotator: { current: null, pair_count: 0 },
+        result: null,
+        human_result: { count: 4, true_count: 4 },
+      },
+    ],
+  };
+  render(<LabellingTaskPage />);
+  const section = (await screen.findByText("Score reliability")).closest(
+    "section",
+  ) as HTMLElement;
+  expect(within(section).getByText("No agreement yet")).toBeInTheDocument();
+  expect(section).toHaveTextContent(
+    "Annotator agreement appears once two annotators label the same items.",
+  );
+  expect(section).toHaveTextContent(
+    "Evaluator agreement appears once the evaluator's live version is run on items annotators have labelled.",
+  );
+  mockAgreement = AGREEMENT;
 });
