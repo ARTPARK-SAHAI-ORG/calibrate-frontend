@@ -1722,12 +1722,14 @@ function VersionAxisTick({
   const label = payload?.value ?? "";
   const isLive = liveLabels.has(label);
   return (
+    // The live version reads "v1 Live" on one line: the version ends just
+    // left of the tick and the Live mark starts just right of it.
     <g transform={`translate(${cx},${cy})`}>
       <text
-        x={0}
+        x={isLive ? -2 : 0}
         y={0}
         dy={12}
-        textAnchor="middle"
+        textAnchor={isLive ? "end" : "middle"}
         fontSize={11}
         fill="currentColor"
       >
@@ -1736,16 +1738,16 @@ function VersionAxisTick({
       {isLive && (
         <>
           <rect
-            x={-17}
-            y={18}
-            width={34}
+            x={2}
+            y={2}
+            width={30}
             height={14}
             rx={3}
             className="fill-green-500/10"
           />
           <text
-            x={0}
-            y={29}
+            x={17}
+            y={12}
             textAnchor="middle"
             fontSize={9}
             fontWeight={600}
@@ -1900,7 +1902,7 @@ function AgreementTrendTab({
               tick: (props) => (
                 <VersionAxisTick {...props} liveLabels={liveLabels} />
               ),
-              height: 44,
+              height: 30,
             }}
             series={[
               {
@@ -1930,7 +1932,7 @@ function AgreementTrendTab({
                     </span>
                   }
                 >
-                  <MeasureCell group={version} />
+                  <MeasureCell group={version} roomy />
                 </TrendHoverBox>
               );
             }}

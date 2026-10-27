@@ -23,8 +23,8 @@ import { useAccessToken, usePageErrorState } from "@/hooks";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
-import type { AnswerKind, KappaByKind } from "@/lib/agreementKappa";
-import { KappaCell } from "@/components/human-labelling/KappaCell";
+import type { KappaByKind } from "@/lib/agreementKappa";
+import { KappaKindLines } from "@/components/human-labelling/KappaCell";
 import { AgreementStatCard } from "@/components/human-labelling/AgreementStatCard";
 
 type Tab = "overview" | "jobs";
@@ -49,8 +49,6 @@ type AnnotatorStats = {
   /** Kappa for each kind of answer the annotator was compared on. */
   kappa_by_kind?: KappaByKind[];
 };
-
-const ANSWER_KINDS: AnswerKind[] = ["binary", "rating"];
 
 type AnnotatorJob = {
   uuid: string;
@@ -334,33 +332,15 @@ function AnnotatorDetailPageInner() {
               </div>
             )}
 
-            <div className="flex flex-wrap items-stretch gap-3">
-              <AgreementStatCard
-                staticPillText="Agreement with others"
-                agreement={stats?.current_agreement}
-              />
-              {ANSWER_KINDS.map((kind) => {
-                const entry = stats?.kappa_by_kind?.find(
-                  (k) => k.answer_kind === kind,
-                );
-                return (
-                  <AgreementStatCard
-                    key={kind}
-                    staticPillText={`Kappa (${kind})`}
-                    result={{
-                      label: `Kappa (${kind})`,
-                      value: entry ? (
-                        <KappaCell fields={entry} />
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      ),
-                      ratio: null,
-                    }}
-                    showResultLabel={false}
-                  />
-                );
-              })}
-            </div>
+            <AgreementStatCard
+              staticPillText="Agreement with others"
+              agreement={stats?.current_agreement}
+              fullWidth
+            >
+              <div className="mt-3">
+                <KappaKindLines kinds={stats?.kappa_by_kind} />
+              </div>
+            </AgreementStatCard>
           </div>
         )}
 

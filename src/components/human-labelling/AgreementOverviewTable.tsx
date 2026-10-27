@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import {
@@ -109,34 +109,36 @@ function SortHeader({
 const DASH = <span className="text-sm text-muted-foreground">—</span>;
 
 /** One measure: the agreement and its kappa on one line, a chance bar under
- * them, or a muted dash when there is no agreement. `kappa` replaces the
- * single kappa, for an annotator whose kappa comes one per kind of answer. */
+ * them, or a muted dash when there is no agreement. `roomy` gives a hover box
+ * a larger number and more space above the bar than a table cell has. */
 export function MeasureCell({
   group,
-  kappa,
+  roomy = false,
 }: {
   group: AgreementGroup;
-  kappa?: ReactNode;
+  roomy?: boolean;
 }) {
   if (group.current == null) return DASH;
   return (
     <div className="min-w-0 w-full">
       {/* Wraps in a narrow column rather than spilling into the next one. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <span className="text-sm font-semibold tabular-nums text-foreground">
+        <span
+          className={`${roomy ? "text-base" : "text-sm"} font-semibold tabular-nums text-foreground`}
+        >
           {Math.round(group.current * 100)}%
         </span>
-        {kappa ?? (
-          <span className="inline-flex flex-wrap items-center gap-1 min-w-0 text-xs text-muted-foreground tabular-nums">
-            Kappa
-            <KappaCell fields={group} />
-          </span>
-        )}
+        <span className="inline-flex flex-wrap items-center gap-1 min-w-0 text-xs text-muted-foreground tabular-nums">
+          Kappa
+          <KappaCell fields={group} />
+        </span>
       </div>
-      <ChanceBar
-        agreement={group.current}
-        chanceAgreement={group.chance_agreement}
-      />
+      <div className={roomy ? "pt-1" : ""}>
+        <ChanceBar
+          agreement={group.current}
+          chanceAgreement={group.chance_agreement}
+        />
+      </div>
     </div>
   );
 }

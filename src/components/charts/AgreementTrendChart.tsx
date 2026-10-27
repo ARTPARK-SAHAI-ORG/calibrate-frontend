@@ -25,8 +25,8 @@ export function TrendHoverBox({
   children: ReactNode;
 }) {
   return (
-    <div className="border border-border rounded-lg px-4 py-3 bg-background min-w-[180px] shadow-sm">
-      <div className="text-xs font-medium text-muted-foreground mb-1">
+    <div className="border border-border rounded-lg p-4 bg-background min-w-[260px] shadow-sm">
+      <div className="text-xs font-medium text-muted-foreground mb-2.5">
         {label}
       </div>
       {children}

@@ -3,6 +3,8 @@ import {
   formatKappa,
   kappaBlank,
   kappaLabel,
+  type AnswerKind,
+  type KappaByKind,
   type KappaFields,
 } from "@/lib/agreementKappa";
 
@@ -68,3 +70,34 @@ export function KappaCell({
   if (blank) return <KappaReasonPill blank={blank} />;
   return <span>—</span>;
 }
+
+const ANSWER_KINDS: AnswerKind[] = ["binary", "rating"];
+
+/** "Kappa (binary)" and "Kappa (rating)", each label at one width so the
+ * values line up, each value a KappaCell or a muted dash. */
+export function KappaKindLines({
+  kinds,
+}: {
+  kinds: readonly KappaByKind[] | null | undefined;
+}) {
+  return (
+    <div className="space-y-1.5 text-sm tabular-nums">
+      {ANSWER_KINDS.map((kind) => {
+        const entry = kinds?.find((k) => k.answer_kind === kind);
+        return (
+          <div key={kind} className="flex items-center gap-3">
+            <span className="w-28 shrink-0 text-muted-foreground">
+              Kappa ({kind})
+            </span>
+            {entry ? (
+              <KappaCell fields={entry} />
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+

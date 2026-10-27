@@ -203,6 +203,10 @@ export function AgreementStatCard(
      * mark beside the name that explains itself on hover, so a run with
      * unlabelled evaluators does not need a banner above the cards. */
     warning?: string | null;
+    /** Stretch to the width of the section instead of fitting the content. */
+    fullWidth?: boolean;
+    /** More detail under the number. */
+    children?: ReactNode;
     /** Shown beside the human agreement number when there is one. */
     kappa?: KappaFields | null;
   },
@@ -212,6 +216,8 @@ export function AgreementStatCard(
     showResultLabel = true,
     showAlignmentLabel = true,
     warning = null,
+    fullWidth = false,
+    children,
     kappa = null,
     agreement = null,
   } = props;
@@ -288,7 +294,11 @@ export function AgreementStatCard(
   ) : null;
   return (
     <>
-      <div className="border border-border rounded-lg px-4 py-3 bg-background w-max shrink-0 min-w-[160px]">
+      <div
+        className={`border border-border rounded-lg px-4 py-3 bg-background min-w-[160px] ${
+          fullWidth ? "w-full" : "w-max shrink-0"
+        }`}
+      >
         {"staticPillText" in props ? (
           <div className="flex items-center gap-2 min-w-0">
             {staticPillClipped ? (
@@ -360,6 +370,7 @@ export function AgreementStatCard(
         ) : (
           singleNumber
         )}
+        {children}
       </div>
       <EvaluatorPreviewModal
         evaluatorUuid={previewEvaluator?.uuid ?? null}

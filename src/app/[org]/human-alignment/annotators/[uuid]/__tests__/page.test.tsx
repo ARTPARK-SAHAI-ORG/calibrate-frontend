@@ -48,11 +48,11 @@ const detail = (
   jobs: [],
 });
 
-// The card whose pill reads `label`.
-const card = (label: string) =>
-  screen.getByText(label).closest(".rounded-lg") as HTMLElement;
+// The one card on the Overview tab.
+const card = () =>
+  screen.getByText("Agreement with others").closest(".rounded-lg") as HTMLElement;
 
-it("shows agreement with others and one kappa card per kind of answer", async () => {
+it("shows agreement with others and both kappas in one full-width card", async () => {
   render(<AnnotatorDetailPage />);
   expect(requested).toBe("/annotators/ann-1");
   resolveDetail(
@@ -67,29 +67,21 @@ it("shows agreement with others and one kappa card per kind of answer", async ()
     ]),
   );
   expect(await screen.findByText("62%")).toBeInTheDocument();
-  expect(card("Agreement with others")).toHaveTextContent(
-    "Agreement with others62%",
+  // Pill, then the number, then the binary line, then the rating line.
+  expect(card()).toHaveTextContent(
+    /^Agreement with others62%Kappa \(binary\)0\.31Kappa \(rating\)Everyone agreed$/,
   );
+  expect(card().className).toContain("w-full");
   // The same neutral percentage as the overall cards elsewhere.
   expect(screen.getByText("62%").className).toContain("text-foreground");
-  expect(screen.getByText("62%").className).not.toMatch(
-    /text-(green|red|yellow)/,
-  );
-  expect(card("Kappa (binary)")).toHaveTextContent("Kappa (binary)0.31");
+  // The kappas are lines inside the card, not cards of their own.
+  expect(screen.getByText("Kappa (binary)").closest("span.rounded-md")).toBeNull();
+  // Both labels share one width, so the values line up.
+  expect(screen.getByText("Kappa (binary)").className).toContain("w-28");
+  expect(screen.getByText("Kappa (rating)").className).toContain("w-28");
   expect(
-    within(card("Kappa (binary)")).getByRole("button", {
-      name: "Cohen's kappa",
-    }),
+    within(card()).getByRole("button", { name: "Cohen's kappa" }),
   ).toBeInTheDocument();
-  expect(card("Kappa (rating)")).toHaveTextContent(
-    "Kappa (rating)Everyone agreed",
-  );
-  // The pill label is the same pill the overall cards use.
-  expect(
-    screen.getByText("Kappa (rating)").closest("span.rounded-md"),
-  ).not.toBeNull();
-  expect(screen.queryByText(/Agreement with other annotators/)).toBeNull();
-  // The job count stays on the Jobs tab.
   expect(screen.getByText("Jobs (2)")).toBeInTheDocument();
 });
 
@@ -97,12 +89,8 @@ it("shows muted dashes when nothing has been compared", async () => {
   render(<AnnotatorDetailPage />);
   resolveDetail(detail(null, []));
   expect(await screen.findByText("Jobs (2)")).toBeInTheDocument();
-  for (const label of [
-    "Agreement with others",
-    "Kappa (binary)",
-    "Kappa (rating)",
-  ]) {
-    const dash = within(card(label)).getByText("—");
+  const dashes = within(card()).getAllByText("—");
+  expect(dashes).toHaveLength(3);
+  for (const dash of dashes)
     expect(dash.className).toContain("text-muted-foreground");
-  }
 });

@@ -79,6 +79,7 @@ jest.mock("../../../../../components/charts/AgreementTrendChart", () => ({
   AgreementTrendChart: ({
     series,
     renderHover,
+    xAxisProps,
   }: {
     series: {
       name: string;
@@ -86,8 +87,18 @@ jest.mock("../../../../../components/charts/AgreementTrendChart", () => ({
       points: { key: string; label: string }[];
     }[];
     renderHover?: (key: string, label: string) => React.ReactNode;
+    xAxisProps?: {
+      tick?: (p: { x: number; y: number; payload: { value: string } }) => React.ReactNode;
+    };
   }) => (
     <div data-testid="trend-chart">
+      <svg data-testid="ticks">
+        {series[0].points.map((p) => (
+          <g key={p.key} data-testid={`tick-${p.label}`}>
+            {xAxisProps?.tick?.({ x: 0, y: 0, payload: { value: p.label } })}
+          </g>
+        ))}
+      </svg>
       <span data-testid="line-names">
         {series.map((s) => [s.name, s.kappaName].filter(Boolean).join(", ")).join("; ")}
       </span>
@@ -617,9 +628,20 @@ describe("the Agreement tab", () => {
     expect(await screen.findByTestId("line-names")).toHaveTextContent(
       /^Agreement, Kappa$/,
     );
+    // "Live" sits on the version's own line, just to the right of it.
+    const tick = screen.getByTestId("tick-v1");
+    const [version, live] = [...tick.querySelectorAll("text")];
+    expect([version.textContent, live.textContent]).toEqual(["v1", "Live"]);
+    expect(version.getAttribute("text-anchor")).toBe("end");
+    expect(Number(live.getAttribute("y"))).toBe(
+      Number(version.getAttribute("y")) + Number(version.getAttribute("dy")),
+    );
+    expect(Number(live.getAttribute("x"))).toBeGreaterThan(0);
     const hover = screen.getByTestId("hover-ver-1");
     expect(within(hover).getByTestId("hover-label")).toHaveTextContent("v1Live");
     expect(hover).toHaveTextContent("80%Kappa0.50");
+    // The hover uses the roomier cell, with a larger number than the table.
+    expect(within(hover).getByText("80%").className).toContain("text-base");
     expect(within(hover).getByTestId("agreement-fill").style.width).toBe("80%");
     expect(
       (global.fetch as jest.Mock).mock.calls.some(([url]) =>

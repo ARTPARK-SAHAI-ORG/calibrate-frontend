@@ -3,6 +3,7 @@ import { buildOverviewRows } from "@/lib/taskOverviewData";
 import {
   AgreementOverviewTable,
   AgreementOverviewSection,
+  MeasureCell,
 } from "../AgreementOverviewTable";
 
 const rows = buildOverviewRows([
@@ -326,6 +327,26 @@ describe("AgreementOverviewSection", () => {
       "Tool call correctness",
       "Brevity",
     ]);
+  });
+});
+
+describe("MeasureCell", () => {
+  const group = { current: 0.55, pair_count: 3, kappa: -0.05, kappa_type: "cohen" as const, chance_agreement: 0.6 };
+
+  it("keeps the table's size by default", () => {
+    render(<MeasureCell group={group} />);
+    expect(screen.getByText("55%").className).toContain("text-sm");
+    expect(
+      screen.getByTestId("agreement-fill").closest(".pt-1"),
+    ).toBeNull();
+  });
+
+  it("has a larger number and more space above the bar when roomy", () => {
+    render(<MeasureCell group={group} roomy />);
+    expect(screen.getByText("55%").className).toContain("text-base");
+    expect(
+      screen.getByTestId("agreement-fill").closest(".pt-1"),
+    ).not.toBeNull();
   });
 });
 

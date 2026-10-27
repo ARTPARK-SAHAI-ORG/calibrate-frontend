@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen } from "@/test-utils";
-import { AgreementTrendChart } from "../AgreementTrendChart";
+import { AgreementTrendChart, TrendHoverBox } from "../AgreementTrendChart";
 
 // jsdom has no layout, so recharts' ResponsiveContainer is given a fixed size.
 class ResizeObserverMock {
@@ -74,3 +74,13 @@ it("names the two lines Agreement and Kappa in the legend", () => {
   expect(legend).toEqual(["Agreement", "Kappa"]);
   expect(screen.queryByRole("button", { name: "Kappa" })).not.toBeInTheDocument();
 });
+
+it("gives the hover box room: 16px padding, a 260px minimum, space under its heading", () => {
+  render(<TrendHoverBox label="v1">content</TrendHoverBox>);
+  const heading = screen.getByText("v1");
+  expect(heading.className).toContain("mb-2.5");
+  const box = heading.parentElement!;
+  expect(box.className).toContain("p-4");
+  expect(box.className).toContain("min-w-[260px]");
+});
+
