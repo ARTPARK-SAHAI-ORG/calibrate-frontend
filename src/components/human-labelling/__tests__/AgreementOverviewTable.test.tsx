@@ -78,7 +78,7 @@ describe("AgreementOverviewTable", () => {
     );
     expect(header.map((c) => c.textContent)).toEqual([
       "Evaluator",
-      "Inter-annotator agreement",
+      "Annotator agreement",
       "Evaluator agreement with humans",
     ]);
     expect(header[0].className).not.toContain("border-l");
@@ -151,7 +151,7 @@ describe("AgreementOverviewTable", () => {
     const t = within(table());
     await user.click(t.getByRole("button", { name: /^Evaluator$/ }));
     expect(onSort).toHaveBeenLastCalledWith("name");
-    await user.click(t.getByRole("button", { name: /^Inter-annotator agreement$/ }));
+    await user.click(t.getByRole("button", { name: /^Annotator agreement$/ }));
     expect(onSort).toHaveBeenLastCalledWith("interAnnotator");
     await user.click(
       t.getByRole("button", { name: /^Evaluator agreement with humans$/ }),
@@ -167,10 +167,10 @@ describe("AgreementOverviewTable", () => {
   it("shows the same measures stacked on each card", () => {
     renderTable();
     const card = screen
-      .getAllByText("Inter-annotator agreement")
+      .getAllByText("Annotator agreement")
       .find((el) => el.tagName === "P")!
       .closest(".rounded-xl") as HTMLElement;
-    expect(card).toHaveTextContent("Inter-annotator agreement40%KappaToo few items");
+    expect(card).toHaveTextContent("Annotator agreement40%KappaToo few items");
     expect(card).toHaveTextContent("Evaluator agreement with humans90%Kappa0.50");
     expect(within(card).getAllByTestId("agreement-fill")).toHaveLength(2);
   });
@@ -246,10 +246,10 @@ describe("AgreementOverviewSection", () => {
       <AgreementOverviewSection agreement={agreement} onOpenEvaluator={jest.fn()} />,
     );
     const pill = screen
-      .getAllByText("Inter-annotator agreement")
+      .getAllByText("Annotator agreement")
       .find((el) => el.closest("span.rounded-md"))!;
     expect(pill.closest(".rounded-lg")).toHaveTextContent(
-      "Inter-annotator agreement70%",
+      "Annotator agreement70%",
     );
     expect(screen.getByText("85%")).toBeInTheDocument();
     expect(screen.getByText("Better than chance")).toBeInTheDocument();
@@ -301,7 +301,7 @@ describe("AgreementOverviewSection", () => {
     expect(picker.closest(".md\\:hidden")).not.toBeNull();
     expect(
       [...picker.querySelectorAll("option")].slice(1).map((o) => o.textContent),
-    ).toEqual(["Evaluator", "Inter-annotator agreement", "Evaluator agreement with humans"]);
+    ).toEqual(["Evaluator", "Annotator agreement", "Evaluator agreement with humans"]);
     const cardNames = () =>
       [...document.querySelectorAll(".md\\:hidden > .rounded-xl")].map(
         (card) => within(card as HTMLElement).getAllByRole("button")[0].textContent,

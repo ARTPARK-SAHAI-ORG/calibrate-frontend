@@ -7,8 +7,6 @@ import {
   type KappaFields,
 } from "@/lib/agreementKappa";
 
-type GroupLike = { current?: number | null; pair_count?: number } | null | undefined;
-
 /**
  * Has anything been compared yet: annotators with each other, evaluators
  * with humans overall, or any one evaluator either way? Every agreement
@@ -17,16 +15,17 @@ type GroupLike = { current?: number | null; pair_count?: number } | null | undef
 export function hasAgreementData(
   agreement:
     | {
-        human_human?: GroupLike;
-        evaluators_with_humans?: GroupLike;
-        evaluators?: readonly (NonNullable<GroupLike> & {
-          inter_annotator?: GroupLike;
+        human_human?: Partial<AgreementGroup> | null;
+        evaluators_with_humans?: Partial<AgreementGroup> | null;
+        evaluators?: readonly (Partial<AgreementGroup> & {
+          inter_annotator?: Partial<AgreementGroup> | null;
         })[];
       }
     | null
     | undefined,
 ): boolean {
-  const has = (g: GroupLike) => g?.current != null || (g?.pair_count ?? 0) > 0;
+  const has = (g: Partial<AgreementGroup> | null | undefined) =>
+    g?.current != null || (g?.pair_count ?? 0) > 0;
   if (!agreement) return false;
   return (
     has(agreement.human_human) ||
@@ -48,12 +47,11 @@ export function hasAgreementData(
  */
 export function hasTaskOverviewData(
   agreement: {
-    human_human?: { pair_count?: number } | null;
-    evaluators?: {
-      pair_count?: number;
+    human_human?: Partial<AgreementGroup> | null;
+    evaluators?: (Partial<AgreementGroup> & {
       result?: { count?: number } | null;
       human_result?: { count?: number } | null;
-    }[];
+    })[];
   } | null,
   runs: { status?: string }[],
   /** Whether `taskEvaluatorScoreCards` produced a card. */
@@ -84,8 +82,8 @@ export function hasTaskOverviewData(
  * says which evaluator the note is about.
  */
 export function hasReliabilityNumber(
-  humanHuman: { current?: number | null } | null | undefined,
-  evaluators: readonly { current?: number | null }[],
+  humanHuman: Partial<AgreementGroup> | null | undefined,
+  evaluators: readonly Partial<AgreementGroup>[],
 ): boolean {
   return (
     humanHuman?.current != null || evaluators.some((ev) => ev.current != null)
@@ -113,22 +111,6 @@ export function taskEvaluatorScoreCards<
     }));
 }
 
-type OverviewGroup = { current: number | null; kappa?: number | null };
-
-/**
- * The evaluator rows on the Human alignment overview. Across all tasks, an
- * evaluator with no agreement and no kappa in either group, inter-annotator
- * or with humans, has nothing to show and is left out. One task keeps every
- * evaluator linked to it.
- */
-export function overviewRows<
-  T extends { withHumans: OverviewGroup; interAnnotator: OverviewGroup },
->(rows: T[], allTasks: boolean): T[] {
-  if (!allTasks) return rows;
-  const has = (g: OverviewGroup) => g.current != null || g.kappa != null;
-  return rows.filter((r) => has(r.withHumans) || has(r.interAnnotator));
-}
-
 export type AgreementGroup = KappaFields & {
   current: number | null;
   pair_count: number;
@@ -151,9 +133,9 @@ type ResultCounts = {
 export type TaskAgreementResponse = {
   task_id?: string;
   /** Overall agreement between annotators. */
-  human_human: { current: number | null; pair_count: number };
+  human_human: AgreementGroup;
   /** Overall agreement between evaluators and humans. */
-  evaluators_with_humans?: { current: number | null; pair_count: number } | null;
+  evaluators_with_humans?: AgreementGroup | null;
   evaluators: (EvaluatorAgreement & {
     /** The evaluator's own rolled-up output across every item in the task,
      * independent of any human labels. `count` is the number of items it
@@ -178,16 +160,24 @@ export type OverviewRow = {
 
 const EMPTY_GROUP: AgreementGroup = { current: null, pair_count: 0 };
 
-/** One row per evaluator, with both measures. */
+/**
+ * One row per evaluator, with both measures. Across all tasks, an evaluator
+ * with no agreement and no kappa in either measure has nothing to show and is
+ * left out. One task keeps every evaluator linked to it.
+ */
 export function buildOverviewRows(
   evaluators: readonly EvaluatorAgreement[],
+  allTasks = false,
 ): OverviewRow[] {
-  return evaluators.map((ev) => ({
-    key: ev.evaluator_id,
-    name: ev.name,
-    withHumans: ev,
-    interAnnotator: ev.inter_annotator ?? EMPTY_GROUP,
-  }));
+  const has = (g: AgreementGroup) => g.current != null || g.kappa != null;
+  return evaluators
+    .map((ev) => ({
+      key: ev.evaluator_id,
+      name: ev.name,
+      withHumans: ev,
+      interAnnotator: ev.inter_annotator ?? EMPTY_GROUP,
+    }))
+    .filter((r) => !allTasks || has(r.withHumans) || has(r.interAnnotator));
 }
 
 /**

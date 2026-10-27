@@ -24,7 +24,6 @@ import {
 } from "@/lib/agreementKappa";
 import {
   buildOverviewRows,
-  overviewRows,
   sortOverviewRows,
   type AgreementGroup,
   type OverviewRow,
@@ -336,7 +335,7 @@ export function AgreementOverviewTable({
       )}
       columns={[
         {
-          title: "Inter-annotator agreement",
+          title: "Annotator agreement",
           sortKey: "interAnnotator",
           cell: (row) => <MeasureCell group={row.interAnnotator} />,
         },
@@ -379,19 +378,15 @@ export function AgreementOverviewSection({
         ? { key, dir: prev.dir === "desc" ? "asc" : "desc" }
         : { key, dir: key === "name" ? "asc" : "desc" },
     );
-  const rows = overviewRows(
-    buildOverviewRows(agreement.evaluators ?? []).map((row) => ({
-      ...row,
-      evaluatorType: evaluatorTypeOf?.(row.key),
-    })),
-    allTasks,
+  const rows = buildOverviewRows(agreement.evaluators ?? [], allTasks).map(
+    (row) => ({ ...row, evaluatorType: evaluatorTypeOf?.(row.key) }),
   );
   return (
     <>
       <div className="flex flex-wrap items-stretch gap-3">
         {(
           [
-            ["Inter-annotator agreement", agreement.human_human],
+            ["Annotator agreement", agreement.human_human],
             ["Evaluator agreement with humans", agreement.evaluators_with_humans],
           ] as const
         ).map(([title, group]) => (

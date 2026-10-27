@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { TabButtons } from "@/components/ui/TabRow";
 
 export type ItemResultsEvaluator = {
   uuid: string;
@@ -69,19 +70,14 @@ export function ItemResultsDialog({
           <>
             <div className="px-4 md:px-6 border-b border-border overflow-x-auto hide-scrollbar">
               <div className="flex items-center gap-1 min-w-max">
-                {evaluators.map((ev) => (
-                  <button
-                    key={ev.uuid}
-                    onClick={() => setActiveUuid(ev.uuid)}
-                    className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                      activeUuid === ev.uuid
-                        ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {ev.name}
-                  </button>
-                ))}
+                <TabButtons
+                  tabs={evaluators.map((ev) => ({
+                    id: ev.uuid,
+                    label: ev.name,
+                  }))}
+                  active={activeUuid}
+                  onChange={setActiveUuid}
+                />
               </div>
             </div>
 

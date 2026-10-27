@@ -93,8 +93,8 @@ it("shows Score reliability as the Overview's cards and table, one row per linke
       .getAllByText(label)
       .find((el) => el.closest("span.rounded-md"))!
       .closest(".rounded-lg") as HTMLElement;
-  expect(card("Inter-annotator agreement")).toHaveTextContent(
-    "Inter-annotator agreement70%",
+  expect(card("Annotator agreement")).toHaveTextContent(
+    "Annotator agreement70%",
   );
   expect(card("Evaluator agreement with humans")).toHaveTextContent(
     "Evaluator agreement with humans85%",

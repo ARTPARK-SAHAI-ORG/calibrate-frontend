@@ -112,8 +112,8 @@ it("shows the overall numbers as neutral pill cards, the plain-words subtitle, a
       .getAllByText(label)
       .find((el) => el.closest("span.rounded-md"))!
       .closest(".rounded-lg") as HTMLElement;
-  expect(card("Inter-annotator agreement")).toHaveTextContent(
-    "Inter-annotator agreement72%",
+  expect(card("Annotator agreement")).toHaveTextContent(
+    "Annotator agreement72%",
   );
   expect(screen.getByText("72%").className).toContain("text-foreground");
   expect(screen.getByText("72%").className).not.toMatch(

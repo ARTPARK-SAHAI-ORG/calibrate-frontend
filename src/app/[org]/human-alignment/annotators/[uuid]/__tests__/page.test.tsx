@@ -149,15 +149,43 @@ it("shows a large muted dash and no bar for a kind with nothing compared", async
   expect(within(column("Binary labels")).getByTestId("agreement-fill")).toBeInTheDocument();
 });
 
-it("shows muted dashes and no legend when nothing has been compared", async () => {
+it("shows an empty state instead of the card when nothing has been compared", async () => {
   render(<AnnotatorDetailPage />);
-  resolveDetail(detail(null, []));
-  expect(await screen.findByText("Jobs (2)")).toBeInTheDocument();
-  for (const title of ["Overall", "Binary labels", "Rating labels"])
-    expect(within(column(title)).getByText("—").className).toContain(
-      "text-muted-foreground",
-    );
-  expect(screen.queryByText("Better than chance")).not.toBeInTheDocument();
+  resolveDetail(
+    detail(null, [
+      {
+        answer_kind: "binary",
+        agreement: null,
+        pair_count: 0,
+        kappa: null,
+        kappa_blank_reason: "too_few_items",
+      },
+    ]),
+  );
+  expect(await screen.findByText("No agreement yet")).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      "Agreement appears once another annotator labels the same items as this annotator",
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Overall")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("Agreement with other annotators"),
+  ).not.toBeInTheDocument();
+});
+
+it("keeps the card when only one kind of answer has a number", async () => {
+  render(<AnnotatorDetailPage />);
+  resolveDetail(
+    detail(null, [
+      { answer_kind: "rating", agreement: null, pair_count: 3, kappa: 0.1 },
+    ]),
+  );
+  expect(await screen.findByText("Overall")).toBeInTheDocument();
+  expect(within(column("Overall")).getByText("—").className).toContain(
+    "text-muted-foreground",
+  );
+  expect(screen.queryByText("No agreement yet")).not.toBeInTheDocument();
 });
 
 // The page title is a dash until the name arrives; only the agreement

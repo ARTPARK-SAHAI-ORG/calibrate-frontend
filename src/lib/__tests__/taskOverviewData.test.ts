@@ -2,7 +2,6 @@ import {
   hasReliabilityNumber,
   hasTaskOverviewData,
   buildOverviewRows,
-  overviewRows,
   sortOverviewRows,
   taskEvaluatorScoreCards,
 } from "../taskOverviewData";
@@ -171,36 +170,6 @@ describe("hasReliabilityNumber", () => {
   });
 });
 
-describe("overviewRows", () => {
-  const g = (current: number | null, kappa?: number | null) => ({
-    current,
-    kappa,
-  });
-  const rows = [
-    { key: "empty", withHumans: g(null, null), interAnnotator: g(null) },
-    { key: "with-humans", withHumans: g(0.8), interAnnotator: g(null) },
-    { key: "inter-only", withHumans: g(null), interAnnotator: g(0.6) },
-    { key: "kappa-only", withHumans: g(null), interAnnotator: g(null, 0) },
-  ];
-
-  it("leaves out evaluators with nothing in either group across all tasks", () => {
-    expect(overviewRows(rows, true).map((r) => r.key)).toEqual([
-      "with-humans",
-      "inter-only",
-      "kappa-only",
-    ]);
-  });
-
-  it("keeps every evaluator on one task", () => {
-    expect(overviewRows(rows, false).map((r) => r.key)).toEqual([
-      "empty",
-      "with-humans",
-      "inter-only",
-      "kappa-only",
-    ]);
-  });
-});
-
 describe("buildOverviewRows", () => {
   const evaluators = [
     {
@@ -238,6 +207,43 @@ describe("buildOverviewRows", () => {
     expect(rows[0].interAnnotator.current).toBe(0.7);
     expect(rows[0].withHumans.current).toBe(0.9);
     expect(rows[1].interAnnotator).toEqual({ current: null, pair_count: 0 });
+  });
+
+  const ev = (
+    evaluator_id: string,
+    current: number | null,
+    kappa: number | null,
+    inter: { current: number | null; kappa?: number | null } | null,
+  ) => ({
+    evaluator_id,
+    name: evaluator_id,
+    current,
+    pair_count: 0,
+    kappa,
+    inter_annotator: inter && { ...inter, pair_count: 0 },
+  });
+  const mixed = [
+    ev("empty", null, null, null),
+    ev("with-humans", 0.8, null, null),
+    ev("inter-only", null, null, { current: 0.6 }),
+    ev("kappa-only", null, null, { current: null, kappa: 0 }),
+  ];
+
+  it("leaves out evaluators with nothing in either measure across all tasks", () => {
+    expect(buildOverviewRows(mixed, true).map((r) => r.key)).toEqual([
+      "with-humans",
+      "inter-only",
+      "kappa-only",
+    ]);
+  });
+
+  it("keeps every evaluator on one task", () => {
+    expect(buildOverviewRows(mixed).map((r) => r.key)).toEqual([
+      "empty",
+      "with-humans",
+      "inter-only",
+      "kappa-only",
+    ]);
   });
 });
 
