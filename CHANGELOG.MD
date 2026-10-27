@@ -1,5 +1,6 @@
 ## October 2026
 
+- The button in the landing page header now says Go to app and opens Agents when you are already signed in, instead of sending you to the login page ([#772](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/772))
 - Agreement between annotators, and between evaluators and annotators, now comes with a second measure that allows for chance, shown on the human alignment pages, the annotator and evaluator pages, and a new Summary tab on finished evaluation runs ([#758](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/758))
 - The analytics page now shows who owns a workspace, with their name and email, when you hover over the workspace name ([#768](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/768))
 - Fixed a problem where some people were stuck on a loading spinner after opening Calibrate and can now reach the login page and sign in again ([#763](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/763))
