@@ -563,7 +563,7 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       path: "/agent-evaluators",
       action: async (page) => {
         await openAddEvaluator(page);
-        await page.getByPlaceholder("e.g. Gives the correct vaccination schedule").fill(d.evaluators[0].name);
+        await page.getByPlaceholder("e.g. Gives the correct vaccination schedule").fill(d.evaluators[0].reply_name);
       },
       waitFor: text("Set the labels shown for Yes/No across the task"),
     },
@@ -572,7 +572,7 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       path: "/agent-evaluators",
       action: async (page) => {
         await openAddEvaluator(page);
-        await page.getByPlaceholder("e.g. Gives the correct vaccination schedule").fill(d.evaluators[1].name);
+        await page.getByPlaceholder("e.g. Gives the correct vaccination schedule").fill(d.evaluators[1].reply_name);
         await page.getByRole("button", { name: /^rating$/i }).click();
       },
       waitFor: button("Add row"),
@@ -667,6 +667,7 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
         const t = d.tests[1];
         await click("Add item")(page);
         await page.getByPlaceholder("Your item name").fill(t.name);
+        await page.getByPlaceholder("Mother asks when her baby's next vaccine is due").fill(t.criteria!);
         // The window opens on a four-turn sample; keep one exchange.
         await page.getByLabel("Remove message").first().click();
         await page.getByLabel("Remove message").first().click();
