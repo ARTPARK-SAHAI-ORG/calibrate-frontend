@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Link } from "@/lib/nav";
+import { useAuth } from "@/hooks/useAccessToken";
 
 type LandingHeaderProps = {
   /** Whether the logo should link to / (for non-home pages) */
@@ -23,6 +24,7 @@ export function LandingHeader({
   talkToUsHref = "#join-community",
 }: LandingHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { isAuthenticated } = useAuth();
 
   const navLinks: NavLink[] = [
     { label: "Why Calibrate?", href: "/#why-calibrate" },
@@ -127,10 +129,10 @@ export function LandingHeader({
           Talk to us
         </a>
         <Link
-          href="/login"
+          href={isAuthenticated ? "/agents" : "/login"}
           className="whitespace-nowrap px-4 md:px-5 py-2 bg-black text-white text-sm md:text-base font-medium rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
         >
-          Get started
+          {isAuthenticated ? "Go to app" : "Get started"}
         </Link>
         <button
           type="button"
