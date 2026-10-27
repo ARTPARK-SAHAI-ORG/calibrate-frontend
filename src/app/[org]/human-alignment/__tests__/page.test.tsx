@@ -86,7 +86,7 @@ jest.mock("../../../../lib/api", () => ({
   ...jest.requireActual("../../../../lib/api"),
   apiClient: (endpoint: string) =>
     Promise.resolve(
-      endpoint.startsWith("/annotation-agreement")
+      endpoint === "/annotation-agreement"
         ? (mockAgreement ?? AGREEMENT)
         : endpoint === "/annotators"
           ? ANNOTATORS

@@ -255,7 +255,7 @@ function HumanLabellingPageInner() {
     try {
       const endpoint =
         selectedTaskId === ALL_TASKS
-          ? "/annotation-agreement/trend"
+          ? "/annotation-agreement"
           : `/annotation-tasks/${encodeURIComponent(selectedTaskId)}/agreement`;
       const data = await apiClient<TaskAgreementResponse>(endpoint, accessToken);
       setAgreement(data);
