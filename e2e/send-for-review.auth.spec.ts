@@ -244,6 +244,8 @@ test.describe("Send for review (authenticated, real backend)", () => {
     );
     await waitForOrgReady(page);
 
+    // A finished run opens on its Summary; the items are on their own tab.
+    await page.getByRole("button", { name: "Items (3)" }).click({ timeout: 30000 });
     await expect(
       page.getByRole("button", { name: "Send for review 3" }),
     ).toBeVisible({ timeout: 30000 });
@@ -296,12 +298,18 @@ test.describe("Send for review (authenticated, real backend)", () => {
       { method: "PATCH", body: { is_public: true } },
     );
 
+    const runUrl = `/public/annotation-eval/${runShare.share_token}`;
     for (const url of [
       `/annotate-job/${seeded.jobToken}`,
       `/public/annotation-jobs/view/${jobShare.view_token}`,
-      `/public/annotation-eval/${runShare.share_token}`,
+      runUrl,
     ]) {
       await page.goto(url);
+      // The finished run opens on its Summary; the items are on their own tab.
+      if (url === runUrl)
+        await page
+          .getByRole("button", { name: "Items (3)" })
+          .click({ timeout: 45000 });
       // Wait for the items to be on screen, so "no button" is a real absence
       // and not a page that had not loaded yet.
       await expect(page.getByText("Item 1 of 3")).toBeVisible({

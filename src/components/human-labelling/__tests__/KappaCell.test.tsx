@@ -1,7 +1,20 @@
-import { render, screen, setupUser } from "@/test-utils";
+import { fireEvent, render, screen, setupUser } from "@/test-utils";
 import { KappaCell } from "../KappaCell";
 
 describe("KappaCell", () => {
+  it("does not follow the row's link when its info icon is clicked", () => {
+    const openRow = jest.fn();
+    render(
+      <a onClick={openRow}>
+        <KappaCell fields={{ kappa: 0.4, kappa_type: "cohen" }} />
+      </a>,
+    );
+    const icon = screen.getByRole("button", { name: "Cohen's kappa" });
+    // fireEvent returns false when the click's default was cancelled.
+    expect(fireEvent.click(icon)).toBe(false);
+    expect(openRow).not.toHaveBeenCalled();
+  });
+
   it("shows only the kappa, with its kind on hover of the info icon", async () => {
     const user = setupUser();
     render(<KappaCell fields={{ kappa: 0.4267, kappa_type: "fleiss" }} />);

@@ -27,6 +27,12 @@ jest.mock("../../../../hooks", () => ({
   useAccessToken: () => "test-token",
 }));
 
+// A stand-in, so the Overview test can tell whether the chart is drawn.
+jest.mock("../../../../components/charts/AgreementTrendChart", () => ({
+  AgreementTrendChart: () => <div data-testid="trend-chart" />,
+  TrendHoverBox: () => null,
+}));
+
 let mockAgreement: unknown = null;
 let mockTasks: unknown[] = [];
 
@@ -92,7 +98,7 @@ jest.mock("../../../../lib/api", () => ({
 
 import HumanLabellingPage from "../page";
 
-it("shows the overall numbers as neutral pill cards, and the plain-words subtitle", async () => {
+it("shows the overall numbers as neutral pill cards, the plain-words subtitle, and no chart", async () => {
   render(<HumanLabellingPage />);
   expect(
     await screen.findByText(
@@ -117,6 +123,7 @@ it("shows the overall numbers as neutral pill cards, and the plain-words subtitl
     "Evaluator agreement with humans—",
   );
   expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("trend-chart")).not.toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "Tone" }).length).toBeGreaterThan(0);
   expect(screen.queryByRole("button", { name: "Ghost" })).not.toBeInTheDocument();
 });

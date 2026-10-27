@@ -1,4 +1,5 @@
 import { Tooltip } from "@/components/Tooltip";
+import { PILL } from "@/components/human-labelling/EvaluatorNamePill";
 import {
   formatKappa,
   kappaBlank,
@@ -6,18 +7,20 @@ import {
   type KappaFields,
 } from "@/lib/agreementKappa";
 
-export const agreementStatPillBase =
-  "inline-flex items-center max-w-full min-w-0 px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground";
-
-/** An (i) button whose hover shows `content`, which is also its
- * name for a screen reader. */
+/** An (i) whose hover shows `content`, which is also its name for a screen
+ * reader. It often sits inside a link (a row that opens an annotator), so it
+ * is not a nested button, and a click on it does not follow the link. */
 export function KappaInfoIcon({ content }: { content: string }) {
   return (
     <Tooltip content={content}>
-      <button
-        type="button"
-        className="p-1 rounded-md hover:bg-muted transition-colors cursor-pointer"
+      <span
+        role="button"
+        className="inline-block p-1 rounded-md hover:bg-muted transition-colors cursor-pointer"
         aria-label={content}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
       >
         <svg
           className="w-4 h-4 text-muted-foreground"
@@ -32,7 +35,7 @@ export function KappaInfoIcon({ content }: { content: string }) {
             d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-      </button>
+      </span>
     </Tooltip>
   );
 }
@@ -41,7 +44,7 @@ export function KappaInfoIcon({ content }: { content: string }) {
 function KappaReasonPill({ blank }: { blank: { text: string; help: string } }) {
   return (
     <span className="inline-flex items-center gap-1.5 align-middle">
-      <span className={`${agreementStatPillBase} cursor-default`}>
+      <span className={`${PILL} max-w-full min-w-0 cursor-default`}>
         {blank.text}
       </span>
       <KappaInfoIcon content={blank.help} />

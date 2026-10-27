@@ -15,6 +15,7 @@ import {
   useSearchParams,
 } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
+import { TabRow } from "@/components/ui/TabRow";
 import { Tooltip } from "@/components/Tooltip";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { EmptyState } from "@/components/ui/LoadingState";
@@ -23,9 +24,8 @@ import { useAccessToken, usePageErrorState } from "@/hooks";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
-import type { KappaByKind } from "@/lib/agreementKappa";
+import type { KappaByKindFields } from "@/lib/agreementKappa";
 import { AgreementByKindCard } from "@/components/human-labelling/AgreementOverviewTable";
-import { ChanceLegend } from "@/components/human-labelling/AgreementStatCard";
 
 type Tab = "overview" | "jobs";
 
@@ -42,12 +42,10 @@ type Annotator = {
   updated_at?: string;
 };
 
-type AnnotatorStats = {
+type AnnotatorStats = KappaByKindFields & {
   current_agreement: number | null;
   pair_count: number;
   jobs_count: number;
-  /** Kappa for each kind of answer the annotator was compared on. */
-  kappa_by_kind?: KappaByKind[];
 };
 
 type AnnotatorJob = {
@@ -81,6 +79,34 @@ function parseApiError(err: unknown, fallback: string): string {
     return match[1];
   }
   return err.message || fallback;
+}
+
+/** The spinner both tabs show while the annotator loads. */
+function loadingRow(text: string) {
+  return (
+    <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+      <svg
+        className="w-4 h-4 animate-spin"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        />
+      </svg>
+      {text}
+    </div>
+  );
 }
 
 export default function AnnotatorDetailPage() {
@@ -302,27 +328,17 @@ function AnnotatorDetailPageInner() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-border flex items-center gap-1">
-          {[
-            { id: "overview" as Tab, label: "Overview" },
+        <TabRow<Tab>
+          tabs={[
+            { id: "overview", label: "Overview" },
             {
-              id: "jobs" as Tab,
+              id: "jobs",
               label: jobsCount > 0 ? `Jobs (${jobsCount})` : "Jobs",
             },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => handleTabChange(t.id)}
-              className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors cursor-pointer ${
-                activeTab === t.id
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+          ]}
+          active={activeTab}
+          onChange={handleTabChange}
+        />
 
         {activeTab === "overview" && (
           <div className="space-y-4 md:space-y-6">
@@ -332,49 +348,31 @@ function AnnotatorDetailPageInner() {
               </div>
             )}
 
-            <div>
-              <h3 className="text-sm font-semibold">
-                Agreement with other annotators
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                How often this annotator&apos;s labels match other
-                annotators&apos; labels on the same items
-              </p>
-            </div>
-            {stats?.kappa_by_kind?.some((k) => k.agreement != null) && (
-              <ChanceLegend />
+            {detailLoading || !detailFetchCompleted ? (
+              loadingRow("Loading agreement")
+            ) : detailError ? null : (
+              <>
+                <div>
+                  <h3 className="text-sm font-semibold">
+                    Agreement with other annotators
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    How often this annotator&apos;s labels match other
+                    annotators&apos; labels on the same items
+                  </p>
+                </div>
+                <AgreementByKindCard
+                  overall={stats?.current_agreement}
+                  kinds={stats?.kappa_by_kind}
+                />
+              </>
             )}
-            <AgreementByKindCard
-              overall={stats?.current_agreement}
-              kinds={stats?.kappa_by_kind}
-            />
           </div>
         )}
 
         {activeTab === "jobs" &&
           (detailLoading || !detailFetchCompleted ? (
-            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-              <svg
-                className="w-4 h-4 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Loading jobs
-            </div>
+            loadingRow("Loading jobs")
           ) : jobs.length === 0 ? (
             <EmptyState
               icon={

@@ -77,32 +77,19 @@ jest.mock(
 // the Agreement tab asks it to draw.
 jest.mock("../../../../../components/charts/AgreementTrendChart", () => ({
   AgreementTrendChart: ({
-    series,
+    points,
     renderHover,
-    xAxisProps,
   }: {
-    series: {
-      name: string;
-      kappaName?: string;
-      points: { key: string; label: string }[];
-    }[];
+    points: { key: string; label: string; agreement: number | null; live?: boolean }[];
     renderHover?: (key: string, label: string) => React.ReactNode;
-    xAxisProps?: {
-      tick?: (p: { x: number; y: number; payload: { value: string } }) => React.ReactNode;
-    };
   }) => (
     <div data-testid="trend-chart">
-      <svg data-testid="ticks">
-        {series[0].points.map((p) => (
-          <g key={p.key} data-testid={`tick-${p.label}`}>
-            {xAxisProps?.tick?.({ x: 0, y: 0, payload: { value: p.label } })}
-          </g>
-        ))}
-      </svg>
-      <span data-testid="line-names">
-        {series.map((s) => [s.name, s.kappaName].filter(Boolean).join(", ")).join("; ")}
+      <span data-testid="trend-points">
+        {points
+          .map((p) => `${p.label} ${p.agreement}${p.live ? " live" : ""}`)
+          .join("; ")}
       </span>
-      {series[0].points.map((p) => (
+      {points.map((p) => (
         <div key={p.key} data-testid={`hover-${p.key}`}>
           {renderHover?.(p.key, p.label)}
         </div>
@@ -624,19 +611,9 @@ describe("the Agreement tab", () => {
       }),
     ) as unknown as typeof fetch;
     render(<EvaluatorDetailPage />);
-    // The page already names the evaluator, so the lines are named plainly.
-    expect(await screen.findByTestId("line-names")).toHaveTextContent(
-      /^Agreement, Kappa$/,
+    expect(await screen.findByTestId("trend-points")).toHaveTextContent(
+      /^v1 0.8 live$/,
     );
-    // "Live" sits on the version's own line, just to the right of it.
-    const tick = screen.getByTestId("tick-v1");
-    const [version, live] = [...tick.querySelectorAll("text")];
-    expect([version.textContent, live.textContent]).toEqual(["v1", "Live"]);
-    expect(version.getAttribute("text-anchor")).toBe("end");
-    expect(Number(live.getAttribute("y"))).toBe(
-      Number(version.getAttribute("y")) + Number(version.getAttribute("dy")),
-    );
-    expect(Number(live.getAttribute("x"))).toBeGreaterThan(0);
     const hover = screen.getByTestId("hover-ver-1");
     expect(within(hover).getByTestId("hover-label")).toHaveTextContent("v1Live");
     expect(hover).toHaveTextContent("80%Kappa0.50");
@@ -651,7 +628,7 @@ describe("the Agreement tab", () => {
     expect(within(hover).getByTestId("agreement-fill").style.width).toBe("80%");
     expect(
       (global.fetch as jest.Mock).mock.calls.some(([url]) =>
-        /\/trend\?bucket=week&days=90/.test(String(url)),
+        /\/trend\?$/.test(String(url)),
       ),
     ).toBe(true);
   });

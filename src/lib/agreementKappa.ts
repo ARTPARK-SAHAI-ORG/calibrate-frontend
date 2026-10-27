@@ -6,6 +6,19 @@ type KappaType =
 
 export type AnswerKind = "binary" | "rating";
 
+/** Binary first, as every list of kinds shows them. */
+export const ANSWER_KINDS: AnswerKind[] = ["binary", "rating"];
+
+/** An agreement fraction as a whole percent, the number every bar and label
+ * shows, so a colour picked from it never contradicts the text. */
+export function percentOf(fraction: number): number {
+  return Math.round(fraction * 100);
+}
+
+export function formatAgreement(fraction: number): string {
+  return `${percentOf(fraction)}%`;
+}
+
 /** One kind of answer's kappa, for a number that covers both kinds. */
 export type KappaByKind = KappaFields & {
   answer_kind: AnswerKind;
@@ -13,6 +26,16 @@ export type KappaByKind = KappaFields & {
   agreement?: number | null;
   pair_count?: number;
 };
+
+/** An annotator's kappa for each kind of answer they were compared on. */
+export type KappaByKindFields = { kappa_by_kind?: KappaByKind[] };
+
+export function kappaForKind(
+  kinds: readonly KappaByKind[] | null | undefined,
+  kind: AnswerKind,
+): KappaByKind | undefined {
+  return kinds?.find((k) => k.answer_kind === kind);
+}
 
 /** Rating answers are compared with a linear weighted kappa, pass/fail
  * answers with a plain one. Null when there is no kind to go by. */
@@ -77,65 +100,32 @@ export function formatKappa(kappa: number): string {
   return text === "-0.00" ? "0.00" : text;
 }
 
-export type TrendSeries = {
+/** One point on the agreement trend: a version, with its agreement and kappa. */
+export type TrendPoint = {
   key: string;
-  /** Legend name of the agreement line. */
-  name: string;
-  /** Legend name of the kappa line. */
-  kappaName: string;
-  color: string;
-  kappaColor: string;
-  /** `key` tells points apart, since two points can share a label. */
-  points: ({
-    key: string;
-    label: string;
-    agreement: number | null;
-  } & KappaFields)[];
-};
-
-type TrendLine = {
-  dataKey: string;
-  name: string;
-  color: string;
-  kappa: boolean;
-};
+  label: string;
+  agreement: number | null;
+  /** The live version, marked on the axis. */
+  live?: boolean;
+} & KappaFields;
 
 /**
- * Every agreement number and its kappa as lines for one chart. Agreement is
- * a percentage; kappa keeps its own -1 to 1 scale, which drops below 0 only
- * when some kappa does. The kappa line is listed even before any point has
- * a kappa, and a point with no kappa has no kappa dot.
+ * The chart rows for agreement and kappa over time. Agreement is a whole
+ * percent; kappa keeps its own -1 to 1 scale, which drops below 0 only when
+ * some kappa does. A point with no kappa has no kappa dot.
  */
-export function buildTrendChart(series: TrendSeries[]): {
-  data: Record<string, string | number | null>[];
-  lines: TrendLine[];
+export function buildTrendChart(points: readonly TrendPoint[]): {
+  data: { key: string; label: string; agreement: number | null; kappa: number | null }[];
   kappaDomain: [number, number];
 } {
-  const rows = new Map<string, Record<string, string | number | null>>();
-  const lines: TrendLine[] = [];
-  let negative = false;
-  for (const s of series) {
-    const kappaKey = `${s.key}__kappa`;
-    if (s.points.some((p) => p.agreement != null)) {
-      lines.push({ dataKey: s.key, name: s.name, color: s.color, kappa: false });
-    }
-    lines.push({
-      dataKey: kappaKey,
-      name: s.kappaName,
-      color: s.kappaColor,
-      kappa: true,
-    });
-    for (const p of s.points) {
-      const row = rows.get(p.key) ?? { key: p.key, label: p.label };
-      rows.set(p.key, row);
-      row[s.key] = p.agreement == null ? null : Math.round(p.agreement * 100);
-      row[kappaKey] = p.kappa ?? null;
-      if (p.kappa != null && Number(formatKappa(p.kappa)) < 0) negative = true;
-    }
-  }
-  return {
-    data: [...rows.values()],
-    lines,
-    kappaDomain: [negative ? -1 : 0, 1],
-  };
+  const data = points.map((p) => ({
+    key: p.key,
+    label: p.label,
+    agreement: p.agreement == null ? null : percentOf(p.agreement),
+    kappa: p.kappa ?? null,
+  }));
+  const negative = points.some(
+    (p) => p.kappa != null && Number(formatKappa(p.kappa)) < 0,
+  );
+  return { data, kappaDomain: [negative ? -1 : 0, 1] };
 }

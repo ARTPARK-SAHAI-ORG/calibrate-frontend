@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Link, replaceUrl, useRouter, useSearchParams } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
+import { TabRow } from "@/components/ui/TabRow";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { EvaluatorTypePill } from "@/components/EvaluatorPills";
@@ -26,22 +27,28 @@ import { apiClient, unwrapList } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import { taskOptionsWithAgreement } from "./taskOptions";
 import {
+  ANSWER_KINDS,
+  formatAgreement,
+  kappaForKind,
   type AnswerKind,
-  type KappaByKind,
+  type KappaByKindFields,
 } from "@/lib/agreementKappa";
 import {
   KappaCell,
   KappaInfoIcon,
 } from "@/components/human-labelling/KappaCell";
-import { AgreementOverviewSection } from "@/components/human-labelling/AgreementOverviewTable";
-import type {
-  AgreementGroup,
-  EvaluatorAgreement,
+import {
+  AgreementOverviewSection,
+  DASH,
+} from "@/components/human-labelling/AgreementOverviewTable";
+import {
+  hasAgreementData,
+  type TaskAgreementResponse,
 } from "@/lib/taskOverviewData";
 
 type Tab = "overview" | "tasks" | "annotators";
 
-type Annotator = {
+type Annotator = KappaByKindFields & {
   uuid: string;
   name: string;
   created_at?: string;
@@ -49,8 +56,6 @@ type Annotator = {
   jobs_count?: number;
   current_agreement?: number | null;
   pair_count?: number | null;
-  /** Kappa for each kind of answer the annotator was compared on. */
-  kappa_by_kind?: KappaByKind[];
 };
 
 function parseApiError(err: unknown, fallback: string): string {
@@ -99,15 +104,6 @@ type LabellingTask = {
   has_agreement?: boolean;
 };
 
-type AgreementResponse = {
-  task_id?: string;
-  /** Overall agreement between annotators. */
-  human_human: AgreementGroup;
-  /** Overall agreement between evaluators and humans. */
-  evaluators_with_humans?: AgreementGroup | null;
-  evaluators: EvaluatorAgreement[];
-};
-
 const ALL_TASKS = "all";
 
 const taskHref = (uuid: string) => `/human-alignment/tasks/${uuid}`;
@@ -116,7 +112,6 @@ const TABS: Tab[] = ["overview", "tasks", "annotators"];
 
 const ANNOTATOR_GRID =
   "grid grid-cols-[minmax(0,1fr)_80px_170px_minmax(0,1fr)_minmax(0,1fr)_88px] gap-4 px-4";
-const ANSWER_KINDS: AnswerKind[] = ["binary", "rating"];
 const KIND_KAPPA_COLUMNS: Record<AnswerKind, { title: string; help: string }> =
   {
     binary: {
@@ -128,7 +123,6 @@ const KIND_KAPPA_COLUMNS: Record<AnswerKind, { title: string; help: string }> =
       help: "Agreement with the other annotators on rating-style labels, after removing what chance alone would produce. Close ratings get partial credit. 1 is full agreement, 0 is no better than chance, below 0 is worse than chance",
     },
   };
-const MUTED_DASH = <span className="text-sm text-muted-foreground">—</span>;
 
 function isTab(value: string | null): value is Tab {
   return !!value && (TABS as string[]).includes(value);
@@ -187,7 +181,7 @@ function HumanLabellingPageInner() {
   const [taskToDelete, setTaskToDelete] = useState<LabellingTask | null>(null);
   const [isDeletingTask, setIsDeletingTask] = useState(false);
 
-  const [agreement, setAgreement] = useState<AgreementResponse | null>(null);
+  const [agreement, setAgreement] = useState<TaskAgreementResponse | null>(null);
   const [agreementLoading, setAgreementLoading] = useState(false);
   const [agreementError, setAgreementError] = useState<string | null>(null);
   /** False until the first agreement request for the current overview session finishes (avoids empty placeholder flash). */
@@ -263,7 +257,7 @@ function HumanLabellingPageInner() {
         selectedTaskId === ALL_TASKS
           ? "/annotation-agreement/trend"
           : `/annotation-tasks/${encodeURIComponent(selectedTaskId)}/agreement`;
-      const data = await apiClient<AgreementResponse>(endpoint, accessToken);
+      const data = await apiClient<TaskAgreementResponse>(endpoint, accessToken);
       setAgreement(data);
     } catch (err) {
       setAgreementError(parseApiError(err, "Failed to load agreement"));
@@ -377,19 +371,9 @@ function HumanLabellingPageInner() {
     a.name.toLowerCase().includes(annotatorSearch.trim().toLowerCase()),
   );
 
-  /**
-   * Mirrors the `hasNoAgreementData` check inside <AgreementOverview/>: true
-   * when there are no human-human pairs and no evaluator pairs to show.
-   * Lifted here so we can auto-switch off the Overview tab when it would
-   * render an empty state.
-   */
-  const overviewIsEmpty =
-    !agreement ||
-    ((agreement.human_human?.current ?? null) == null &&
-      (agreement.human_human?.pair_count ?? 0) === 0 &&
-      (agreement.evaluators ?? []).every(
-        (e) => (e.current ?? null) == null && (e.pair_count ?? 0) === 0,
-      ));
+  // Lets the page switch off the Overview tab when it would show only its
+  // empty state.
+  const overviewIsEmpty = !hasAgreementData(agreement);
 
   /**
    * On a fresh visit to `/human-alignment` (no explicit `?tab=...`), skip
@@ -444,34 +428,24 @@ function HumanLabellingPageInner() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-border flex items-center gap-1">
-          {[
-            { id: "overview" as Tab, label: "Overview" },
+        <TabRow<Tab>
+          tabs={[
+            { id: "overview", label: "Overview" },
             {
-              id: "tasks" as Tab,
+              id: "tasks",
               label: tasksCount > 0 ? `Tasks (${tasksCount})` : "Tasks",
             },
             {
-              id: "annotators" as Tab,
+              id: "annotators",
               label:
                 annotatorsCount > 0
                   ? `Annotators (${annotatorsCount})`
                   : "Annotators",
             },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => handleTabChange(t.id)}
-              className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors cursor-pointer ${
-                activeTab === t.id
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+          ]}
+          active={activeTab}
+          onChange={handleTabChange}
+        />
 
         {/* Tab Content */}
         {activeTab === "overview" && (
@@ -872,14 +846,15 @@ function HumanLabellingPageInner() {
                         {cell(
                           "flex items-center py-3 text-sm font-semibold tabular-nums text-foreground",
                           agreement != null ? (
-                            <span>{Math.round(agreement * 100)}%</span>
+                            <span>{formatAgreement(agreement)}</span>
                           ) : (
-                            MUTED_DASH
+                            DASH
                           ),
                         )}
                         {ANSWER_KINDS.map((kind) => {
-                          const entry = annotator.kappa_by_kind?.find(
-                            (k) => k.answer_kind === kind,
+                          const entry = kappaForKind(
+                            annotator.kappa_by_kind,
+                            kind,
                           );
                           return (
                             <Fragment key={kind}>
@@ -888,7 +863,7 @@ function HumanLabellingPageInner() {
                                 entry ? (
                                   <KappaCell fields={entry} />
                                 ) : (
-                                  MUTED_DASH
+                                  DASH
                                 ),
                               )}
                             </Fragment>
@@ -1050,7 +1025,7 @@ function HumanLabellingPageInner() {
                           {" · "}
                           {agreement != null ? (
                             <span className="font-semibold tabular-nums text-foreground">
-                              {Math.round(agreement * 100)}% agreement with
+                              {formatAgreement(agreement)} agreement with
                               others
                             </span>
                           ) : (
@@ -1058,8 +1033,9 @@ function HumanLabellingPageInner() {
                           )}
                         </div>
                         {ANSWER_KINDS.map((kind) => {
-                          const entry = annotator.kappa_by_kind?.find(
-                            (k) => k.answer_kind === kind,
+                          const entry = kappaForKind(
+                            annotator.kappa_by_kind,
+                            kind,
                           );
                           return (
                             <div
@@ -1251,7 +1227,7 @@ function AgreementOverview({
   taskOptions,
   tasks,
 }: {
-  agreement: AgreementResponse | null;
+  agreement: TaskAgreementResponse | null;
   agreementLoading: boolean;
   agreementError: string | null;
   selectedTaskId: string;
@@ -1277,16 +1253,7 @@ function AgreementOverview({
     name: string;
   } | null>(null);
 
-  const hasNoAgreementData =
-    (agreement?.human_human?.pair_count ?? 0) === 0 &&
-    (agreement?.evaluators_with_humans?.pair_count ?? 0) === 0 &&
-    (agreement?.evaluators ?? []).every(
-      (ev) =>
-        ev.current == null &&
-        (ev.pair_count ?? 0) === 0 &&
-        ev.inter_annotator?.current == null &&
-        (ev.inter_annotator?.pair_count ?? 0) === 0,
-    );
+  const hasNoAgreementData = !hasAgreementData(agreement);
 
   return (
     <div className="space-y-4 md:space-y-6">

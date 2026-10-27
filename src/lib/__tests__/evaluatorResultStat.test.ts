@@ -13,6 +13,7 @@ describe("formatEvaluatorResultStat", () => {
       label: "Score",
       value: "80%",
       title: "Correct on 8 of 10 items",
+      passLabel: "Correct",
       ratio: 0.8,
     });
   });

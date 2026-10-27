@@ -18,6 +18,7 @@ import {
   toRatingScale,
 } from "@/lib/binaryLabels";
 import type { EvaluatorResultStat } from "@/components/human-labelling/AgreementStatCard";
+import { TabRow } from "@/components/ui/TabRow";
 import {
   EvaluatorRunSummaryTable,
   type RunSummaryRow,
@@ -1686,9 +1687,6 @@ export function EvaluatorRunDetailView({
     };
   }, [job?.evaluators]);
 
-  // Shim that matches the legacy `details.evaluators` shape the rest of
-  // this file consumes — `{ evaluator_id, evaluator_version_id?, name? }`.
-  // Built from the new top-level `job.evaluators[]` payload.
   // The summary is ready once the run has finished. Opening a finished run
   // starts on it; a run that finishes while open keeps the reader on Items.
   const [tab, setTab] = useState<"summary" | "items">(() =>
@@ -1867,16 +1865,16 @@ export function EvaluatorRunDetailView({
     return null;
   }
 
-  // The summary cards (rendered by EvaluatorSummary) already name the
-  // evaluators. When they show, the status pill + action buttons move up onto
-  // the "Evaluator results" heading row instead of sitting on their own line.
-  const cardsWillRender =
+  // Once the run has finished its summary names the evaluators, so the status
+  // pill and the action buttons move up onto the "Evaluator results" heading
+  // row instead of sitting on their own line.
+  const summaryReady =
     job.status === "completed" && detailsEvaluators.length > 0;
 
   const agreementByEvaluator = new Map(
     (job.human_agreement?.evaluators ?? []).map((e) => [e.evaluator_id, e]),
   );
-  const summaryRows: RunSummaryRow[] = cardsWillRender
+  const summaryRows: RunSummaryRow[] = summaryReady
     ? detailsEvaluators.map((ev) => {
         const row = agreementByEvaluator.get(ev.evaluator_id);
         const versionId = row?.evaluator_version_id ?? ev.evaluator_version_id;
@@ -1927,7 +1925,7 @@ export function EvaluatorRunDetailView({
 
   return (
     <>
-      {!cardsWillRender && (
+      {!summaryReady && (
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             {detailsEvaluators.length === 0 ? (
@@ -1990,35 +1988,24 @@ export function EvaluatorRunDetailView({
         </ErrorNote>
       )}
 
-      {cardsWillRender && (
+      {summaryReady && (
         <>
           <EvaluatorResultsHeading
             headerActions={headerActions}
             statusPill={statusPill}
           />
-          <div className="border-b border-border flex items-center gap-1">
-            {[
-              { id: "summary" as const, label: "Summary" },
-              { id: "items" as const, label: `Items (${itemsForRun.length})` },
-            ].map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors cursor-pointer ${
-                  tab === t.id
-                    ? "border-foreground text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+          <TabRow
+            tabs={[
+              { id: "summary", label: "Summary" },
+              { id: "items", label: `Items (${itemsForRun.length})` },
+            ]}
+            active={tab}
+            onChange={setTab}
+          />
         </>
       )}
 
-      {cardsWillRender && tab === "summary" ? (
+      {summaryReady && tab === "summary" ? (
         <div className="space-y-4">
           <EvaluatorRunSummaryTable
             rows={summaryRows}

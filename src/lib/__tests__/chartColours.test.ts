@@ -48,6 +48,13 @@ describe.each([":root", ".dark"])("chart colours in %s", (selector) => {
       expect(contrast(hex, theme.background)).toBeGreaterThanOrEqual(4.5);
   });
 
+  // Green means "better than chance" in the chance legend, so the kappa
+  // line (chart-1) must not read as green.
+  it("keeps the kappa line colour out of the green the legend uses", () => {
+    const [r, g, b] = rgb(theme["chart-1"]);
+    expect(g).toBeLessThan(Math.max(r, b));
+  });
+
   it("keeps every two line colours far enough apart to tell apart", () => {
     for (const [i, [, a]] of lines.entries())
       for (const [, b] of lines.slice(i + 1))

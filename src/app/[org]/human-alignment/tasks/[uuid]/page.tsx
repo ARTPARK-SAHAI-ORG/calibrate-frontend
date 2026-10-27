@@ -27,6 +27,7 @@ import {
   type TestConfig,
 } from "@/components/AddTestDialog";
 import { AppLayout } from "@/components/AppLayout";
+import { TabRow } from "@/components/ui/TabRow";
 import {
   ExportResultsButton,
   type ExportColumn,
@@ -72,6 +73,7 @@ import type { EvaluatorResultStat } from "@/components/human-labelling/Agreement
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
+  type TaskAgreementResponse,
   hasTaskOverviewData,
   hasReliabilityNumber,
   taskEvaluatorScoreCards,
@@ -107,45 +109,8 @@ import {
   readEvaluatorVariables,
 } from "@/lib/labellingItem";
 import { parseBackendTime } from "@/lib/relativeTime";
-import type { KappaFields } from "@/lib/agreementKappa";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
-
-type AgreementBlock = {
-  current: number | null;
-  pair_count: number;
-};
-
-type TaskAgreementResponse = {
-  /** Overall agreement between annotators. */
-  human_human: AgreementBlock;
-  /** Overall agreement between evaluators and humans. */
-  evaluators_with_humans?: AgreementBlock | null;
-  evaluators: (AgreementBlock &
-    KappaFields & {
-    /** How well annotators agree with each other on this evaluator's items. */
-    inter_annotator?: (AgreementBlock & KappaFields) | null;
-    evaluator_id: string;
-    name: string;
-    /** The evaluator's own rolled-up output across every item in the task,
-     * independent of any human labels. `count` is the number of items it
-     * produced a value for; a binary evaluator fills `true_count`, a rating
-     * evaluator fills `mean`. Absent when it has not run on anything. */
-    result?: {
-      count: number;
-      true_count?: number | null;
-      mean?: number | null;
-    } | null;
-    /** The same rolled-up numbers, taken from the labels annotators gave on
-     * this evaluator instead of from the evaluator's own output. Absent when
-     * nobody has labelled for it yet. */
-    human_result?: {
-      count: number;
-      true_count?: number | null;
-      mean?: number | null;
-    } | null;
-  })[];
-};
 
 // Denormalized one-row-per-(item × linked evaluator) view from
 // /annotation-tasks/{uuid}/summary. `annotators[]` provides the column
@@ -2810,43 +2775,33 @@ function LabellingTaskPageInner() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-border flex items-center gap-1">
-          {[
-            { id: "overview" as Tab, label: "Overview" },
+        <TabRow<Tab>
+          tabs={[
+            { id: "overview", label: "Overview" },
             {
-              id: "items" as Tab,
+              id: "items",
               // No count here: "Dataset (42)" reads as 42 datasets. The number
               // sits above the rows instead, where it says what it counts.
               label: "Dataset",
             },
             {
-              id: "jobs" as Tab,
+              id: "jobs",
               label:
                 jobsCount > 0
                   ? `Labelling jobs (${jobsCount})`
                   : "Labelling jobs",
             },
             {
-              id: "runs" as Tab,
+              id: "runs",
               label:
                 runs.length > 0
                   ? `Evaluation runs (${runs.length})`
                   : "Evaluation runs",
             },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => handleTabChange(t.id)}
-              className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition-colors cursor-pointer ${
-                activeTab === t.id
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+          ]}
+          active={activeTab}
+          onChange={handleTabChange}
+        />
 
         {activeTab === "overview" && (
           <div className="space-y-4 md:space-y-6">

@@ -4,7 +4,10 @@ import {
   formatKappa,
   kappaBlank,
   kappaLabel,
-  type TrendSeries,
+  formatAgreement,
+  kappaForKind,
+  percentOf,
+  type TrendPoint,
 } from "../agreementKappa";
 
 describe("kappaLabel", () => {
@@ -63,64 +66,51 @@ describe("kappaBlank", () => {
   });
 });
 
-const versions = (
-  points: { agreement: number | null; kappa?: number | null }[],
-): TrendSeries[] => [
-  {
-    key: "agreement",
-    name: "Agreement",
-    kappaName: "Kappa",
-    color: "#111",
-    kappaColor: "#222",
-    points: points.map((p, i) => ({
-      key: `v${i + 1}`,
-      label: `v${i + 1}`,
-      agreement: p.agreement,
-      kappa: p.kappa ?? null,
-      kappa_type: "cohen" as const,
-    })),
-  },
-];
+const point = (
+  i: number,
+  agreement: number | null,
+  kappa: number | null = null,
+): TrendPoint => ({
+  key: `v${i}`,
+  label: `v${i}`,
+  agreement,
+  kappa,
+  kappa_type: "cohen",
+});
 
 describe("buildTrendChart", () => {
-  it("puts agreement as a percentage and kappa beside it for each point", () => {
-    const { data, lines, kappaDomain } = buildTrendChart(
-      versions([
-        { agreement: 0.8, kappa: 0.5 },
-        { agreement: 0.6, kappa: null },
-      ]),
-    );
-    expect(lines).toEqual([
-      { dataKey: "agreement", name: "Agreement", color: "#111", kappa: false },
-      { dataKey: "agreement__kappa", name: "Kappa", color: "#222", kappa: true },
+  it("puts agreement as a whole percent and kappa beside it for each point", () => {
+    const { data, kappaDomain } = buildTrendChart([
+      point(1, 0.8, 0.5),
+      point(2, 0.6),
     ]);
     expect(data).toEqual([
-      { key: "v1", label: "v1", agreement: 80, agreement__kappa: 0.5 },
-      { key: "v2", label: "v2", agreement: 60, agreement__kappa: null },
+      { key: "v1", label: "v1", agreement: 80, kappa: 0.5 },
+      { key: "v2", label: "v2", agreement: 60, kappa: null },
     ]);
     expect(kappaDomain).toEqual([0, 1]);
   });
 
-  it("lists the kappa line even before any point has a kappa", () => {
-    expect(
-      buildTrendChart(versions([{ agreement: 0.5 }])).lines.map((l) => l.name),
-    ).toEqual(["Agreement", "Kappa"]);
-  });
-
-  it("leaves out the agreement line when no point has agreement", () => {
-    expect(
-      buildTrendChart(versions([{ agreement: null }])).lines.map((l) => l.name),
-    ).toEqual(["Kappa"]);
-  });
-
   it("takes the kappa axis below 0 only when a kappa shows as below 0", () => {
-    expect(
-      buildTrendChart(versions([{ agreement: 0.4, kappa: -0.2 }])).kappaDomain,
-    ).toEqual([-1, 1]);
-    expect(
-      buildTrendChart(versions([{ agreement: 0.4, kappa: -0.004 }]))
-        .kappaDomain,
-    ).toEqual([0, 1]);
+    expect(buildTrendChart([point(1, 0.4, -0.2)]).kappaDomain).toEqual([-1, 1]);
+    expect(buildTrendChart([point(1, 0.4, -0.004)]).kappaDomain).toEqual([0, 1]);
+  });
+});
+
+describe("formatAgreement", () => {
+  it("shows a fraction as a whole percent", () => {
+    expect(formatAgreement(0.456)).toBe("46%");
+    expect(formatAgreement(1)).toBe("100%");
+    expect(percentOf(0.004)).toBe(0);
+  });
+});
+
+describe("kappaForKind", () => {
+  it("finds the entry for one kind of answer", () => {
+    const binary = { answer_kind: "binary" as const, kappa: 0.2 };
+    expect(kappaForKind([binary], "binary")).toBe(binary);
+    expect(kappaForKind([binary], "rating")).toBeUndefined();
+    expect(kappaForKind(undefined, "binary")).toBeUndefined();
   });
 });
 

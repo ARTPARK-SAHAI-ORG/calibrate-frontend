@@ -48,9 +48,12 @@ function renderTable(onSort = jest.fn(), onOpenEvaluator = jest.fn()) {
   render(
     <AgreementOverviewTable
       rows={rows}
-      sortKey="withHumans"
-      sortDir="desc"
-      onSort={onSort}
+      sort={{
+        key: "withHumans",
+        dir: "desc",
+        onToggle: onSort,
+        onPick: jest.fn(),
+      }}
       onOpenEvaluator={onOpenEvaluator}
     />,
   );
@@ -193,9 +196,7 @@ describe("AgreementOverviewTable", () => {
         rows={buildOverviewRows([
           { evaluator_id: "ev-9", name: "New", current: null, pair_count: 0 },
         ])}
-        sortKey="name"
-        sortDir="asc"
-        onSort={jest.fn()}
+        sort={{ key: "name", dir: "asc", onToggle: jest.fn(), onPick: jest.fn() }}
         onOpenEvaluator={jest.fn()}
       />,
     );
@@ -295,6 +296,26 @@ describe("AgreementOverviewSection", () => {
     expect(onOpen).toHaveBeenCalledWith({ uuid: "ev-high", name: "Tone" });
   });
 
+  it("sorts the phone cards from a Sort by picker, which the table hides", async () => {
+    const user = setupUser();
+    render(
+      <AgreementOverviewSection agreement={agreement} onOpenEvaluator={jest.fn()} />,
+    );
+    const picker = screen.getByRole("combobox");
+    expect(picker.closest(".md\\:hidden")).not.toBeNull();
+    expect(
+      [...picker.querySelectorAll("option")].slice(1).map((o) => o.textContent),
+    ).toEqual(["Evaluator", "Inter-annotator agreement", "Evaluator agreement with humans"]);
+    const cardNames = () =>
+      [...document.querySelectorAll(".md\\:hidden > .rounded-xl")].map(
+        (card) => within(card as HTMLElement).getAllByRole("button")[0].textContent,
+      );
+    expect(cardNames()).toEqual(["Tone", "Clarity", "Tool call correctness", "Brevity"]);
+    // The direction already chosen, highest first, carries over.
+    await user.selectOptions(picker, "Evaluator");
+    expect(cardNames()).toEqual(["Tool call correctness", "Tone", "Clarity", "Brevity"]);
+  });
+
   it("leaves out evaluators with nothing to show under All tasks only", () => {
     const { rerender } = render(
       <AgreementOverviewSection
@@ -342,7 +363,7 @@ describe("MeasureCell", () => {
   });
 
   it("has a larger number and more space above the bar in a hover box", () => {
-    render(<MeasureCell group={group} variant="detailed" />);
+    render(<MeasureCell group={group} size="detailed" />);
     expect(screen.getByText("55%").className).toContain("text-base");
     expect(
       screen.getByTestId("agreement-fill").closest(".pt-1"),
@@ -350,10 +371,10 @@ describe("MeasureCell", () => {
   });
 
   it("lays out a card column: large number, bar, then chance and kappa", () => {
-    render(<MeasureCell group={group} variant="card" />);
+    render(<MeasureCell group={group} size="card" />);
     const number = screen.getByText("55%");
     expect(number.className).toContain("text-2xl");
-    const cell = number.parentElement!;
+    const cell = number.closest(".w-full") as HTMLElement;
     const [, barWrap, bottom] = [...cell.children] as HTMLElement[];
     expect(within(barWrap).getByTestId("agreement-fill").style.width).toBe(
       "55%",
@@ -364,7 +385,7 @@ describe("MeasureCell", () => {
 
   it("shows a large muted dash and no bar in a card column with no agreement", () => {
     render(
-      <MeasureCell group={{ current: null, pair_count: 0 }} variant="card" />,
+      <MeasureCell group={{ current: null, pair_count: 0 }} size="card" />,
     );
     const dash = screen.getByText("—");
     expect(dash.className).toContain("text-2xl");

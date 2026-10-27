@@ -601,6 +601,7 @@ describe("summariseEvaluatorRuns", () => {
       label: "Score",
       value: "75%",
       title: "Correct on 3 of 4 items",
+      passLabel: "Correct",
       ratio: 0.75,
     });
   });
@@ -2937,9 +2938,9 @@ describe("EvaluatorRunDetailView summary", () => {
       .closest(".grid") as HTMLElement;
     const cells = [...row.children] as HTMLElement[];
     expect(cells[0]).toHaveTextContent("Binary Evaluatorv1");
-    // Only the value: the column heading already says it is the score.
-    expect(cells[1].textContent).toBe("50%");
-    expect(within(cells[1]).getByText("50%").className).toContain(
+    // A binary score names what it counts with the evaluator's own word.
+    expect(cells[1].textContent).toBe("50% Correct");
+    expect(within(cells[1]).getByText("50% Correct").className).toContain(
       "text-foreground",
     );
     expect(cells[2]).toHaveTextContent("80%Kappa0.40");
@@ -2982,6 +2983,68 @@ describe("EvaluatorRunDetailView summary", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Items \(2\)$/ }));
     expect(screen.getByText("Item One")).toBeInTheDocument();
     expect(screen.queryByText("Agreement expected by chance alone")).toBeNull();
+  });
+
+  const scoreCell = (name: string) => {
+    const table = screen
+      .getAllByText("Agreement with humans")[0]
+      .closest(".md\\:block") as HTMLElement;
+    const row = within(table)
+      .getByRole("button", { name })
+      .closest(".grid") as HTMLElement;
+    return row.children[1] as HTMLElement;
+  };
+
+  it("names a binary score with the evaluator's own passing label", () => {
+    const concise = {
+      ...evaluatorBinary,
+      output_config: {
+        scale: [
+          { value: true, name: "Concise" },
+          { value: false, name: "Wordy" },
+        ],
+      },
+    };
+    render(
+      <EvaluatorRunDetailView
+        job={makeJob({
+          evaluators: [concise],
+          runs: [
+            makeRun({ uuid: "r1", item_id: "item-1", value: { value: true } }),
+            makeRun({ uuid: "r2", item_id: "item-2", value: { value: true } }),
+            makeRun({ uuid: "r3", item_id: "item-2", value: { value: false } }),
+          ],
+        })}
+        task={makeTask()}
+        versionLabels={{}}
+      />,
+    );
+    expect(scoreCell("Binary Evaluator").textContent).toBe("67% Concise");
+  });
+
+  it("shows a rating score as the average out of the scale, with no label", () => {
+    render(
+      <EvaluatorRunDetailView
+        job={makeJob({
+          evaluators: [evaluatorRating],
+          runs: [
+            makeRun({
+              uuid: "r1",
+              evaluator_id: "ev-rate",
+              evaluator_version_id: "v-rate-1",
+              value: { value: 3 },
+            }),
+          ],
+        })}
+        task={makeTask({ evaluators: [{ uuid: "ev-rate", name: "Rating Evaluator" }] })}
+        versionLabels={{}}
+      />,
+    );
+    const cell = scoreCell("Rating Evaluator");
+    expect(cell.textContent).toBe("3 / 5");
+    expect(within(cell).getByText("3 / 5").className).toContain(
+      "text-foreground",
+    );
   });
 });
 

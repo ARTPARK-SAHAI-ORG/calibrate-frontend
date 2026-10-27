@@ -4,7 +4,7 @@
  * is stubbed so only the cards run.
  */
 import React from "react";
-import { render, screen, within } from "@/test-utils";
+import { act, render, screen, within } from "@/test-utils";
 
 jest.mock("next/navigation", () => ({
   __esModule: true,
@@ -27,13 +27,15 @@ jest.mock("../../../../../../hooks", () => ({
 }));
 
 let resolveDetail: (value: unknown) => void = () => {};
+let rejectDetail: (reason: unknown) => void = () => {};
 let requested = "";
 jest.mock("../../../../../../lib/api", () => ({
   ...jest.requireActual("../../../../../../lib/api"),
   apiClient: (endpoint: string) =>
-    new Promise((resolve) => {
+    new Promise((resolve, reject) => {
       requested = endpoint;
       resolveDetail = resolve;
+      rejectDetail = reject;
     }),
 }));
 
@@ -156,4 +158,28 @@ it("shows muted dashes and no legend when nothing has been compared", async () =
       "text-muted-foreground",
     );
   expect(screen.queryByText("Better than chance")).not.toBeInTheDocument();
+});
+
+// The page title is a dash until the name arrives; only the agreement
+// numbers below it matter here.
+const agreementDashes = () =>
+  screen.queryAllByText("—").filter((el) => el.tagName !== "H1");
+
+it("says it is loading, not dashes, until the agreement arrives", async () => {
+  render(<AnnotatorDetailPage />);
+  expect(await screen.findByText("Loading agreement")).toBeInTheDocument();
+  expect(agreementDashes()).toEqual([]);
+  expect(screen.queryByText("Overall")).not.toBeInTheDocument();
+  resolveDetail(detail(0.62, []));
+  expect(await screen.findByText("Overall")).toBeInTheDocument();
+  expect(screen.queryByText("Loading agreement")).not.toBeInTheDocument();
+});
+
+it("shows the error, not dashes, when the agreement fails to load", async () => {
+  render(<AnnotatorDetailPage />);
+  await act(async () => rejectDetail(new Error("Server is down")));
+  expect(await screen.findByText("Server is down")).toBeInTheDocument();
+  expect(agreementDashes()).toEqual([]);
+  expect(screen.queryByText("Overall")).not.toBeInTheDocument();
+  expect(screen.queryByText("Loading agreement")).not.toBeInTheDocument();
 });

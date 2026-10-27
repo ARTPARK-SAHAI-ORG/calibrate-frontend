@@ -19,6 +19,7 @@ import {
   TrendHoverBox,
 } from "@/components/charts/AgreementTrendChart";
 import { MeasureCell } from "@/components/human-labelling/AgreementOverviewTable";
+import { VersionLabel } from "@/components/human-labelling/RunEvaluatorsDialog";
 import { ChanceLegend } from "@/components/human-labelling/AgreementStatCard";
 import { Tooltip } from "@/components/Tooltip";
 import type { KappaFields } from "@/lib/agreementKappa";
@@ -146,8 +147,6 @@ type TrendTask = {
 type EvaluatorTrendResponse = {
   evaluator_id: string;
   evaluator_name: string;
-  bucket: string;
-  days: number;
   filters: { task_id: string | null; version_id: string | null };
   versions: TrendVersion[];
   tasks: TrendTask[];
@@ -740,7 +739,7 @@ function EvaluatorDetailPageInner() {
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       if (!backendUrl) throw new Error("BACKEND_URL is not set");
-      const params = new URLSearchParams({ bucket: "week", days: "90" });
+      const params = new URLSearchParams();
       if (trendTaskId !== "all") params.set("task_id", trendTaskId);
       const res = await fetch(
         `${backendUrl}/annotation-agreement/evaluator/${uuid}/trend?${params}`,
@@ -1707,61 +1706,6 @@ function EvaluatorDetailPageInner() {
   );
 }
 
-function VersionAxisTick({
-  x,
-  y,
-  payload,
-  liveLabels,
-}: {
-  x?: number;
-  y?: number;
-  payload?: { value: string };
-  liveLabels: Set<string>;
-}) {
-  const cx = x ?? 0;
-  const cy = y ?? 0;
-  const label = payload?.value ?? "";
-  const isLive = liveLabels.has(label);
-  return (
-    // The live version reads "v1 Live" on one line: the version ends just
-    // left of the tick and the Live mark starts just right of it.
-    <g transform={`translate(${cx},${cy})`}>
-      <text
-        x={isLive ? -2 : 0}
-        y={0}
-        dy={12}
-        textAnchor={isLive ? "end" : "middle"}
-        fontSize={11}
-        fill="currentColor"
-      >
-        {label}
-      </text>
-      {isLive && (
-        <>
-          <rect
-            x={2}
-            y={2}
-            width={30}
-            height={14}
-            rx={3}
-            className="fill-green-500/10"
-          />
-          <text
-            x={17}
-            y={12}
-            textAnchor="middle"
-            fontSize={9}
-            fontWeight={600}
-            className="fill-green-600 dark:fill-green-400"
-          >
-            Live
-          </text>
-        </>
-      )}
-    </g>
-  );
-}
-
 function AgreementTrendTab({
   trend,
   trendLoading,
@@ -1777,26 +1721,19 @@ function AgreementTrendTab({
   onSelectTask: (id: string) => void;
   allTasks: TrendTask[];
 }) {
-  const { points, liveLabels } = useMemo(() => {
-    if (!trend?.versions?.length)
-      return { points: [], liveLabels: new Set<string>() };
-    const sorted = [...trend.versions].sort(
-      (a, b) => a.version_number - b.version_number,
-    );
-    const liveSet = new Set(
-      sorted.filter((v) => v.is_live).map((v) => `v${v.version_number}`),
-    );
-    return {
-      points: sorted.map((v) => ({
-        key: v.version_id,
-        label: `v${v.version_number}`,
-        agreement: v.current,
-        kappa: v.kappa,
-        kappa_type: v.kappa_type,
-      })),
-      liveLabels: liveSet,
-    };
-  }, [trend]);
+  const points = useMemo(
+    () =>
+      [...(trend?.versions ?? [])]
+        .sort((a, b) => a.version_number - b.version_number)
+        .map((v) => ({
+          ...v,
+          key: v.version_id,
+          label: `v${v.version_number}`,
+          agreement: v.current,
+          live: v.is_live,
+        })),
+    [trend],
+  );
 
   const hasData = points.some((p) => p.agreement != null);
 
@@ -1897,26 +1834,8 @@ function AgreementTrendTab({
         <div className="border border-border rounded-xl p-4 md:p-6 space-y-3">
           <ChanceLegend />
           <AgreementTrendChart
-            className="w-full h-64 md:h-72"
-            dotRadius={4}
-            xAxisProps={{
-              padding: { left: 40, right: 40 },
-              tick: (props) => (
-                <VersionAxisTick {...props} liveLabels={liveLabels} />
-              ),
-              height: 30,
-            }}
-            series={[
-              {
-                key: "agreement",
-                name: "Agreement",
-                kappaName: "Kappa",
-                color: "var(--chart-2)",
-                kappaColor: "var(--chart-1)",
-                points,
-              },
-            ]}
-            renderHover={(versionId, label) => {
+            points={points}
+            renderHover={(versionId) => {
               const version = trend?.versions.find(
                 (v) => v.version_id === versionId,
               );
@@ -1924,17 +1843,16 @@ function AgreementTrendTab({
               return (
                 <TrendHoverBox
                   label={
-                    <span className="inline-flex items-center gap-1.5">
-                      {label}
-                      {version.is_live && (
-                        <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400 leading-none flex-shrink-0">
-                          Live
-                        </span>
-                      )}
-                    </span>
+                    <VersionLabel
+                      version={{
+                        uuid: version.version_id,
+                        version_number: version.version_number,
+                      }}
+                      liveVersionId={version.is_live ? version.version_id : null}
+                    />
                   }
                 >
-                  <MeasureCell group={version} variant="detailed" />
+                  <MeasureCell group={version} size="detailed" />
                 </TrendHoverBox>
               );
             }}

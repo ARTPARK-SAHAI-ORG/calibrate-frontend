@@ -1,75 +1,143 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Tooltip } from "@/components/Tooltip";
-import { useIsNameClipped } from "@/hooks/useIsNameClipped";
+import { ChevronDownIcon } from "@/components/icons";
 import {
+  AgreementStatCard,
+  BigPercent,
   ChanceBar,
   ChanceLegend,
-  OverallAgreementCards,
+  chanceText,
   type EvaluatorResultStat,
 } from "@/components/human-labelling/AgreementStatCard";
+import { EvaluatorNamePill } from "@/components/human-labelling/EvaluatorNamePill";
 import { KappaCell } from "@/components/human-labelling/KappaCell";
-import type { AnswerKind, KappaByKind } from "@/lib/agreementKappa";
+import {
+  SortByControl,
+  type SortDirection,
+} from "@/components/eval-details/tableSort";
+import {
+  ANSWER_KINDS,
+  formatAgreement,
+  kappaForKind,
+  type KappaByKind,
+} from "@/lib/agreementKappa";
 import {
   buildOverviewRows,
   overviewRows,
   sortOverviewRows,
   type AgreementGroup,
-  type EvaluatorAgreement,
   type OverviewRow,
+  type OverviewSortKey,
+  type TaskAgreementResponse,
 } from "@/lib/taskOverviewData";
 
-export type OverviewSortKey = "name" | "interAnnotator" | "withHumans";
-type SortDirection = "asc" | "desc";
-
-const GRID =
-  "grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-4 px-4";
 // A thin line before each measure column.
 const DIVIDER = "border-l border-border pl-4 min-w-0 self-stretch flex items-center";
 
-/**
- * One evaluator's name, as a pill that opens how that evaluator judges. The
- * name is cut to fit the row, and the whole of it is on hover only when it is
- * actually cut off: a name already fully readable would just be covered by a
- * popup saying the same thing.
- */
-function EvaluatorNamePill({
-  name,
-  onOpen,
-  fitClassName,
+export const DASH = <span className="text-sm text-muted-foreground">—</span>;
+
+/** Whether any of these measures draws a bar, which is when the chance
+ * legend has something to explain. */
+function hasChanceBar(groups: readonly (AgreementGroup | null | undefined)[]) {
+  return groups.some((g) => g?.current != null);
+}
+
+const MEASURE_SIZES = {
+  // A table cell: agreement and kappa on one line over the bar.
+  table: { percent: "text-sm", kappaOnTop: true, chanceBelow: false, barPad: "" },
+  // A hover box or summary table: a larger number, room above the bar, and
+  // the chance under it.
+  detailed: { percent: "text-base", kappaOnTop: true, chanceBelow: true, barPad: "pt-1" },
+  // A column of a card: a large number, the bar, then chance and kappa.
+  card: { percent: "text-2xl", kappaOnTop: false, chanceBelow: false, barPad: "pt-1" },
+};
+
+/** One measure's agreement, kappa and chance bar, at the size its spot
+ * needs, or a muted dash when there is no agreement. */
+export function MeasureCell({
+  group,
+  size = "table",
 }: {
-  name: string;
-  /** Without it the pill is plain text, as on a shared page. */
-  onOpen?: () => void;
-  /** Sizing for the row this pill sits in, on whatever wraps the pill. */
-  fitClassName: string;
+  group: AgreementGroup;
+  size?: keyof typeof MEASURE_SIZES;
 }) {
-  const { ref, clipped } = useIsNameClipped(name);
-  const base =
-    "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground truncate max-w-full";
-  const text = (
-    <span ref={ref} className="truncate">
-      {name}
+  if (group.current == null) return size === "card" ? <BigPercent value={null} /> : DASH;
+  const s = MEASURE_SIZES[size];
+  const chance = group.chance_agreement;
+  const kappa = (
+    <span className="inline-flex flex-wrap items-center gap-1 min-w-0 text-xs text-muted-foreground tabular-nums">
+      Kappa
+      <KappaCell fields={group} />
     </span>
   );
-  const pill = onOpen ? (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={`${base} hover:bg-muted hover:border-foreground/30 transition-colors cursor-pointer`}
-    >
-      {text}
-    </button>
-  ) : (
-    <span className={`${base} cursor-default`}>{text}</span>
+  return (
+    <div className="min-w-0 w-full">
+      {/* Wraps in a narrow column rather than spilling into the next one. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <span className={`${s.percent} font-semibold tabular-nums text-foreground`}>
+          {formatAgreement(group.current)}
+        </span>
+        {s.kappaOnTop && kappa}
+      </div>
+      {/* pt-1 on top of the bar's own 8px gives 12px above it. */}
+      <div className={s.barPad}>
+        <ChanceBar agreement={group.current} chanceAgreement={chance} />
+      </div>
+      {!s.kappaOnTop && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
+          <span>{chance != null ? chanceText(chance) : ""}</span>
+          {kappa}
+        </div>
+      )}
+      {s.chanceBelow && chance != null && (
+        <div className="mt-1.5 text-[11px] text-muted-foreground tabular-nums">
+          {chanceText(chance)}
+        </div>
+      )}
+    </div>
   );
-  return clipped ? (
-    <Tooltip content={name} className={fitClassName}>
-      {pill}
-    </Tooltip>
-  ) : (
-    <div className={`relative ${fitClassName}`}>{pill}</div>
+}
+
+/**
+ * An annotator's agreement with the others in one card of three equal
+ * columns: overall, then binary and rating labels each with its own bar,
+ * under the chance legend. The columns stack on a narrow screen.
+ */
+export function AgreementByKindCard({
+  overall,
+  kinds,
+}: {
+  overall: number | null | undefined;
+  kinds: readonly KappaByKind[] | null | undefined;
+}) {
+  const groups = ANSWER_KINDS.map((kind) => {
+    const entry = kappaForKind(kinds, kind);
+    return {
+      ...entry,
+      current: entry?.agreement ?? null,
+      pair_count: entry?.pair_count ?? 0,
+    };
+  });
+  const column = (title: string, content: ReactNode) => (
+    <div key={title} className="p-6 min-w-0">
+      <div className="text-sm font-medium text-foreground mb-3">{title}</div>
+      {content}
+    </div>
+  );
+  return (
+    <>
+      {hasChanceBar(groups) && <ChanceLegend />}
+      <div className="border border-border rounded-xl bg-background grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border">
+        {column("Overall", <BigPercent value={overall} />)}
+        {ANSWER_KINDS.map((kind, i) =>
+          column(
+            kind === "binary" ? "Binary labels" : "Rating labels",
+            <MeasureCell size="card" group={groups[i]} />,
+          ),
+        )}
+      </div>
+    </>
   );
 }
 
@@ -95,230 +163,127 @@ function SortHeader({
       }`}
     >
       {label}
-      <svg
-        className={`w-3.5 h-3.5 ${active ? "opacity-100" : "opacity-40"}`}
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d={
-            dir === "desc"
-              ? "M19.5 8.25l-7.5 7.5-7.5-7.5"
-              : "M4.5 15.75l7.5-7.5 7.5 7.5"
-          }
-        />
-      </svg>
+      <ChevronDownIcon
+        className={`w-3.5 h-3.5 ${active ? "opacity-100" : "opacity-40"} ${
+          dir === "asc" ? "rotate-180" : ""
+        }`}
+      />
     </button>
   );
 }
 
-const DASH = <span className="text-sm text-muted-foreground">—</span>;
-
-/**
- * One measure's agreement, kappa and chance bar, laid out three ways:
- * - `table`: agreement and kappa on one line over the bar, for a table cell.
- * - `detailed`: the same with a larger number, more room, and the chance
- *   under the bar, for a hover box or a summary table.
- * - `card`: a large number, the bar, then the chance and the kappa on one
- *   line, for a column of a card.
- * With no agreement it is a muted dash, large in a card.
- */
-export function MeasureCell({
-  group,
-  variant = "table",
+/** An evaluator's name pill with a small muted tag after it. */
+function NameCell({
+  name,
+  onOpen,
+  tag,
 }: {
-  group: AgreementGroup;
-  variant?: "table" | "detailed" | "card";
+  name: string;
+  onOpen?: () => void;
+  tag?: ReactNode;
 }) {
-  if (group.current == null)
-    return variant === "card" ? (
-      <div className="text-2xl font-semibold text-muted-foreground">—</div>
-    ) : (
-      DASH
-    );
-  const percent = `${Math.round(group.current * 100)}%`;
-  const kappa = (
-    <span className="inline-flex flex-wrap items-center gap-1 min-w-0 text-xs text-muted-foreground tabular-nums">
-      Kappa
-      <KappaCell fields={group} />
-    </span>
-  );
-  // pt-1 on top of the bar's own 8px gives 12px above it.
-  const bar = (
-    <div className={variant === "table" ? "" : "pt-1"}>
-      <ChanceBar
-        agreement={group.current}
-        chanceAgreement={group.chance_agreement}
-      />
-    </div>
-  );
-  if (variant === "card") {
-    const chance = group.chance_agreement;
-    return (
-      <div className="min-w-0 w-full">
-        <div className="text-2xl font-semibold tabular-nums text-foreground">
-          {percent}
-        </div>
-        {bar}
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
-          <span>{chance != null ? `Chance ${Math.round(chance * 100)}%` : ""}</span>
-          {kappa}
-        </div>
-      </div>
-    );
-  }
   return (
-    <div className="min-w-0 w-full">
-      {/* Wraps in a narrow column rather than spilling into the next one. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <span
-          className={`${variant === "detailed" ? "text-base" : "text-sm"} font-semibold tabular-nums text-foreground`}
-        >
-          {percent}
-        </span>
-        {kappa}
-      </div>
-      {bar}
-      {variant === "detailed" && group.chance_agreement != null && (
-        <div className="mt-1.5 text-[11px] text-muted-foreground tabular-nums">
-          Chance {Math.round(group.chance_agreement * 100)}%
-        </div>
-      )}
-    </div>
-  );
-}
-
-const ANSWER_KINDS: AnswerKind[] = ["binary", "rating"];
-
-/**
- * An annotator's agreement with the others in one card of three equal
- * columns: overall, then binary and rating labels each with its own bar.
- * The columns stack on a narrow screen.
- */
-export function AgreementByKindCard({
-  overall,
-  kinds,
-}: {
-  overall: number | null | undefined;
-  kinds: readonly KappaByKind[] | null | undefined;
-}) {
-  const column = (title: string, content: ReactNode) => (
-    <div key={title} className="p-6 min-w-0">
-      <div className="text-sm font-medium text-foreground mb-3">{title}</div>
-      {content}
-    </div>
-  );
-  return (
-    <div className="border border-border rounded-xl bg-background grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border">
-      {column(
-        "Overall",
-        overall != null ? (
-          <div className="text-2xl font-semibold tabular-nums text-foreground">
-            {Math.round(overall * 100)}%
-          </div>
-        ) : (
-          <div className="text-2xl font-semibold text-muted-foreground">—</div>
-        ),
-      )}
-      {ANSWER_KINDS.map((kind) => {
-        const entry = kinds?.find((k) => k.answer_kind === kind);
-        return column(
-          kind === "binary" ? "Binary labels" : "Rating labels",
-          <MeasureCell
-            variant="card"
-            group={{
-              ...entry,
-              current: entry?.agreement ?? null,
-              pair_count: entry?.pair_count ?? 0,
-            }}
-          />,
-        );
-      })}
-    </div>
-  );
-}
-
-const MEASURES = [
-  {
-    title: "Inter-annotator agreement",
-    sortKey: "interAnnotator",
-    pick: (r: OverviewRow) => r.interAnnotator,
-  },
-  {
-    title: "Evaluator agreement with humans",
-    sortKey: "withHumans",
-    pick: (r: OverviewRow) => r.withHumans,
-  },
-] as const;
-
-/** Each evaluator's inter-annotator agreement and its agreement with humans,
- * as a table on wide screens and as cards on narrow ones. */
-export function AgreementOverviewTable({
-  rows,
-  sortKey,
-  sortDir,
-  onSort,
-  onOpenEvaluator,
-}: {
-  rows: readonly OverviewRow[];
-  sortKey: OverviewSortKey;
-  sortDir: SortDirection;
-  onSort: (key: OverviewSortKey) => void;
-  onOpenEvaluator: (evaluator: { uuid: string; name: string }) => void;
-}) {
-  const name = (row: OverviewRow) => (
     <div className="flex items-center gap-2 min-w-0">
       <EvaluatorNamePill
-        name={row.name}
+        name={name}
         fitClassName="min-w-0 max-w-full"
-        onOpen={() => onOpenEvaluator({ uuid: row.key, name: row.name })}
+        onOpen={onOpen}
       />
-      {row.kind && (
-        <span className="text-xs text-muted-foreground shrink-0">
-          {row.kind}
-        </span>
-      )}
+      {tag}
     </div>
   );
-  const hasBar = rows.some(
-    (r) => r.interAnnotator.current != null || r.withHumans.current != null,
-  );
+}
+
+type Column<T> = {
+  title: string;
+  cell: (row: T) => ReactNode;
+  sortKey?: OverviewSortKey;
+};
+
+type Sort = {
+  key: OverviewSortKey;
+  dir: SortDirection;
+  /** A heading was clicked. */
+  onToggle: (key: OverviewSortKey) => void;
+  /** The phone sort picker chose a column and direction, or cleared it. */
+  onPick: (next: { key: OverviewSortKey; dir: SortDirection } | null) => void;
+};
+
+/**
+ * Evaluators down the side and one column per measure, as a table on wide
+ * screens and as cards on narrow ones, under the chance legend when there
+ * is a bar to explain.
+ */
+function MeasuresTable<T extends { key: string }>({
+  rows,
+  gridCols,
+  nameTitle,
+  nameSortKey,
+  name,
+  columns,
+  sort,
+  legend,
+}: {
+  rows: readonly T[];
+  gridCols: string;
+  nameTitle: string;
+  nameSortKey?: OverviewSortKey;
+  name: (row: T) => ReactNode;
+  columns: Column<T>[];
+  sort?: Sort;
+  legend: boolean;
+}) {
+  const heading = (title: string, sortKey?: OverviewSortKey) =>
+    sort && sortKey ? (
+      <SortHeader
+        label={title}
+        active={sort.key === sortKey}
+        dir={sort.dir}
+        onClick={() => sort.onToggle(sortKey)}
+      />
+    ) : (
+      <div className="text-sm font-medium text-muted-foreground">{title}</div>
+    );
+  const grid = `grid ${gridCols} gap-4 px-4`;
   return (
     <>
-      {hasBar && <ChanceLegend />}
+      {legend && <ChanceLegend />}
+      {sort && (
+        <SortByControl
+          className="md:hidden"
+          columns={[
+            ...(nameSortKey ? [{ key: nameSortKey, label: nameTitle }] : []),
+            ...columns.flatMap((c) =>
+              c.sortKey ? [{ key: c.sortKey, label: c.title }] : [],
+            ),
+          ]}
+          sort={sort}
+          onChange={(next) =>
+            sort.onPick(
+              next ? { key: next.key as OverviewSortKey, dir: next.dir } : null,
+            )
+          }
+        />
+      )}
       {/* Desktop table */}
       <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-        <div className={`${GRID} py-2 border-b border-border bg-muted/30 items-center`}>
-          <SortHeader
-            label="Evaluator"
-            active={sortKey === "name"}
-            dir={sortDir}
-            onClick={() => onSort("name")}
-          />
-          {MEASURES.map((m) => (
-            <div key={m.sortKey} className={DIVIDER}>
-              <SortHeader
-                label={m.title}
-                active={sortKey === m.sortKey}
-                dir={sortDir}
-                onClick={() => onSort(m.sortKey)}
-              />
+        <div className={`${grid} py-2 border-b border-border bg-muted/30 items-center`}>
+          {heading(nameTitle, nameSortKey)}
+          {columns.map((c) => (
+            <div key={c.title} className={DIVIDER}>
+              {heading(c.title, c.sortKey)}
             </div>
           ))}
         </div>
         {rows.map((row) => (
           <div
             key={row.key}
-            className={`${GRID} py-3 border-b border-border last:border-b-0 items-center`}
+            className={`${grid} py-3 border-b border-border last:border-b-0 items-center`}
           >
             {name(row)}
-            {MEASURES.map((m) => (
-              <div key={m.sortKey} className={DIVIDER}>
-                <MeasureCell group={m.pick(row)} />
+            {columns.map((c) => (
+              <div key={c.title} className={DIVIDER}>
+                {c.cell(row)}
               </div>
             ))}
           </div>
@@ -333,10 +298,10 @@ export function AgreementOverviewTable({
             className="border border-border rounded-xl overflow-hidden p-4 space-y-3"
           >
             {name(row)}
-            {MEASURES.map((m) => (
-              <div key={m.sortKey}>
-                <p className="text-xs text-muted-foreground mb-1">{m.title}</p>
-                <MeasureCell group={m.pick(row)} />
+            {columns.map((c) => (
+              <div key={c.title}>
+                <p className="text-xs text-muted-foreground mb-1">{c.title}</p>
+                {c.cell(row)}
               </div>
             ))}
           </div>
@@ -345,6 +310,56 @@ export function AgreementOverviewTable({
     </>
   );
 }
+
+/** Each evaluator's inter-annotator agreement and its agreement with humans,
+ * as a table on wide screens and as cards on narrow ones. */
+export function AgreementOverviewTable({
+  rows,
+  sort,
+  onOpenEvaluator,
+}: {
+  rows: readonly OverviewRow[];
+  sort: Sort;
+  onOpenEvaluator: (evaluator: { uuid: string; name: string }) => void;
+}) {
+  return (
+    <MeasuresTable
+      rows={rows}
+      gridCols="grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]"
+      nameTitle="Evaluator"
+      nameSortKey="name"
+      name={(row) => (
+        <NameCell
+          name={row.name}
+          onOpen={() => onOpenEvaluator({ uuid: row.key, name: row.name })}
+          tag={
+            row.kind && (
+              <span className="text-xs text-muted-foreground shrink-0">
+                {row.kind}
+              </span>
+            )
+          }
+        />
+      )}
+      columns={[
+        {
+          title: "Inter-annotator agreement",
+          sortKey: "interAnnotator",
+          cell: (row) => <MeasureCell group={row.interAnnotator} />,
+        },
+        {
+          title: "Evaluator agreement with humans",
+          sortKey: "withHumans",
+          cell: (row) => <MeasureCell group={row.withHumans} />,
+        },
+      ]}
+      sort={sort}
+      legend={hasChanceBar(rows.flatMap((r) => [r.interAnnotator, r.withHumans]))}
+    />
+  );
+}
+
+const DEFAULT_SORT = { key: "withHumans" as OverviewSortKey, dir: "desc" as SortDirection };
 
 /**
  * Agreement laid out for the Overview tab and the task page: the two overall
@@ -358,26 +373,19 @@ export function AgreementOverviewSection({
   allTasks = false,
   evaluatorTypeOf,
 }: {
-  agreement: {
-    human_human?: { current: number | null } | null;
-    evaluators_with_humans?: { current: number | null } | null;
-    evaluators?: EvaluatorAgreement[];
-  };
+  agreement: TaskAgreementResponse;
   onOpenEvaluator: (evaluator: { uuid: string; name: string }) => void;
   allTasks?: boolean;
   /** Groups evaluators of the same type together in the table. */
   evaluatorTypeOf?: (evaluatorId: string) => string | undefined;
 }) {
-  const [sortKey, setSortKey] = useState<OverviewSortKey>("withHumans");
-  const [sortDir, setSortDir] = useState<SortDirection>("desc");
-  const handleSort = (key: OverviewSortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
-    } else {
-      setSortKey(key);
-      setSortDir(key === "name" ? "asc" : "desc");
-    }
-  };
+  const [sort, setSort] = useState(DEFAULT_SORT);
+  const onToggle = (key: OverviewSortKey) =>
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "desc" ? "asc" : "desc" }
+        : { key, dir: key === "name" ? "asc" : "desc" },
+    );
   const rows = overviewRows(
     buildOverviewRows(agreement.evaluators ?? []).map((row) => ({
       ...row,
@@ -388,16 +396,26 @@ export function AgreementOverviewSection({
   return (
     <>
       <div className="flex flex-wrap items-stretch gap-3">
-        <OverallAgreementCards
-          interAnnotator={agreement.human_human}
-          withHumans={agreement.evaluators_with_humans}
-        />
+        {(
+          [
+            ["Inter-annotator agreement", agreement.human_human],
+            ["Evaluator agreement with humans", agreement.evaluators_with_humans],
+          ] as const
+        ).map(([title, group]) => (
+          <AgreementStatCard
+            key={title}
+            staticPillText={title}
+            agreement={group?.current}
+          />
+        ))}
       </div>
       <AgreementOverviewTable
-        rows={sortOverviewRows(rows, sortKey, sortDir)}
-        sortKey={sortKey}
-        sortDir={sortDir}
-        onSort={handleSort}
+        rows={sortOverviewRows(rows, sort.key, sort.dir)}
+        sort={{
+          ...sort,
+          onToggle,
+          onPick: (next) => setSort(next ?? DEFAULT_SORT),
+        }}
         onOpenEvaluator={onOpenEvaluator}
       />
     </>
@@ -414,9 +432,6 @@ export type RunSummaryRow = {
   agreement: AgreementGroup | null;
 };
 
-const RUN_GRID =
-  "grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.7fr)_minmax(0,1.3fr)] gap-4 px-4";
-
 /**
  * An evaluation run's summary, in the Overview table's style: each
  * evaluator's score for the run, and its agreement with humans with the
@@ -430,95 +445,58 @@ export function EvaluatorRunSummaryTable({
   /** Opens how an evaluator judges; left out on a shared page. */
   onOpenEvaluator?: (evaluator: { uuid: string; name: string }) => void;
 }) {
-  const name = (row: RunSummaryRow) => (
-    <div className="flex items-center gap-2 min-w-0">
-      <EvaluatorNamePill
-        name={row.name}
-        fitClassName="min-w-0 max-w-full"
-        onOpen={
-          onOpenEvaluator
-            ? () => onOpenEvaluator({ uuid: row.evaluatorId, name: row.name })
-            : undefined
-        }
-      />
-      {row.versionLabel && (
-        <span className="font-mono text-[11px] text-muted-foreground shrink-0">
-          {row.versionLabel}
-        </span>
-      )}
-    </div>
-  );
-  const score = (row: RunSummaryRow) =>
-    row.score ? (
-      <span className="text-sm font-semibold tabular-nums text-foreground">
-        {row.score.value}
-      </span>
-    ) : (
-      DASH
-    );
-  const agreement = (row: RunSummaryRow) =>
-    row.agreement?.current != null ? (
-      <MeasureCell group={row.agreement} variant="detailed" />
-    ) : (
-      <span className="inline-flex items-center gap-2">
-        {DASH}
-        <span className="text-xs text-muted-foreground">
-          No human labels yet
-        </span>
-      </span>
-    );
   return (
-    <>
-      {rows.some((r) => r.agreement?.current != null) && <ChanceLegend />}
-      {/* Desktop table */}
-      <div className="hidden md:block border border-border rounded-xl overflow-hidden">
-        <div
-          className={`${RUN_GRID} py-2 border-b border-border bg-muted/30 items-center`}
-        >
-          <div className="text-sm font-medium text-muted-foreground">
-            Evaluator
-          </div>
-          <div className={`${DIVIDER} text-sm font-medium text-muted-foreground`}>
-            Score
-          </div>
-          <div className={`${DIVIDER} text-sm font-medium text-muted-foreground`}>
-            Agreement with humans
-          </div>
-        </div>
-        {rows.map((row) => (
-          <div
-            key={row.key}
-            className={`${RUN_GRID} py-3 border-b border-border last:border-b-0 items-center`}
-          >
-            {name(row)}
-            <div className={DIVIDER}>{score(row)}</div>
-            <div className={DIVIDER}>{agreement(row)}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Mobile cards */}
-      <div className="md:hidden space-y-2">
-        {rows.map((row) => (
-          <div
-            key={row.key}
-            className="border border-border rounded-xl overflow-hidden p-4 space-y-2"
-          >
-            {name(row)}
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Score</p>
-              {score(row)}
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">
-                Agreement with humans
-              </p>
-              {agreement(row)}
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
+    <MeasuresTable
+      rows={rows}
+      gridCols="grid-cols-[minmax(0,1.2fr)_minmax(0,0.7fr)_minmax(0,1.3fr)]"
+      nameTitle="Evaluator"
+      name={(row) => (
+        <NameCell
+          name={row.name}
+          onOpen={
+            onOpenEvaluator
+              ? () => onOpenEvaluator({ uuid: row.evaluatorId, name: row.name })
+              : undefined
+          }
+          tag={
+            row.versionLabel && (
+              <span className="font-mono text-[11px] text-muted-foreground shrink-0">
+                {row.versionLabel}
+              </span>
+            )
+          }
+        />
+      )}
+      columns={[
+        {
+          title: "Score",
+          // A binary score names what it counts, e.g. "33% Correct".
+          cell: (row) =>
+            row.score ? (
+              <span className="text-sm font-semibold tabular-nums text-foreground">
+                {row.score.value}
+                {row.score.passLabel && ` ${row.score.passLabel}`}
+              </span>
+            ) : (
+              DASH
+            ),
+        },
+        {
+          title: "Agreement with humans",
+          cell: (row) =>
+            row.agreement?.current != null ? (
+              <MeasureCell group={row.agreement} size="detailed" />
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                {DASH}
+                <span className="text-xs text-muted-foreground">
+                  No human labels yet
+                </span>
+              </span>
+            ),
+        },
+      ]}
+      legend={hasChanceBar(rows.map((r) => r.agreement))}
+    />
   );
 }
-

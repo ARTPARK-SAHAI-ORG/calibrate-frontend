@@ -2,7 +2,6 @@ import React from "react";
 import { render, screen, setupUser, waitFor } from "@/test-utils";
 import {
   AgreementStatCard,
-  OverallAgreementCards,
   agreementColor,
 } from "../AgreementStatCard";
 import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
@@ -148,7 +147,6 @@ describe("AgreementStatCard", () => {
     const button = screen.getByRole("button", { name: /Correctness/ });
     expect(button).not.toHaveAttribute("title");
     expect(screen.getByText("v2")).toBeInTheDocument();
-    expect(screen.getByText("alignment")).toBeInTheDocument();
     expect(screen.getByText("90%")).toBeInTheDocument();
   });
 
@@ -165,25 +163,6 @@ describe("AgreementStatCard", () => {
     expect(screen.queryByText("Open Correctness")).toBeNull();
   });
 
-  it("says on hover how many items the score counts", async () => {
-    const user = setupUser();
-    render(
-      <AgreementStatCard
-        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        agreement={0.9}
-        result={{
-          label: "Correct",
-          value: "75%",
-          title: "3 of 4 items",
-          ratio: 0.75,
-        }}
-      />,
-    );
-
-    await user.hover(screen.getByText("Correct"));
-    expect(await screen.findByText("3 of 4 items")).toBeInTheDocument();
-  });
-
   it("says on hover how many items the score counts when it is the only number", async () => {
     const user = setupUser();
     render(
@@ -195,7 +174,6 @@ describe("AgreementStatCard", () => {
           title: "3 of 4 items",
           ratio: 0.75,
         }}
-        showResultLabel={false}
       />,
     );
 
@@ -223,54 +201,6 @@ describe("AgreementStatCard", () => {
     expect(mockFetch).toHaveBeenCalledWith("ev-1", "tok");
   });
 
-  it("shows the evaluator's own result next to the agreement number", () => {
-    render(
-      <AgreementStatCard
-        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        agreement={0.9}
-        result={{
-          label: "Correct",
-          value: "75%",
-          title: "3 of 4 items",
-          ratio: 0.75,
-        }}
-      />
-    );
-    const stat = screen.getByText("Correct").parentElement!;
-    expect(stat).toHaveTextContent("Correct");
-    expect(stat).toHaveTextContent("75%");
-    expect(stat).not.toHaveAttribute("title");
-    // Coloured on the same thresholds as the agreement number.
-    expect(screen.getByText("75%").className).toContain("text-green-600");
-    expect(screen.getByText("Human agreement")).toBeInTheDocument();
-    expect(screen.getByText("90%")).toBeInTheDocument();
-    // The word "alignment" is dropped once each number carries its own label.
-    expect(screen.queryByText("alignment")).not.toBeInTheDocument();
-  });
-
-  it("shows the result on its own when agreement belongs to another section", () => {
-    render(
-      <AgreementStatCard
-        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        result={{
-          label: "Score",
-          value: "75%",
-          title: "3 of 4 items",
-          ratio: 0.75,
-        }}
-      />
-    );
-    const number = screen.getByText("75%");
-    expect(number).not.toHaveAttribute("title");
-    expect(number.className).toContain("text-green-600");
-    // The score keeps its own label, exactly as it has when the agreement
-    // number sits next to it. Only the agreement number is left out.
-    expect(screen.getByText("Score")).toBeInTheDocument();
-    expect(screen.queryByText("Human agreement")).not.toBeInTheDocument();
-    expect(screen.queryByText("alignment")).not.toBeInTheDocument();
-    expect(screen.queryByText("—")).not.toBeInTheDocument();
-  });
-
   it("drops the score's label when the section heading already names it", () => {
     render(
       <AgreementStatCard
@@ -281,7 +211,6 @@ describe("AgreementStatCard", () => {
           title: "3 of 4 items",
           ratio: 0.75,
         }}
-        showResultLabel={false}
       />,
     );
     const number = screen.getByText("75%");
@@ -292,19 +221,6 @@ describe("AgreementStatCard", () => {
     expect(screen.queryByText("alignment")).not.toBeInTheDocument();
   });
 
-  it("keeps both labels when the agreement number is on the card too", () => {
-    render(
-      <AgreementStatCard
-        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        agreement={0.9}
-        result={{ label: "Score", value: "75%", ratio: 0.75 }}
-        showResultLabel={false}
-      />,
-    );
-    expect(screen.getByText("Score")).toBeInTheDocument();
-    expect(screen.getByText("Human agreement")).toBeInTheDocument();
-  });
-
   it("renders the static pill variant with a result", () => {
     render(
       <AgreementStatCard
@@ -313,68 +229,12 @@ describe("AgreementStatCard", () => {
         result={{ label: "Average score", value: "3.5 / 5", ratio: null }}
       />
     );
-    expect(screen.getByText("Average score")).toBeInTheDocument();
+    // The number alone: the section heading says what it is.
+    expect(screen.queryByText("Average score")).not.toBeInTheDocument();
     // No ratio, so the number keeps the default text colour.
     expect(screen.getByText("3.5 / 5").className).not.toMatch(
       /text-(green|red|yellow)/,
     );
-  });
-
-  it("names the kind of kappa on the info icon, for hover and screen readers", async () => {
-    const user = setupUser();
-    render(
-      <AgreementStatCard
-        staticPillText="Annotator agreement"
-        agreement={0.82}
-        kappa={{ kappa: -0.125, kappa_type: "linear_weighted_fleiss" }}
-      />,
-    );
-    expect(screen.getByText("-0.13")).toBeInTheDocument();
-    const icon = screen.getByRole("button", {
-      name: "Linear weighted Fleiss' kappa",
-    });
-    expect(
-      screen.queryByText("Linear weighted Fleiss' kappa"),
-    ).not.toBeInTheDocument();
-    await user.hover(icon);
-    expect(
-      await screen.findByText("Linear weighted Fleiss' kappa"),
-    ).toBeInTheDocument();
-  });
-
-  it("names the reason kappa is blank on its info icon", () => {
-    render(
-      <AgreementStatCard
-        staticPillText="Annotator agreement"
-        agreement={1}
-        kappa={{
-          kappa: null,
-          kappa_type: "fleiss",
-          kappa_blank_reason: "everyone_agreed",
-          chance_agreement: 1,
-        }}
-      />,
-    );
-    expect(screen.getByText("Everyone agreed").className).toContain(
-      "rounded-md",
-    );
-    expect(
-      screen.getByRole("button", {
-        name: "Every answer was the same, so chance alone would also agree every time and kappa cannot be worked out",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("leaves kappa out when there is no agreement number beside it", () => {
-    render(
-      <AgreementStatCard
-        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        result={{ label: "Score", value: "75%", ratio: 0.75 }}
-        kappa={{ kappa: 0.5, kappa_type: "cohen" }}
-      />,
-    );
-    expect(screen.queryByText("Kappa")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("agreement-fill")).not.toBeInTheDocument();
   });
 
   it("renders the evaluator pill variant without a version label", () => {
@@ -400,149 +260,5 @@ describe("AgreementStatCard", () => {
       />
     );
     expect(screen.getByText("Safety")).toBeInTheDocument();
-  });
-});
-
-describe("AgreementStatCard agreement bar", () => {
-  const fill = () => screen.getByTestId("agreement-fill");
-
-  it("fills green to the agreement, ticks at chance, and keeps the number neutral", () => {
-    render(
-      <AgreementStatCard
-        staticPillText="Annotator agreement"
-        agreement={0.62}
-        kappa={{ kappa: 0.42, kappa_type: "cohen", chance_agreement: 0.35 }}
-      />
-    );
-    const number = screen.getByText("62%");
-    expect(number.className).toContain("text-foreground");
-    expect(number.className).not.toMatch(/text-(green|red|yellow)/);
-    expect(fill().style.width).toBe("62%");
-    expect(fill().className).toContain("bg-green-500");
-    expect(screen.getByTestId("chance-tick").style.left).toBe("35%");
-    expect(screen.getByText("Chance 35%")).toBeInTheDocument();
-    expect(screen.getByText("Kappa")).toBeInTheDocument();
-    expect(screen.getByText("0.42")).toBeInTheDocument();
-    expect(screen.queryByText("Agreement")).not.toBeInTheDocument();
-  });
-
-  it("fills red when agreement falls short of chance", () => {
-    render(
-      <AgreementStatCard
-        staticPillText="Annotator agreement"
-        agreement={0.94}
-        kappa={{ kappa: -0.33, kappa_type: "cohen", chance_agreement: 0.96 }}
-      />
-    );
-    expect(fill().style.width).toBe("94%");
-    expect(fill().className).toContain("bg-red-500");
-    expect(screen.getByTestId("chance-tick").style.left).toBe("96%");
-    expect(screen.getByText("Chance 96%")).toBeInTheDocument();
-    expect(screen.getByText("-0.33")).toBeInTheDocument();
-  });
-
-  it("fills muted when agreement equals chance", () => {
-    render(
-      <AgreementStatCard
-        staticPillText="Annotator agreement"
-        agreement={1}
-        kappa={{
-          kappa: null,
-          kappa_blank_reason: "everyone_agreed",
-          chance_agreement: 1,
-        }}
-      />
-    );
-    expect(fill().className).toContain("bg-muted-foreground");
-    expect(screen.getByText("Chance 100%")).toBeInTheDocument();
-    expect(screen.getByText("Everyone agreed")).toBeInTheDocument();
-  });
-
-  it("draws no tick and no chance when chance is unknown", () => {
-    render(
-      <AgreementStatCard
-        staticPillText="Annotator agreement"
-        agreement={0.8}
-        kappa={{
-          kappa: null,
-          kappa_blank_reason: "too_few_items",
-          chance_agreement: null,
-        }}
-      />
-    );
-    expect(fill().style.width).toBe("80%");
-    expect(screen.queryByTestId("chance-tick")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Chance/)).not.toBeInTheDocument();
-    expect(screen.getByText("Kappa")).toBeInTheDocument();
-    expect(screen.getByText("Too few items")).toBeInTheDocument();
-  });
-
-  it("draws no bar when there is no agreement number", () => {
-    render(
-      <AgreementStatCard
-        staticPillText="Annotator agreement"
-        agreement={null}
-        kappa={{ kappa: null, kappa_type: null, chance_agreement: null }}
-      />
-    );
-    expect(screen.queryByTestId("agreement-fill")).not.toBeInTheDocument();
-    expect(screen.getByText("—").className).toContain("text-muted-foreground");
-    expect(screen.queryByText("Kappa")).not.toBeInTheDocument();
-  });
-
-  it("keeps the score first and names the agreement beside it", () => {
-    render(
-      <AgreementStatCard
-        evaluatorPill={{ uuid: "ev-1", name: "Correctness" }}
-        agreement={0.9}
-        result={{ label: "Score", value: "75%", ratio: 0.75 }}
-        kappa={{ kappa: 0.5, kappa_type: "cohen", chance_agreement: 0.8 }}
-      />
-    );
-    const text = document.body.textContent!;
-    expect(text.indexOf("Score")).toBeLessThan(text.indexOf("Human agreement"));
-    expect(screen.getByText("90%").className).toContain("text-foreground");
-    expect(fill().style.width).toBe("90%");
-    expect(screen.getByText("Chance 80%")).toBeInTheDocument();
-  });
-});
-
-describe("OverallAgreementCards", () => {
-  it("draws each overall number as a pill label over a large neutral percentage", () => {
-    render(
-      <OverallAgreementCards
-        interAnnotator={{ current: 0.82 }}
-        withHumans={{ current: null }}
-      />
-    );
-    const pill = screen.getByText("Inter-annotator agreement");
-    // The same pill and the same card the score cards use.
-    expect(pill.closest("span.rounded-md")!.className).toContain(
-      "border-border",
-    );
-    expect(pill.closest(".rounded-lg")!.className).toContain("min-w-[160px]");
-    const number = screen.getByText("82%");
-    expect(number.className).toContain("text-2xl");
-    expect(number.className).toContain("text-foreground");
-    expect(number.className).not.toMatch(/text-(green|red|yellow)/);
-    expect(screen.getByText("Evaluator agreement with humans")).toBeInTheDocument();
-    expect(screen.getByText("—").className).toContain("text-muted-foreground");
-    expect(screen.queryByText(/Kappa|Chance/)).not.toBeInTheDocument();
-    expect(screen.queryByTestId("agreement-fill")).not.toBeInTheDocument();
-  });
-
-  it("keeps low and middling numbers neutral too", () => {
-    render(
-      <OverallAgreementCards
-        interAnnotator={{ current: 0.4 }}
-        withHumans={{ current: 0.6 }}
-      />
-    );
-    expect(screen.getByText("40%").className).not.toMatch(
-      /text-(green|red|yellow)/,
-    );
-    expect(screen.getByText("60%").className).not.toMatch(
-      /text-(green|red|yellow)/,
-    );
   });
 });
