@@ -2,13 +2,11 @@
 // fresh workspace auth.setup.ts made, runs everything, then saves one PNG per
 // docs picture listed in shots.ts.
 //
-// Run with `npm run docs:screenshots` (it sets the fake backend's env), plus
-// DOCS_SCREENSHOTS_OUT=<folder> and CALIBRATE_BACKEND_DIR=<backend checkout
-// that has src/testing/demo_replies.json>.
+// Run with DOCS_SCREENSHOTS_OUT=<folder> npm run docs:screenshots.
 import fs from "node:fs";
 import path from "node:path";
 import { test, expect } from "../fixtures";
-import { waitForOrgReady } from "../helpers";
+import { waitForOrgReady, workspaceUuidFromUrl } from "../helpers";
 import { loadDemo, seed } from "./seed";
 import { shots } from "./shots";
 
@@ -26,7 +24,7 @@ test("docs screenshots", async ({ page, browser, request }) => {
   // under it directly.
   await page.goto("/agents");
   await waitForOrgReady(page);
-  const workspace = new URL(page.url()).pathname.split("/")[1];
+  const workspace = workspaceUuidFromUrl(page.url())!;
 
   // New pages take the project's options, sign-in included, so clear it.
   const signedOut = await browser.newPage({ storageState: { cookies: [], origins: [] } });

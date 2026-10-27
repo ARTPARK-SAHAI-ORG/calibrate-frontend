@@ -25,7 +25,6 @@ export type Demo = {
     llm_model: string;
     stt_provider: string;
     tts_provider: string;
-    language: string;
   };
   tools: { kind: string; name: string; description: string; url?: string; method?: string; parameters: Param[] }[];
   evaluators: { name: string; reply_name: string; type: "binary" | "rating"; prompt: string; scale_min?: number; scale_max?: number }[];
@@ -39,21 +38,7 @@ export type Demo = {
   human_alignment: { task_name: string; evaluator: string; annotators: string[] };
 };
 
-export type Seeded = {
-  agentId: string;
-  connectionAgentId: string;
-  testRunId: string;
-  benchmarkId: string;
-  evaluatorIds: string[];
-  simulationId: string;
-  textRunId: string;
-  voiceRunId: string;
-  sttTaskId: string;
-  ttsTaskId: string;
-  taskId: string;
-  evaluatorRunId: string;
-  jobTokens: string[];
-};
+export type Seeded = Awaited<ReturnType<typeof seed>>;
 
 export function loadDemo(): Demo {
   const dir = process.env.CALIBRATE_BACKEND_DIR;
@@ -87,7 +72,6 @@ async function api<T>(
 async function waitFor(
   request: APIRequestContext,
   urlPath: string,
-  done: string[] = ["done", "completed"],
 ): Promise<void> {
   let last: { status?: string } = {};
   await expect
@@ -95,17 +79,17 @@ async function waitFor(
       async () => {
         last = await api<{ status?: string }>(request, urlPath);
         if (last.status === "failed") throw new Error(`${urlPath} failed: ${JSON.stringify(last)}`);
-        return done.includes(last.status ?? "");
+        return ["done", "completed"].includes(last.status ?? "");
       },
       { timeout: 5 * 60_000, intervals: [1000, 2000] },
     )
     .toBe(true);
 }
 
-/** A silent 16 kHz mono 16-bit PCM WAV, `seconds` long. */
-function silentWav(seconds = 1.5): Buffer {
+/** A 1.5 second silent 16 kHz mono 16-bit PCM WAV. */
+function silentWav(): Buffer {
   const rate = 16000;
-  const dataBytes = Math.round(rate * seconds) * 2;
+  const dataBytes = rate * 1.5 * 2;
   const b = Buffer.alloc(44 + dataBytes);
   b.write("RIFF", 0);
   b.writeUInt32LE(36 + dataBytes, 4);
@@ -123,15 +107,14 @@ function silentWav(seconds = 1.5): Buffer {
   return b;
 }
 
-const WORKSPACE_NAME = "Maths tutor team";
 
 const toolParams = (params: Param[]) =>
   params.map((p) => ({ id: p.name, type: p.type, description: p.description, required: true }));
 
-export async function seed(request: APIRequestContext, d: Demo): Promise<Seeded> {
+export async function seed(request: APIRequestContext, d: Demo) {
   // The backend has no call that renames a user, so only the workspace is named.
   const [org] = await api<{ uuid: string }[]>(request, "/organizations");
-  await api(request, `/organizations/${org.uuid}`, { name: WORKSPACE_NAME }, "PATCH");
+  await api(request, `/organizations/${org.uuid}`, { name: "Maths tutor team" }, "PATCH");
 
   // Agent built in Calibrate, plus a connected one for the Connection pictures.
   const { uuid: agentId } = await api<{ uuid: string }>(request, "/agents", {
