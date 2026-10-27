@@ -7,7 +7,12 @@ type KappaType =
 export type AnswerKind = "binary" | "rating";
 
 /** One kind of answer's kappa, for a number that covers both kinds. */
-export type KappaByKind = KappaFields & { answer_kind: AnswerKind };
+export type KappaByKind = KappaFields & {
+  answer_kind: AnswerKind;
+  /** Agreement on this kind of answer alone, 0 to 1. */
+  agreement?: number | null;
+  pair_count?: number;
+};
 
 /** Rating answers are compared with a linear weighted kappa, pass/fail
  * answers with a plain one. Null when there is no kind to go by. */

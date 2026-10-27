@@ -52,40 +52,84 @@ const detail = (
 const card = () =>
   screen.getByText("Agreement with others").closest(".rounded-lg") as HTMLElement;
 
-it("shows agreement with others and both kappas in one full-width card", async () => {
+it("shows agreement with others, then each kind's agreement, kappa and bar, in one card", async () => {
   render(<AnnotatorDetailPage />);
   expect(requested).toBe("/annotators/ann-1");
   resolveDetail(
     detail(0.62, [
-      { answer_kind: "binary", kappa: 0.31, kappa_type: "cohen" },
+      {
+        answer_kind: "binary",
+        agreement: 0.75,
+        pair_count: 8,
+        kappa: 0.31,
+        kappa_type: "cohen",
+        chance_agreement: 0.6,
+      },
       {
         answer_kind: "rating",
+        agreement: 0.4,
+        pair_count: 5,
         kappa: null,
         kappa_type: "linear_weighted_cohen",
         kappa_blank_reason: "everyone_agreed",
+        chance_agreement: 0.55,
       },
     ]),
   );
   expect(await screen.findByText("62%")).toBeInTheDocument();
-  // Pill, then the number, then the binary line, then the rating line.
+  // The large number on top, then the binary line, then the rating line.
   expect(card()).toHaveTextContent(
-    /^Agreement with others62%Kappa \(binary\)0\.31Kappa \(rating\)Everyone agreed$/,
+    /^Agreement with others62%Binary labels75%Kappa0\.31Rating labels40%KappaEveryone agreed$/,
   );
   expect(card().className).toContain("w-full");
-  // The same neutral percentage as the overall cards elsewhere.
   expect(screen.getByText("62%").className).toContain("text-foreground");
-  // The kappas are lines inside the card, not cards of their own.
-  expect(screen.getByText("Kappa (binary)").closest("span.rounded-md")).toBeNull();
-  // Both labels share one width, so the values line up.
-  expect(screen.getByText("Kappa (binary)").className).toContain("w-28");
-  expect(screen.getByText("Kappa (rating)").className).toContain("w-28");
+  const fills = within(card()).getAllByTestId("agreement-fill");
+  expect(fills.map((f) => f.style.width)).toEqual(["75%", "40%"]);
+  expect(fills[0].className).toContain("bg-green-500");
+  expect(fills[1].className).toContain("bg-red-500");
   expect(
-    within(card()).getByRole("button", { name: "Cohen's kappa" }),
-  ).toBeInTheDocument();
+    within(card()).getAllByTestId("chance-tick").map((t) => t.style.left),
+  ).toEqual(["60%", "55%"]);
+  // Both labels share one width, so the values line up.
+  expect(screen.getByText("Binary labels").className).toContain("w-28");
+  expect(screen.getByText("Rating labels").className).toContain("w-28");
+  // The labels are readable text; only the dashes are muted.
+  expect(screen.getByText("Binary labels").className).toContain(
+    "text-foreground",
+  );
+  expect(screen.getByText("Binary labels").className).toContain("font-medium");
+  expect(screen.getByText("Binary labels").className).not.toContain(
+    "text-muted-foreground",
+  );
+  // The legend explains the bars, as on the Overview tab.
+  expect(screen.getByText("Agreement expected by chance alone")).toBeInTheDocument();
   expect(screen.getByText("Jobs (2)")).toBeInTheDocument();
 });
 
-it("shows muted dashes when nothing has been compared", async () => {
+it("shows a muted dash and no bar for a kind with nothing compared", async () => {
+  render(<AnnotatorDetailPage />);
+  resolveDetail(
+    detail(0.7, [
+      {
+        answer_kind: "binary",
+        agreement: 0.7,
+        pair_count: 4,
+        kappa: 0.2,
+        kappa_type: "cohen",
+        chance_agreement: 0.5,
+      },
+    ]),
+  );
+  expect(await screen.findByText("Jobs (2)")).toBeInTheDocument();
+  const rating = screen.getByText("Rating labels").parentElement as HTMLElement;
+  expect(within(rating).getByText("—").className).toContain(
+    "text-muted-foreground",
+  );
+  expect(within(rating).queryByTestId("agreement-fill")).not.toBeInTheDocument();
+  expect(within(card()).getAllByTestId("agreement-fill")).toHaveLength(1);
+});
+
+it("shows muted dashes and no legend when nothing has been compared", async () => {
   render(<AnnotatorDetailPage />);
   resolveDetail(detail(null, []));
   expect(await screen.findByText("Jobs (2)")).toBeInTheDocument();
@@ -93,4 +137,5 @@ it("shows muted dashes when nothing has been compared", async () => {
   expect(dashes).toHaveLength(3);
   for (const dash of dashes)
     expect(dash.className).toContain("text-muted-foreground");
+  expect(screen.queryByText("Better than chance")).not.toBeInTheDocument();
 });

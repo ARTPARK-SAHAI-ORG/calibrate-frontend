@@ -9,6 +9,7 @@ import {
   OverallAgreementCards,
 } from "@/components/human-labelling/AgreementStatCard";
 import { KappaCell } from "@/components/human-labelling/KappaCell";
+import type { AnswerKind, KappaByKind } from "@/lib/agreementKappa";
 import {
   buildOverviewRows,
   overviewRows,
@@ -139,6 +140,38 @@ export function MeasureCell({
           chanceAgreement={group.chance_agreement}
         />
       </div>
+    </div>
+  );
+}
+
+const ANSWER_KINDS: AnswerKind[] = ["binary", "rating"];
+
+/** One line per kind of answer: its label at one width so the values line
+ * up, then that kind's agreement, kappa and chance bar, or a muted dash. */
+export function AnswerKindLines({
+  kinds,
+}: {
+  kinds: readonly KappaByKind[] | null | undefined;
+}) {
+  return (
+    <div className="space-y-3">
+      {ANSWER_KINDS.map((kind) => {
+        const entry = kinds?.find((k) => k.answer_kind === kind);
+        return (
+          <div key={kind} className="flex items-start gap-3">
+            <span className="w-28 shrink-0 text-sm font-medium text-foreground">
+              {kind === "binary" ? "Binary labels" : "Rating labels"}
+            </span>
+            <MeasureCell
+              group={{
+                ...entry,
+                current: entry?.agreement ?? null,
+                pair_count: entry?.pair_count ?? 0,
+              }}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

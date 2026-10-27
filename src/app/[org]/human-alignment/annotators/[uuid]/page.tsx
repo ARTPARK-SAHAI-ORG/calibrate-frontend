@@ -24,8 +24,11 @@ import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import type { KappaByKind } from "@/lib/agreementKappa";
-import { KappaKindLines } from "@/components/human-labelling/KappaCell";
-import { AgreementStatCard } from "@/components/human-labelling/AgreementStatCard";
+import { AnswerKindLines } from "@/components/human-labelling/AgreementOverviewTable";
+import {
+  AgreementStatCard,
+  ChanceLegend,
+} from "@/components/human-labelling/AgreementStatCard";
 
 type Tab = "overview" | "jobs";
 
@@ -332,13 +335,16 @@ function AnnotatorDetailPageInner() {
               </div>
             )}
 
+            {stats?.kappa_by_kind?.some((k) => k.agreement != null) && (
+              <ChanceLegend />
+            )}
             <AgreementStatCard
               staticPillText="Agreement with others"
               agreement={stats?.current_agreement}
               fullWidth
             >
               <div className="mt-3">
-                <KappaKindLines kinds={stats?.kappa_by_kind} />
+                <AnswerKindLines kinds={stats?.kappa_by_kind} />
               </div>
             </AgreementStatCard>
           </div>
