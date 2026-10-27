@@ -23,6 +23,8 @@ npm run dev            # start Next dev server on :3000
 npm run build          # production build
 npm run start          # run production build
 npm run lint           # eslint (flat config, eslint.config.mjs)
+npm run lint:reuse -- src   # the rules below that send code to the shared helper
+npm run check:duplication   # fails on code copied, or an address repeated, by lines changed against main
 npm test               # jest (jsdom)
 npm test -- path/to/file.test.ts    # single test file
 npm test -- -t "test name"          # single test by name
@@ -212,6 +214,10 @@ Where it lives today, and what counts as one unit of work:
 
 ## Conventions worth knowing
 
+- **Two checks stop new copies, before every commit (`.husky/pre-commit`) and in the CI job "Reuse and copied code".**
+  - `npm run lint:reuse` runs `eslint.reuse.config.mjs`, which holds only these rules, because the full `npm run lint` already fails on hundreds of older errors. A hand-written `fetch` (also `window.`/`globalThis.fetch`) instead of `apiClient`, a browser `title=` instead of `Tooltip` (an iframe's is allowed), `router.push`/`router.replace` written inside an `onClick` instead of `Link`, `useSession` instead of `useAuth`, and `console.*` instead of `reportError`.
+  - Places that broke a rule before it existed are counted per file and rule in `eslint-reuse-suppressions.json`. Only a new one fails, and when it does ESLint lists every match in that file, old ones included. Fixing an old one also fails, asking for the count to come down: run `npx eslint -c eslint.reuse.config.mjs --suppressions-location eslint-reuse-suppressions.json --prune-suppressions src` and commit the file, so the room left by the fix cannot be used by a new break.
+  - `npm run check:duplication` (`scripts/check-duplication.mjs`, tests in `scripts/check-duplication.test.mjs`, run with `node --test`) runs jscpd over `src/` and fails when a copy of 100 tokens or more is mostly lines that were changed, or a changed line types a web address another file already has (the w3.org and schema.org names inside SVG and page data are allowed). Editing a line inside a copy already on `main` is allowed. In CI it checks the whole branch against `main`; before a commit, with `--staged`, only what that commit adds. It stops with a message when it cannot find `main`.
 - Read a backend time with `parseBackendTime` from `src/lib/relativeTime.ts`, never `new Date(value.replace(" ", "T"))`. The backend writes UTC with no zone ("2026-08-22 02:16:02"), and reading that as local time showed times 5½ hours early in India. Jest runs every test in `Asia/Kolkata` (set in `jest.config.js`) so this mistake fails a test even on a UTC machine.
 - An explaining note on a page is `InfoNote` from `@/components/ui`: the blue box with the "i" icon. Use it rather than copying its classes.
 - A box saying what went wrong is `ErrorNote` from `@/components/ui`: the red box, dark red text in light mode. Use it rather than writing red border and background classes by hand; pass only layout classes (margins, width, spacing). A failed run is `RunFailureBox`, which has its own heading and details.
