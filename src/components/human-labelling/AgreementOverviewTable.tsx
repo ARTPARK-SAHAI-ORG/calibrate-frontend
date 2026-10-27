@@ -112,7 +112,8 @@ const DASH = <span className="text-sm text-muted-foreground">—</span>;
 /**
  * One measure's agreement, kappa and chance bar, laid out three ways:
  * - `table`: agreement and kappa on one line over the bar, for a table cell.
- * - `hover`: the same with a larger number and more room, for a hover box.
+ * - `hover`: the same with a larger number, more room, and the chance under
+ *   the bar, for a hover box.
  * - `card`: a large number, the bar, then the chance and the kappa on one
  *   line, for a column of a card.
  * With no agreement it is a muted dash, large in a card.
@@ -173,6 +174,11 @@ export function MeasureCell({
         {kappa}
       </div>
       {bar}
+      {variant === "hover" && group.chance_agreement != null && (
+        <div className="mt-1.5 text-[11px] text-muted-foreground tabular-nums">
+          Chance {Math.round(group.chance_agreement * 100)}%
+        </div>
+      )}
     </div>
   );
 }

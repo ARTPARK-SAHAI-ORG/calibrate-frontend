@@ -1,13 +1,18 @@
 "use client";
 
-import type { ComponentProps, ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import {
   CartesianGrid,
   Legend,
   Line,
   LineChart,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -34,10 +39,33 @@ export function TrendHoverBox({
   );
 }
 
+type HoveredPoint = {
+  key: string;
+  label: string;
+  x: number;
+  y: number;
+  /** The box goes on the right of the point unless that runs out of room. */
+  onRight: boolean;
+};
+
+type DotProps = {
+  cx?: number;
+  cy?: number;
+  index?: number;
+  payload?: { key?: string; label?: string };
+};
+
+/** How long the hover box waits after the mouse leaves the point and the
+ * box before closing, so the mouse can cross from one to the other. */
+const CLOSE_DELAY_MS = 200;
+const HIT_RADIUS = 10;
+
 /**
  * Agreement and kappa over time on one chart: agreement on the left axis as
- * a percentage, kappa on its own axis on the right. The page draws the hover
- * box for each point.
+ * a percentage, kappa on its own axis on the right. Hovering a point opens
+ * the page's box for it beside the point; the box takes the mouse, so its
+ * own hover text can be read, and clicking a point keeps it open until a
+ * click elsewhere or Escape.
  */
 export function AgreementTrendChart({
   series,
@@ -54,8 +82,87 @@ export function AgreementTrendChart({
   renderHover: (pointKey: string, label: string) => ReactNode;
 }) {
   const { data, lines, kappaDomain } = buildTrendChart(series);
+  const [hovered, setHovered] = useState<HoveredPoint | null>(null);
+  const [pinned, setPinned] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  };
+  const scheduleClose = () => {
+    if (pinned) return;
+    cancelClose();
+    closeTimer.current = setTimeout(() => setHovered(null), CLOSE_DELAY_MS);
+  };
+  useEffect(() => cancelClose, []);
+  useEffect(() => {
+    if (!pinned) return;
+    const unpin = () => {
+      setPinned(false);
+      setHovered(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") unpin();
+    };
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (boxRef.current?.contains(target) || target.closest("[data-trend-dot]"))
+        return;
+      unpin();
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [pinned]);
+
+  const renderDot = (color: string, { cx, cy, index, payload }: DotProps) => {
+    if (cx == null || cy == null || !payload?.key) return <g key={index} />;
+    const key = payload.key;
+    const point = () => ({
+      key,
+      label: String(payload.label ?? ""),
+      x: cx,
+      y: cy,
+      onRight: cx < (containerRef.current?.offsetWidth ?? 0) / 2,
+    });
+    return (
+      <g
+        key={index}
+        data-trend-dot=""
+        data-testid="trend-dot"
+        style={{ cursor: "pointer" }}
+        onMouseEnter={() => {
+          cancelClose();
+          if (!pinned) setHovered(point());
+        }}
+        onMouseLeave={scheduleClose}
+        onClick={() => {
+          cancelClose();
+          setHovered(point());
+          setPinned(true);
+        }}
+      >
+        <circle
+          cx={cx}
+          cy={cy}
+          r={dotRadius}
+          fill="var(--background)"
+          stroke={color}
+          strokeWidth={2}
+        />
+        <circle cx={cx} cy={cy} r={HIT_RADIUS} fill="transparent" />
+      </g>
+    );
+  };
+
   return (
-    <div className={className}>
+    <div ref={containerRef} className={`relative ${className}`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(125,125,125,0.15)" />
@@ -74,13 +181,6 @@ export function AgreementTrendChart({
             fontSize={11}
             tick={TICK}
           />
-          <Tooltip
-            content={({ active, payload, label }) => {
-              const row = payload?.[0]?.payload as { key?: string } | undefined;
-              if (!active || !row?.key) return null;
-              return renderHover(row.key, String(label ?? ""));
-            }}
-          />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           {lines.map((line) => (
             <Line
@@ -92,11 +192,33 @@ export function AgreementTrendChart({
               name={line.name}
               stroke={line.color}
               strokeWidth={2}
-              dot={{ r: dotRadius, fill: "var(--background)" }}
+              dot={(props: DotProps) => renderDot(line.color, props)}
+              activeDot={false}
+              isAnimationActive={false}
             />
           ))}
         </LineChart>
       </ResponsiveContainer>
+      {hovered && (
+        <div
+          ref={boxRef}
+          data-testid="trend-hover"
+          className="absolute z-10"
+          style={{
+            left: hovered.onRight
+              ? hovered.x + HIT_RADIUS + 4
+              : hovered.x - HIT_RADIUS - 4,
+            top: hovered.y,
+            transform: hovered.onRight
+              ? "translateY(-50%)"
+              : "translate(-100%, -50%)",
+          }}
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+        >
+          {renderHover(hovered.key, hovered.label)}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import React from "react";
-import { render, screen } from "@/test-utils";
+import { act, fireEvent, render, screen } from "@/test-utils";
 import { AgreementTrendChart } from "../AgreementTrendChart";
+import { KappaCell } from "@/components/human-labelling/KappaCell";
 
 // jsdom cannot lay out the chart, so the axes and lines are never drawn.
 // Standing in for them shows which axis each line is put on.
@@ -12,23 +13,6 @@ jest.mock("recharts", () => {
   return {
     CartesianGrid: nothing,
     Legend: nothing,
-    // Hands the custom hover a point, as hovering the first point would.
-    Tooltip: (props: {
-      content?: (p: {
-        active: boolean;
-        label: string;
-        payload: { payload: { key: string } }[];
-      }) => React.ReactNode;
-    }) =>
-      props.content ? (
-        <div data-testid="hover">
-          {props.content({
-            active: true,
-            label: "v1",
-            payload: [{ payload: { key: "1" } }],
-          })}
-        </div>
-      ) : null,
     XAxis: nothing,
     ResponsiveContainer: pass,
     LineChart: pass,
@@ -46,11 +30,20 @@ jest.mock("recharts", () => {
         data-side={props.orientation ?? "left"}
       />
     ),
+    // Draws the line's own dots for two points, one on each half of a
+    // 600px wide chart, so the hover can be driven from them.
     Line: (props: {
       name: string;
       strokeDasharray?: string;
       yAxisId?: string;
       stroke?: string;
+      dataKey: string;
+      dot?: (p: {
+        cx: number;
+        cy: number;
+        index: number;
+        payload: { key: string; label: string };
+      }) => React.ReactNode;
     }) => (
       <div
         data-testid="line"
@@ -58,7 +51,14 @@ jest.mock("recharts", () => {
         data-dash={props.strokeDasharray ?? ""}
         data-axis={props.yAxisId}
         data-colour={props.stroke}
-      />
+      >
+        {props.dataKey.endsWith("__kappa") ? null : (
+          <svg>
+            {props.dot?.({ cx: 100, cy: 50, index: 0, payload: { key: "1", label: "v1" } })}
+            {props.dot?.({ cx: 500, cy: 60, index: 1, payload: { key: "2", label: "v2" } })}
+          </svg>
+        )}
+      </div>
     ),
   };
 });
@@ -112,19 +112,126 @@ describe("agreement and kappa drawn together", () => {
     render(<AgreementTrendChart series={versions([null])} renderHover={() => null} />);
     expect(lineNames()).toEqual(["Agreement", "Kappa"]);
   });
+});
 
-  it("draws the page's own hover box for the hovered point", () => {
+describe("the hover box", () => {
+  const series = [
+    {
+      key: "agreement",
+      name: "Agreement",
+      kappaName: "Kappa",
+      color: "var(--chart-2)",
+      kappaColor: "var(--chart-1)",
+      points: [
+        { key: "1", label: "v1", agreement: 0.5, kappa: 0.2, kappa_type: "cohen" as const },
+        { key: "2", label: "v2", agreement: 0.6, kappa: 0.3, kappa_type: "cohen" as const },
+      ],
+    },
+  ];
+  const renderChart = () =>
     render(
       <AgreementTrendChart
-        series={versions([0.4])}
+        series={series}
         renderHover={(key, label) => (
-          <span>
-            point {key} {label}
-          </span>
+          <div>
+            box {key} {label}
+            <button type="button">inside</button>
+          </div>
         )}
       />,
     );
-    expect(screen.getByTestId("hover")).toHaveTextContent("point 1 v1");
+  const dots = () => screen.getAllByTestId("trend-dot");
+  const box = () => screen.queryByTestId("trend-hover");
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+      configurable: true,
+      value: 600,
+    });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+    // jsdom's own value, so other tests are not affected.
+    Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+      configurable: true,
+      value: 0,
+    });
+  });
+
+  it("opens beside the hovered point, not at the mouse", () => {
+    renderChart();
+    fireEvent.mouseEnter(dots()[0]);
+    expect(box()).toHaveTextContent("box 1 v1");
+    // Left half of the chart, so the box sits to the right of the point.
+    expect(box()!.style.left).toBe("114px");
+    expect(box()!.style.top).toBe("50px");
+    fireEvent.mouseEnter(dots()[1]);
+    expect(box()).toHaveTextContent("box 2 v2");
+    // Right half, so the box sits to its left.
+    expect(box()!.style.left).toBe("486px");
+    expect(box()!.style.transform).toContain("-100%");
+  });
+
+  it("stays open while the mouse crosses from the point into the box", () => {
+    renderChart();
+    fireEvent.mouseEnter(dots()[0]);
+    fireEvent.mouseLeave(dots()[0]);
+    act(() => jest.advanceTimersByTime(100));
+    fireEvent.mouseEnter(box()!);
+    act(() => jest.advanceTimersByTime(1000));
+    expect(box()).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "inside" })).toBeInTheDocument();
+  });
+
+  it("closes about 200ms after the mouse has left both", () => {
+    renderChart();
+    fireEvent.mouseEnter(dots()[0]);
+    fireEvent.mouseLeave(dots()[0]);
+    fireEvent.mouseEnter(box()!);
+    fireEvent.mouseLeave(box()!);
+    act(() => jest.advanceTimersByTime(150));
+    expect(box()).toBeInTheDocument();
+    act(() => jest.advanceTimersByTime(100));
+    expect(box()).not.toBeInTheDocument();
+  });
+
+  it("stays open after a click until Escape", () => {
+    renderChart();
+    fireEvent.click(dots()[0]);
+    fireEvent.mouseLeave(dots()[0]);
+    act(() => jest.advanceTimersByTime(1000));
+    expect(box()).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(box()).not.toBeInTheDocument();
+  });
+
+  it("stays open after a click until a click elsewhere, but not a click inside it", () => {
+    renderChart();
+    fireEvent.click(dots()[0]);
+    fireEvent.mouseDown(screen.getByRole("button", { name: "inside" }));
+    expect(box()).toBeInTheDocument();
+    fireEvent.mouseDown(document.body);
+    expect(box()).not.toBeInTheDocument();
+  });
+
+  it("lets the mouse reach the kind of kappa inside the box", () => {
+    render(
+      <AgreementTrendChart
+        series={series}
+        renderHover={() => (
+          <KappaCell fields={{ kappa: 0.2, kappa_type: "cohen" }} />
+        )}
+      />,
+    );
+    fireEvent.mouseEnter(dots()[0]);
+    fireEvent.mouseLeave(dots()[0]);
+    fireEvent.mouseEnter(box()!);
+    const icon = screen.getByRole("button", { name: "Cohen's kappa" });
+    fireEvent.mouseEnter(icon.parentElement!);
+    act(() => jest.advanceTimersByTime(1000));
+    expect(box()).toBeInTheDocument();
+    expect(screen.getByText("Cohen's kappa")).toBeInTheDocument();
   });
 });
 

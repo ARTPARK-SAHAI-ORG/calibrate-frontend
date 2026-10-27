@@ -642,6 +642,12 @@ describe("the Agreement tab", () => {
     expect(hover).toHaveTextContent("80%Kappa0.50");
     // The hover uses the roomier cell, with a larger number than the table.
     expect(within(hover).getByText("80%").className).toContain("text-base");
+    // No chance number for this version, so no chance line.
+    expect(within(hover).queryByText(/^Chance/)).not.toBeInTheDocument();
+    // The legend explains the bar, as on the Overview tab.
+    expect(
+      screen.getByText("Agreement expected by chance alone"),
+    ).toBeInTheDocument();
     expect(within(hover).getByTestId("agreement-fill").style.width).toBe("80%");
     expect(
       (global.fetch as jest.Mock).mock.calls.some(([url]) =>
@@ -684,6 +690,8 @@ describe("the Agreement tab", () => {
     render(<EvaluatorDetailPage />);
     const hover = await screen.findByTestId("hover-ver-2");
     expect(hover).toHaveTextContent("50%KappaToo few items");
+    // The chance is spelled out under the bar.
+    expect(within(hover).getByText("Chance 50%")).toBeInTheDocument();
     expect(within(hover).getByTestId("hover-label").textContent).toBe("v2");
     expect(within(hover).getByTestId("chance-tick").style.left).toBe("50%");
   });

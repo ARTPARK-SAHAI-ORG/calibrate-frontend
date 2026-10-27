@@ -19,6 +19,7 @@ import {
   TrendHoverBox,
 } from "@/components/charts/AgreementTrendChart";
 import { MeasureCell } from "@/components/human-labelling/AgreementOverviewTable";
+import { ChanceLegend } from "@/components/human-labelling/AgreementStatCard";
 import { Tooltip } from "@/components/Tooltip";
 import type { KappaFields } from "@/lib/agreementKappa";
 import { NotFoundState, InfoNote } from "@/components/ui";
@@ -1893,7 +1894,8 @@ function AgreementTrendTab({
           </p>
         </div>
       ) : (
-        <div className="border border-border rounded-xl p-4 md:p-6">
+        <div className="border border-border rounded-xl p-4 md:p-6 space-y-3">
+          <ChanceLegend />
           <AgreementTrendChart
             className="w-full h-64 md:h-72"
             dotRadius={4}
