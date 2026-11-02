@@ -48,5 +48,6 @@ export {
 export { useItemPager } from "./useItemPager";
 export { useDialogNavKeys } from "./useDialogNavKeys";
 export { useResizableWidth } from "./useResizableWidth";
+export { useSavedColumnWidth } from "./useSavedColumnWidth";
 export { useUnsavedChangesPrompt } from "./useUnsavedChangesPrompt";
 export { useDismissOnOutside } from "./useDismissOnOutside";
