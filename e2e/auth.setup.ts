@@ -23,14 +23,14 @@ const ONBOARDING_SEEN_KEY = "calibrate:onboarding:v1:first-eval";
 
 setup("create account and save auth state", async ({ page, request, baseURL }) => {
   // Unique email per run so re-runs don't collide with an existing account.
-  const email = `e2e+${Date.now()}@test.local`;
+  const email = process.env.E2E_EMAIL ?? `e2e+${Date.now()}@test.local`;
 
   const res = await request.post(`${BACKEND_URL}/auth/signup`, {
     data: {
       email,
       password: "test123456",
-      first_name: "E2E",
-      last_name: "Bot",
+      first_name: process.env.E2E_FIRST_NAME ?? "E2E",
+      last_name: process.env.E2E_LAST_NAME ?? "Bot",
     },
   });
   expect(

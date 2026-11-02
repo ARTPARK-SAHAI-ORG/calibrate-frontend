@@ -118,6 +118,24 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], storageState: STORAGE_STATE },
       dependencies: ["setup"],
     },
+    // Builds the docs example in a fresh workspace and saves one PNG per docs
+    // picture. Never part of the test runs; see e2e/docs-screenshots/.
+    {
+      name: "docs-screenshots",
+      testMatch: /docs-screenshots\/.*\.docs\.ts$/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: STORAGE_STATE,
+        viewport: { width: 1440, height: 900 },
+        colorScheme: "light",
+        // A click or page that never resolves fails its shot instead of
+        // hanging the whole run.
+        actionTimeout: 15_000,
+        // The dev server compiles each page on first visit.
+        navigationTimeout: 60_000,
+      },
+      dependencies: ["setup"],
+    },
   ],
   webServer: {
     command: `npm run dev -- -p ${PORT}`,
