@@ -2116,53 +2116,13 @@ describe("AnnotationJobView message versions", () => {
     },
   };
 
-  it("draws no version toggle for an item whose turns carry no versions", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
-    render(<AnnotationJobView token="tok" mode="public" />);
-    await waitFor(() =>
-      expect(screen.getByText("Item One")).toBeInTheDocument(),
-    );
-    expect(screen.queryByText("All versions")).not.toBeInTheDocument();
-    expect(screen.queryByText("Default only")).not.toBeInTheDocument();
-  });
-
-  it("shows every version by default and hides the others on Default only", async () => {
-    const user = setupUser();
+  it("shows every version with no switch to hide them", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(jobResponse({ items: [withVersions] })),
     );
     render(<AnnotationJobView token="tok" mode="public" />);
-    await waitFor(() =>
-      expect(screen.getByText("All versions")).toBeInTheDocument(),
-    );
-    expect(screen.getByText("All versions")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByText("namaste")).toBeInTheDocument();
-
-    await user.click(screen.getByText("Default only"));
-    expect(screen.getByText("Default only")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByText("All versions")).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    expect(screen.queryByText("namaste")).not.toBeInTheDocument();
-
-    await user.click(screen.getByText("All versions"));
-    expect(screen.getByText("namaste")).toBeInTheDocument();
-  });
-
-  it("keeps the version toggle in the admin read-only view", async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse(jobResponse({ items: [withVersions], read_only: true })),
-    );
-    render(<AnnotationJobView token="tok" mode="admin" />);
-    await waitFor(() =>
-      expect(screen.getByText("Default only")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("namaste")).toBeInTheDocument());
+    expect(screen.queryByText("All versions")).not.toBeInTheDocument();
+    expect(screen.queryByText("Default only")).not.toBeInTheDocument();
   });
 });

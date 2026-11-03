@@ -21,10 +21,8 @@ import { Section } from "./shared";
  */
 export function LlmGeneralItemPane({
   payload,
-  showVersions = true,
 }: {
   payload: Record<string, unknown>;
-  showVersions?: boolean;
 }) {
   const inputField = readTextField(payload.input);
   const outputField = readTextField(payload.output);
@@ -56,13 +54,11 @@ export function LlmGeneralItemPane({
         <p className="text-sm whitespace-pre-wrap break-words">
           {input || "—"}
         </p>
-        {showVersions && (
-          <TurnVersionBubbles
-            versions={inputField?.versions}
-            side="assistant"
-            pillColor={TEXT_FIELD_COLOR_CLASS.input}
-          />
-        )}
+        <TurnVersionBubbles
+          versions={inputField?.versions}
+          side="assistant"
+          pillColor={TEXT_FIELD_COLOR_CLASS.input}
+        />
       </Section>
       <Section
         title="Output"
@@ -72,13 +68,11 @@ export function LlmGeneralItemPane({
         {output && (
           <p className="text-sm whitespace-pre-wrap break-words">{output}</p>
         )}
-        {showVersions && (
-          <TurnVersionBubbles
-            versions={outputField?.versions}
-            side="assistant"
-            pillColor={TEXT_FIELD_COLOR_CLASS.output}
-          />
-        )}
+        <TurnVersionBubbles
+          versions={outputField?.versions}
+          side="assistant"
+          pillColor={TEXT_FIELD_COLOR_CLASS.output}
+        />
         {toolCalls.length > 0 && (
           <div className={`space-y-3 ${output ? "mt-3" : ""}`}>
             {toolCalls.map((toolCall, index) => {

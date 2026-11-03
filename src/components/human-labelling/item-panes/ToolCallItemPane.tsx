@@ -22,10 +22,8 @@ import { normaliseHistoryItem } from "./shared";
  */
 export function ToolCallItemPane({
   payload,
-  showVersions = true,
 }: {
   payload: Record<string, unknown>;
-  showVersions?: boolean;
 }) {
   const history: TestCaseHistory[] = [];
   if (Array.isArray(payload.chat_history)) {
@@ -63,7 +61,6 @@ export function ToolCallItemPane({
       history={history}
       passed={true}
       highlightEvalTarget
-      showVersions={showVersions}
     />
   );
 }

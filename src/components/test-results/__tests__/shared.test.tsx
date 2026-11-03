@@ -729,34 +729,6 @@ describe("TestDetailView", () => {
     expect(screen.getByText("Hello").closest(".border-dashed")).toBeTruthy();
   });
 
-  it("hides version bubbles but keeps labels when showVersions is false", () => {
-    const { container } = render(
-      <TestDetailView
-        history={[
-          {
-            role: "user",
-            content: "Namaste",
-            label: "Patient",
-            versions: { English: "Hello" },
-          },
-          {
-            role: "assistant",
-            content: "Kaise ho",
-            label: "Nurse",
-            versions: { English: "How are you" },
-          },
-        ]}
-        passed={true}
-        showVersions={false}
-      />,
-    );
-    expect(screen.getByText("Patient")).toBeInTheDocument();
-    expect(screen.getByText("Nurse")).toBeInTheDocument();
-    expect(screen.queryByText("English")).not.toBeInTheDocument();
-    expect(screen.queryByText("Hello")).not.toBeInTheDocument();
-    expect(container.querySelectorAll(".border-dashed")).toHaveLength(0);
-  });
-
   it("renders an assistant tool-call turn with its inline tool response", () => {
     const history: TestCaseHistory[] = [
       {
@@ -1331,27 +1303,4 @@ describe("TestDetailView with a malformed label or versions from the API", () =>
 });
 
 describe("TestDetailView JSON view with versions hidden", () => {
-  it("leaves versions out of the JSON when showVersions is false", async () => {
-    const user = setupUser();
-    const history = [
-      {
-        role: "user" as const,
-        content: "hi",
-        label: "Caller",
-        versions: { Hindi: "namaste" },
-      },
-    ];
-    const { unmount } = render(
-      <TestDetailView history={history} passed={true} showVersions={false} />,
-    );
-    await user.click(screen.getByRole("button", { name: "JSON" }));
-    const json = document.querySelector("pre")?.textContent ?? "";
-    expect(json).toContain('"label": "Caller"');
-    expect(json).not.toContain("namaste");
-    unmount();
-
-    render(<TestDetailView history={history} passed={true} />);
-    await user.click(screen.getByRole("button", { name: "JSON" }));
-    expect(document.querySelector("pre")?.textContent ?? "").toContain("namaste");
-  });
 });

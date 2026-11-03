@@ -178,19 +178,4 @@ describe("ConversationItemPane", () => {
     expect(screen.getByText("Hindi")).toBeInTheDocument();
     expect(screen.getByText("नमस्ते")).toBeInTheDocument();
   });
-
-  it("hides a turn's versions when showVersions is false", () => {
-    render(
-      <ConversationItemPane
-        showVersions={false}
-        payload={{
-          transcript: [
-            { role: "user", content: "Hi", versions: { Hindi: "नमस्ते" } },
-          ],
-        }}
-      />,
-    );
-    expect(screen.getByText("Hi")).toBeInTheDocument();
-    expect(screen.queryByText("नमस्ते")).not.toBeInTheDocument();
-  });
 });

@@ -951,7 +951,6 @@ export function TestDetailView({
   enableEvaluatorLinks = true,
   highlightEvalTarget = false,
   showVerdict = true,
-  showVersions = true,
   markOutput = true,
 }: {
   history: TestCaseHistory[];
@@ -983,9 +982,6 @@ export function TestDetailView({
    * turn (left border) but pass/fail chrome is omitted. Used by traces,
    * which are not scored. */
   showVerdict?: boolean;
-  /** When false, a turn's other forms (`versions`) are not drawn under its
-   * bubble. Labels still show. */
-  showVersions?: boolean;
   /** When false, the final reply gets no left border: nothing on screen is
    * being judged, as in a whole conversation read back. */
   markOutput?: boolean;
@@ -1057,13 +1053,7 @@ export function TestDetailView({
     // Mirror what the UI shows: the prior turns (`history`) followed by the
     // agent's evaluated response (`output`) appended as the final turn(s),
     // so the JSON is the full conversation, not just the prefix.
-    const turns: Array<Record<string, unknown>> = showVersions
-      ? [...history]
-      : history.map((turn) =>
-          Object.fromEntries(
-            Object.entries(turn).filter(([key]) => key !== "versions"),
-          ),
-        );
+    const turns: Array<Record<string, unknown>> = [...history];
     if (output?.response) {
       turns.push({ role: "assistant", content: output.response });
     }
@@ -1071,7 +1061,7 @@ export function TestDetailView({
       turns.push(...outputToolCallsToHistory(output.tool_calls));
     }
     return JSON.stringify(turns, null, 2);
-  }, [history, output, showVersions]);
+  }, [history, output]);
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Basic agent tests: one Input/Output box pair, no chat
@@ -1177,12 +1167,10 @@ export function TestDetailView({
                             </span>
                           )}
                         </div>
-                        {showVersions && (
-                          <TurnVersionBubbles
-                            versions={message.versions}
-                            side="user"
-                          />
-                        )}
+                        <TurnVersionBubbles
+                          versions={message.versions}
+                          side="user"
+                        />
                       </>
                     )}
 
@@ -1211,12 +1199,10 @@ export function TestDetailView({
                             </span>
                           )}
                         </div>
-                        {showVersions && (
-                          <TurnVersionBubbles
-                            versions={message.versions}
-                            side="assistant"
-                          />
-                        )}
+                        <TurnVersionBubbles
+                          versions={message.versions}
+                          side="assistant"
+                        />
                       </>
                     )}
 
