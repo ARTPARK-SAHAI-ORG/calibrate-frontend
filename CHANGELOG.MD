@@ -1,5 +1,6 @@
 ## November 2026
 
+- The quote on the Noora Health card on the landing page now names who said it, Zezhen Wu of The Agency Fund ([#799](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/799))
 - The labelling job page no longer has the All versions / Default only switch, and every version of a message always shows ([#797](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/797))
 - The landing page now shows Maisha Meds as a fifth partner card under "Trusted by mission-driven teams", with what they do and their use case ([#793](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/793))
 - Hovering over a long reply in the Output column of an agent's traces no longer opens a pop-up, and clicking the row still shows the whole reply ([#795](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/795))
