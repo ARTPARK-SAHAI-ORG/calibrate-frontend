@@ -82,4 +82,12 @@ describe("Customer cards", () => {
       }),
     ).toHaveAttribute("src", "/use-cases/maisha-meds.png");
   });
+
+  it("names who said the Noora Health quote", () => {
+    render(<HomePage />);
+
+    expect(
+      within(card("Noora Health")).getByText("Zezhen Wu, The Agency Fund"),
+    ).toBeInTheDocument();
+  });
 });
