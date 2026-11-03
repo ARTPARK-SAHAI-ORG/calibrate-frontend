@@ -5,7 +5,7 @@ import confetti from "canvas-confetti";
 import { getBackendUrl } from "@/lib/api";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
-import { ErrorNote, type MetadataEntry } from "@/components/ui";
+import { ErrorNote, InfoNote, type MetadataEntry } from "@/components/ui";
 import { ItemDetailsBlock } from "./ItemDetailsBlock";
 import { JobItemColumns } from "./JobItemColumns";
 import {
@@ -181,6 +181,14 @@ function evaluatorsForItem(
  * Everything that asks "is this item finished?" goes through here. */
 function requiredOnly(evaluators: Evaluator[]): Evaluator[] {
   return evaluators.filter((ev) => ev.is_optional !== true);
+}
+
+/** What the labeller reads in the item column, for the line above the questions. */
+function itemToReadFor(taskType: Task["type"]): string {
+  if (taskType === "stt") return "Read the transcripts";
+  if (taskType === "tts") return "Read the text and listen to the audio";
+  if (taskType === "llm-general") return "Read the input and output";
+  return "Read the conversation";
 }
 
 function readSavedComment(v: unknown): string {
@@ -1183,9 +1191,7 @@ function AnnotateView({
         )}
 
         {topError && (
-          <ErrorNote className="mx-4 md:mx-6 mt-3">
-            {topError}
-          </ErrorNote>
+          <ErrorNote className="mx-4 md:mx-6 mt-3">{topError}</ErrorNote>
         )}
 
         <div className="flex-1 flex flex-col md:flex-row min-h-0">
@@ -1256,7 +1262,7 @@ function AnnotateView({
             </div>
           </div>
 
-          <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
+          <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden scroll-pt-14">
             {!currentItem ? (
               <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground w-full">
                 {filterActive
@@ -1279,6 +1285,7 @@ function AnnotateView({
                   <EvaluatorsPane
                     evaluators={evaluators}
                     item={currentItem}
+                    taskType={data.task.type}
                     fields={fields}
                     setField={setField}
                     readOnly={isAdmin}
@@ -1401,6 +1408,7 @@ export function ItemPane({
 function EvaluatorsPane({
   evaluators,
   item,
+  taskType,
   fields,
   setField,
   readOnly,
@@ -1411,6 +1419,7 @@ function EvaluatorsPane({
 }: {
   evaluators: Evaluator[];
   item: Item;
+  taskType: Task["type"];
   fields: Record<FieldKey, FieldValue>;
   setField: (key: FieldKey, partial: Partial<FieldValue>) => void;
   readOnly: boolean;
@@ -1486,19 +1495,58 @@ function EvaluatorsPane({
     return out;
   })();
 
+  const isBlank = (ev: Evaluator) => {
+    const f = fields[fieldKey(item.uuid, ev.uuid)];
+    return !f || f.value === undefined || f.value === null || f.value === "";
+  };
+  // An evaluator of a type this page cannot draw has nothing to answer, so it
+  // gets no number and does not count towards the total.
+  const questions = evaluatorsForItem(evaluators, item).filter(
+    (ev) => ev.output_type === "binary" || ev.output_type === "rating",
+  );
+  const nextUnanswered = questions.find(isBlank);
+  const showGuidance = !readOnly && questions.length > 0;
+
   return (
     <div className="space-y-3 pb-4 md:pb-6">
+      {showGuidance && (
+        <div className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-2 bg-background border-b border-border flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+          <span className="font-medium">
+            {questions.filter((ev) => !isBlank(ev)).length} of{" "}
+            {questions.length} answered
+          </span>
+          {nextUnanswered && (
+            <button
+              type="button"
+              onClick={() =>
+                document
+                  .getElementById(`question-${nextUnanswered.uuid}`)
+                  ?.scrollIntoView?.({ behavior: "smooth", block: "start" })
+              }
+              className="text-xs underline text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              Go to the next unanswered question
+            </button>
+          )}
+        </div>
+      )}
+      {showGuidance && (
+        <InfoNote>
+          <span>
+            {itemToReadFor(taskType)}
+            <span className="hidden md:inline"> on the left</span>, then answer
+            the questions below
+          </span>
+        </InfoNote>
+      )}
       <ExpectedToolCalls payload={itemPayload} />
       <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
-      {commentBlock}
       {evaluatorsForItem(evaluators, item).map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);
         const f = fields[k];
         // Reviewing what came back: an optional evaluator the annotator
         // skipped has nothing to show, so drop the card entirely.
-        const blank =
-          !f || f.value === undefined || f.value === null || f.value === "";
-        if (readOnly && ev.is_optional === true && blank) return null;
+        if (readOnly && ev.is_optional === true && isBlank(ev)) return null;
         const variableValues = itemEvaluatorVariables[ev.uuid];
         const outputType =
           ev.output_type === "binary" || ev.output_type === "rating"
@@ -1567,31 +1615,34 @@ function EvaluatorsPane({
           );
         }
         return (
-          <EvaluatorVerdictCard
-            key={ev.uuid}
-            mode="write"
-            name={ev.name}
-            isOptional={ev.is_optional === true}
-            description={ev.description}
-            outputType={outputType}
-            evaluatorUuid={ev.uuid}
-            scaleMin={scaleMin}
-            scaleMax={scaleMax}
-            variableValues={variableValues}
-            value={f?.value as boolean | number | undefined}
-            comment={typeof f?.comment === "string" ? f.comment : ""}
-            reasoningMissing={missingReasoningKeys.has(k)}
-            reasoningMode={ev.reasoning_mode ?? "optional"}
-            onValueChange={(v) => setField(k, { value: v })}
-            onCommentChange={(s) => setField(k, { comment: s })}
-            trueLabel={trueLabel}
-            falseLabel={falseLabel}
-            trueDescription={trueDescription}
-            falseDescription={falseDescription}
-            ratingScale={ratingScale}
-          />
+          <div key={ev.uuid} id={`question-${ev.uuid}`}>
+            <EvaluatorVerdictCard
+              mode="write"
+              name={ev.name}
+              isOptional={ev.is_optional === true}
+              description={ev.description}
+              questionLabel={`Question ${questions.indexOf(ev) + 1} of ${questions.length}`}
+              outputType={outputType}
+              evaluatorUuid={ev.uuid}
+              scaleMin={scaleMin}
+              scaleMax={scaleMax}
+              variableValues={variableValues}
+              value={f?.value as boolean | number | undefined}
+              comment={typeof f?.comment === "string" ? f.comment : ""}
+              reasoningMissing={missingReasoningKeys.has(k)}
+              reasoningMode={ev.reasoning_mode ?? "optional"}
+              onValueChange={(v) => setField(k, { value: v })}
+              onCommentChange={(s) => setField(k, { comment: s })}
+              trueLabel={trueLabel}
+              falseLabel={falseLabel}
+              trueDescription={trueDescription}
+              falseDescription={falseDescription}
+              ratingScale={ratingScale}
+            />
+          </div>
         );
       })}
+      {commentBlock}
     </div>
   );
 }

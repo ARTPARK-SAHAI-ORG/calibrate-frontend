@@ -39,6 +39,10 @@ type CommonProps = {
   name: string;
   /** Short evaluator description, shown under the name. */
   description?: string | null;
+  /** "Question 3 of 12" above the name, for someone answering a list of
+   * these. The description is then the question they are reading, so it is
+   * drawn larger and darker. */
+  questionLabel?: string;
   /** Optional version label (e.g. "v3") shown as a small monospace pill
    * next to the name. Use this when annotators are evaluating against a
    * specific evaluator version so it stays visually distinct from the
@@ -209,6 +213,11 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
       {/* Header: name + verdict pill + toggle on one row; description
           on its own row below so it can use the full card width. */}
       <div className="space-y-1">
+        {props.questionLabel && (
+          <p className="text-xs font-medium text-muted-foreground">
+            {props.questionLabel}
+          </p>
+        )}
         <div className="flex items-center justify-between gap-2">
           {/* Name and version pill on one line. A long name is shortened
               with an ellipsis so the version pill always stays whole: it
@@ -263,7 +272,13 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
           </div>
         </div>
         {props.description && (
-          <p className="text-xs text-muted-foreground whitespace-normal break-words">
+          <p
+            className={`${
+              props.questionLabel
+                ? "text-sm text-foreground"
+                : "text-xs text-muted-foreground"
+            } whitespace-normal break-words`}
+          >
             {props.description}
           </p>
         )}

@@ -14,6 +14,18 @@ describe("ItemDetailsBlock", () => {
     expect(screen.getByText("district")).toBeInTheDocument();
   });
 
+  it("holds the description and the metadata in one box with one heading", () => {
+    render(
+      <ItemDetailsBlock
+        payload={{ description: "Mother asks" }}
+        metadata={[{ key: "district", value: "Pune" }]}
+      />,
+    );
+    const box = screen.getByText("Item details").parentElement;
+    expect(box).toContainElement(screen.getByText("Mother asks"));
+    expect(box).toContainElement(screen.getByText("district"));
+  });
+
   it("draws nothing for an item with neither", () => {
     const { container } = render(
       <ItemDetailsBlock payload={{ description: "   " }} metadata={[]} />,

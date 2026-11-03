@@ -2303,4 +2303,101 @@ describe("AnnotationJobView message versions", () => {
     expect(screen.queryByText("All versions")).not.toBeInTheDocument();
     expect(screen.queryByText("Default only")).not.toBeInTheDocument();
   });
+
+  describe("guiding the labeller through the questions", () => {
+    const itemWithDetails = {
+      ...items[0],
+      payload: { ...items[0].payload, description: "A mother asks" },
+    };
+
+    it("numbers the questions and counts the answers as they are given", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      const user = setupUser();
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await screen.findByText("Question 1 of 2");
+      expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
+      expect(screen.getByText("0 of 2 answered")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      expect(screen.getByText("1 of 2 answered")).toBeInTheDocument();
+    });
+
+    it("jumps to the first question left, and offers no jump once all are answered", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      const user = setupUser();
+      const { container } = render(
+        <AnnotationJobView token="tok" mode="public" />,
+      );
+      await screen.findByText("0 of 2 answered");
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+
+      const scroll = jest.mocked(Element.prototype.scrollIntoView);
+      scroll.mockClear();
+      await user.click(
+        screen.getByRole("button", {
+          name: "Go to the next unanswered question",
+        }),
+      );
+      expect(scroll.mock.contexts).toEqual([
+        container.querySelector("#question-ev-2"),
+      ]);
+
+      await user.click(screen.getByRole("button", { name: "3" }));
+      expect(screen.getByText("2 of 2 answered")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", {
+          name: "Go to the next unanswered question",
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ["llm", "Read the conversation"],
+      ["llm-general", "Read the input and output"],
+      ["stt", "Read the transcripts"],
+      ["tts", "Read the text and listen to the audio"],
+    ])("tells a %s labeller what to read", async (type, words) => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({ task: { uuid: "task-1", name: "My Task", type } }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      const line = await screen.findByText(words, { exact: false });
+      expect(line).toHaveTextContent(
+        `${words} on the left, then answer the questions below`,
+      );
+    });
+
+    it("orders the item details, then the questions, then the comments", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(jobResponse({ items: [itemWithDetails] })),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      const details = await screen.findByText("Item details");
+      const question = screen.getByText("Question 1 of 2");
+      const comments = screen.getByText("Comments (optional)");
+      expect(
+        details.compareDocumentPosition(question) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        question.compareDocumentPosition(comments) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("gives no guidance to someone only reading the answers", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(jobResponse({ read_only: true })),
+      );
+      render(<AnnotationJobView token="tok" mode="admin" />);
+      await screen.findByText("Correctness");
+      expect(screen.queryByText(/answered$/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Question 1/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Read the conversation", { exact: false }),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

@@ -15,8 +15,9 @@ export function hasItemDetails(
   return Boolean(itemDescriptionOf(payload)) || Boolean(metadata?.length);
 }
 
-/** An item's description and metadata, the way every view that shows one
- *  item draws them. Renders nothing when the item has neither. */
+/** An item's description and metadata in one box headed "Item details", the
+ *  way every view that shows one item draws them. Renders nothing when the item
+ *  has neither. */
 export function ItemDetailsBlock({
   payload,
   metadata,
@@ -24,9 +25,11 @@ export function ItemDetailsBlock({
   payload: unknown;
   metadata?: MetadataEntry[] | null;
 }) {
+  if (!hasItemDetails(payload, metadata)) return null;
   const description = itemDescriptionOf(payload);
   return (
-    <>
+    <section className="border border-border rounded-xl bg-muted/20 p-3 space-y-3">
+      <h2 className="text-sm font-semibold">Item details</h2>
       {description && (
         <div className="space-y-1.5">
           <h3 className="text-sm font-semibold">Description</h3>
@@ -36,6 +39,6 @@ export function ItemDetailsBlock({
         </div>
       )}
       <MetadataTable entries={metadata} />
-    </>
+    </section>
   );
 }
