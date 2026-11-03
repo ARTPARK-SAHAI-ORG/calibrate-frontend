@@ -1370,9 +1370,9 @@ export function TestDetailView({
   );
 }
 
-// A draggable divider between two columns, wired to a useResizableWidth
-// hook's startDrag. Desktop-only — the side columns it sits between are
-// full-width and stacked on mobile, so there's nothing to resize there.
+// A draggable divider between two columns, wired to the startDrag of a
+// useResizableWidth or useSavedColumnWidth hook. Desktop-only — the side
+// columns it sits between are full-width and stacked on mobile, so there's nothing to resize there.
 export function ResizeHandle({
   onMouseDown,
   label,

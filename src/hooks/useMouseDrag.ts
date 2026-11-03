@@ -20,8 +20,9 @@ export function useMouseDrag() {
       onMove: (ev: MouseEvent) => void,
       onRelease?: () => void,
     ) => {
-      // A right-click opens a menu that swallows the mouse release.
-      if (e.button !== 0) return;
+      // A right-click, or Control-click on a Mac, opens a menu that swallows
+      // the mouse release.
+      if (e.button !== 0 || e.ctrlKey) return;
       e.preventDefault();
       stopListening.current?.();
 
