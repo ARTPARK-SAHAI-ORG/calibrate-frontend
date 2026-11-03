@@ -1,3 +1,7 @@
+## November 2026
+
+- A labeller can now drag the divider between the item and the questions on a labelling job to make either side wider, and the width is remembered for every job ([#784](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/784))
+
 ## October 2026
 
 - The Agreement with humans column on an evaluation run's Summary tab now shows just "No human labels yet" for an evaluator with no human labels, without a dash in front ([#776](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/776))
