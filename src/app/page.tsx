@@ -47,6 +47,8 @@ const USE_CASES: {
   /** A point is plain text, or text that links out to supporting material. */
   useCase: (string | { text: string; href: string })[];
   quote?: string;
+  /** Who said the quote, shown under it. */
+  quoteBy?: string;
   /** Where "Read the story" goes: a post on this site, or a page elsewhere. */
   storyHref?: string;
 }[] = [
@@ -80,6 +82,7 @@ const USE_CASES: {
     ],
     quote:
       "Calibrate was intuitive to use by an old professor who has trouble navigating Zoom.",
+    quoteBy: "Zezhen Wu, The Agency Fund",
   },
   {
     name: "ARMMAN",
@@ -1187,6 +1190,11 @@ export default function HomePage() {
                       <blockquote className="text-sm md:text-[15px] italic text-gray-700 leading-relaxed">
                         &ldquo;{useCase.quote}&rdquo;
                       </blockquote>
+                    )}
+                    {useCase.quoteBy && (
+                      <p className="mt-2 text-sm font-medium text-gray-500">
+                        {useCase.quoteBy}
+                      </p>
                     )}
                     {useCase.storyHref && (
                       <UseCaseStoryLink
