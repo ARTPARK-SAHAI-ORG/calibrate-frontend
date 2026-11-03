@@ -24,4 +24,16 @@ describe("MetadataTable", () => {
     expect(screen.getByText("channel")).toBeInTheDocument();
     expect(screen.getByText("whatsapp")).toBeInTheDocument();
   });
+
+  it("sizes the field column to its names and breaks inside a word only when it must", () => {
+    render(<MetadataTable entries={[{ key: "region", value: "south" }]} />);
+    const key = screen.getByText("region");
+    const value = screen.getByText("south");
+    expect(key).toHaveClass("wrap-anywhere");
+    expect(value).toHaveClass("wrap-anywhere");
+    expect(value).not.toHaveClass("break-all");
+    expect(value.parentElement).toHaveClass(
+      "grid-cols-[fit-content(50%)_minmax(0,1fr)]",
+    );
+  });
 });

@@ -8,6 +8,7 @@ import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
 import { ItemDetailsBlock } from "./ItemDetailsBlock";
+import { JobItemColumns } from "./JobItemColumns";
 import {
   getBinaryDescription,
   getBinaryLabel,
@@ -1299,64 +1300,20 @@ function AnnotateView({
                   ? "No items match this filter."
                   : "No items in this job."}
               </div>
-            ) : data.task.type === "stt" || data.task.type === "tts" ? (
-              // STT/TTS show compact inputs (short transcripts, or text +
-              // an audio clip) side-by-side with the evaluators; keep a
-              // single outer scroll container so they stay aligned.
-              <div
-                ref={evaluatorsPaneRef}
-                className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full md:overflow-y-auto"
-              >
-                <ItemPane
-                  item={currentItem}
-                  taskType={data.task.type}
-                  showVersions={showVersions}
-                />
-                <EvaluatorsPane
-                  evaluators={evaluators}
-                  item={currentItem}
-                  fields={fields}
-                  setField={setField}
-                  readOnly={isAdmin}
-                  commentsEnabled={commentsEnabled}
-                  reasoningMode={reasoningMode}
-                  missingReasoningKeys={missingReasoningKeys}
-                  itemComment={itemComments[currentItem.uuid] ?? ""}
-                  onItemCommentChange={(s) =>
-                    setItemComments((prev) => ({
-                      ...prev,
-                      [currentItem.uuid]: s,
-                    }))
-                  }
-                />
-              </div>
             ) : (
-              // LLM / conversation: long conversation on the left, evaluators
-              // on the right. Each panel scrolls independently so the
-              // evaluator controls stay visible while the annotator scrolls
-              // through history.
-              <>
-                <div
-                  className={`${
-                    isAdmin ? "md:flex-[6]" : "md:flex-[7]"
-                  } md:min-h-0 md:overflow-y-auto md:border-r border-border px-4 md:px-6 ${
-                    itemPaneHasOwnPadding(data.task.type)
-                      ? "pb-4 md:pb-6"
-                      : "py-4 md:py-6"
-                  }`}
-                >
+              <JobItemColumns
+                taskType={data.task.type}
+                canResize={!isAdmin}
+                leftHasOwnPadding={itemPaneHasOwnPadding(data.task.type)}
+                rightRef={evaluatorsPaneRef}
+                left={
                   <ItemPane
                     item={currentItem}
                     taskType={data.task.type}
                     showVersions={showVersions}
                   />
-                </div>
-                <div
-                  ref={evaluatorsPaneRef}
-                  className={`${
-                    isAdmin ? "md:flex-[4]" : "md:flex-[3]"
-                  } md:min-h-0 md:overflow-y-auto p-4 md:p-6`}
-                >
+                }
+                right={
                   <EvaluatorsPane
                     evaluators={evaluators}
                     item={currentItem}
@@ -1374,8 +1331,8 @@ function AnnotateView({
                       }))
                     }
                   />
-                </div>
-              </>
+                }
+              />
             )}
           </main>
         </div>

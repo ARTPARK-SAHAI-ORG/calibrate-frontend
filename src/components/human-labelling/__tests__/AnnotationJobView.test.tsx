@@ -672,6 +672,24 @@ describe("AnnotationJobView", () => {
     );
   });
 
+  it.each([
+    ["public", 1],
+    ["admin", 0],
+    ["public-readonly", 0],
+  ] as const)(
+    "in %s mode draws %i divider between the columns",
+    async (mode, dividers) => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      render(<AnnotationJobView token="tok" mode={mode} />);
+      await waitFor(() =>
+        expect(screen.getByText("Correctness")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryAllByRole("separator", { name: "Resize the columns" }),
+      ).toHaveLength(dividers);
+    },
+  );
+
   it("renders the STT pane side-by-side layout for stt tasks", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(
