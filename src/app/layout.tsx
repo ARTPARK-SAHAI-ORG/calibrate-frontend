@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter, DM_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { pageMetadata, SITE_URL } from "@/lib/site";
 import { SessionProvider } from "@/components/providers/SessionProvider";
@@ -10,25 +10,32 @@ import { Analytics } from "@vercel/analytics/next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { Toaster } from "sonner";
 
-const geistSans = Geist({
+// Kept in the repo rather than fetched with next/font/google: Google sometimes
+// answers with an address the build cannot read, and the deployment then fails.
+const geistSans = localFont({
+  src: "./fonts/geist.woff2",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  weight: "100 900",
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/geist-mono.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: "100 900",
+  fallback: ["ui-monospace", "monospace"],
+  adjustFontFallback: false,
 });
 
-const inter = Inter({
+const inter = localFont({
+  src: "./fonts/inter.woff2",
   variable: "--font-inter",
-  subsets: ["latin"],
+  weight: "100 900",
 });
 
-const dmSans = DM_Sans({
+const dmSans = localFont({
+  src: "./fonts/dm-sans.woff2",
   variable: "--font-dm-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: "100 1000",
 });
 
 export const metadata: Metadata = {
