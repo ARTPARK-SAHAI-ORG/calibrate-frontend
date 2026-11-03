@@ -61,7 +61,7 @@ function brandImageSrc(slug: string | null, logoUrl?: string): string | null {
   return null;
 }
 
-function usePrefersReducedMotion(): boolean {
+export function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
