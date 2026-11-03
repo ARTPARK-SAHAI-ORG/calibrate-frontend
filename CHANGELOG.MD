@@ -1,5 +1,6 @@
 ## November 2026
 
+- Hovering over a long reply in the Output column of an agent's traces no longer opens a pop-up, and clicking the row still shows the whole reply ([#795](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/795))
 - A labeller can now drag the divider between the item and the questions on a labelling job to make either side wider, and the width is remembered for every job ([#784](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/784))
 
 ## October 2026
