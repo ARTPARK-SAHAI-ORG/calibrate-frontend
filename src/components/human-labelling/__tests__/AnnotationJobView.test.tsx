@@ -2341,6 +2341,7 @@ describe("AnnotationJobView message versions", () => {
       expect(scroll.mock.contexts).toEqual([
         container.querySelector("#question-ev-2"),
       ]);
+      expect(screen.getByRole("button", { name: "1" })).toHaveFocus();
 
       await user.click(screen.getByRole("button", { name: "3" }));
       expect(screen.getByText("2 of 2 answered")).toBeInTheDocument();
@@ -2383,6 +2384,68 @@ describe("AnnotationJobView message versions", () => {
       ).toBeTruthy();
       expect(
         question.compareDocumentPosition(comments) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("does not count an answer as finished until it has its required reason", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            job: {
+              ...jobResponse().job,
+              reasoning_mode: "required",
+            },
+          }),
+        ),
+      );
+      const user = setupUser();
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await screen.findByText("0 of 2 answered");
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      expect(screen.getByText("0 of 2 answered")).toBeInTheDocument();
+      await user.type(
+        screen.getAllByPlaceholderText(/reasoning/i)[0],
+        "Because",
+      );
+      expect(screen.getByText("1 of 2 answered")).toBeInTheDocument();
+    });
+
+    it("starts each item from the top of the right column", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      const user = setupUser();
+      render(<AnnotationJobView token="tok" mode="public" />);
+      const pane = (await screen.findByText("Question 1 of 2")).closest(
+        ".md\\:overflow-y-auto",
+      ) as HTMLElement;
+      const row = pane.parentElement as HTMLElement;
+      pane.scrollTop = 400;
+      row.scrollTop = 400;
+      await user.click(screen.getByRole("button", { name: "Next" }));
+      await screen.findByText("Item Two");
+      expect(pane.scrollTop).toBe(0);
+      expect(row.scrollTop).toBe(0);
+    });
+
+    it("keeps a comment above the answers for someone only reading them", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            read_only: true,
+            annotations: [
+              {
+                item_id: "item-1",
+                evaluator_id: null,
+                value: { comment: "A note" },
+              },
+            ],
+          }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="admin" />);
+      const comment = await screen.findByText("A note");
+      expect(
+        comment.compareDocumentPosition(screen.getByText("Correctness")) &
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });

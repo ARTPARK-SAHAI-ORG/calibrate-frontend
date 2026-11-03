@@ -191,6 +191,16 @@ function itemToReadFor(taskType: Task["type"]): string {
   return "Read the conversation";
 }
 
+function hasFieldValue(f?: FieldValue): boolean {
+  return !!f && f.value !== undefined && f.value !== null && f.value !== "";
+}
+
+function drawableOutputType(ev: Evaluator): "binary" | "rating" | null {
+  return ev.output_type === "binary" || ev.output_type === "rating"
+    ? ev.output_type
+    : null;
+}
+
 function readSavedComment(v: unknown): string {
   if (v && typeof v === "object") {
     const obj = v as Record<string, unknown>;
@@ -699,8 +709,6 @@ function AnnotateView({
 
   // Shared answered / dirty checks, so the submit guard, the navigate guard,
   // and the button label all agree on what counts as answered or edited.
-  const hasFieldValue = (f?: FieldValue) =>
-    !!f && f.value !== undefined && f.value !== null && f.value !== "";
   const evaluatorAnswered = (itemId: string, ev: Evaluator) =>
     hasFieldValue(fields[fieldKey(itemId, ev.uuid)]);
 
@@ -804,6 +812,15 @@ function AnnotateView({
         );
       })
       .map((ev) => fieldKey(itemId, ev.uuid));
+
+  // Each item starts from the top of the right column. On a phone the columns
+  // are stacked, so the row holding them is what scrolls.
+  useEffect(() => {
+    const pane = evaluatorsPaneRef.current;
+    if (!pane) return;
+    pane.scrollTop = 0;
+    if (pane.parentElement) pane.parentElement.scrollTop = 0;
+  }, [currentItem?.uuid]);
 
   // Red borders are painted first, then the first one is scrolled into view,
   // the same as the item dialogs do with their invalid fields.
@@ -1495,16 +1512,19 @@ function EvaluatorsPane({
     return out;
   })();
 
-  const isBlank = (ev: Evaluator) => {
-    const f = fields[fieldKey(item.uuid, ev.uuid)];
-    return !f || f.value === undefined || f.value === null || f.value === "";
-  };
+  const forItem = evaluatorsForItem(evaluators, item);
   // An evaluator of a type this page cannot draw has nothing to answer, so it
   // gets no number and does not count towards the total.
-  const questions = evaluatorsForItem(evaluators, item).filter(
-    (ev) => ev.output_type === "binary" || ev.output_type === "rating",
-  );
-  const nextUnanswered = questions.find(isBlank);
+  const questions = forItem.filter(drawableOutputType);
+  // A job that requires reasoning refuses an answer with no reason, so that
+  // answer is not finished yet.
+  const isUnanswered = (ev: Evaluator) => {
+    const f = fields[fieldKey(item.uuid, ev.uuid)];
+    return (
+      !hasFieldValue(f) || (reasoningMode === "required" && !f?.comment?.trim())
+    );
+  };
+  const nextUnanswered = questions.find(isUnanswered);
   const showGuidance = !readOnly && questions.length > 0;
 
   return (
@@ -1512,17 +1532,24 @@ function EvaluatorsPane({
       {showGuidance && (
         <div className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-2 bg-background border-b border-border flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
           <span className="font-medium">
-            {questions.filter((ev) => !isBlank(ev)).length} of{" "}
+            {questions.filter((ev) => !isUnanswered(ev)).length} of{" "}
             {questions.length} answered
           </span>
           {nextUnanswered && (
             <button
               type="button"
-              onClick={() =>
-                document
-                  .getElementById(`question-${nextUnanswered.uuid}`)
-                  ?.scrollIntoView?.({ behavior: "smooth", block: "start" })
-              }
+              onClick={() => {
+                const question = document.getElementById(
+                  `question-${nextUnanswered.uuid}`,
+                );
+                question?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+                question
+                  ?.querySelector("button")
+                  ?.focus({ preventScroll: true });
+              }}
               className="text-xs underline text-muted-foreground hover:text-foreground cursor-pointer"
             >
               Go to the next unanswered question
@@ -1541,17 +1568,16 @@ function EvaluatorsPane({
       )}
       <ExpectedToolCalls payload={itemPayload} />
       <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
-      {evaluatorsForItem(evaluators, item).map((ev) => {
+      {readOnly && commentBlock}
+      {forItem.map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);
         const f = fields[k];
         // Reviewing what came back: an optional evaluator the annotator
         // skipped has nothing to show, so drop the card entirely.
-        if (readOnly && ev.is_optional === true && isBlank(ev)) return null;
+        if (readOnly && ev.is_optional === true && !hasFieldValue(f))
+          return null;
         const variableValues = itemEvaluatorVariables[ev.uuid];
-        const outputType =
-          ev.output_type === "binary" || ev.output_type === "rating"
-            ? ev.output_type
-            : null;
+        const outputType = drawableOutputType(ev);
         if (!outputType) {
           return (
             <div
@@ -1642,7 +1668,7 @@ function EvaluatorsPane({
           </div>
         );
       })}
-      {commentBlock}
+      {!readOnly && commentBlock}
     </div>
   );
 }
