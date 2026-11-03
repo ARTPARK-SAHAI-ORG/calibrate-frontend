@@ -186,7 +186,7 @@ function ToolCallPreview({ call }: { call: TraceToolCall }) {
 function TraceOutputCell({ trace }: { trace: TraceSummary }) {
   const reply = trace.response_preview?.trim();
   if (reply) {
-    return <ClippedLine text={reply} className="text-sm text-foreground" />;
+    return <div className="text-sm text-foreground truncate">{reply}</div>;
   }
   const calls = (trace.tool_calls ?? []).filter((call) => call.tool?.trim());
   if (calls.length > 0) {

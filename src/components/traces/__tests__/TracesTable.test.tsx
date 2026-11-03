@@ -338,27 +338,17 @@ describe("TracesTable", () => {
     };
   }
 
-  it("shows the whole reply in hover text when the column has cut it short", async () => {
+  it("adds no hover text to a reply the column has cut short", async () => {
     const user = setupUser();
     const restore = mockClipped();
     const reply = "a very long reply the Output column cannot fit on one line";
     renderTable({ traces: [trace({ response_preview: reply })] });
     const before = screen.getAllByText(reply).length;
     await user.hover(screen.getAllByText(reply)[0]);
-    await waitFor(() =>
-      expect(screen.getAllByText(reply).length).toBeGreaterThan(before),
-    );
+    // The tool arguments test below shows this same hover does open hover text.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(screen.getAllByText(reply).length).toBe(before);
     restore();
-  });
-
-  it("leaves a reply that already fits without hover text", async () => {
-    const user = setupUser();
-    renderTable();
-    const line = screen.getAllByText("At 14 weeks.")[0];
-    expect(line).not.toHaveAttribute("title");
-    const before = screen.getAllByText("At 14 weeks.").length;
-    await user.hover(line);
-    expect(screen.getAllByText("At 14 weeks.").length).toBe(before);
   });
 
   it("shows the whole tool arguments line in hover text when it is cut short", async () => {
