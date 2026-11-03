@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+import { useMouseDrag } from "./useMouseDrag";
 
 /**
  * A pixel width the user can drag a handle to resize, clamped to
@@ -17,42 +18,19 @@ export function useResizableWidth(
   direction: "grow-right" | "grow-left" = "grow-right",
 ) {
   const [width, setWidth] = useState(initial);
-  const drag = useRef<{ startX: number; startWidth: number } | null>(null);
-  const listeners = useRef<{
-    move: (e: MouseEvent) => void;
-    up: () => void;
-  } | null>(null);
-
-  const stopDrag = useCallback(() => {
-    if (!listeners.current) return;
-    document.removeEventListener("mousemove", listeners.current.move);
-    document.removeEventListener("mouseup", listeners.current.up);
-    listeners.current = null;
-    drag.current = null;
-  }, []);
+  const beginDrag = useMouseDrag();
 
   const startDrag = useCallback(
     (e: React.MouseEvent) => {
-      e.preventDefault();
-      drag.current = { startX: e.clientX, startWidth: width };
-      const move = (ev: MouseEvent) => {
-        if (!drag.current) return;
-        const delta = ev.clientX - drag.current.startX;
+      const startX = e.clientX;
+      beginDrag(e, (ev) => {
+        const delta = ev.clientX - startX;
         const signed = direction === "grow-right" ? delta : -delta;
-        setWidth(
-          Math.min(max, Math.max(min, drag.current.startWidth + signed)),
-        );
-      };
-      const up = () => stopDrag();
-      listeners.current = { move, up };
-      document.addEventListener("mousemove", move);
-      document.addEventListener("mouseup", up);
+        setWidth(Math.min(max, Math.max(min, width + signed)));
+      });
     },
-    [width, direction, min, max, stopDrag],
+    [width, direction, min, max, beginDrag],
   );
-
-  // Drop the listeners if the component unmounts mid-drag.
-  useEffect(() => stopDrag, [stopDrag]);
 
   return { width, startDrag };
 }

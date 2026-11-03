@@ -47,6 +47,7 @@ export {
 } from "./useOrganizations";
 export { useItemPager } from "./useItemPager";
 export { useDialogNavKeys } from "./useDialogNavKeys";
+export { useMouseDrag } from "./useMouseDrag";
 export { useResizableWidth } from "./useResizableWidth";
 export { useSavedColumnWidth } from "./useSavedColumnWidth";
 export { useUnsavedChangesPrompt } from "./useUnsavedChangesPrompt";

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+import { useMouseDrag } from "./useMouseDrag";
 
 /** The saved width, or `initial` when there is none or it is outside the limits. */
 function savedWidth(
@@ -35,48 +36,35 @@ export function useSavedColumnWidth(
   const [percent, setPercent] = useState(() =>
     savedWidth(storageKey, initial, min, max),
   );
-  const stopListening = useRef<(() => void) | null>(null);
+  const beginDrag = useMouseDrag();
 
   const startDrag = useCallback(
     (e: React.MouseEvent) => {
-      // A right-click opens a menu that swallows the mouse release.
-      if (e.button !== 0) return;
-      e.preventDefault();
-      stopListening.current?.();
       const row = e.currentTarget.parentElement!;
       let latest: number | null = null;
 
-      const move = (ev: MouseEvent) => {
-        const { right, width } = row.getBoundingClientRect();
-        latest = Math.min(
-          max,
-          Math.max(min, ((right - ev.clientX) / width) * 100),
-        );
-        setPercent(latest);
-      };
-      const remove = () => {
-        document.removeEventListener("mousemove", move);
-        document.removeEventListener("mouseup", up);
-        stopListening.current = null;
-      };
-      const up = () => {
-        remove();
-        if (latest === null) return;
-        try {
-          window.localStorage.setItem(storageKey, String(latest));
-        } catch {
-          // Site data is blocked, so the width lasts for this visit only.
-        }
-      };
-      stopListening.current = remove;
-      document.addEventListener("mousemove", move);
-      document.addEventListener("mouseup", up);
+      beginDrag(
+        e,
+        (ev) => {
+          const { right, width } = row.getBoundingClientRect();
+          latest = Math.min(
+            max,
+            Math.max(min, ((right - ev.clientX) / width) * 100),
+          );
+          setPercent(latest);
+        },
+        () => {
+          if (latest === null) return;
+          try {
+            window.localStorage.setItem(storageKey, String(latest));
+          } catch {
+            // Site data is blocked, so the width lasts for this visit only.
+          }
+        },
+      );
     },
-    [storageKey, min, max],
+    [storageKey, min, max, beginDrag],
   );
-
-  // Drop the listeners if the component unmounts mid-drag.
-  useEffect(() => () => stopListening.current?.(), []);
 
   return { percent, startDrag };
 }

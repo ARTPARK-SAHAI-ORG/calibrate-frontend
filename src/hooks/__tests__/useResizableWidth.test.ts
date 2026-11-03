@@ -1,23 +1,36 @@
 import { renderHook, act } from "@testing-library/react";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 
+function press(
+  startDrag: (e: React.MouseEvent) => void,
+  clientX: number,
+  button = 0,
+) {
+  act(() => {
+    startDrag({
+      button,
+      preventDefault: () => {},
+      clientX,
+    } as unknown as React.MouseEvent);
+  });
+}
+
+function moveTo(clientX: number) {
+  act(() => {
+    document.dispatchEvent(
+      new MouseEvent("mousemove", { clientX } as MouseEventInit),
+    );
+  });
+}
+
 /** Simulates dragging the handle from `startX` to `endX` in one move. */
 function drag(
   startDrag: (e: React.MouseEvent) => void,
   startX: number,
   endX: number,
 ) {
-  act(() => {
-    startDrag({
-      preventDefault: () => {},
-      clientX: startX,
-    } as unknown as React.MouseEvent);
-  });
-  act(() => {
-    document.dispatchEvent(
-      new MouseEvent("mousemove", { clientX: endX } as MouseEventInit),
-    );
-  });
+  press(startDrag, startX);
+  moveTo(endX);
 }
 
 function release() {
@@ -68,6 +81,16 @@ describe("useResizableWidth", () => {
     release();
   });
 
+  it("measures each move from where the drag started", () => {
+    const { result } = renderHook(() =>
+      useResizableWidth(320, 240, 560, "grow-right"),
+    );
+    drag(result.current.startDrag, 100, 150);
+    moveTo(160);
+    expect(result.current.width).toBe(380);
+    release();
+  });
+
   it("stops updating width once mouseup fires", () => {
     const { result } = renderHook(() =>
       useResizableWidth(320, 240, 560, "grow-right"),
@@ -75,12 +98,27 @@ describe("useResizableWidth", () => {
     drag(result.current.startDrag, 100, 150);
     expect(result.current.width).toBe(370);
     release();
-    act(() => {
-      document.dispatchEvent(
-        new MouseEvent("mousemove", { clientX: 400 } as MouseEventInit),
-      );
-    });
+    moveTo(400);
     expect(result.current.width).toBe(370);
+  });
+
+  it("ignores a right-click on the handle", () => {
+    const { result } = renderHook(() => useResizableWidth(320, 240, 560));
+    press(result.current.startDrag, 100, 2);
+    moveTo(150);
+    expect(result.current.width).toBe(320);
+  });
+
+  it("drops the earlier drag when the handle is pressed again", () => {
+    const { result } = renderHook(() => useResizableWidth(320, 240, 560));
+    drag(result.current.startDrag, 100, 150);
+    const removeSpy = jest.spyOn(document, "removeEventListener");
+    press(result.current.startDrag, 150);
+    expect(removeSpy).toHaveBeenCalledWith("mousemove", expect.any(Function));
+    removeSpy.mockRestore();
+    moveTo(160);
+    expect(result.current.width).toBe(380);
+    release();
   });
 
   it("removes its listeners on unmount", () => {
