@@ -105,6 +105,17 @@ const USE_CASES: {
     ],
     storyHref: "/blog/building-a-reliable-ai-coaching-assistant",
   },
+  {
+    name: "Maisha Meds",
+    logo: "/use-cases/maisha-meds.png",
+    whatTheyDo:
+      "Point-of-sale software serving private pharmacies and clinics across Africa",
+    useCase: [
+      "Sending patients AI-drafted instructions for their medicines",
+      "Using LLM judges to track and monitor the quality of these messages over time",
+      "Flagging messages that contradict a listed warning or describe its directions of use incorrectly",
+    ],
+  },
 ];
 
 function LandingFeatureImageColumn(props: {

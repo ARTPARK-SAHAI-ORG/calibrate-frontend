@@ -72,4 +72,14 @@ describe("Customer cards", () => {
       }),
     ).toBeNull();
   });
+
+  it("shows the Maisha Meds card with its logo", () => {
+    render(<HomePage />);
+
+    expect(
+      within(card("Maisha Meds")).getByRole("img", {
+        name: "Maisha Meds logo",
+      }),
+    ).toHaveAttribute("src", "/use-cases/maisha-meds.png");
+  });
 });
