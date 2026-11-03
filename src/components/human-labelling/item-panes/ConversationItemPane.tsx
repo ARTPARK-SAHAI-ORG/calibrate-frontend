@@ -6,10 +6,8 @@ import { normaliseHistoryItem } from "./shared";
 
 export function ConversationItemPane({
   payload,
-  showVersions = true,
 }: {
   payload: Record<string, unknown>;
-  showVersions?: boolean;
 }) {
   // Reuse the same read-only conversation renderer used by the test
   // runner / benchmark dialogs (and the LLM labelling pane), so all
@@ -34,7 +32,6 @@ export function ConversationItemPane({
     <TestDetailView
       history={history}
       passed={true}
-      showVersions={showVersions}
     />
   );
 }

@@ -114,13 +114,6 @@ describe("LlmGeneralItemPane", () => {
     expect(screen.getByText("Output")).toBeInTheDocument();
   });
 
-  it("hides versions when showVersions is false", () => {
-    render(<LlmGeneralItemPane payload={versioned} showVersions={false} />);
-    expect(screen.getByText("Summarise this")).toBeInTheDocument();
-    expect(screen.queryByText("Hindi")).not.toBeInTheDocument();
-    expect(screen.queryByText("इसका सार दो")).not.toBeInTheDocument();
-  });
-
   it("falls back to Input and Output titles for object fields without a label", () => {
     render(
       <LlmGeneralItemPane

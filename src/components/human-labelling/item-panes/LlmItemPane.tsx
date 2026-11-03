@@ -9,10 +9,8 @@ import { normaliseHistoryItem } from "./shared";
 
 export function LlmItemPane({
   payload,
-  showVersions = true,
 }: {
   payload: Record<string, unknown>;
-  showVersions?: boolean;
 }) {
   // Reuse the read-only conversation renderer from the test runner /
   // benchmark dialogs so labelling stays visually in sync with how the
@@ -57,7 +55,6 @@ export function LlmItemPane({
       history={history}
       passed={true}
       highlightEvalTarget
-      showVersions={showVersions}
     />
   );
 }

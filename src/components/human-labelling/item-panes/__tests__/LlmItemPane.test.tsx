@@ -211,22 +211,6 @@ describe("LlmItemPane", () => {
     expect(screen.getByText("नमस्ते")).toBeInTheDocument();
   });
 
-  it("hides an object agent_response's versions when showVersions is false", () => {
-    render(
-      <LlmItemPane
-        showVersions={false}
-        payload={{
-          agent_response: {
-            content: "Hello there",
-            versions: { Hindi: "नमस्ते" },
-          },
-        }}
-      />,
-    );
-    expect(screen.getByText("Hello there")).toBeInTheDocument();
-    expect(screen.queryByText("नमस्ते")).not.toBeInTheDocument();
-  });
-
   it("ignores an object agent_response without content", () => {
     render(
       <LlmItemPane
