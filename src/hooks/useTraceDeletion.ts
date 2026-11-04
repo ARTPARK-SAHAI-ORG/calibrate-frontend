@@ -3,7 +3,7 @@
 import { useBulkDeletion } from "./useBulkDeletion";
 import {
   selectAllBody,
-  type TraceFilters,
+  type TraceSelectAll,
   type TraceSummary,
 } from "@/lib/tracesApi";
 
@@ -16,7 +16,7 @@ type UseTraceDeletionArgs = {
   accessToken: string | null;
   /** Set when the reader asked for every trace the list matches, not only the
    *  ticked ones: the delete is then sent as those filters. */
-  selectAll?: TraceFilters | null;
+  selectAll?: TraceSelectAll | null;
 };
 
 // Single and bulk deletes both go through `POST /traces/bulk-delete` — there

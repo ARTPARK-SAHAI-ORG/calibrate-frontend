@@ -40,12 +40,10 @@ const fetchTrace = jest.fn();
 const fetchTraces = jest.fn();
 const fetchTraceUsage = jest.fn();
 jest.mock("../../../lib/tracesApi", () => ({
+  ...jest.requireActual("../../../lib/tracesApi"),
   fetchTrace: (...args: unknown[]) => fetchTrace(...args),
   fetchTraces: (...args: unknown[]) => fetchTraces(...args),
   fetchTraceUsage: (...args: unknown[]) => fetchTraceUsage(...args),
-  MAX_TRACES_PAGE_SIZE: 200,
-  traceLabellingMetadata: jest.requireActual("../../../lib/tracesApi")
-    .traceLabellingMetadata,
 }));
 
 // The agent's own evaluators decide whether the attach prompt has anything to
@@ -61,8 +59,16 @@ jest.mock("../../../lib/evaluatorApi", () => ({
 }));
 
 jest.mock("../../traces/ConversationsView", () => ({
-  ConversationsView: ({ labels }: { labels: string[] }) => (
-    <div data-testid="conversations-view">{labels.join(",")}</div>
+  ConversationsView: ({
+    labels,
+    ...rest
+  }: { labels: string[] } & Record<string, unknown>) => (
+    <div
+      data-testid="conversations-view"
+      data-props={Object.keys(rest).sort().join(",")}
+    >
+      {labels.join(",")}
+    </div>
   ),
 }));
 
@@ -239,6 +245,8 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     testType: "response" | "tool_call" | "general";
     selectAll?: {
       agentId: string;
+      q?: string;
+      conversationId?: string | null;
       outputType?: string;
       labels?: string[];
       scores?: Record<string, string>;
@@ -264,6 +272,9 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
         </span>
         <span data-testid="convert-select-all-scores">
           {JSON.stringify(selectAll?.scores ?? null)}
+        </span>
+        <span data-testid="convert-select-all-search">
+          {`${selectAll?.q}|${selectAll?.conversationId}`}
         </span>
         <span data-testid="convert-select-all-before">
           {selectAll?.createdBefore ?? "none"}
@@ -324,6 +335,17 @@ const trace = (over: Partial<TraceSummary> = {}): TraceSummary => ({
 
 const refetch = jest.fn();
 
+/** The filters the rows on screen came from: none, unless a test says so. */
+const loaded = (over: Record<string, unknown> = {}) => ({
+  agentId: "agent-1",
+  q: "",
+  outputType: "all",
+  labels: [],
+  scores: {},
+  conversationId: null,
+  ...over,
+});
+
 function tracesResult(
   items: TraceSummary[],
   over: Record<string, unknown> = {},
@@ -331,10 +353,7 @@ function tracesResult(
   return {
     items,
     total: items.length,
-    loadedQ: "",
-    loadedOutputType: "all",
-    loadedLabels: [],
-    loadedScores: {},
+    loadedFilters: loaded(),
     scoreAverages: [],
     offset: 0,
     setOffset: jest.fn(),
@@ -1278,6 +1297,158 @@ describe("TracesTabContent", () => {
     );
   });
 
+  it("takes the search and the conversation into a whole matching list, and counts within them", async () => {
+    window.history.replaceState(null, "", "/?conversation=conv-9");
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    (fetchTraces as jest.Mock).mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 1,
+      offset: 0,
+    });
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.type(screen.getByPlaceholderText("Search traces"), "polio");
+    await waitFor(() => expect(lastTracesArgs().q).toBe("polio"));
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText(/Select all 4 traces/));
+    await user.click(screen.getByText("Add to tests (4)"));
+
+    expect(
+      await screen.findByTestId("convert-select-all-search"),
+    ).toHaveTextContent("polio|conv-9");
+    expect(fetchTraces).toHaveBeenCalledWith(
+      "test-token",
+      expect.objectContaining({ q: "polio", conversationId: "conv-9" }),
+    );
+  });
+
+  it("keeps the selection when every trace is chosen, without changing what the list asks for", async () => {
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    const before = lastTracesArgs();
+    await user.click(screen.getByText("Select all 4 traces"));
+
+    // Still chosen once the time of choosing is set. If that time reached the
+    // list's filters, setting it would clear the choice it belongs to.
+    expect(screen.getByText("Add to tests (4)")).toBeInTheDocument();
+    expect(screen.getByText("Delete selected (4)")).toBeInTheDocument();
+    expect(lastTracesArgs()).toEqual(before);
+    expect(lastTracesArgs()).not.toHaveProperty("createdBefore");
+  });
+
+  it("keeps the ticks when Apply is pressed with nothing changed", async () => {
+    window.history.replaceState(null, "", "/?score=ev-1%3Afailed");
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await openTraceFilter(user);
+    await user.click(screen.getByRole("button", { name: /^Apply/ }));
+
+    expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
+  });
+
+  it("keeps the ticks when Back lands on the same filters", async () => {
+    window.history.replaceState(null, "", "/?label=vip&score=ev-1%3Afailed");
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
+  });
+
+  it("drops the ticks when Back lands on different filters", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    window.history.replaceState(null, "", "/?label=vip");
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(screen.queryByText("Add to tests (1)")).not.toBeInTheDocument();
+  });
+
+  it("drops the ticks when the agent changes", async () => {
+    const user = setupUser();
+    const { rerender } = render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    rerender(<TracesTabContent {...tabProps} agentUuid="agent-2" />);
+
+    expect(screen.queryByText("Add to tests (1)")).not.toBeInTheDocument();
+  });
+
+  it("hands the conversations only what they can filter by, and leaves the rest in the address", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/?view=conversations&score=ev-1%3Afailed&conversation=conv-9",
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    const props = screen.getByTestId("conversations-view").dataset.props;
+    expect(props).not.toContain("scores");
+    expect(props).not.toContain("conversationId");
+    const address = new URLSearchParams(window.location.search);
+    expect(address.get("score")).toBe("ev-1:failed");
+    expect(address.get("conversation")).toBe("conv-9");
+  });
+
+  it("keeps the ticks when the list is sorted", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(
+      screen.getByRole("button", { name: /^Sort traces by Tone/ }),
+    );
+
+    await waitFor(() => expect(lastTracesArgs().sortByEvaluator).toBe("ev-1"));
+    expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
+  });
+
+  it("drops the ticked traces when the output kind changes", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
+
+    await applyTraceFilter(user, { output: "Response" });
+
+    expect(screen.queryByText("Add to tests (1)")).not.toBeInTheDocument();
+  });
+
+  it("drops the ticked traces when a conversation is picked", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
+
+    await openTraceFilter(user);
+    await user.click(screen.getByRole("button", { name: "Conversation ID" }));
+    await user.click(screen.getByRole("option", { name: "conv-9" }));
+    await user.click(screen.getByRole("button", { name: /^Apply/ }));
+
+    expect(screen.queryByText("Add to tests (1)")).not.toBeInTheDocument();
+  });
+
   it("drops the ticked traces when a label is picked", async () => {
     mockUseTraceLabels.mockReturnValue({
       labels: ["production"],
@@ -1305,7 +1476,7 @@ describe("TracesTabContent", () => {
       refetch: refetchLabels,
     });
     // Nothing carries the label, and the rows for it have not arrived yet, so
-    // `loadedLabels` is still empty: exactly the moment after the pick.
+    // `loadedFilters.labels` is still empty: exactly the moment after the pick.
     mockUseTraces.mockImplementation((args: { labels: string[] }) =>
       args.labels.length > 0
         ? tracesResult([], { total: 0 })
@@ -1373,7 +1544,7 @@ describe("TracesTabContent", () => {
       refetch: refetchLabels,
     });
     mockUseTraces.mockReturnValue(
-      tracesResult([], { loadedLabels: ["production"] }),
+      tracesResult([], { loadedFilters: loaded({ labels: ["production"] }) }),
     );
     render(<TracesTabContent {...tabProps} />);
 
@@ -1394,7 +1565,7 @@ describe("TracesTabContent", () => {
             tool_call_count: 1,
           }),
         ],
-        { loadedOutputType: "tool_call", total: 1 },
+        { loadedFilters: loaded({ outputType: "tool_call" }), total: 1 },
       ),
     );
     render(<TracesTabContent {...tabProps} />);
@@ -1563,7 +1734,7 @@ describe("TracesTabContent", () => {
     render(<TracesTabContent {...tabProps} />);
 
     mockUseTraces.mockReturnValue(
-      tracesResult([], { loadedOutputType: "tool_call" }),
+      tracesResult([], { loadedFilters: loaded({ outputType: "tool_call" }) }),
     );
     await applyTraceFilter(user, { output: "Tool call" });
 
@@ -1580,7 +1751,7 @@ describe("TracesTabContent", () => {
     render(<TracesTabContent {...tabProps} />);
 
     mockUseTraces.mockReturnValue(
-      tracesResult([], { loadedQ: "polio", loadedOutputType: "tool_call" }),
+      tracesResult([], { loadedFilters: loaded({ q: "polio", outputType: "tool_call" }) }),
     );
     await applyTraceFilter(user, { output: "Tool call" });
     await user.type(screen.getByPlaceholderText("Search traces"), "polio");
@@ -1597,7 +1768,7 @@ describe("TracesTabContent", () => {
     render(<TracesTabContent {...tabProps} />);
 
     mockUseTraces.mockReturnValue(
-      tracesResult([], { loadedOutputType: "tool_call" }),
+      tracesResult([], { loadedFilters: loaded({ outputType: "tool_call" }) }),
     );
     await applyTraceFilter(user, { output: "Tool call" });
     await waitFor(() =>
@@ -1617,7 +1788,7 @@ describe("TracesTabContent", () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
 
-    mockUseTraces.mockReturnValue(tracesResult([], { loadedQ: "polio" }));
+    mockUseTraces.mockReturnValue(tracesResult([], { loadedFilters: loaded({ q: "polio" }) }));
     await user.type(screen.getByPlaceholderText("Search traces"), "polio");
 
     await waitFor(() =>
@@ -1635,7 +1806,7 @@ describe("TracesTabContent", () => {
     render(<TracesTabContent {...tabProps} />);
 
     // The search found nothing, so the rows on screen belong to "polio".
-    mockUseTraces.mockReturnValue(tracesResult([], { loadedQ: "polio" }));
+    mockUseTraces.mockReturnValue(tracesResult([], { loadedFilters: loaded({ q: "polio" }) }));
     const box = screen.getByPlaceholderText("Search traces");
     await user.type(box, "polio");
     await waitFor(() =>
@@ -1662,7 +1833,7 @@ describe("TracesTabContent", () => {
     expect(screen.getByText("Loading traces...")).toBeInTheDocument();
 
     // A search lands while the traces are still loading and matches nothing.
-    mockUseTraces.mockReturnValue(tracesResult([], { loadedQ: "polio" }));
+    mockUseTraces.mockReturnValue(tracesResult([], { loadedFilters: loaded({ q: "polio" }) }));
     await user.type(screen.getByPlaceholderText("Search traces"), "polio");
 
     await waitFor(() =>
@@ -2893,7 +3064,7 @@ describe("TracesTabContent", () => {
 
     it("says nothing matched instead of the setup steps when a score is picked", async () => {
       // Nothing carries the score, and the rows for it have not arrived yet, so
-      // `loadedScores` is still empty: exactly the moment after the pick.
+      // `loadedFilters.scores` is still empty: exactly the moment after the pick.
       mockUseTraces.mockImplementation(
         (args: { scores: Record<string, string> }) =>
           Object.keys(args.scores).length > 0

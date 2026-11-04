@@ -11,6 +11,8 @@ import {
   fetchTraceUsage,
   convertTracesToTests,
   selectAllBody,
+  traceFilterKey,
+  NO_TRACE_FACETS,
   convertTracesErrorMessage,
   validateApiKeyForAgent,
   traceInputTurns,
@@ -953,5 +955,53 @@ describe("traceLabellingMetadata", () => {
         trace({ metadata: full, conversation_id: "c", labels: ["x"] }),
       ),
     ).toEqual(full);
+  });
+});
+
+describe("traceFilterKey", () => {
+  const key = traceFilterKey;
+  const agentId = "ag-1";
+
+  it("is the same for filters left at their defaults and filters left out", () => {
+    expect(key({ agentId, q: "", ...NO_TRACE_FACETS })).toBe(key({ agentId }));
+  });
+
+  it("ignores the order of the score conditions", () => {
+    expect(
+      key({ agentId, scores: { "ev-1": "failed", "ev-2": "<=2" } }),
+    ).toBe(key({ agentId, scores: { "ev-2": "<=2", "ev-1": "failed" } }));
+  });
+
+  it("ignores spaces around the search and a new array of the same labels", () => {
+    expect(key({ agentId, q: "  refund " })).toBe(key({ agentId, q: "refund" }));
+    expect(key({ agentId, q: "   " })).toBe(key({ agentId }));
+    expect(key({ agentId, labels: ["vip"] })).toBe(
+      key({ agentId, labels: ["vip"] }),
+    );
+  });
+
+  it("tells apart a label holding a separator from two labels", () => {
+    for (const separator of ["\u0000", "\n", ",", '","']) {
+      expect(key({ agentId, labels: [`a${separator}b`] })).not.toBe(
+        key({ agentId, labels: ["a", "b"] }),
+      );
+    }
+  });
+
+  it.each([
+    ["agent", { agentId: "ag-2" }],
+    ["search", { agentId, q: "refund" }],
+    ["output kind", { agentId, outputType: "response" as const }],
+    ["labels", { agentId, labels: ["vip"] }],
+    ["scores", { agentId, scores: { "ev-1": "failed" } }],
+    ["conversation", { agentId, conversationId: "conv-1" }],
+  ])("changes with the %s", (_name, filters) => {
+    expect(key(filters)).not.toBe(key({ agentId }));
+  });
+
+  it("leaves out the moment the reader chose select all", () => {
+    const chosen = { agentId, createdBefore: "2026-11-04T10:00:00.000Z" };
+    expect(key(chosen)).toBe(key({ agentId }));
+    expect(key(chosen)).not.toContain("2026");
   });
 });
