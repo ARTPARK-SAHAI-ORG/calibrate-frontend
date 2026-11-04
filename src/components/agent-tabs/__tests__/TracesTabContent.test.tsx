@@ -1101,7 +1101,7 @@ describe("TracesTabContent", () => {
       // The sentence and the link share one line, so read the whole line.
       expect(
         screen.getByRole("button", { name: "Evaluators tab" }).parentElement,
-      ).toHaveTextContent(/Every evaluator added to this agent uses variables/);
+      ).toHaveTextContent(/Every evaluator added to this agent has a variable with no trace value chosen/);
       await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
       expect(onGoToEvaluators).toHaveBeenCalled();
     });

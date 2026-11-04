@@ -92,6 +92,7 @@ const mockFetchAllEvaluators = jest.fn();
 const mockDetach = jest.fn();
 const mockDelete = jest.fn();
 const mockAttach = jest.fn();
+const mockSaveTraceVariables = jest.fn();
 jest.mock("../../../lib/evaluatorApi", () => ({
   fetchAgentEvaluators: (...args: unknown[]) =>
     mockFetchAgentEvaluators(...args),
@@ -99,6 +100,8 @@ jest.mock("../../../lib/evaluatorApi", () => ({
   addEvaluatorsToAgent: (...args: unknown[]) => mockAttach(...args),
   detachEvaluatorFromAgent: (...args: unknown[]) => mockDetach(...args),
   deleteEvaluator: (...args: unknown[]) => mockDelete(...args),
+  saveEvaluatorTraceVariables: (...args: unknown[]) =>
+    mockSaveTraceVariables(...args),
   // Mirror the real helpers: owned unless flagged as a built-in default.
   isOwnedEvaluator: (e: EvaluatorData) =>
     typeof e.is_default === "boolean" ? !e.is_default : !!e.owner_user_id,
@@ -547,5 +550,174 @@ describe("EvaluatorsTabContent", () => {
 
     await user.hover(remove);
     expect(await screen.findByText("Remove from agent")).toBeInTheDocument();
+  });
+
+  describe("choosing trace values", () => {
+    const WARNING = "Will not score traces until every variable has a value";
+    const withVariables = (over: Partial<EvaluatorData> = {}) =>
+      evaluator({
+        live_version: { variables: [{ name: "nurse_reply" }, { name: "ai" }] },
+        ...over,
+      });
+    const dialogTitle = () =>
+      screen.queryByRole("heading", { name: "Choose trace values" });
+
+    it("offers the button only on evaluators with variables", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([
+        withVariables(),
+        evaluator({ uuid: "ev-2", name: "Tone check" }),
+        evaluator({
+          uuid: "ev-3",
+          name: "Empty list",
+          live_version: { variables: [] },
+        }),
+      ]);
+      mockFetchAllEvaluators.mockResolvedValue([]);
+
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+      await screen.findByText("Tone check");
+      expect(
+        screen.getAllByRole("button", { name: "Choose trace values" }),
+      ).toHaveLength(1);
+      expect(screen.getAllByText(WARNING)).toHaveLength(1);
+    });
+
+    it("warns while any variable has no value, and not once they all do", async () => {
+      mockFetchAgentEvaluators.mockResolvedValueOnce([
+        withVariables({
+          trace_variables: { nurse_reply: "metadata.expert_answer" },
+        }),
+      ]);
+      mockFetchAgentEvaluators.mockResolvedValue([
+        withVariables({
+          trace_variables: {
+            nurse_reply: "metadata.expert_answer",
+            ai: "output.response",
+          },
+        }),
+      ]);
+      mockFetchAllEvaluators.mockResolvedValue([]);
+      mockSaveTraceVariables.mockResolvedValue(undefined);
+      const user = setupUser();
+
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      expect(await screen.findByText(WARNING)).toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole("button", { name: "Choose trace values" }),
+      );
+      await user.selectOptions(
+        screen.getByLabelText("{{ai}}"),
+        "output.response",
+      );
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      await waitFor(() =>
+        expect(mockSaveTraceVariables).toHaveBeenCalledWith(
+          "agent-1",
+          "ev-1",
+          { nurse_reply: "metadata.expert_answer", ai: "output.response" },
+          "test-token",
+        ),
+      );
+      await waitFor(() => expect(dialogTitle()).not.toBeInTheDocument());
+      expect(mockFetchAgentEvaluators).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
+    });
+
+    it("keeps the dialog open with the error when saving fails", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([withVariables()]);
+      mockFetchAllEvaluators.mockResolvedValue([]);
+      mockSaveTraceVariables.mockRejectedValue(new Error("Bad source"));
+      const user = setupUser();
+
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      await user.click(
+        await screen.findByRole("button", { name: "Choose trace values" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Bad source");
+      expect(dialogTitle()).toBeInTheDocument();
+    });
+
+    it("opens the dialog, not the preview, from the button", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([withVariables()]);
+      mockFetchAllEvaluators.mockResolvedValue([]);
+      const user = setupUser();
+
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      await user.click(
+        await screen.findByRole("button", { name: "Choose trace values" }),
+      );
+
+      expect(dialogTitle()).toBeInTheDocument();
+      expect(mockFetchEvaluatorDetail).not.toHaveBeenCalled();
+      expect(
+        screen.queryByRole("button", { name: "Close preview" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("opens by itself for the first added evaluator with variables", async () => {
+      mockFetchAgentEvaluators.mockResolvedValueOnce([]);
+      mockFetchAgentEvaluators.mockResolvedValue([
+        evaluator({ uuid: "ev-1", name: "Tone check" }),
+        withVariables({ uuid: "ev-2", name: "Agrees with the nurse" }),
+      ]);
+      mockFetchAllEvaluators.mockResolvedValue([
+        evaluator({ uuid: "ev-2", name: "Agrees with the nurse" }),
+      ]);
+      mockAttach.mockResolvedValue({ linked: ["ev-2"], already_linked: [] });
+      const user = setupUser();
+
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      await screen.findByText("No evaluators added yet");
+      await user.click(screen.getByRole("button", { name: "Add evaluators" }));
+      await user.click(screen.getByRole("button", { name: "Confirm add" }));
+
+      await screen.findByRole("heading", { name: "Choose trace values" });
+      expect(screen.getByLabelText("{{nurse_reply}}")).toBeInTheDocument();
+    });
+
+    it("does not open after adding an evaluator without variables", async () => {
+      mockFetchAgentEvaluators.mockResolvedValueOnce([]);
+      mockFetchAgentEvaluators.mockResolvedValue([
+        evaluator({ uuid: "ev-2", name: "Tone check" }),
+      ]);
+      mockFetchAllEvaluators.mockResolvedValue([
+        evaluator({ uuid: "ev-2", name: "Tone check" }),
+      ]);
+      mockAttach.mockResolvedValue({ linked: ["ev-2"], already_linked: [] });
+      const user = setupUser();
+
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      await screen.findByText("No evaluators added yet");
+      await user.click(screen.getByRole("button", { name: "Add evaluators" }));
+      await user.click(screen.getByRole("button", { name: "Confirm add" }));
+
+      await screen.findByText("Tone check");
+      expect(dialogTitle()).not.toBeInTheDocument();
+    });
+
+    it("opens by itself after a created evaluator with variables is attached", async () => {
+      mockFetchAgentEvaluators.mockResolvedValueOnce([
+        evaluator({ uuid: "ev-1", name: "Tone check" }),
+      ]);
+      mockFetchAgentEvaluators.mockResolvedValue([
+        evaluator({ uuid: "ev-1", name: "Tone check" }),
+        withVariables({ uuid: "ev-copy", name: "Copy" }),
+      ]);
+      mockFetchAllEvaluators.mockResolvedValue([]);
+      mockAttach.mockResolvedValue({ linked: ["ev-copy"], already_linked: [] });
+      const user = setupUser();
+
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      await user.click(
+        await screen.findByRole("button", { name: "Duplicate Tone check" }),
+      );
+
+      await screen.findByRole("heading", { name: "Choose trace values" });
+    });
   });
 });

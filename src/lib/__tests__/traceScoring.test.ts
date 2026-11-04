@@ -21,7 +21,7 @@ describe("copy", () => {
     );
     expect(ineligibleReasonCopy("no_live_version")).toBe("Has no live version");
     expect(ineligibleReasonCopy("declares_variables")).toBe(
-      "Uses variables, which cannot be filled for a trace automatically",
+      "A variable has no trace value chosen. Choose one in the Evaluators tab",
     );
     expect(ineligibleReasonCopy("other")).toBe(
       "Cannot score traces for this agent",
@@ -34,6 +34,12 @@ describe("copy", () => {
     );
     expect(scoringRunErrorCopy("unsupported_interaction_type")).toMatch(
       /cannot be scored yet/,
+    );
+    expect(scoringRunErrorCopy("no_reply")).toBe(
+      "This turn has tool calls and no reply, so there was nothing to score",
+    );
+    expect(scoringRunErrorCopy("missing_trace_values")).toBe(
+      "This trace is missing a value that its evaluators need",
     );
     expect(scoringRunErrorCopy("")).toBe("Scoring did not finish");
     expect(scoringRunErrorCopy(null)).toBe("Scoring did not finish");
@@ -62,7 +68,7 @@ describe("nothingCanScoreCopy", () => {
         { reason: "declares_variables" },
       ]),
     ).toBe(
-      "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically.",
+      "Every evaluator added to this agent has a variable with no trace value chosen. Choose them in the Evaluators tab.",
     );
   });
 

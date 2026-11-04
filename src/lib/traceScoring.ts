@@ -20,7 +20,7 @@ export function ineligibleReasonCopy(
     case "no_live_version":
       return "Has no live version";
     case "declares_variables":
-      return "Uses variables, which cannot be filled for a trace automatically";
+      return "A variable has no trace value chosen. Choose one in the Evaluators tab";
     default:
       return "Cannot score traces for this agent";
   }
@@ -28,15 +28,15 @@ export function ineligibleReasonCopy(
 
 /**
  * Why an agent with evaluators still cannot score its traces. The usual cause
- * is variables, which have nowhere to be filled in for a trace, so that case
- * says so plainly rather than leaving the reader to guess.
+ * is a variable with no trace value chosen, so that case says so plainly rather
+ * than leaving the reader to guess.
  */
 export function nothingCanScoreCopy(ineligible: { reason: string }[]): string {
   if (ineligible.length === 0) {
     return "This agent has no evaluators, so its traces are not scored.";
   }
   if (ineligible.every((item) => item.reason === "declares_variables")) {
-    return "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically.";
+    return "Every evaluator added to this agent has a variable with no trace value chosen. Choose them in the Evaluators tab.";
   }
   return "None of this agent's evaluators can score traces.";
 }
@@ -58,6 +58,10 @@ export function scoringRunErrorCopy(error: string | null | undefined): string {
       return "Monitoring was turned off before this trace was scored";
     case "unsupported_interaction_type":
       return "This kind of agent cannot be scored yet";
+    case "no_reply":
+      return "This turn has tool calls and no reply, so there was nothing to score";
+    case "missing_trace_values":
+      return "This trace is missing a value that its evaluators need";
     default:
       return "Scoring did not finish";
   }

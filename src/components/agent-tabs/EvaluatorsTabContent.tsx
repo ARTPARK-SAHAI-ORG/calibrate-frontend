@@ -6,6 +6,7 @@ import { reportError } from "@/lib/reportError";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
+import { TraceVariablesDialog } from "@/components/agent-tabs/TraceVariablesDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { EvaluatorCard } from "@/components/evaluators/EvaluatorCard";
 import {
@@ -22,6 +23,7 @@ import {
   deleteEvaluator,
   deleteEvaluatorWarning,
   canDeleteEvaluator,
+  saveEvaluatorTraceVariables,
 } from "@/lib/evaluatorApi";
 
 // Two remove flavours share one confirmation dialog:
@@ -46,6 +48,16 @@ function agentEvaluatorTypes(agentNature: "conversation" | "general") {
     : new Set(["llm"]);
 }
 
+function hasVariables(evaluator: EvaluatorData) {
+  return !!evaluator.live_version?.variables?.length;
+}
+
+function isMissingTraceValue(evaluator: EvaluatorData) {
+  return evaluator.live_version?.variables?.some(
+    (variable) => !evaluator.trace_variables?.[variable.name],
+  );
+}
+
 export function EvaluatorsTabContent({
   agentUuid,
   agentNature = "conversation",
@@ -68,6 +80,8 @@ export function EvaluatorsTabContent({
   // Dialog / flow state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
+  const [traceVariablesTarget, setTraceVariablesTarget] =
+    useState<EvaluatorData | null>(null);
 
   // Shared destructive-confirmation dialog state.
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -77,10 +91,24 @@ export function EvaluatorsTabContent({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadAttached = useCallback(async () => {
-    if (!backendAccessToken) return;
+    if (!backendAccessToken) return [];
     const data = await fetchAgentEvaluators(agentUuid, backendAccessToken);
     setAttachedEvaluators(data);
+    return data;
   }, [agentUuid, backendAccessToken]);
+
+  // Evaluators just added need their variables chosen before they can score
+  // traces, so ask straight away. One dialog is enough when several were added.
+  const askForTraceValues = useCallback(
+    (attached: EvaluatorData[], addedUuids: string[]) => {
+      setTraceVariablesTarget(
+        attached.find(
+          (e) => addedUuids.includes(e.uuid) && hasVariables(e),
+        ) ?? null,
+      );
+    },
+    [],
+  );
 
   const loadLibrary = useCallback(async () => {
     if (!backendAccessToken) return;
@@ -125,7 +153,7 @@ export function EvaluatorsTabContent({
           selectedUuids,
           backendAccessToken,
         );
-        await loadAttached();
+        askForTraceValues(await loadAttached(), selectedUuids);
       } catch (err) {
         reportError("Error adding evaluators to agent:", err);
         // Re-throw so AddEvaluatorsDialog can surface the failure and stay open
@@ -133,7 +161,7 @@ export function EvaluatorsTabContent({
         throw err;
       }
     },
-    [agentUuid, backendAccessToken, loadAttached],
+    [agentUuid, backendAccessToken, loadAttached, askForTraceValues],
   );
 
   // A freshly-created evaluator: attach it to the agent, then refresh both
@@ -147,15 +175,36 @@ export function EvaluatorsTabContent({
           [evaluator.uuid],
           backendAccessToken,
         );
-        await Promise.all([loadAttached(), loadLibrary()]);
+        const [attached] = await Promise.all([loadAttached(), loadLibrary()]);
+        askForTraceValues(attached, [evaluator.uuid]);
       } catch (err) {
         reportError("Error attaching created evaluator:", err);
       } finally {
         setCreateFlowOpen(false);
       }
     },
-    [agentUuid, backendAccessToken, loadAttached, loadLibrary],
+    [agentUuid, backendAccessToken, loadAttached, loadLibrary, askForTraceValues],
   );
+
+  const handleSaveTraceVariables = async (
+    evaluatorUuid: string,
+    traceVariables: Record<string, string>,
+  ) => {
+    if (!backendAccessToken) return;
+    try {
+      await saveEvaluatorTraceVariables(
+        agentUuid,
+        evaluatorUuid,
+        traceVariables,
+        backendAccessToken,
+      );
+      await loadAttached();
+    } catch (err) {
+      reportError("Error saving evaluator trace values:", err);
+      // Re-throw so TraceVariablesDialog can show the failure and stay open.
+      throw err;
+    }
+  };
 
   const openRemoveDialog = (evaluator: EvaluatorData) => {
     setDeleteTarget(evaluator);
@@ -347,12 +396,26 @@ export function EvaluatorsTabContent({
               evaluator={evaluator}
               data-tour="evaluator-card"
               data-evaluator-name={evaluator.name}
+              warning={
+                isMissingTraceValue(evaluator)
+                  ? "Will not score traces until every variable has a value"
+                  : undefined
+              }
               actions={
                 <>
                   <DuplicateEvaluatorButton
                     evaluator={evaluator}
                     onCreated={handleCreated}
                   />
+                  {hasVariables(evaluator) && (
+                    <button
+                      type="button"
+                      onClick={() => setTraceVariablesTarget(evaluator)}
+                      className={EVALUATOR_CARD_BUTTON_CLASS}
+                    >
+                      Choose trace values
+                    </button>
+                  )}
                   <Tooltip content="Remove from agent" position="top">
                     <button
                       onClick={() => openRemoveDialog(evaluator)}
@@ -382,6 +445,16 @@ export function EvaluatorsTabContent({
         onCreateEvaluator={() => setCreateFlowOpen(true)}
         onAdd={handleAddEvaluators}
       />
+
+      {traceVariablesTarget && (
+        <TraceVariablesDialog
+          evaluator={traceVariablesTarget}
+          onClose={() => setTraceVariablesTarget(null)}
+          onSave={(traceVariables) =>
+            handleSaveTraceVariables(traceVariablesTarget.uuid, traceVariables)
+          }
+        />
+      )}
 
       {/* Create a new evaluator inline (drives its own multi-step flow) */}
       <CreateEvaluatorFlow
