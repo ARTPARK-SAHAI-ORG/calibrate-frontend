@@ -76,6 +76,7 @@ export function useConfigureTraceValues({
     ),
     dialog: evaluators && (
       <TraceVariablesDialog
+        agentUuid={agentUuid}
         evaluators={evaluators}
         agentNature={agentNature}
         onClose={() => setEvaluators(null)}

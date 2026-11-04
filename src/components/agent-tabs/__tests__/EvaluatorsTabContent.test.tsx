@@ -738,6 +738,13 @@ describe("EvaluatorsTabContent", () => {
 
       await screen.findByRole("heading", { name: "Choose trace values" });
       expect(screen.getByLabelText("{{nurse_reply}}")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(mockFetchTraces).toHaveBeenCalledWith("test-token", {
+          limit: 20,
+          offset: 0,
+          agentId: "agent-1",
+        }),
+      );
     });
 
     it("does not open after adding an evaluator without variables", async () => {

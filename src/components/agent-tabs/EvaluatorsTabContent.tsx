@@ -465,6 +465,7 @@ export function EvaluatorsTabContent({
 
       {traceVariablesTarget && (
         <TraceVariablesDialog
+          agentUuid={agentUuid}
           evaluators={[traceVariablesTarget]}
           agentNature={agentNature}
           onClose={() => setTraceVariablesTarget(null)}

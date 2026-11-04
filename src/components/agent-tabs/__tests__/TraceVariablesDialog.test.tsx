@@ -1,6 +1,14 @@
 import { render, screen, waitFor, setupUser } from "@/test-utils";
 import { TraceVariablesDialog } from "../TraceVariablesDialog";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
+import { fetchTraces, previewTraceVariables } from "@/lib/tracesApi";
+
+jest.mock("../../../lib/tracesApi", () => ({
+  __esModule: true,
+  ...jest.requireActual("../../../lib/tracesApi"),
+  fetchTraces: jest.fn(),
+  previewTraceVariables: jest.fn(),
+}));
 
 const evaluator = (
   traceVariables?: Record<string, string> | null,
@@ -24,6 +32,7 @@ function setup(
   const user = setupUser();
   render(
     <TraceVariablesDialog
+      agentUuid="agent-1"
       evaluators={[evaluator(traceVariables)]}
       onClose={onClose}
       onSave={onSave}
@@ -189,6 +198,7 @@ it("shows the evaluator's words and each variable's, and leaves out what is abse
   const onSave = jest.fn();
   render(
     <TraceVariablesDialog
+      agentUuid="agent-1"
       evaluators={[
         evaluator(null, {
           description: "Compares the reply with the nurse",
@@ -221,6 +231,7 @@ it("shows the evaluator's words and each variable's, and leaves out what is abse
 it("draws no rows for an evaluator with no live version", () => {
   render(
     <TraceVariablesDialog
+      agentUuid="agent-1"
       evaluators={[evaluator(null, { live_version: null })]}
       onClose={jest.fn()}
       onSave={jest.fn()}
@@ -252,6 +263,7 @@ describe("the options depend on the agent type", () => {
   ) =>
     render(
       <TraceVariablesDialog
+        agentUuid="agent-1"
         evaluators={[evaluator(traceVariables)]}
         agentNature={agentNature}
         onClose={jest.fn()}
@@ -308,6 +320,7 @@ describe("the options depend on the agent type", () => {
     const onSave = jest.fn().mockResolvedValue(undefined);
     render(
       <TraceVariablesDialog
+        agentUuid="agent-1"
         evaluators={[evaluator({ nurse_reply: "message_id" })]}
         agentNature="general"
         onClose={jest.fn()}
@@ -350,6 +363,7 @@ describe("several evaluators", () => {
     const user = setupUser();
     render(
       <TraceVariablesDialog
+        agentUuid="agent-1"
         evaluators={evaluators}
         onClose={onClose}
         onSave={onSave}
@@ -510,5 +524,100 @@ describe("several evaluators", () => {
     await waitFor(() =>
       expect(row("Charlie")).toHaveAttribute("aria-current", "true"),
     );
+  });
+});
+
+describe("the column on the right", () => {
+  const mockFetchTraces = fetchTraces as jest.Mock;
+  const mockPreview = previewTraceVariables as jest.Mock;
+  const body = () =>
+    JSON.parse(
+      screen.getByText("What your traces need to contain").nextElementSibling
+        ?.textContent ?? "",
+    );
+
+  beforeEach(() => {
+    localStorage.setItem("access_token", "tok");
+    mockFetchTraces.mockReset();
+    mockPreview.mockReset();
+    mockFetchTraces.mockResolvedValue({
+      items: [
+        {
+          uuid: "t1",
+          created_at: "2026-08-29T12:00:00Z",
+          input_preview: "Hello",
+        },
+      ],
+    });
+    mockPreview.mockResolvedValue({
+      values: [
+        { variable: "nurse_reply", source: "metadata.k", value: "From the trace" },
+      ],
+    });
+  });
+  afterEach(() => localStorage.removeItem("access_token"));
+
+  it("follows the dropdowns, and leaves a Metadata row with no key out of the request", async () => {
+    const { user } = setup();
+    await screen.findByLabelText("Test on a trace");
+
+    expect(body().metadata).toBeUndefined();
+
+    await user.selectOptions(nurse(), "metadata.");
+    expect(body().metadata).toBeUndefined();
+    expect(screen.getAllByText("Not set", { selector: "p" })).toHaveLength(2);
+
+    await user.type(keyInput(), "k");
+    expect(body().metadata).toEqual([{ key: "k", value: "<nurse_reply>" }]);
+
+    expect(await screen.findByText("From the trace")).toBeInTheDocument();
+    expect(mockPreview).toHaveBeenCalledTimes(1);
+    expect(mockPreview).toHaveBeenCalledWith("tok", "agent-1", "t1", {
+      nurse_reply: "metadata.k",
+    });
+  });
+
+  it("uses the agent's type for the example and the wording", async () => {
+    mockPreview.mockResolvedValue({
+      values: [{ variable: "nurse_reply", source: "input", value: null }],
+    });
+    const user = setupUser();
+    render(
+      <TraceVariablesDialog
+        agentUuid="agent-1"
+        evaluators={[evaluator({ nurse_reply: "input" })]}
+        agentNature="general"
+        onClose={jest.fn()}
+        onSave={jest.fn()}
+      />,
+    );
+
+    expect(body().input).toBe("<nurse_reply>");
+    expect(await screen.findByText("This trace has no input")).toBeInTheDocument();
+    await user.selectOptions(nurse(), "");
+    expect(body().input).toBe("The user's message");
+  });
+
+  it("is there for several evaluators, showing the selected one, and fetches the traces once", async () => {
+    const user = setupUser();
+    render(
+      <TraceVariablesDialog
+        agentUuid="agent-1"
+        evaluators={[
+          evaluator({ nurse_reply: "labels" }, { uuid: "a", name: "Alpha" }),
+          evaluator({ nurse_reply: "message_id" }, { uuid: "b", name: "Bravo" }),
+        ]}
+        onClose={jest.fn()}
+        onSave={jest.fn()}
+      />,
+    );
+    await screen.findByLabelText("Test on a trace");
+    expect(body().labels).toEqual(["<nurse_reply>"]);
+
+    await user.click(screen.getByRole("button", { name: /^Bravo/ }));
+
+    expect(body().labels).toBeUndefined();
+    expect(body().message_id).toBe("<nurse_reply>");
+    expect(mockFetchTraces).toHaveBeenCalledTimes(1);
   });
 });

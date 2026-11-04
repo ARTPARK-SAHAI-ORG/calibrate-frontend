@@ -14,6 +14,7 @@ beforeEach(() => {
 });
 
 jest.mock("../../EvaluatorVerdictCard", () => ({
+  evaluatorCardSurfaceClass: () => "evaluator-card",
   EvaluatorVerdictCard: ({
     name,
     description,
@@ -234,4 +235,147 @@ it("gives each card what its own evaluator is for, and nothing for one with no w
 it("shows the error when the scores could not be loaded", () => {
   render(<TraceScorePanel run={null} error="Could not load scores." />);
   expect(screen.getByText("Could not load scores.")).toBeInTheDocument();
+});
+
+describe("variables a trace had no value for", () => {
+  const missing = (
+    evaluator_uuid: string,
+    name: string,
+    variable: string,
+    source: string,
+  ) => ({ evaluator_uuid, name, variable, source });
+  const skipped: TraceScoringRun = {
+    run_uuid: "r6",
+    status: "skipped",
+    created_at: "2026-08-29T12:00:00Z",
+    error: "missing_trace_values",
+    results: [],
+    missing_values: [
+      missing("ev-9", "Agrees with the nurse", "nurse_reply", "metadata.expert_answer"),
+    ],
+  };
+  const GENERIC = "This trace is missing a value that its evaluators need";
+
+  it("names the metadata entry, and shows no general line on a skipped run", () => {
+    const { container } = render(<TraceScorePanel run={skipped} />);
+
+    const block = container.querySelector(".evaluator-card");
+    expect(block).toHaveTextContent(
+      "Agrees with the nurseCould not run. {{nurse_reply}} reads from the metadata entry expert_answer, and this trace does not have it.",
+    );
+    expect(block?.querySelector(".border-amber-500\\/40")).not.toBeNull();
+    expect(screen.queryByText(GENERIC)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["input", "the input"],
+    ["output.response", "the agent reply"],
+    ["output.tool_calls", "the tool calls"],
+    ["labels", "the labels"],
+    ["conversation_id", "the conversation ID"],
+    ["message_id", "the message ID"],
+  ])("names %s in words", (source, words) => {
+    render(
+      <TraceScorePanel
+        run={{ ...skipped, missing_values: [missing("e", "E", "x", source)] }}
+      />,
+    );
+    expect(
+      screen.getByText(
+        (_, el) =>
+          el?.tagName === "P" &&
+          el.textContent ===
+            `Could not run. {{x}} reads from ${words}, and this trace does not have it.`,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("puts several variables of one evaluator in one block, one sentence each", () => {
+    const { container } = render(
+      <TraceScorePanel
+        run={{
+          ...skipped,
+          missing_values: [
+            missing("e1", "First", "a", "labels"),
+            missing("e2", "Second", "c", "input"),
+            missing("e1", "First", "b", "message_id"),
+          ],
+        }}
+      />,
+    );
+
+    const blocks = container.querySelectorAll(".evaluator-card");
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]).toHaveTextContent("{{a}} reads from the labels");
+    expect(blocks[0]).toHaveTextContent("{{b}} reads from the message ID");
+    expect(blocks[0].querySelectorAll(".border-amber-500\\/40 p")).toHaveLength(2);
+    expect(blocks[1]).toHaveTextContent("{{c}} reads from the input");
+  });
+
+  it("shows a block beside the scores of a completed run", () => {
+    const { container } = render(
+      <TraceScorePanel
+        run={{
+          ...completed,
+          missing_values: [missing("e3", "Third", "x", "labels")],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("verdict-Tone")).toBeInTheDocument();
+    expect(container.querySelector(".evaluator-card")).toHaveTextContent(
+      "Third",
+    );
+  });
+
+  it("shows only the block when a completed run has no scores", () => {
+    const { container } = render(
+      <TraceScorePanel
+        run={{
+          ...completed,
+          results: [],
+          missing_values: [missing("e3", "Third", "x", "labels")],
+        }}
+      />,
+    );
+
+    expect(container.querySelector(".evaluator-card")).not.toBeNull();
+    expect(
+      screen.queryByText("This run produced no scores."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the general line when the skipped run names nothing", () => {
+    const { container, rerender } = render(
+      <TraceScorePanel run={{ ...skipped, missing_values: [] }} />,
+    );
+    expect(screen.getByText(GENERIC)).toBeInTheDocument();
+    expect(container.querySelector(".evaluator-card")).toBeNull();
+
+    // A run from before the backend reported these.
+    rerender(<TraceScorePanel run={{ ...skipped, missing_values: undefined }} />);
+    expect(screen.getByText(GENERIC)).toBeInTheDocument();
+  });
+
+  it("leaves other run states as they are", () => {
+    const values = skipped.missing_values;
+    const { container, rerender } = render(
+      <TraceScorePanel
+        run={{ ...skipped, error: "over_limit", missing_values: values }}
+      />,
+    );
+    expect(container.querySelector(".evaluator-card")).toBeNull();
+
+    rerender(
+      <TraceScorePanel run={{ ...skipped, status: "failed", missing_values: values }} />,
+    );
+    expect(screen.getByText(GENERIC)).toBeInTheDocument();
+    expect(container.querySelector(".evaluator-card")).toBeNull();
+
+    rerender(<TraceScorePanel run={{ ...skipped, status: "pending" }} />);
+    expect(
+      screen.getByText("Running the evaluators on this trace"),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".evaluator-card")).toBeNull();
+  });
 });

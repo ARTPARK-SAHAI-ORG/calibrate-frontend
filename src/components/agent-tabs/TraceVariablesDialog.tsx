@@ -3,34 +3,21 @@
 import React, { useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Select } from "@/components/ui/Select";
+import { TraceVariablesPreview } from "@/components/agent-tabs/TraceVariablesPreview";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
-import { isMissingTraceValue, missingTraceValues } from "@/lib/traceScoring";
-
-const METADATA = "metadata.";
-
-const CONVERSATION_SOURCES = [
-  { value: "input", label: "Conversation" },
-  { value: "output.response", label: "Agent reply" },
-  { value: "output.tool_calls", label: "Tool calls" },
-  { value: METADATA, label: "Metadata" },
-  { value: "labels", label: "Labels" },
-  { value: "conversation_id", label: "Conversation ID" },
-  { value: "message_id", label: "Message ID" },
-];
-
-// A general agent has no conversation, so nothing to identify one by.
-const GENERAL_SOURCES = [
-  { value: "input", label: "Input" },
-  { value: "output.response", label: "Output" },
-  { value: "output.tool_calls", label: "Tool calls" },
-  { value: METADATA, label: "Metadata" },
-  { value: "labels", label: "Labels" },
-];
-
-const isMetadata = (value: string) => value.startsWith(METADATA);
-const metadataKey = (value: string) => value.slice(METADATA.length).trim();
+import {
+  isMetadataSource,
+  isMissingTraceValue,
+  METADATA_SOURCE,
+  metadataKey,
+  missingTraceValues,
+  traceChoices,
+  traceSourceLabel,
+  traceSources,
+} from "@/lib/traceScoring";
 
 type TraceVariablesDialogProps = {
+  agentUuid: string;
   evaluators: EvaluatorData[];
   agentNature?: "conversation" | "general";
   onClose: () => void;
@@ -43,6 +30,7 @@ type TraceVariablesDialogProps = {
 
 /** Mounted only while open, so every open starts from `evaluators`. */
 export function TraceVariablesDialog({
+  agentUuid,
   evaluators,
   agentNature = "conversation",
   onClose,
@@ -75,8 +63,12 @@ export function TraceVariablesDialog({
   const othersMissing = saved.some(
     (e) => e.uuid !== selectedUuid && isMissingTraceValue(e),
   );
-  const sources =
-    agentNature === "general" ? GENERAL_SOURCES : CONVERSATION_SOURCES;
+  const sources = traceSources(agentNature);
+  const choices = traceChoices(
+    Object.fromEntries(
+      variables.map(({ name }) => [name, values[name] ?? ""]),
+    ),
+  );
 
   const setValue = (name: string, value: string) =>
     setDrafts((prev) => ({
@@ -86,7 +78,7 @@ export function TraceVariablesDialog({
 
   const hasEmptyMetadataKey = variables.some((variable) => {
     const value = values[variable.name] ?? "";
-    return isMetadata(value) && !metadataKey(value);
+    return isMetadataSource(value) && !metadataKey(value);
   });
 
   const handleClose = () => {
@@ -99,15 +91,7 @@ export function TraceVariablesDialog({
   };
 
   const handleSave = async () => {
-    const traceVariables: Record<string, string> = {};
-    for (const { name } of variables) {
-      const value = values[name];
-      if (value) {
-        traceVariables[name] = isMetadata(value)
-          ? METADATA + metadataKey(value)
-          : value;
-      }
-    }
+    const traceVariables = choices;
     try {
       setSaving(true);
       setError(null);
@@ -154,7 +138,7 @@ export function TraceVariablesDialog({
         const savedValue = selected.trace_variables?.[name];
         const offList =
           savedValue &&
-          !isMetadata(savedValue) &&
+          !isMetadataSource(savedValue) &&
           !sources.some((source) => source.value === savedValue)
             ? savedValue
             : null;
@@ -175,7 +159,7 @@ export function TraceVariablesDialog({
             </div>
             <Select
               id={`trace-variable-${name}`}
-              value={isMetadata(value) ? METADATA : value}
+              value={isMetadataSource(value) ? METADATA_SOURCE : value}
               onChange={(e) => setValue(name, e.target.value)}
               disabled={saving}
               className="cursor-pointer"
@@ -187,18 +171,17 @@ export function TraceVariablesDialog({
                 </option>
               ))}
               {offList && (
-                <option value={offList}>
-                  {CONVERSATION_SOURCES.find((s) => s.value === offList)
-                    ?.label ?? offList}
-                </option>
+                <option value={offList}>{traceSourceLabel(offList)}</option>
               )}
             </Select>
-            {isMetadata(value) && (
+            {isMetadataSource(value) && (
               <input
                 type="text"
                 aria-label={`Metadata key for ${name}`}
-                value={value.slice(METADATA.length)}
-                onChange={(e) => setValue(name, METADATA + e.target.value)}
+                value={value.slice(METADATA_SOURCE.length)}
+                onChange={(e) =>
+                  setValue(name, METADATA_SOURCE + e.target.value)
+                }
                 disabled={saving}
                 placeholder="Metadata key, for example expert_answer"
                 className="w-full h-10 px-3 rounded-md text-sm border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
@@ -214,6 +197,15 @@ export function TraceVariablesDialog({
     </div>
   );
 
+  const preview = (
+    <TraceVariablesPreview
+      agentUuid={agentUuid}
+      agentNature={agentNature}
+      variables={variables.map(({ name }) => name)}
+      choices={choices}
+    />
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
@@ -221,7 +213,7 @@ export function TraceVariablesDialog({
     >
       <div
         className={`bg-background border border-border rounded-xl w-full shadow-2xl flex flex-col max-h-[90vh] ${
-          hasSeveral ? "max-w-6xl md:h-[85vh]" : "max-w-md"
+          hasSeveral ? "max-w-7xl lg:h-[85vh]" : "max-w-4xl"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -259,9 +251,9 @@ export function TraceVariablesDialog({
 
         {/* Body */}
         {hasSeveral ? (
-          <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden p-4 md:p-6">
-            <div className="flex flex-col md:flex-row gap-3 md:gap-4 md:h-full md:min-h-0">
-              <div className="md:flex-1 md:min-w-0 border border-border rounded-md overflow-y-auto divide-y divide-border max-h-60 md:max-h-none md:h-full">
+          <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden p-4 md:p-6">
+            <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 lg:h-full lg:min-h-0">
+              <div className="lg:flex-1 lg:min-w-0 border border-border rounded-md overflow-y-auto divide-y divide-border max-h-60 lg:max-h-none lg:h-full">
                 {saved.map((evaluator) => {
                   const total = evaluator.live_version?.variables?.length ?? 0;
                   const missing = missingTraceValues(evaluator).length;
@@ -293,13 +285,21 @@ export function TraceVariablesDialog({
                   );
                 })}
               </div>
-              <div className="md:flex-1 md:min-w-0 md:overflow-y-auto md:h-full md:min-h-0">
+              <div className="lg:flex-1 lg:min-w-0 lg:overflow-y-auto lg:h-full lg:min-h-0">
                 {form}
+              </div>
+              <div className="lg:flex-1 lg:min-w-0 lg:overflow-y-auto lg:h-full lg:min-h-0">
+                {preview}
               </div>
             </div>
           </div>
         ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">{form}</div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">
+            <div className="flex flex-col md:flex-row gap-6">
+              <div className="md:flex-1 md:min-w-0">{form}</div>
+              <div className="md:flex-1 md:min-w-0">{preview}</div>
+            </div>
+          </div>
         )}
 
         {/* Footer */}

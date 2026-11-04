@@ -1187,6 +1187,13 @@ describe("TracesTabContent", () => {
       );
       await user.click(configureNow());
       await screen.findByRole("heading", { name: "Choose trace values" });
+      await waitFor(() =>
+        expect(fetchTraces).toHaveBeenCalledWith("test-token", {
+          limit: 20,
+          offset: 0,
+          agentId: "agent-1",
+        }),
+      );
 
       await user.selectOptions(screen.getByLabelText("{{reply}}"), "input");
       await user.click(screen.getByRole("button", { name: "Save and next" }));

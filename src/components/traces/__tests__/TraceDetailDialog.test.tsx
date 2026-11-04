@@ -727,6 +727,42 @@ it("says what each evaluator is for, from the words the agent page passes in", a
   expect(screen.getAllByText("Helpfulness").length).toBeGreaterThan(0);
 });
 
+it("keeps the scores column for a run skipped over a missing value", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-new",
+        status: "skipped",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "missing_trace_values",
+        results: [],
+        missing_values: [
+          {
+            evaluator_uuid: "ev-1",
+            name: "Tone",
+            variable: "x",
+            source: "metadata.k",
+          },
+        ],
+      },
+    ],
+  });
+
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+
+  expect(
+    (await screen.findAllByText(/reads from the metadata entry k/)).length,
+  ).toBeGreaterThan(0);
+});
+
 it("refetches scores while a run is still in progress", async () => {
   mockFetchTrace.mockResolvedValue(detail);
   mockFetchTraceScores.mockResolvedValue({
@@ -1053,7 +1089,7 @@ describe("showing a whole conversation", () => {
     },
   };
 
-  it("draws the newest turn's trace under the conversation id, with no scores", async () => {
+  it("draws the newest turn's trace under the conversation ID, with no scores", async () => {
     mockFetchTrace.mockResolvedValue({ ...detail, uuid: "t-last" });
 
     render(
