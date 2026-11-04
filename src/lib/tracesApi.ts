@@ -211,6 +211,8 @@ export type TraceListParams = {
   outputType?: TraceOutputFilter;
   /** Keep only the turns of this conversation. */
   conversationId?: string | null;
+  /** Keep only traces created before this time. */
+  createdBefore?: string | null;
   /** Ask for `score_averages` beside the page. Costly, so only when the
    *  filters change rather than on every page or poll. */
   includeScoreAverages?: boolean;
@@ -248,6 +250,7 @@ export async function fetchTraces(
     sortOrder,
     includeScoreAverages,
     conversationId,
+    createdBefore,
   }: TraceListParams,
 ): Promise<Paginated<TraceSummary> & { score_averages?: TraceScoreAverage[] }> {
   const params = new URLSearchParams();
@@ -255,6 +258,7 @@ export async function fetchTraces(
   params.set("offset", String(offset));
   params.set("agent_id", agentId);
   if (conversationId) params.set("conversation_id", conversationId);
+  if (createdBefore) params.set("created_before", createdBefore);
   if (q?.trim()) params.set("q", q.trim());
   if (outputType && outputType !== "all") {
     params.set("output_type", outputType);
@@ -476,6 +480,8 @@ export type TraceFilters = {
   scores?: TraceScoreFilters;
   /** Keep only the turns of this conversation. */
   conversationId?: string | null;
+  /** Keep only traces created before this time. */
+  createdBefore?: string | null;
 };
 
 /** Turn the filters into the fields both bulk endpoints read. */
@@ -490,6 +496,7 @@ export function selectAllBody(filters: TraceFilters): Record<string, unknown> {
   }
   if (filters.labels?.length) body.labels = filters.labels;
   if (filters.conversationId) body.conversation_id = filters.conversationId;
+  if (filters.createdBefore) body.created_before = filters.createdBefore;
   const score = traceScoreParams(filters.scores);
   if (score.length) body.score = score;
   return body;
@@ -512,6 +519,8 @@ export type ConvertTracesToTestsResult = {
   created: number;
   /** Their ids, in the order the traces were sent. */
   test_uuids: string[];
+  /** What went wrong after the tests were made, in words for the reader. */
+  warnings?: string[] | null;
 };
 
 /**
