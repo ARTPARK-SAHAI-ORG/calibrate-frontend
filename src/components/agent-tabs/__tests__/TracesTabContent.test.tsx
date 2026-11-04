@@ -242,10 +242,11 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
       outputType?: string;
       labels?: string[];
       scores?: Record<string, string>;
+      createdBefore?: string | null;
     } | null;
     agentNature?: string;
     onConverted: (
-      result: { created: number; test_uuids: string[] },
+      result: { created: number; test_uuids: string[]; warnings?: string[] },
       evaluatorsUsed?: { uuid: string; name: string }[],
     ) => void;
   }) =>
