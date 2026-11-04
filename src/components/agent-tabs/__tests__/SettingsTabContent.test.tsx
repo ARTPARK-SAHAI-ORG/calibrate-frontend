@@ -22,6 +22,7 @@ function scoring(
     saveError: null,
     enableBlocked: false,
     cannotEnable: false,
+    refreshEligibility: jest.fn(),
     ...overrides,
   };
   // The hook works this out from the other two; a test that sets either of

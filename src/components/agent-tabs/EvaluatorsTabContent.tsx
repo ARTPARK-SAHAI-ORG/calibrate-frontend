@@ -26,6 +26,7 @@ import {
   saveEvaluatorTraceVariables,
 } from "@/lib/evaluatorApi";
 import { fetchTraces } from "@/lib/tracesApi";
+import { isMissingTraceValue } from "@/lib/traceScoring";
 
 // Two remove flavours share one confirmation dialog:
 //   "remove"     → detach from this agent only (evaluator stays in library).
@@ -51,12 +52,6 @@ function agentEvaluatorTypes(agentNature: "conversation" | "general") {
 
 function hasVariables(evaluator: EvaluatorData) {
   return !!evaluator.live_version?.variables?.length;
-}
-
-function isMissingTraceValue(evaluator: EvaluatorData) {
-  return evaluator.live_version?.variables?.some(
-    (variable) => !evaluator.trace_variables?.[variable.name],
-  );
 }
 
 export function EvaluatorsTabContent({
@@ -470,11 +465,10 @@ export function EvaluatorsTabContent({
 
       {traceVariablesTarget && (
         <TraceVariablesDialog
-          evaluator={traceVariablesTarget}
+          evaluators={[traceVariablesTarget]}
+          agentNature={agentNature}
           onClose={() => setTraceVariablesTarget(null)}
-          onSave={(traceVariables) =>
-            handleSaveTraceVariables(traceVariablesTarget.uuid, traceVariables)
-          }
+          onSave={handleSaveTraceVariables}
         />
       )}
 

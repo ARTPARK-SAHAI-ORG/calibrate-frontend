@@ -4,11 +4,12 @@ import React, { useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Select } from "@/components/ui/Select";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
+import { isMissingTraceValue, missingTraceValues } from "@/lib/traceScoring";
 
 const METADATA = "metadata.";
 
-const TRACE_SOURCES = [
-  { value: "input", label: "Input" },
+const CONVERSATION_SOURCES = [
+  { value: "input", label: "Conversation" },
   { value: "output.response", label: "Agent reply" },
   { value: "output.tool_calls", label: "Tool calls" },
   { value: METADATA, label: "Metadata" },
@@ -17,35 +18,71 @@ const TRACE_SOURCES = [
   { value: "message_id", label: "Message ID" },
 ];
 
+// A general agent has no conversation, so nothing to identify one by.
+const GENERAL_SOURCES = [
+  { value: "input", label: "Input" },
+  { value: "output.response", label: "Output" },
+  { value: "output.tool_calls", label: "Tool calls" },
+  { value: METADATA, label: "Metadata" },
+  { value: "labels", label: "Labels" },
+];
+
 const isMetadata = (value: string) => value.startsWith(METADATA);
 const metadataKey = (value: string) => value.slice(METADATA.length).trim();
 
 type TraceVariablesDialogProps = {
-  evaluator: EvaluatorData;
+  evaluators: EvaluatorData[];
+  agentNature?: "conversation" | "general";
   onClose: () => void;
   /** Parent does the saving + refresh; we just hand back the whole map. */
-  onSave: (traceVariables: Record<string, string>) => Promise<void>;
+  onSave: (
+    evaluatorUuid: string,
+    traceVariables: Record<string, string>,
+  ) => Promise<void>;
 };
 
-/** Mounted only while open, so every open starts from `evaluator`. */
+/** Mounted only while open, so every open starts from `evaluators`. */
 export function TraceVariablesDialog({
-  evaluator,
+  evaluators,
+  agentNature = "conversation",
   onClose,
   onSave,
 }: TraceVariablesDialogProps) {
   // Hide the floating "Talk to Us" button while the modal is open.
   useHideFloatingButton(true);
 
-  const variables = evaluator.live_version?.variables ?? [];
-  // A Metadata row holds "metadata." plus whatever key has been typed so far.
-  const [values, setValues] = useState<Record<string, string>>(
-    evaluator.trace_variables ?? {},
+  // What the server holds, which is what the left column reports on.
+  const [saved, setSaved] = useState(evaluators);
+  // What has been typed, per evaluator. A Metadata row holds "metadata." plus
+  // whatever key has been typed so far.
+  const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>(
+    () =>
+      Object.fromEntries(
+        evaluators.map((e) => [e.uuid, e.trace_variables ?? {}]),
+      ),
+  );
+  const [selectedUuid, setSelectedUuid] = useState(
+    () => (evaluators.find(isMissingTraceValue) ?? evaluators[0]).uuid,
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const selectedIndex = saved.findIndex((e) => e.uuid === selectedUuid);
+  const selected = saved[selectedIndex];
+  const variables = selected.live_version?.variables ?? [];
+  const values = drafts[selectedUuid];
+  const hasSeveral = saved.length > 1;
+  const othersMissing = saved.some(
+    (e) => e.uuid !== selectedUuid && isMissingTraceValue(e),
+  );
+  const sources =
+    agentNature === "general" ? GENERAL_SOURCES : CONVERSATION_SOURCES;
+
   const setValue = (name: string, value: string) =>
-    setValues((prev) => ({ ...prev, [name]: value }));
+    setDrafts((prev) => ({
+      ...prev,
+      [selectedUuid]: { ...prev[selectedUuid], [name]: value },
+    }));
 
   const hasEmptyMetadataKey = variables.some((variable) => {
     const value = values[variable.name] ?? "";
@@ -54,6 +91,11 @@ export function TraceVariablesDialog({
 
   const handleClose = () => {
     if (!saving) onClose();
+  };
+
+  const handleSelect = (uuid: string) => {
+    setSelectedUuid(uuid);
+    setError(null);
   };
 
   const handleSave = async () => {
@@ -69,8 +111,18 @@ export function TraceVariablesDialog({
     try {
       setSaving(true);
       setError(null);
-      await onSave(traceVariables);
-      onClose();
+      await onSave(selectedUuid, traceVariables);
+      const next = saved.map((e) =>
+        e.uuid === selectedUuid ? { ...e, trace_variables: traceVariables } : e,
+      );
+      setSaved(next);
+      setDrafts((prev) => ({ ...prev, [selectedUuid]: traceVariables }));
+      const nextMissing = [
+        ...next.slice(selectedIndex + 1),
+        ...next.slice(0, selectedIndex),
+      ].find(isMissingTraceValue);
+      if (nextMissing) setSelectedUuid(nextMissing.uuid);
+      else onClose();
     } catch (err) {
       // Keep the dialog open and surface the failure instead of closing as if
       // the save succeeded.
@@ -82,13 +134,95 @@ export function TraceVariablesDialog({
     }
   };
 
+  const form = (
+    <div key={selectedUuid} className="space-y-4">
+      <div>
+        <h3 className="text-sm md:text-base font-semibold text-foreground">
+          {selected.name}
+        </h3>
+        {selected.description && (
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">
+            {selected.description}
+          </p>
+        )}
+      </div>
+      {variables.map(({ name, description }) => {
+        const value = values[name] ?? "";
+        // A copy of an agent of another type can hold a value this agent's list
+        // does not offer. Showing it stops it reading as Not set and being
+        // dropped by a save nobody meant to change it.
+        const savedValue = selected.trace_variables?.[name];
+        const offList =
+          savedValue &&
+          !isMetadata(savedValue) &&
+          !sources.some((source) => source.value === savedValue)
+            ? savedValue
+            : null;
+        return (
+          <div key={name} className="space-y-2">
+            <div>
+              <label
+                htmlFor={`trace-variable-${name}`}
+                className="block text-sm font-medium font-mono text-foreground break-all"
+              >
+                {`{{${name}}}`}
+              </label>
+              {description && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {description}
+                </p>
+              )}
+            </div>
+            <Select
+              id={`trace-variable-${name}`}
+              value={isMetadata(value) ? METADATA : value}
+              onChange={(e) => setValue(name, e.target.value)}
+              disabled={saving}
+              className="cursor-pointer"
+            >
+              <option value="">Not set</option>
+              {sources.map((source) => (
+                <option key={source.value} value={source.value}>
+                  {source.label}
+                </option>
+              ))}
+              {offList && (
+                <option value={offList}>
+                  {CONVERSATION_SOURCES.find((s) => s.value === offList)
+                    ?.label ?? offList}
+                </option>
+              )}
+            </Select>
+            {isMetadata(value) && (
+              <input
+                type="text"
+                aria-label={`Metadata key for ${name}`}
+                value={value.slice(METADATA.length)}
+                onChange={(e) => setValue(name, METADATA + e.target.value)}
+                disabled={saving}
+                placeholder="Metadata key, for example expert_answer"
+                className="w-full h-10 px-3 rounded-md text-sm border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              />
+            )}
+          </div>
+        );
+      })}
+      <p className="text-xs text-muted-foreground">
+        Applies to new traces. Traces that already arrived are not scored again.
+        An evaluator with a variable left as Not set does not score traces.
+      </p>
+    </div>
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
       onClick={handleClose}
     >
       <div
-        className="bg-background border border-border rounded-xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]"
+        className={`bg-background border border-border rounded-xl w-full shadow-2xl flex flex-col max-h-[90vh] ${
+          hasSeveral ? "max-w-6xl md:h-[85vh]" : "max-w-md"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -98,8 +232,7 @@ export function TraceVariablesDialog({
               Choose trace values
             </h2>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
-              Choose which part of each trace fills each variable in this
-              evaluator
+              Choose which part of each trace fills each variable
             </p>
           </div>
           <button
@@ -125,52 +258,49 @@ export function TraceVariablesDialog({
         </div>
 
         {/* Body */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 space-y-4">
-          {variables.map(({ name }) => {
-            const value = values[name] ?? "";
-            return (
-              <div key={name} className="space-y-2">
-                <label
-                  htmlFor={`trace-variable-${name}`}
-                  className="block text-sm font-medium font-mono text-foreground break-all"
-                >
-                  {`{{${name}}}`}
-                </label>
-                <Select
-                  id={`trace-variable-${name}`}
-                  value={isMetadata(value) ? METADATA : value}
-                  onChange={(e) => setValue(name, e.target.value)}
-                  disabled={saving}
-                  className="cursor-pointer"
-                >
-                  <option value="">Not set</option>
-                  {TRACE_SOURCES.map((source) => (
-                    <option key={source.value} value={source.value}>
-                      {source.label}
-                    </option>
-                  ))}
-                </Select>
-                {isMetadata(value) && (
-                  <input
-                    type="text"
-                    aria-label={`Metadata key for ${name}`}
-                    value={value.slice(METADATA.length)}
-                    onChange={(e) =>
-                      setValue(name, METADATA + e.target.value)
-                    }
-                    disabled={saving}
-                    placeholder="Metadata key, for example expert_answer"
-                    className="w-full h-10 px-3 rounded-md text-sm border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                  />
-                )}
+        {hasSeveral ? (
+          <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden p-4 md:p-6">
+            <div className="flex flex-col md:flex-row gap-3 md:gap-4 md:h-full md:min-h-0">
+              <div className="md:flex-1 md:min-w-0 border border-border rounded-md overflow-y-auto divide-y divide-border max-h-60 md:max-h-none md:h-full">
+                {saved.map((evaluator) => {
+                  const total = evaluator.live_version?.variables?.length ?? 0;
+                  const missing = missingTraceValues(evaluator).length;
+                  const isSelected = evaluator.uuid === selectedUuid;
+                  return (
+                    <button
+                      key={evaluator.uuid}
+                      type="button"
+                      aria-current={isSelected ? "true" : undefined}
+                      onClick={() => handleSelect(evaluator.uuid)}
+                      disabled={saving}
+                      className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left cursor-pointer transition-colors disabled:cursor-not-allowed ${
+                        isSelected ? "bg-muted" : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <span className="text-sm font-medium text-foreground min-w-0 break-words">
+                        {evaluator.name}
+                      </span>
+                      {missing > 0 ? (
+                        <span className="text-xs text-yellow-700 dark:text-yellow-500 flex-shrink-0">
+                          {missing} of {total} missing
+                        </span>
+                      ) : (
+                        <span className="text-xs text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+                          All set
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-            );
-          })}
-          <p className="text-xs text-muted-foreground">
-            Applies to new traces. A trace missing one of these values is not
-            scored by this evaluator.
-          </p>
-        </div>
+              <div className="md:flex-1 md:min-w-0 md:overflow-y-auto md:h-full md:min-h-0">
+                {form}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">{form}</div>
+        )}
 
         {/* Footer */}
         <div className="flex flex-col gap-2 px-5 md:px-6 py-4 border-t border-border">
@@ -183,12 +313,17 @@ export function TraceVariablesDialog({
             </p>
           )}
           <div className="flex items-center justify-end gap-2 md:gap-3">
+            {hasSeveral && (
+              <p className="mr-auto text-sm text-muted-foreground">
+                Evaluator {selectedIndex + 1} of {saved.length}
+              </p>
+            )}
             <button
               onClick={handleClose}
               disabled={saving}
               className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Cancel
+              Close
             </button>
             <button
               onClick={handleSave}
@@ -216,7 +351,7 @@ export function TraceVariablesDialog({
                   />
                 </svg>
               )}
-              {saving ? "Saving..." : "Save"}
+              {saving ? "Saving..." : othersMissing ? "Save and next" : "Save"}
             </button>
           </div>
         </div>

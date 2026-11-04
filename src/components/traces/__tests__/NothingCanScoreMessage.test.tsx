@@ -18,7 +18,7 @@ it("says variables are the reason and offers the way to fix it", async () => {
   expect(onGoToEvaluators).toHaveBeenCalled();
   // The copy names the tab itself, so it must not be said twice.
   expect(container).toHaveTextContent(
-    /^Every evaluator .* Choose them in the Evaluators tab\.$/,
+    /^Every evaluator .* Configure them in the Evaluators tab\.$/,
   );
 });
 

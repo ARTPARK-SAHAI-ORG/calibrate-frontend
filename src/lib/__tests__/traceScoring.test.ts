@@ -1,6 +1,9 @@
+import type { EvaluatorData } from "../evaluatorApi";
 import {
   ineligibleReasonCopy,
+  isMissingTraceValue,
   isTraceScoringInProgress,
+  missingTraceValues,
   nothingCanScoreCopy,
   scoringRunErrorCopy,
 } from "../traceScoring";
@@ -21,7 +24,7 @@ describe("copy", () => {
     );
     expect(ineligibleReasonCopy("no_live_version")).toBe("Has no live version");
     expect(ineligibleReasonCopy("declares_variables")).toBe(
-      "A variable has no trace value chosen. Choose one in the Evaluators tab",
+      "A variable has no trace value chosen. Configure it in the Evaluators tab",
     );
     expect(ineligibleReasonCopy("other")).toBe(
       "Cannot score traces for this agent",
@@ -68,7 +71,7 @@ describe("nothingCanScoreCopy", () => {
         { reason: "declares_variables" },
       ]),
     ).toBe(
-      "Every evaluator added to this agent has a variable with no trace value chosen. Choose them in the Evaluators tab.",
+      "Every evaluator added to this agent has a variable with no trace value chosen. Configure them in the Evaluators tab.",
     );
   });
 
@@ -88,5 +91,32 @@ describe("nothingCanScoreCopy", () => {
     expect(nothingCanScoreCopy([{ reason: "wrong_type_for_agent" }])).toBe(
       "None of this agent's evaluators can score traces.",
     );
+  });
+});
+
+describe("missing trace values", () => {
+  const evaluator = (trace_variables?: Record<string, string> | null) =>
+    ({
+      uuid: "ev",
+      live_version: { variables: [{ name: "a" }, { name: "b" }] },
+      trace_variables,
+    }) as EvaluatorData;
+
+  it("names only the variables with nothing saved", () => {
+    expect(
+      missingTraceValues(evaluator({ a: "input" })).map((v) => v.name),
+    ).toEqual(["b"]);
+    expect(isMissingTraceValue(evaluator({ a: "input" }))).toBe(true);
+    expect(isMissingTraceValue(evaluator(null))).toBe(true);
+  });
+
+  it("is not missing anything when every variable has a value", () => {
+    expect(isMissingTraceValue(evaluator({ a: "input", b: "labels" }))).toBe(
+      false,
+    );
+  });
+
+  it("is not missing anything when the evaluator has no variables", () => {
+    expect(isMissingTraceValue({ uuid: "ev" } as EvaluatorData)).toBe(false);
   });
 });

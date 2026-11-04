@@ -44,6 +44,8 @@ export type TraceScoringControls = {
    * reads this, so none of them has to work it out again.
    */
   cannotEnable: boolean;
+  /** Asks again which evaluators can score, after their trace values change. */
+  refreshEligibility: () => Promise<void>;
 };
 
 /**
@@ -154,5 +156,6 @@ export function useAgentTraceScoring({
     saveError,
     enableBlocked,
     cannotEnable,
+    refreshEligibility: loadEligibility,
   };
 }

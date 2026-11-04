@@ -54,10 +54,13 @@ const fetchAgentEvaluators = jest.fn(
   async () => [] as { uuid: string; description?: string }[],
 );
 const addEvaluatorsToAgent = jest.fn(async () => ({}));
+const saveEvaluatorTraceVariables = jest.fn();
 jest.mock("../../../lib/evaluatorApi", () => ({
   fetchAgentEvaluators: () => fetchAgentEvaluators(),
   fetchAllEvaluators: async () => [],
   addEvaluatorsToAgent: (...args: unknown[]) => addEvaluatorsToAgent(...args),
+  saveEvaluatorTraceVariables: (...args: unknown[]) =>
+    saveEvaluatorTraceVariables(...args),
 }));
 
 jest.mock("../../traces/ConversationsView", () => ({
@@ -356,6 +359,7 @@ const traceScoring = {
   saveError: null,
   enableBlocked: false,
   cannotEnable: false,
+  refreshEligibility: jest.fn(async () => {}),
 };
 const tabProps = {
   agentUuid: "agent-1",
@@ -1102,20 +1106,113 @@ describe("TracesTabContent", () => {
       expect(screen.getAllByText("Retired judge").length).toBeGreaterThan(0);
     });
 
-    it("says nothing is being scored when no evaluator can, and points at the Evaluators tab", async () => {
+    const blockedBy = (...reasons: string[]) => ({
+      ...traceScoring,
+      enabled: true,
+      eligibility: {
+        eligible: [],
+        ineligible: reasons.map((reason, i) => ({
+          evaluator_uuid: `ev-${i}`,
+          name: `Evaluator ${i}`,
+          reason: reason as "declares_variables",
+        })),
+      },
+    });
+    const configureNow = () =>
+      screen.getByRole("button", { name: "Configure now" });
+
+    it("says plainly what is wrong and offers the button when every evaluator needs values", async () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={blockedBy("declares_variables")}
+        />,
+      );
+      expect(
+        screen.getByText(
+          "Every evaluator added to this agent has a variable with no trace value chosen.",
+        ),
+      ).toBeInTheDocument();
+      expect(configureNow()).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Evaluators tab" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the link and adds the button when only some evaluators need values", async () => {
       const user = setupUser();
       render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={blockedBy("declares_variables", "no_live_version")}
+        />,
+      );
+      expect(configureNow()).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
+      expect(onGoToEvaluators).toHaveBeenCalled();
+    });
+
+    it("has no button when no evaluator needs values", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={blockedBy("no_live_version")}
+        />,
+      );
+      expect(
+        screen.getByRole("button", { name: "Evaluators tab" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Configure now" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the dialog open when the first save ends the warning", async () => {
+      const user = setupUser();
+      const needsValues = (uuid: string, name: string) => ({
+        uuid,
+        name,
+        description: "",
+        live_version: { variables: [{ name: "reply" }] },
+      });
+      fetchAgentEvaluators.mockResolvedValue([
+        needsValues("ev-1", "Alpha"),
+        needsValues("ev-2", "Bravo"),
+      ]);
+      const { rerender } = render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={blockedBy("declares_variables", "declares_variables")}
+        />,
+      );
+      await user.click(configureNow());
+      await screen.findByRole("heading", { name: "Choose trace values" });
+
+      await user.selectOptions(screen.getByLabelText("{{reply}}"), "input");
+      await user.click(screen.getByRole("button", { name: "Save and next" }));
+      await waitFor(() =>
+        expect(saveEvaluatorTraceVariables).toHaveBeenCalledWith(
+          "agent-1",
+          "ev-1",
+          { reply: "input" },
+          "test-token",
+        ),
+      );
+      expect(traceScoring.refreshEligibility).toHaveBeenCalled();
+
+      // One evaluator can score now, so the banner goes away.
+      rerender(
         <TracesTabContent
           {...tabProps}
           traceScoring={{
             ...traceScoring,
             enabled: true,
             eligibility: {
-              eligible: [],
+              eligible: [{ evaluator_uuid: "ev-1", name: "Alpha" }],
               ineligible: [
                 {
                   evaluator_uuid: "ev-2",
-                  name: "Correctness",
+                  name: "Bravo",
                   reason: "declares_variables" as const,
                 },
               ],
@@ -1123,12 +1220,121 @@ describe("TracesTabContent", () => {
           }}
         />,
       );
-      // The sentence and the link share one line, so read the whole line.
+
       expect(
-        screen.getByRole("button", { name: "Evaluators tab" }).parentElement,
-      ).toHaveTextContent(/Every evaluator added to this agent has a variable with no trace value chosen/);
-      await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
-      expect(onGoToEvaluators).toHaveBeenCalled();
+        screen.queryByRole("button", { name: "Configure now" }),
+      ).not.toBeInTheDocument();
+      expect(
+        await screen.findByRole("button", { name: /^Bravo/, current: true }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("the note above the setup steps", () => {
+    const empty = tracesResult([]);
+    const noteFor = (reasons: string[], enabled = true) => ({
+      ...traceScoring,
+      enabled,
+      eligibility: {
+        eligible: [],
+        ineligible: reasons.map((reason, i) => ({
+          evaluator_uuid: `ev-${i}`,
+          name: `Evaluator ${i}`,
+          reason: reason as "declares_variables",
+        })),
+      },
+    });
+
+    beforeEach(() => {
+      mockUseTraces.mockReturnValue(empty);
+    });
+
+    it("counts the evaluators that need values", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={noteFor([
+            "declares_variables",
+            "declares_variables",
+            "no_live_version",
+          ])}
+        />,
+      );
+      expect(
+        screen.getByText(
+          "2 evaluators need values before they can score your traces",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Configure now" }),
+      ).toBeInTheDocument();
+    });
+
+    it("says it in the singular for one", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={noteFor(["declares_variables"])}
+        />,
+      );
+      expect(
+        screen.getByText(
+          "1 evaluator needs values before it can score your traces",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("is absent while scoring is off", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={noteFor(["declares_variables"], false)}
+        />,
+      );
+      expect(screen.queryByText(/before it can score/)).not.toBeInTheDocument();
+    });
+
+    it("is absent when nothing is missing values", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={noteFor(["no_live_version"])}
+        />,
+      );
+      expect(
+        screen.queryByRole("button", { name: "Configure now" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("opens the dialog even when the list then fails to load", async () => {
+      const user = setupUser();
+      fetchAgentEvaluators.mockResolvedValue([
+        {
+          uuid: "ev-1",
+          name: "Alpha",
+          live_version: { variables: [{ name: "reply" }] },
+        } as never,
+      ]);
+      mockUseTraces.mockReturnValue(empty);
+      const { rerender } = render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={noteFor(["declares_variables"])}
+        />,
+      );
+      mockUseTraces.mockReturnValue({ ...empty, error: "Could not load" });
+      rerender(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={noteFor(["declares_variables"])}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Configure now" }));
+
+      expect(
+        await screen.findByRole("heading", { name: "Choose trace values" }),
+      ).toBeInTheDocument();
     });
   });
 

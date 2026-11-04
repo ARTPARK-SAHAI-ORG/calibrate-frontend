@@ -1,3 +1,4 @@
+import type { EvaluatorData } from "./evaluatorApi";
 import type {
   TraceScoringIneligibleReason,
   TraceScoringStatus,
@@ -10,6 +11,20 @@ export function isTraceScoringInProgress(
   return status === "pending" || status === "processing";
 }
 
+/** The variables of an evaluator that have no trace value saved for this agent. */
+export function missingTraceValues(evaluator: EvaluatorData) {
+  return (evaluator.live_version?.variables ?? []).filter(
+    (variable) => !evaluator.trace_variables?.[variable.name],
+  );
+}
+
+export function isMissingTraceValue(evaluator: EvaluatorData) {
+  return missingTraceValues(evaluator).length > 0;
+}
+
+export const EVERY_EVALUATOR_NEEDS_VALUES =
+  "Every evaluator added to this agent has a variable with no trace value chosen.";
+
 /** Why a linked evaluator cannot score this agent's traces. */
 export function ineligibleReasonCopy(
   reason: TraceScoringIneligibleReason | string,
@@ -20,7 +35,7 @@ export function ineligibleReasonCopy(
     case "no_live_version":
       return "Has no live version";
     case "declares_variables":
-      return "A variable has no trace value chosen. Choose one in the Evaluators tab";
+      return "A variable has no trace value chosen. Configure it in the Evaluators tab";
     default:
       return "Cannot score traces for this agent";
   }
@@ -36,7 +51,7 @@ export function nothingCanScoreCopy(ineligible: { reason: string }[]): string {
     return "This agent has no evaluators, so its traces are not scored.";
   }
   if (ineligible.every((item) => item.reason === "declares_variables")) {
-    return "Every evaluator added to this agent has a variable with no trace value chosen. Choose them in the Evaluators tab.";
+    return `${EVERY_EVALUATOR_NEEDS_VALUES} Configure them in the Evaluators tab.`;
   }
   return "None of this agent's evaluators can score traces.";
 }
