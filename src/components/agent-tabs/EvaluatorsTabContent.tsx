@@ -435,7 +435,7 @@ export function EvaluatorsTabContent({
                       onClick={() => setTraceVariablesTarget(evaluator)}
                       className={EVALUATOR_CARD_BUTTON_CLASS}
                     >
-                      Choose trace values
+                      Configure
                     </button>
                   )}
                   <Tooltip content="Remove from agent" position="top">

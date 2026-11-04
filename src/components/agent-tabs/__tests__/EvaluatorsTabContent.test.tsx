@@ -578,7 +578,7 @@ describe("EvaluatorsTabContent", () => {
       render(<EvaluatorsTabContent agentUuid="agent-1" />);
 
       expect(
-        await screen.findByRole("button", { name: "Choose trace values" }),
+        await screen.findByRole("button", { name: "Configure" }),
       ).toBeInTheDocument();
       expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
     });
@@ -589,7 +589,7 @@ describe("EvaluatorsTabContent", () => {
 
       render(<EvaluatorsTabContent agentUuid="agent-1" />);
 
-      await screen.findByRole("button", { name: "Choose trace values" });
+      await screen.findByRole("button", { name: "Configure" });
       expect(mockFetchTraces).not.toHaveBeenCalled();
     });
 
@@ -600,7 +600,7 @@ describe("EvaluatorsTabContent", () => {
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
 
-      await screen.findByRole("button", { name: "Choose trace values" });
+      await screen.findByRole("button", { name: "Configure" });
       await waitFor(() =>
         expect(mockFetchTraces).toHaveBeenCalledWith(
           expect.anything(),
@@ -617,7 +617,7 @@ describe("EvaluatorsTabContent", () => {
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
 
-      await screen.findByRole("button", { name: "Choose trace values" });
+      await screen.findByRole("button", { name: "Configure" });
       await waitFor(() => expect(mockFetchTraces).toHaveBeenCalled());
       expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
     });
@@ -638,7 +638,7 @@ describe("EvaluatorsTabContent", () => {
 
       await screen.findByText("Tone check");
       expect(
-        screen.getAllByRole("button", { name: "Choose trace values" }),
+        screen.getAllByRole("button", { name: "Configure" }),
       ).toHaveLength(1);
       expect(await screen.findAllByText(WARNING)).toHaveLength(1);
     });
@@ -665,7 +665,7 @@ describe("EvaluatorsTabContent", () => {
       expect(await screen.findByText(WARNING)).toBeInTheDocument();
 
       await user.click(
-        screen.getByRole("button", { name: "Choose trace values" }),
+        screen.getByRole("button", { name: "Configure" }),
       );
       await user.selectOptions(
         screen.getByLabelText("{{ai}}"),
@@ -694,7 +694,7 @@ describe("EvaluatorsTabContent", () => {
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
       await user.click(
-        await screen.findByRole("button", { name: "Choose trace values" }),
+        await screen.findByRole("button", { name: "Configure" }),
       );
       await user.click(screen.getByRole("button", { name: "Save" }));
 
@@ -709,7 +709,7 @@ describe("EvaluatorsTabContent", () => {
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
       await user.click(
-        await screen.findByRole("button", { name: "Choose trace values" }),
+        await screen.findByRole("button", { name: "Configure" }),
       );
 
       expect(dialogTitle()).toBeInTheDocument();
