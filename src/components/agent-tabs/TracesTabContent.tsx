@@ -722,7 +722,8 @@ export function TracesTabContent({
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
 
-  const hasWarning = nothingCanScore || overLimit;
+  const scoringBlocked = traceScoring.enabled && nothingCanScore;
+  const hasWarning = scoringBlocked || overLimit;
 
   const integrationGuideButton = (
     <Button
@@ -847,7 +848,7 @@ export function TracesTabContent({
           and its detail. Only a real problem takes a row of its own. */}
       {hasLoaded && !showEmptyState && hasWarning && (
         <div className="space-y-3">
-          {nothingCanScore && (
+          {scoringBlocked && (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
               <p className="text-sm text-amber-700 dark:text-amber-300">
                 <NothingCanScoreMessage

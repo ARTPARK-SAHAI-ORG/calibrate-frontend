@@ -1035,6 +1035,31 @@ describe("TracesTabContent", () => {
       expect(screen.getAllByText("Tone")).toHaveLength(2);
     });
 
+    it("does not blame the evaluators while scoring is off", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            enabled: false,
+            eligibility: {
+              eligible: [],
+              ineligible: [
+                {
+                  evaluator_uuid: "ev-1",
+                  name: "Correctness",
+                  reason: "declares_variables" as const,
+                },
+              ],
+            },
+          }}
+        />,
+      );
+      expect(
+        screen.queryByText(/has a variable with no trace value chosen/),
+      ).not.toBeInTheDocument();
+    });
+
     it("shows no evaluator columns when nothing can score and nothing has been scored", () => {
       render(
         <TracesTabContent
