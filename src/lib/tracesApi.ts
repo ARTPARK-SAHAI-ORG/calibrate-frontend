@@ -196,39 +196,95 @@ export function traceScoreParams(scores?: TraceScoreFilters): string[] {
 /** Which way a sorted column runs. */
 export type TraceSortOrder = "asc" | "desc";
 
-export type TraceListParams = {
-  limit: number;
-  offset: number;
+/** What a reader can narrow the list by, as the tab holds it. The one
+ *  definition: a new filter is added here, in `traceFilterFields`, and in the
+ *  places that draw it. */
+export type TraceFacets = {
+  /** Keep only the traces whose output has a reply ("response") or whose
+   *  output has tool calls and no reply ("tool_call"). "all" keeps everything
+   *  and is left off the request. */
+  outputType: TraceOutputFilter;
+  /** Keep only traces carrying any of these labels, matched exactly and
+   *  case-sensitively. An empty list is left off the request. */
+  labels: string[];
+  /** Keep only traces whose latest scores match every one of these
+   *  conditions. An empty set is left off the request. */
+  scores: TraceScoreFilters;
+  /** Keep only the turns of this conversation. */
+  conversationId: string | null;
+};
+
+export const NO_TRACE_FACETS: TraceFacets = {
+  outputType: "all",
+  labels: [],
+  scores: {},
+  conversationId: null,
+};
+
+/** Which traces a list shows. */
+export type TraceFilters = {
   /** Traces belong to one agent; every read is scoped to it. */
   agentId: string;
   /** Plain "contains this text" match, case-insensitive, over the message id,
    *  conversation id, conversation history, reply, and metadata. Blank is
    *  ignored by the backend, and left off here. */
   q?: string;
-  /** Keep only the traces whose output has a reply ("response") or whose
-   *  output has tool calls and no reply ("tool_call"). "all" keeps everything
-   *  and is left off here. */
-  outputType?: TraceOutputFilter;
-  /** Keep only the turns of this conversation. */
-  conversationId?: string | null;
-  /** Keep only traces created before this time. */
-  createdBefore?: string | null;
+} & Partial<TraceFacets>;
+
+export type TraceListParams = TraceFilters & {
+  limit: number;
+  offset: number;
   /** Ask for `score_averages` beside the page. Costly, so only when the
    *  filters change rather than on every page or poll. */
   includeScoreAverages?: boolean;
-  /** Keep only traces carrying any of these labels, matched exactly and
-   *  case-sensitively. An empty list is left off here. */
-  labels?: string[];
-  /** Keep only traces whose latest scores match every one of these
-   *  conditions. An empty set is left off here. */
-  scores?: TraceScoreFilters;
   /** Order by this evaluator's score rather than newest first. Traces it has
    *  not scored come last whichever way the order runs, since an unscored
    *  trace is unknown rather than zero. */
   sortByEvaluator?: string | null;
   /** Which way `sortByEvaluator` runs. Ignored without it. */
   sortOrder?: TraceSortOrder;
+  /** Keep only traces created before this time. Not a list filter, so it is
+   *  not in `TraceFilters`: see `TraceSelectAll`. */
+  createdBefore?: string | null;
 };
+
+/** The request fields for a set of filters, the same in a query string and in
+ *  a bulk request's body. Anything left at its default is left off. */
+function traceFilterFields(f: TraceFilters): Record<string, string | string[]> {
+  const fields: Record<string, string | string[]> = { agent_id: f.agentId };
+  const q = f.q?.trim();
+  if (q) fields.q = q;
+  if (f.outputType && f.outputType !== "all") fields.output_type = f.outputType;
+  if (f.labels?.length) fields.labels = f.labels;
+  if (f.conversationId) fields.conversation_id = f.conversationId;
+  const score = traceScoreParams(f.scores);
+  if (score.length) fields.score = score;
+  return fields;
+}
+
+/**
+ * Two sets of filters with the same key ask for the same traces, whatever
+ * arrays or objects hold them and whichever order the score conditions are in.
+ * `createdBefore` is deliberately not in it: choosing select all sets that, and
+ * if that changed the key it would drop the ticks and select all with them.
+ */
+export function traceFilterKey(f: TraceFilters): string {
+  return JSON.stringify({
+    ...traceFilterFields(f),
+    score: traceScoreParams(f.scores).sort(),
+  });
+}
+
+function traceListQuery(f: TraceFilters, limit: number, offset: number) {
+  const params = new URLSearchParams({
+    limit: String(Math.min(limit, MAX_TRACES_PAGE_SIZE)),
+    offset: String(offset),
+  });
+  for (const [name, value] of Object.entries(traceFilterFields(f))) {
+    for (const entry of [value].flat()) params.append(name, entry);
+  }
+  return params;
+}
 
 /**
  * Fetch one page of traces for one agent. Unlike the other list pages this one
@@ -238,40 +294,22 @@ export type TraceListParams = {
  */
 export async function fetchTraces(
   accessToken: string,
-  {
-    limit,
-    offset,
-    agentId,
-    q,
-    outputType,
-    labels,
-    scores,
-    sortByEvaluator,
-    sortOrder,
-    includeScoreAverages,
-    conversationId,
-    createdBefore,
-  }: TraceListParams,
+  listParams: TraceListParams,
 ): Promise<Paginated<TraceSummary> & { score_averages?: TraceScoreAverage[] }> {
-  const params = new URLSearchParams();
-  params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
-  params.set("offset", String(offset));
-  params.set("agent_id", agentId);
-  if (conversationId) params.set("conversation_id", conversationId);
-  if (createdBefore) params.set("created_before", createdBefore);
-  if (q?.trim()) params.set("q", q.trim());
-  if (outputType && outputType !== "all") {
-    params.set("output_type", outputType);
+  const { limit, offset, sortByEvaluator, sortOrder } = listParams;
+  const params = traceListQuery(listParams, limit, offset);
+  if (listParams.createdBefore) {
+    params.set("created_before", listParams.createdBefore);
   }
-  for (const label of labels ?? []) params.append("labels", label);
-  for (const score of traceScoreParams(scores)) params.append("score", score);
   if (sortByEvaluator) {
     params.set("sort_by_evaluator", sortByEvaluator);
     params.set("sort_order", sortOrder ?? "desc");
   }
   // Averages read every matching trace, not the page, so they are asked for
   // when the filters change and left off while paging through the result.
-  if (includeScoreAverages) params.set("include_score_averages", "true");
+  if (listParams.includeScoreAverages) {
+    params.set("include_score_averages", "true");
+  }
   return apiGet<
     Paginated<TraceSummary> & { score_averages?: TraceScoreAverage[] }
   >(`/traces?${params.toString()}`, accessToken);
@@ -295,29 +333,16 @@ export type TraceConversation = {
  *  without a conversation ID are not part of any. */
 export async function fetchTraceConversations(
   accessToken: string,
-  {
-    limit,
-    offset,
-    agentId,
-    q,
-    outputType,
-    labels,
-    conversationId,
-  }: Pick<
+  listParams: Omit<
     TraceListParams,
-    "limit" | "offset" | "agentId" | "q" | "outputType" | "labels" | "conversationId"
+    | "scores"
+    | "sortByEvaluator"
+    | "sortOrder"
+    | "includeScoreAverages"
+    | "createdBefore"
   >,
 ): Promise<Paginated<TraceConversation>> {
-  const params = new URLSearchParams();
-  params.set("limit", String(Math.min(limit, MAX_TRACES_PAGE_SIZE)));
-  params.set("offset", String(offset));
-  params.set("agent_id", agentId);
-  if (q?.trim()) params.set("q", q.trim());
-  if (outputType && outputType !== "all") {
-    params.set("output_type", outputType);
-  }
-  for (const label of labels ?? []) params.append("labels", label);
-  if (conversationId) params.set("conversation_id", conversationId);
+  const params = traceListQuery(listParams, listParams.limit, listParams.offset);
   return apiGet<Paginated<TraceConversation>>(
     `/traces/conversations?${params.toString()}`,
     accessToken,
@@ -471,41 +496,25 @@ export type ConvertTestType = "response" | "tool_call" | "general";
 
 /** The list the reader is looking at, when they asked for every trace in it
  *  rather than the ones they ticked. The backend re-reads the same rows, so a
- *  page they never loaded is included and a stale tick cannot slip through. */
-export type TraceFilters = {
-  agentId: string;
-  q?: string;
-  outputType?: TraceOutputFilter;
-  labels?: string[];
-  scores?: TraceScoreFilters;
-  /** Keep only the turns of this conversation. */
-  conversationId?: string | null;
-  /** Keep only traces created before this time. */
-  createdBefore?: string | null;
-};
+ *  page they never loaded is included and a stale tick cannot slip through.
+ *  `createdBefore` is the moment they asked, so a trace that lands later is
+ *  left alone. */
+export type TraceSelectAll = TraceFilters & { createdBefore?: string | null };
 
 /** Turn the filters into the fields both bulk endpoints read. */
-export function selectAllBody(filters: TraceFilters): Record<string, unknown> {
+export function selectAllBody(filters: TraceSelectAll): Record<string, unknown> {
   const body: Record<string, unknown> = {
     select_all: true,
-    agent_id: filters.agentId,
+    ...traceFilterFields(filters),
   };
-  if (filters.q?.trim()) body.q = filters.q.trim();
-  if (filters.outputType && filters.outputType !== "all") {
-    body.output_type = filters.outputType;
-  }
-  if (filters.labels?.length) body.labels = filters.labels;
-  if (filters.conversationId) body.conversation_id = filters.conversationId;
   if (filters.createdBefore) body.created_before = filters.createdBefore;
-  const score = traceScoreParams(filters.scores);
-  if (score.length) body.score = score;
   return body;
 }
 
 export type ConvertTracesToTestsBody = {
   traceIds: string[];
   /** Convert every trace the filters match, ignoring `traceIds`. */
-  selectAll?: TraceFilters | null;
+  selectAll?: TraceSelectAll | null;
   type: ConvertTestType;
   /** Evaluators to link to each created test. Required for `response` and
    * `general`, rejected for `tool_call`. */

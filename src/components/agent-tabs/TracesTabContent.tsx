@@ -26,6 +26,7 @@ import {
 } from "@/components/human-labelling/labellingSubmit";
 import {
   TracesFilter,
+  traceFilterCount,
   type TraceScoreFilterEvaluator,
 } from "@/components/traces/TracesFilter";
 import { TracesSort } from "@/components/traces/TracesSort";
@@ -61,6 +62,7 @@ import {
   fetchTrace,
   fetchTraceUsage,
   fetchTraces,
+  traceFilterKey,
   type TraceUsage,
   type TraceDetail,
   traceLabellingMetadata,
@@ -138,14 +140,12 @@ export function TracesTabContent({
   // shared link keeps the same view. `tab` and `traceId` are left alone.
   const [view, setView] = useTraceView();
   const {
-    outputType: outputFilter,
-    labels: labelFilter,
-    scores: scoreFilter,
     sortByEvaluator,
     sortOrder,
     conversations: showConversations,
-    conversationId: conversationFilter,
+    ...facets
   } = view;
+  const listFilters = { agentId: agentUuid, q: search, ...facets };
 
   // The tags sent with the traces, and the ones picked to filter by. A trace
   // matches when it carries any of the picked ones. The whole set comes from
@@ -178,11 +178,7 @@ export function TracesTabContent({
   const {
     items,
     total,
-    loadedQ,
-    loadedOutputType,
-    loadedLabels,
-    loadedScores,
-    loadedConversationId,
+    loadedFilters,
     scoreAverages,
     offset,
     setOffset,
@@ -197,16 +193,11 @@ export function TracesTabContent({
     refetch,
   } = useTraces({
     accessToken,
-    agentId: agentUuid,
     pageSize,
-    q: search,
-    outputType: outputFilter,
-    labels: labelFilter,
-    scores: scoreFilter,
+    ...listFilters,
     sortByEvaluator,
     sortOrder,
     poll: isActive && !showConversations,
-    conversationId: conversationFilter,
   });
 
   // Every trace the list matches, not only the ticked ones. The two bulk
@@ -220,13 +211,8 @@ export function TracesTabContent({
     string | null
   >(null);
   const everyTraceMatching = everyTraceMatchingSince !== null;
-  const traceFilters = {
-    agentId: agentUuid,
-    q: search,
-    outputType: outputFilter,
-    labels: labelFilter,
-    scores: scoreFilter,
-    conversationId: conversationFilter,
+  const selectAllFilters = {
+    ...listFilters,
     createdBefore: everyTraceMatchingSince,
   };
 
@@ -235,7 +221,7 @@ export function TracesTabContent({
     onDeleted: (uuids) =>
       handleDeleted(everyTraceMatching ? total : uuids.length),
     accessToken,
-    selectAll: everyTraceMatching ? traceFilters : null,
+    selectAll: everyTraceMatching ? selectAllFilters : null,
   });
 
   // Add selected traces as tests. A recorded response becomes a test that
@@ -420,14 +406,9 @@ export function TracesTabContent({
       const [replies, toolCalls] = await Promise.all(
         (["response", "tool_call"] as const).map((outputType) =>
           fetchTraces(accessToken, {
+            ...selectAllFilters,
             limit: 1,
             offset: 0,
-            agentId: agentUuid,
-            q: search,
-            labels: labelFilter,
-            scores: scoreFilter,
-            conversationId: conversationFilter,
-            createdBefore: everyTraceMatchingSince,
             outputType,
           }),
         ),
@@ -470,9 +451,10 @@ export function TracesTabContent({
     deletion.clearSelection();
     // Not the sort: ordering the list changes what is on the page in front of
     // the reader, never which traces the list matches, so a tick survives it
-    // the same way it survives a page turn.
+    // the same way it survives a page turn. Not `everyTraceMatchingSince`
+    // either: choosing select all sets it, and that must not clear the choice.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, outputFilter, labelFilter, scoreFilter, conversationFilter]);
+  }, [traceFilterKey(listFilters)]);
   // Unticking a row is the reader narrowing what they want, so the whole list
   // is no longer what they asked for.
   useEffect(() => {
@@ -556,11 +538,11 @@ export function TracesTabContent({
       // An evaluator whose column has gone keeps its picker while its own
       // condition is still narrowing the list, or the filter is on with
       // nothing on screen able to turn it off.
-      ...Object.keys(scoreFilter),
+      ...Object.keys(facets.scores),
     ]);
     return [...ids].flatMap((uuid) => knownEvaluators.get(uuid) ?? []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scoreColumns, scoreFilter, scoreAverages, items]);
+  }, [scoreColumns, facets.scores, scoreAverages, items]);
   // The backend marks a trace it could not score for the workspace cap, so the
   // page can say so without asking for the limit itself.
   // A trace's scores name each evaluator but not what it judges, so the words
@@ -699,25 +681,16 @@ export function TracesTabContent({
   // longer mean "never sent a trace", and after the box is cleared the rows on
   // screen are still the old search until the full list has loaded back.
   const isSearching =
-    searchInput.trim() !== "" || search.trim() !== "" || loadedQ.trim() !== "";
-  // A chosen output kind counts the same way: once one is on, an empty list can
-  // no longer mean "this agent never sent a trace". Both the chosen value and
-  // the one the rows came from count, because after the filter is set back to
-  // All the rows on screen are still the filtered ones until the full list has
-  // loaded back.
-  const isFilteringOutput =
-    outputFilter !== "all" || loadedOutputType !== "all";
-  // Picked labels and picked scores narrow the list the same way, and the rows
-  // on screen are still the filtered ones until a cleared filter has loaded
+    searchInput.trim() !== "" ||
+    search.trim() !== "" ||
+    loadedFilters.q.trim() !== "";
+  // A chosen filter counts the same way: once one is on, an empty list can no
+  // longer mean "this agent never sent a trace". Both the chosen filters and
+  // the ones the rows came from count, because after a filter is cleared the
+  // rows on screen are still the filtered ones until the full list has loaded
   // back.
   const isFiltering =
-    conversationFilter != null ||
-    loadedConversationId != null ||
-    isFilteringOutput ||
-    labelFilter.length > 0 ||
-    loadedLabels.length > 0 ||
-    Object.keys(scoreFilter).length > 0 ||
-    Object.keys(loadedScores).length > 0;
+    traceFilterCount(facets) > 0 || traceFilterCount(loadedFilters) > 0;
   const isNarrowed = isSearching || isFiltering;
   const noMatchMessage =
     isSearching && isFiltering
@@ -818,8 +791,8 @@ export function TracesTabContent({
         {viewSwitch}
         <ConversationsView
           agentUuid={agentUuid}
-          outputType={outputFilter}
-          labels={labelFilter}
+          outputType={facets.outputType}
+          labels={facets.labels}
           allLabels={allLabels}
           onFilterChange={(next) => setView(next)}
         />
@@ -900,20 +873,13 @@ export function TracesTabContent({
           {/* One control for both the output kind and the labels, so the row
               stays the search box and the thing that narrows it. */}
           <TracesFilter
-            value={{
-              outputType: outputFilter,
-              labels: labelFilter,
-              scores: scoreFilter,
-              conversationId: conversationFilter,
-            }}
+            value={facets}
             labels={allLabels}
             scoreEvaluators={scoreFilterEvaluators}
             conversationIds={conversationIds}
             onApply={(next) =>
               setView({
-                outputType: next.outputType,
-                labels: next.labels,
-                scores: next.scores,
+                ...next,
                 conversationId: next.conversationId ?? null,
               })
             }
@@ -1028,9 +994,9 @@ export function TracesTabContent({
                       // The pages behind this one are unread, so the backend
                       // says what kinds they hold before anything is made.
                       const kind =
-                        outputFilter === "all"
+                        facets.outputType === "all"
                           ? await wholeListKindOf()
-                          : outputFilter;
+                          : facets.outputType;
                       if (!kind) return;
                       if (kind === "mixed") {
                         toast.error(
@@ -1171,20 +1137,20 @@ export function TracesTabContent({
         selectAll={
           everyTraceMatching
             ? {
-                ...traceFilters,
+                ...selectAllFilters,
                 // Only one kind of test is made per call, so an unfiltered
                 // list is pinned to the kind the counts found.
                 outputType:
-                  outputFilter === "all" && wholeListKind !== "mixed"
+                  facets.outputType === "all" && wholeListKind !== "mixed"
                     ? (wholeListKind ?? "all")
-                    : outputFilter,
+                    : facets.outputType,
               }
             : null
         }
         traceCount={selectionCount}
         testType={
           everyTraceMatching
-            ? (outputFilter === "all" ? wholeListKind : outputFilter) ===
+            ? (facets.outputType === "all" ? wholeListKind : facets.outputType) ===
               "tool_call"
               ? "tool_call"
               : isGeneral

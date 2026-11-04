@@ -11,8 +11,8 @@ import { reportError } from "@/lib/reportError";
 
 jest.mock("../../lib/tracesApi", () => ({
   __esModule: true,
-  // The hook builds its own key from the real helper, so keep that one real.
-  traceScoreParams: jest.requireActual("../../lib/tracesApi").traceScoreParams,
+  // The hook builds its own key from the real helpers, so keep those real.
+  ...jest.requireActual("../../lib/tracesApi"),
   fetchTraces: jest.fn(),
 }));
 jest.mock("../../lib/reportError", () => ({
@@ -110,7 +110,7 @@ describe("useTraces", () => {
         useTraces({ accessToken: "tok", agentId: "ag-1", outputType }),
       { initialProps: { outputType: "all" as TraceOutputFilter } },
     );
-    await waitFor(() => expect(result.current.loadedOutputType).toBe("all"));
+    await waitFor(() => expect(result.current.loadedFilters.outputType).toBe("all"));
 
     mockFetchTraces.mockReturnValueOnce(
       new Promise((resolve) => {
@@ -119,12 +119,12 @@ describe("useTraces", () => {
     );
     rerender({ outputType: "tool_call" });
     // The new filter is in flight, so the rows are still the old ones.
-    expect(result.current.loadedOutputType).toBe("all");
+    expect(result.current.loadedFilters.outputType).toBe("all");
 
     await act(async () => {
       resolvePage(page([], 0));
     });
-    expect(result.current.loadedOutputType).toBe("tool_call");
+    expect(result.current.loadedFilters.outputType).toBe("tool_call");
   });
 
   it("sends the search text and returns to the first page when it changes", async () => {
@@ -159,7 +159,7 @@ describe("useTraces", () => {
         useTraces({ accessToken: "tok", agentId: "ag-1", q }),
       { initialProps: { q: "" } },
     );
-    await waitFor(() => expect(result.current.loadedQ).toBe(""));
+    await waitFor(() => expect(result.current.loadedFilters.q).toBe(""));
 
     mockFetchTraces.mockReturnValueOnce(
       new Promise((resolve) => {
@@ -168,12 +168,44 @@ describe("useTraces", () => {
     );
     rerender({ q: "polio" });
     // The new search is in flight, so the rows are still the old ones.
-    expect(result.current.loadedQ).toBe("");
+    expect(result.current.loadedFilters.q).toBe("");
 
     await act(async () => {
       resolvePage(page([], 0));
     });
-    expect(result.current.loadedQ).toBe("polio");
+    expect(result.current.loadedFilters.q).toBe("polio");
+  });
+
+  it("does not load again for a search differing only by spaces", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 1));
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string }) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", q }),
+      { initialProps: { q: "polio" } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    mockFetchTraces.mockClear();
+
+    rerender({ q: " polio " });
+
+    await act(async () => {});
+    expect(mockFetchTraces).not.toHaveBeenCalled();
+  });
+
+  it("does not move the rows' filters on when a load fails", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 1));
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string }) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", q }),
+      { initialProps: { q: "polio" } },
+    );
+    await waitFor(() => expect(result.current.loadedFilters.q).toBe("polio"));
+
+    mockFetchTraces.mockRejectedValue(new Error("boom"));
+    rerender({ q: "measles" });
+
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.loadedFilters.q).toBe("polio");
   });
 
   it("stays idle without an access token", async () => {
@@ -461,7 +493,7 @@ describe("useTraces", () => {
     );
 
     await waitFor(() =>
-      expect(result.current.loadedLabels).toEqual(["staging"]),
+      expect(result.current.loadedFilters.labels).toEqual(["staging"]),
     );
   });
 
@@ -746,6 +778,32 @@ describe("useTraces score averages", () => {
     );
   });
 
+  it.each([
+    ["output kind", { outputType: "response" as TraceOutputFilter }],
+    ["labels", { labels: ["vip"] }],
+    ["conversation", { conversationId: "conv-1" }],
+  ])("asks again when the %s changes", async (_name, narrowed) => {
+    mockFetchTraces.mockResolvedValue({
+      ...page([{ uuid: "t1" }], 1),
+      score_averages: averages,
+    });
+    const { result, rerender } = renderHook(
+      (props: Partial<Parameters<typeof useTraces>[0]>) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", ...props }),
+      { initialProps: {} },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    rerender(narrowed);
+
+    await waitFor(() =>
+      expect(mockFetchTraces).toHaveBeenLastCalledWith(
+        "tok",
+        expect.objectContaining({ ...narrowed, includeScoreAverages: true }),
+      ),
+    );
+  });
+
   it("does not ask again for the next page, and keeps the averages on screen", async () => {
     mockFetchTraces.mockResolvedValue({
       ...page([{ uuid: "t1" }], 120),
@@ -850,6 +908,29 @@ describe("useTraces score filters and evaluator sorting", () => {
     );
   });
 
+  it("returns to the first page when the conversation changes", async () => {
+    mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 200));
+
+    const { result, rerender } = renderHook(
+      ({ conversationId }: { conversationId: string | null }) =>
+        useTraces({ accessToken: "tok", agentId: "ag-1", conversationId }),
+      { initialProps: { conversationId: null as string | null } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.nextPage());
+    await waitFor(() => expect(result.current.offset).toBe(50));
+
+    rerender({ conversationId: "conv-1" });
+
+    await waitFor(() => expect(result.current.offset).toBe(0));
+    await waitFor(() =>
+      expect(mockFetchTraces).toHaveBeenLastCalledWith(
+        "tok",
+        expect.objectContaining({ conversationId: "conv-1", offset: 0 }),
+      ),
+    );
+  });
+
   it("returns to the first page when the sorted evaluator or its direction changes", async () => {
     mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 200));
 
@@ -917,7 +998,7 @@ describe("useTraces score filters and evaluator sorting", () => {
         useTraces({ accessToken: "tok", agentId: "ag-1", scores }),
       { initialProps: { scores: {} as TraceScoreFilters } },
     );
-    await waitFor(() => expect(result.current.loadedScores).toEqual({}));
+    await waitFor(() => expect(result.current.loadedFilters.scores).toEqual({}));
 
     mockFetchTraces.mockReturnValueOnce(
       new Promise((resolve) => {
@@ -926,11 +1007,11 @@ describe("useTraces score filters and evaluator sorting", () => {
     );
     rerender({ scores: { "ev-1": "failed" } });
     // The new filter is in flight, so the rows are still the old ones.
-    expect(result.current.loadedScores).toEqual({});
+    expect(result.current.loadedFilters.scores).toEqual({});
 
     await act(async () => {
       resolvePage(page([], 0));
     });
-    expect(result.current.loadedScores).toEqual({ "ev-1": "failed" });
+    expect(result.current.loadedFilters.scores).toEqual({ "ev-1": "failed" });
   });
 });

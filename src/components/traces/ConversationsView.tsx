@@ -3,7 +3,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConversationsTable } from "@/components/traces/ConversationsTable";
 import { TraceDetailDialog } from "@/components/traces/TraceDetailDialog";
-import { TracesFilter } from "@/components/traces/TracesFilter";
+import {
+  TracesFilter,
+  traceFilterCount,
+} from "@/components/traces/TracesFilter";
 import { SearchIcon } from "@/components/icons";
 import { RefreshButton } from "@/components/RefreshButton";
 import {
@@ -20,7 +23,9 @@ import {
 } from "@/hooks";
 import {
   fetchTraceConversations,
+  traceFilterKey,
   type TraceConversation,
+  type TraceFacets,
   type TraceOutputFilter,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
@@ -32,14 +37,11 @@ import { reportError } from "@/lib/reportError";
  */
 export function ConversationsView({
   agentUuid,
-  outputType,
-  labels,
   allLabels,
   onFilterChange,
-}: {
+  ...facets
+}: Omit<TraceFacets, "scores" | "conversationId"> & {
   agentUuid: string;
-  outputType: TraceOutputFilter;
-  labels: string[];
   /** Every label in use, for the filter's choices. */
   allLabels: string[];
   onFilterChange: (next: {
@@ -65,9 +67,12 @@ export function ConversationsView({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const labelsKey = labels.join("\n");
+  const filters = { agentId: agentUuid, q: search, ...facets };
+  // Keyed on the filters' text, so a new array of the same labels does not
+  // load the page again.
+  const filterKey = traceFilterKey(filters);
   // A new search or filter starts again from the first page.
-  useEffect(() => setOffset(0), [search, outputType, labelsKey, pageSize]);
+  useEffect(() => setOffset(0), [filterKey, pageSize]);
 
   // Only the newest request may fill the list, so a slow answer for an older
   // search cannot replace the one the reader is looking at.
@@ -78,12 +83,9 @@ export function ConversationsView({
     setIsLoading(true);
     try {
       const res = await fetchTraceConversations(accessToken, {
+        ...filters,
         limit: pageSize,
         offset,
-        agentId: agentUuid,
-        q: search,
-        outputType,
-        labels,
       });
       if (request !== latestRequest.current) return;
       setPage({ items: res.items, total: res.total, offset });
@@ -95,10 +97,8 @@ export function ConversationsView({
     } finally {
       if (request === latestRequest.current) setIsLoading(false);
     }
-    // Keyed on the labels' text, so a new array of the same labels does not
-    // load the page again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, agentUuid, pageSize, offset, search, outputType, labelsKey]);
+  }, [accessToken, pageSize, offset, filterKey]);
 
   useEffect(() => {
     void load();
@@ -174,7 +174,7 @@ export function ConversationsView({
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
   const isNarrowed =
-    search.trim() !== "" || outputType !== "all" || labels.length > 0;
+    search.trim() !== "" || traceFilterCount({ ...facets, scores: {} }) > 0;
 
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
@@ -186,7 +186,7 @@ export function ConversationsView({
           className="w-full sm:w-2/5"
         />
         <TracesFilter
-          value={{ outputType, labels, scores: {} }}
+          value={{ ...facets, scores: {} }}
           labels={allLabels}
           scoreEvaluators={[]}
           forConversations
