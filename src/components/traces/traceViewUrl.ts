@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type {
-  TraceOutputFilter,
+  TraceFacets,
   TraceScoreFilters,
   TraceSortOrder,
 } from "@/lib/tracesApi";
+import { NO_TRACE_FACETS, traceScoreParams } from "@/lib/tracesApi";
 
 /**
  * Keeps the Monitoring tab's filters and its sort in the address bar, so
@@ -34,24 +35,17 @@ const VIEW_PARAM = "view";
 /** The one conversation the traces list is narrowed to. */
 const CONVERSATION_PARAM = "conversation";
 
-export type TraceView = {
-  outputType: TraceOutputFilter;
-  labels: string[];
-  scores: TraceScoreFilters;
+export type TraceView = TraceFacets & {
   sortByEvaluator: string | null;
   sortOrder: TraceSortOrder;
   conversations: boolean;
-  conversationId: string | null;
 };
 
 export const EMPTY_TRACE_VIEW: TraceView = {
-  outputType: "all",
-  labels: [],
-  scores: {},
+  ...NO_TRACE_FACETS,
   sortByEvaluator: null,
   sortOrder: "asc",
   conversations: false,
-  conversationId: null,
 };
 
 export function readTraceView(): TraceView {
@@ -93,8 +87,8 @@ export function writeTraceView(view: TraceView): void {
   }
   if (view.outputType !== "all") params.set(OUTPUT_PARAM, view.outputType);
   for (const label of view.labels) params.append(LABEL_PARAM, label);
-  for (const [uuid, condition] of Object.entries(view.scores)) {
-    if (condition) params.append(SCORE_PARAM, `${uuid}:${condition}`);
+  for (const score of traceScoreParams(view.scores)) {
+    params.append(SCORE_PARAM, score);
   }
   if (view.sortByEvaluator) {
     params.set(SORT_PARAM, view.sortByEvaluator);
