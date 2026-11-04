@@ -17,6 +17,11 @@ beforeAll(() => {
 });
 
 // The tab only needs a stable access token to kick off its loads.
+const mockFetchTraces = jest.fn();
+jest.mock("../../../lib/tracesApi", () => ({
+  fetchTraces: (...args: unknown[]) => mockFetchTraces(...args),
+}));
+
 jest.mock("../../../hooks", () => ({
   ...jest.requireActual("../../../hooks"),
   useAccessToken: () => "test-token",
@@ -559,8 +564,63 @@ describe("EvaluatorsTabContent", () => {
         live_version: { variables: [{ name: "nurse_reply" }, { name: "ai" }] },
         ...over,
       });
+    beforeEach(() => {
+      mockFetchTraces.mockReset();
+      mockFetchTraces.mockResolvedValue({ total: 1, items: [] });
+    });
     const dialogTitle = () =>
       screen.queryByRole("heading", { name: "Choose trace values" });
+
+    it("does not warn while trace scoring is off", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([withVariables()]);
+      mockFetchAllEvaluators.mockResolvedValue([]);
+
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+      expect(
+        await screen.findByRole("button", { name: "Choose trace values" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
+    });
+
+    it("does not look for traces while trace scoring is off", async () => {
+      mockFetchAgentEvaluators.mockResolvedValue([withVariables()]);
+      mockFetchAllEvaluators.mockResolvedValue([]);
+
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+
+      await screen.findByRole("button", { name: "Choose trace values" });
+      expect(mockFetchTraces).not.toHaveBeenCalled();
+    });
+
+    it("does not warn while the agent has no traces", async () => {
+      mockFetchTraces.mockResolvedValue({ total: 0, items: [] });
+      mockFetchAgentEvaluators.mockResolvedValue([withVariables()]);
+      mockFetchAllEvaluators.mockResolvedValue([]);
+
+      render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
+
+      await screen.findByRole("button", { name: "Choose trace values" });
+      await waitFor(() =>
+        expect(mockFetchTraces).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ agentId: "agent-1", limit: 1 }),
+        ),
+      );
+      expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
+    });
+
+    it("does not warn when the check for traces fails", async () => {
+      mockFetchTraces.mockRejectedValue(new Error("boom"));
+      mockFetchAgentEvaluators.mockResolvedValue([withVariables()]);
+      mockFetchAllEvaluators.mockResolvedValue([]);
+
+      render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
+
+      await screen.findByRole("button", { name: "Choose trace values" });
+      await waitFor(() => expect(mockFetchTraces).toHaveBeenCalled());
+      expect(screen.queryByText(WARNING)).not.toBeInTheDocument();
+    });
 
     it("offers the button only on evaluators with variables", async () => {
       mockFetchAgentEvaluators.mockResolvedValue([
@@ -574,13 +634,13 @@ describe("EvaluatorsTabContent", () => {
       ]);
       mockFetchAllEvaluators.mockResolvedValue([]);
 
-      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
 
       await screen.findByText("Tone check");
       expect(
         screen.getAllByRole("button", { name: "Choose trace values" }),
       ).toHaveLength(1);
-      expect(screen.getAllByText(WARNING)).toHaveLength(1);
+      expect(await screen.findAllByText(WARNING)).toHaveLength(1);
     });
 
     it("warns while any variable has no value, and not once they all do", async () => {
@@ -601,7 +661,7 @@ describe("EvaluatorsTabContent", () => {
       mockSaveTraceVariables.mockResolvedValue(undefined);
       const user = setupUser();
 
-      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
       expect(await screen.findByText(WARNING)).toBeInTheDocument();
 
       await user.click(
@@ -632,7 +692,7 @@ describe("EvaluatorsTabContent", () => {
       mockSaveTraceVariables.mockRejectedValue(new Error("Bad source"));
       const user = setupUser();
 
-      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
       await user.click(
         await screen.findByRole("button", { name: "Choose trace values" }),
       );
@@ -647,7 +707,7 @@ describe("EvaluatorsTabContent", () => {
       mockFetchAllEvaluators.mockResolvedValue([]);
       const user = setupUser();
 
-      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
       await user.click(
         await screen.findByRole("button", { name: "Choose trace values" }),
       );
@@ -671,7 +731,7 @@ describe("EvaluatorsTabContent", () => {
       mockAttach.mockResolvedValue({ linked: ["ev-2"], already_linked: [] });
       const user = setupUser();
 
-      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
       await screen.findByText("No evaluators added yet");
       await user.click(screen.getByRole("button", { name: "Add evaluators" }));
       await user.click(screen.getByRole("button", { name: "Confirm add" }));
@@ -691,7 +751,7 @@ describe("EvaluatorsTabContent", () => {
       mockAttach.mockResolvedValue({ linked: ["ev-2"], already_linked: [] });
       const user = setupUser();
 
-      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
       await screen.findByText("No evaluators added yet");
       await user.click(screen.getByRole("button", { name: "Add evaluators" }));
       await user.click(screen.getByRole("button", { name: "Confirm add" }));
@@ -712,7 +772,7 @@ describe("EvaluatorsTabContent", () => {
       mockAttach.mockResolvedValue({ linked: ["ev-copy"], already_linked: [] });
       const user = setupUser();
 
-      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
       await user.click(
         await screen.findByRole("button", { name: "Duplicate Tone check" }),
       );

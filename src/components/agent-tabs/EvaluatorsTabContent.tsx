@@ -25,6 +25,7 @@ import {
   canDeleteEvaluator,
   saveEvaluatorTraceVariables,
 } from "@/lib/evaluatorApi";
+import { fetchTraces } from "@/lib/tracesApi";
 
 // Two remove flavours share one confirmation dialog:
 //   "remove"     → detach from this agent only (evaluator stays in library).
@@ -61,10 +62,12 @@ function isMissingTraceValue(evaluator: EvaluatorData) {
 export function EvaluatorsTabContent({
   agentUuid,
   agentNature = "conversation",
+  traceScoringOn = false,
 }: {
   agentUuid: string;
   agentName?: string;
   agentNature?: "conversation" | "general";
+  traceScoringOn?: boolean;
 }) {
   const backendAccessToken = useAccessToken();
 
@@ -82,6 +85,7 @@ export function EvaluatorsTabContent({
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
   const [traceVariablesTarget, setTraceVariablesTarget] =
     useState<EvaluatorData | null>(null);
+  const [hasTraces, setHasTraces] = useState(false);
 
   // Shared destructive-confirmation dialog state.
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -140,6 +144,24 @@ export function EvaluatorsTabContent({
       cancelled = true;
     };
   }, [agentUuid, backendAccessToken, loadAttached, loadLibrary]);
+
+  // The warning below only matters once traces are arriving to be scored.
+  useEffect(() => {
+    if (!traceScoringOn || !backendAccessToken) return;
+    let cancelled = false;
+    fetchTraces(backendAccessToken, {
+      agentId: agentUuid,
+      limit: 1,
+      offset: 0,
+    })
+      .then((page) => {
+        if (!cancelled) setHasTraces(page.total > 0);
+      })
+      .catch((err) => reportError("Error checking for agent traces:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [agentUuid, backendAccessToken, traceScoringOn]);
 
   // Attach the newly-selected library evaluators to the agent in one add-only
   // POST (validated up front; leaves the rest of the list untouched), then
@@ -397,7 +419,7 @@ export function EvaluatorsTabContent({
               data-tour="evaluator-card"
               data-evaluator-name={evaluator.name}
               warning={
-                isMissingTraceValue(evaluator)
+                traceScoringOn && hasTraces && isMissingTraceValue(evaluator)
                   ? "Will not score traces until every variable has a value"
                   : undefined
               }

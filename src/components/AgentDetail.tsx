@@ -1464,6 +1464,7 @@ export function AgentDetail({
         {shouldRenderTab("evaluators") && (
           <div className={activeTab === "evaluators" ? undefined : "hidden"}>
             <EvaluatorsTabContent
+              traceScoringOn={traceScoring.enabled}
               key={evaluatorsReloadKey}
               agentUuid={agentUuid}
               agentName={agent.name}
