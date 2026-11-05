@@ -68,11 +68,12 @@ function reasonDescription(questions: LabellingTourQuestion[]): string | null {
   const required = modes.filter((m) => m === "required").length;
   const optional = modes.filter((m) => m === "optional").length;
   if (required + optional === 0) return null;
-  const opens = "After you answer, a box opens for your reason";
-  if (required === 0) return opens;
+  const why =
+    "Share the reasoning behind your choice to help the team understand your rationale and resolve disagreements, if they arise";
+  if (required === 0) return why;
   if (optional === 0 && required === modes.length)
-    return `${opens}. You must write one before you can submit.`;
-  return `${opens}. Some questions need one before you can submit.`;
+    return `${why}. You must add it before you can submit.`;
+  return `${why}. Some questions need it before you can submit.`;
 }
 
 export function buildLabellingJobTour({

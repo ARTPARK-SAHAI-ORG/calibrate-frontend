@@ -93,10 +93,13 @@ describe("buildLabellingJobTour", () => {
   });
 
   it.each([
-    ["optional", "After you answer, a box opens for your reason"],
+    [
+      "optional",
+      "Share the reasoning behind your choice to help the team understand your rationale and resolve disagreements, if they arise",
+    ],
     [
       "required",
-      "After you answer, a box opens for your reason. You must write one before you can submit.",
+      "Share the reasoning behind your choice to help the team understand your rationale and resolve disagreements, if they arise. You must add it before you can submit.",
     ],
   ] as const)("words the reason step for %s", (reasoningMode, words) => {
     const step = build({ questions: [{ ...binary, reasoningMode }] }).find(
@@ -113,7 +116,7 @@ describe("buildLabellingJobTour", () => {
         { uuid: "o", outputType: "binary", reasoningMode: "optional" },
       ],
     }).find((s) => s.title === "Add a reason");
-    expect(step?.description).toContain("Some questions need one");
+    expect(step?.description).toContain("Some questions need it");
     expect(step?.anchor).toBe('#question-r [data-tutorial="reason-box"]');
   });
 
