@@ -5,7 +5,7 @@ import confetti from "canvas-confetti";
 import { getBackendUrl } from "@/lib/api";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
-import { ErrorNote, InfoNote, type MetadataEntry } from "@/components/ui";
+import { ErrorNote, type MetadataEntry } from "@/components/ui";
 import { ItemDetailsBlock } from "./ItemDetailsBlock";
 import { JobItemColumns } from "./JobItemColumns";
 import {
@@ -181,14 +181,6 @@ function evaluatorsForItem(
  * Everything that asks "is this item finished?" goes through here. */
 function requiredOnly(evaluators: Evaluator[]): Evaluator[] {
   return evaluators.filter((ev) => ev.is_optional !== true);
-}
-
-/** What the labeller reads in the item column, for the line above the questions. */
-function itemToReadFor(taskType: Task["type"]): string {
-  if (taskType === "stt") return "Read the transcripts";
-  if (taskType === "tts") return "Read the text and listen to the audio";
-  if (taskType === "llm-general") return "Read the input and output";
-  return "Read the conversation";
 }
 
 function hasFieldValue(f?: FieldValue): boolean {
@@ -1297,7 +1289,6 @@ function AnnotateView({
                   <EvaluatorsPane
                     evaluators={evaluators}
                     item={currentItem}
-                    taskType={data.task.type}
                     fields={fields}
                     setField={setField}
                     readOnly={isAdmin}
@@ -1421,7 +1412,6 @@ export function ItemPane({
 function EvaluatorsPane({
   evaluators,
   item,
-  taskType,
   fields,
   setField,
   readOnly,
@@ -1433,7 +1423,6 @@ function EvaluatorsPane({
 }: {
   evaluators: Evaluator[];
   item: Item;
-  taskType: Task["type"];
   fields: Record<FieldKey, FieldValue>;
   setField: (key: FieldKey, partial: Partial<FieldValue>) => void;
   readOnly: boolean;
@@ -1552,15 +1541,6 @@ function EvaluatorsPane({
             </button>
           )}
         </div>
-      )}
-      {showGuidance && (
-        <InfoNote>
-          <span>
-            {itemToReadFor(taskType)}
-            <span className="hidden md:inline"> on the left</span>, then answer
-            the questions below
-          </span>
-        </InfoNote>
       )}
       <ExpectedToolCalls payload={itemPayload} />
       <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />

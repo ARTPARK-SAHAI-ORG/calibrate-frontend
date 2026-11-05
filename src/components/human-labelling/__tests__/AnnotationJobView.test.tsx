@@ -2352,24 +2352,6 @@ describe("AnnotationJobView message versions", () => {
       ).not.toBeInTheDocument();
     });
 
-    it.each([
-      ["llm", "Read the conversation"],
-      ["llm-general", "Read the input and output"],
-      ["stt", "Read the transcripts"],
-      ["tts", "Read the text and listen to the audio"],
-    ])("tells a %s labeller what to read", async (type, words) => {
-      fetchMock.mockResolvedValue(
-        jsonResponse(
-          jobResponse({ task: { uuid: "task-1", name: "My Task", type } }),
-        ),
-      );
-      render(<AnnotationJobView token="tok" mode="public" />);
-      const line = await screen.findByText(words, { exact: false });
-      expect(line).toHaveTextContent(
-        `${words} on the left, then answer the questions below`,
-      );
-    });
-
     it("orders the item details, then the questions, then the comments", async () => {
       fetchMock.mockResolvedValue(
         jsonResponse(jobResponse({ items: [itemWithDetails] })),
@@ -2484,9 +2466,6 @@ describe("AnnotationJobView message versions", () => {
       await screen.findByText("Correctness");
       expect(screen.queryByText(/answered$/)).not.toBeInTheDocument();
       expect(screen.queryByText(/^Question 1/)).not.toBeInTheDocument();
-      expect(
-        screen.queryByText("Read the conversation", { exact: false }),
-      ).not.toBeInTheDocument();
     });
   });
 });
