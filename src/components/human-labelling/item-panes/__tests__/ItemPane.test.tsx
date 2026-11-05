@@ -33,7 +33,7 @@ describe("ItemPane picks the pane by task type first", () => {
     );
     expect(screen.getByText("Input")).toBeInTheDocument();
     expect(screen.getByText("Book me a slot in Bengaluru")).toBeInTheDocument();
-    expect(screen.getByText("book_appointment")).toBeInTheDocument();
+    expect(screen.getAllByText("book_appointment")[0]).toBeInTheDocument();
   });
 
   it("draws a next-reply tool-call item as a conversation", () => {

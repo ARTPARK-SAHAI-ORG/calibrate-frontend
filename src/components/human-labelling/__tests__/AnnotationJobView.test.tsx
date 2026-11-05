@@ -2144,6 +2144,7 @@ describe("AnnotationJobView expected tool calls", () => {
           items: [
             {
               ...items[0],
+              is_tool_call: true,
               payload: {
                 ...items[0].payload,
                 expected_tool_calls: [
@@ -2162,7 +2163,7 @@ describe("AnnotationJobView expected tool calls", () => {
     );
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("Expected tool calls")).toBeInTheDocument(),
+      expect(screen.getByText("Expected answer")).toBeInTheDocument(),
     );
     expect(screen.getByText("book_appointment")).toBeInTheDocument();
     expect(screen.getByText("city")).toBeInTheDocument();
@@ -2175,7 +2176,7 @@ describe("AnnotationJobView expected tool calls", () => {
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
-    expect(screen.queryByText("Expected tool calls")).not.toBeInTheDocument();
+    expect(screen.queryByText("Expected answer")).not.toBeInTheDocument();
   });
 });
 
@@ -2337,7 +2338,7 @@ describe("AnnotationJobView message versions", () => {
       const user = setupUser();
       render(<AnnotationJobView token="tok" mode="public" />);
       const bar = await screen.findByRole("progressbar", { name: "Items done" });
-      expect(screen.getByText("0 of 2 items done")).toBeInTheDocument();
+      expect(bar).toHaveAttribute("aria-valuenow", "0");
 
       await user.click(screen.getByRole("button", { name: "Correct" }));
       await user.click(screen.getByRole("button", { name: "3" }));
@@ -2347,8 +2348,7 @@ describe("AnnotationJobView message versions", () => {
         jsonResponse({ saved: ["ev-1", "ev-2"], count: 2, status: "pending" }),
       );
       await user.click(screen.getByRole("button", { name: "Submit & Next" }));
-      await screen.findByText("1 of 2 items done");
-      expect(bar).toHaveAttribute("aria-valuenow", "1");
+      await waitFor(() => expect(bar).toHaveAttribute("aria-valuenow", "1"));
       expect(bar.firstElementChild).toHaveStyle({ width: "50%" });
     });
 
@@ -2361,7 +2361,7 @@ describe("AnnotationJobView message versions", () => {
       expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     });
 
-    it("gives each question a button that goes to it and turns green once answered", async () => {
+    it("gives each question a button that goes to it and fills in once answered, in a colour that does not read as a verdict", async () => {
       fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
       const user = setupUser();
       const { container } = render(
@@ -2376,9 +2376,10 @@ describe("AnnotationJobView message versions", () => {
       expect(scroll.mock.contexts).toEqual([
         container.querySelector("#question-ev-2"),
       ]);
-      expect(second).not.toHaveClass("bg-green-600");
+      expect(second).not.toHaveClass("bg-foreground");
       await user.click(screen.getByRole("button", { name: "3" }));
-      expect(second).toHaveClass("bg-green-600");
+      expect(second).toHaveClass("bg-foreground");
+      expect(second).not.toHaveClass("bg-green-600");
     });
 
     it("draws no question buttons for an item with one question", async () => {
@@ -2386,7 +2387,7 @@ describe("AnnotationJobView message versions", () => {
         jsonResponse(jobResponse({ evaluators: [evaluators[0]] })),
       );
       render(<AnnotationJobView token="tok" mode="public" />);
-      await screen.findByText("Answer this question");
+      await screen.findByText("Correctness");
       expect(
         screen.queryByRole("button", { name: "Go to question 1" }),
       ).not.toBeInTheDocument();
@@ -2445,6 +2446,77 @@ describe("AnnotationJobView message versions", () => {
       expect(scroll.mock.contexts).toContain(
         container.querySelector("#question-ev-2"),
       );
+    });
+
+    const toolCallItem = (payload: Record<string, unknown>) => ({
+      ...items[0],
+      is_tool_call: true,
+      payload: {
+        ...items[0].payload,
+        agent_response: "",
+        expected_tool_calls: [{ tool: "book_visit", arguments: {} }],
+        ...payload,
+      },
+    });
+    const toolEvaluator = {
+      ...evaluators[0],
+      evaluator_type: "tool-call",
+    };
+
+    it("heads a tool call the agent made as its answer, in the item column above the expected one", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            evaluators: [toolEvaluator],
+            items: [
+              toolCallItem({
+                actual_tool_calls: [{ tool: "send_sms", arguments: {} }],
+              }),
+            ],
+          }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      const answer = await screen.findByText("Agent's answer");
+      const expected = screen.getByText("Expected answer");
+      expect(
+        answer.compareDocumentPosition(expected) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        screen.queryByRole("button", { name: "Collapse parameters" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("heads a reply in words the agent gave in place of a tool call as its answer too", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            evaluators: [toolEvaluator],
+            items: [
+              toolCallItem({ agent_response: "Call us", actual_tool_calls: [] }),
+            ],
+          }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      expect(await screen.findByText("Agent's answer")).toBeInTheDocument();
+    });
+
+    it("outlines the first question left, and moves on as it is answered", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      const user = setupUser();
+      const { container } = render(
+        <AnnotationJobView token="tok" mode="public" />,
+      );
+      await screen.findByText("Correctness");
+      const first = container.querySelector("#question-ev-1");
+      const second = container.querySelector("#question-ev-2");
+      expect(first).toHaveClass("ring-foreground/60");
+      expect(second).not.toHaveClass("ring-foreground/60");
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      expect(first).not.toHaveClass("ring-foreground/60");
+      expect(second).toHaveClass("ring-foreground/60");
     });
 
     it("clears the red marks when the labeller moves to another item", async () => {

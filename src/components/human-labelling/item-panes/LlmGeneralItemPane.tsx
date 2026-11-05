@@ -5,6 +5,7 @@ import {
   normalizeToolCall,
 } from "@/components/test-results/shared";
 import { readTextField } from "@/lib/messageVersions";
+import { ExpectedToolCalls } from "./ExpectedToolCalls";
 import { Section } from "./shared";
 
 /**
@@ -45,57 +46,62 @@ export function LlmGeneralItemPane({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Section
-        title="Input"
-        subtitle={inputField?.label}
-        subtitleColor={TEXT_FIELD_COLOR_CLASS.input}
-      >
-        <p className="text-sm whitespace-pre-wrap break-words">
-          {input || "—"}
-        </p>
-        <TurnVersionBubbles
-          versions={inputField?.versions}
-          side="assistant"
-          pillColor={TEXT_FIELD_COLOR_CLASS.input}
-        />
-      </Section>
-      <Section
-        title="Output"
-        subtitle={outputField?.label}
-        subtitleColor={TEXT_FIELD_COLOR_CLASS.output}
-      >
-        {output && (
-          <p className="text-sm whitespace-pre-wrap break-words">{output}</p>
-        )}
-        <TurnVersionBubbles
-          versions={outputField?.versions}
-          side="assistant"
-          pillColor={TEXT_FIELD_COLOR_CLASS.output}
-        />
-        {toolCalls.length > 0 && (
-          <div className={`space-y-3 ${output ? "mt-3" : ""}`}>
-            {toolCalls.map((toolCall, index) => {
-              const {
-                toolName,
-                args,
-                output: toolOutput,
-              } = normalizeToolCall(toolCall);
-              return (
-                <ToolCallCard
-                  key={index}
-                  toolName={toolName}
-                  args={args}
-                  output={toolOutput}
-                />
-              );
-            })}
-          </div>
-        )}
-        {!output && toolCalls.length === 0 && (
-          <p className="text-sm text-muted-foreground">—</p>
-        )}
-      </Section>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Section
+          title="Input"
+          subtitle={inputField?.label}
+          subtitleColor={TEXT_FIELD_COLOR_CLASS.input}
+        >
+          <p className="text-sm whitespace-pre-wrap break-words">
+            {input || "—"}
+          </p>
+          <TurnVersionBubbles
+            versions={inputField?.versions}
+            side="assistant"
+            pillColor={TEXT_FIELD_COLOR_CLASS.input}
+          />
+        </Section>
+        <Section
+          title="Output"
+          subtitle={outputField?.label}
+          subtitleColor={TEXT_FIELD_COLOR_CLASS.output}
+        >
+          {output && (
+            <p className="text-sm whitespace-pre-wrap break-words">{output}</p>
+          )}
+          <TurnVersionBubbles
+            versions={outputField?.versions}
+            side="assistant"
+            pillColor={TEXT_FIELD_COLOR_CLASS.output}
+          />
+          {toolCalls.length > 0 && (
+            <div className={`space-y-3 ${output ? "mt-3" : ""}`}>
+              {toolCalls.map((toolCall, index) => {
+                const {
+                  toolName,
+                  args,
+                  output: toolOutput,
+                } = normalizeToolCall(toolCall);
+                return (
+                  <ToolCallCard
+                    key={index}
+                    toolName={toolName}
+                    args={args}
+                    output={toolOutput}
+                  />
+                );
+              })}
+            </div>
+          )}
+          {!output && toolCalls.length === 0 && (
+            <p className="text-sm text-muted-foreground">—</p>
+          )}
+        </Section>
+      </div>
+      <div className="pl-4">
+        <ExpectedToolCalls payload={payload} />
+      </div>
     </div>
   );
 }

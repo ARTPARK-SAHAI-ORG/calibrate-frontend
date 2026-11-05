@@ -3,6 +3,7 @@ import {
   type TestCaseHistory,
 } from "@/components/test-results/shared";
 import { readTextField } from "@/lib/messageVersions";
+import { ExpectedToolCalls } from "./ExpectedToolCalls";
 import { normaliseHistoryItem } from "./shared";
 
 /**
@@ -10,8 +11,8 @@ import { normaliseHistoryItem } from "./shared";
  * item inside an `llm` task): the conversation and the agent's actual output
  * (its tool call, or the text it replied with when it made no call). This is
  * the "what happened" pane — the "what was expected" spec is the item's
- * evaluator-equivalent and renders on the other side of the screen, in
- * `ExpectedToolCalls`, the same place a response item's evaluators show.
+ * evaluator-equivalent and renders right under this pane, in
+ * `ExpectedToolCalls`, so the two can be compared.
  *
  * Follows the exact same pattern as `LlmItemPane`: the agent's actual output
  * is appended to `history` as its own trailing turn and highlighted with
@@ -20,6 +21,8 @@ import { normaliseHistoryItem } from "./shared";
  * colored bar, a check or cross) that a labelling item, which nobody has
  * judged yet, should never show.
  */
+const AGENT_ANSWER = "Agent's answer";
+
 export function ToolCallItemPane({
   payload,
 }: {
@@ -44,7 +47,11 @@ export function ToolCallItemPane({
     // actually did.
     const agentResponse = readTextField(payload.agent_response);
     if (agentResponse && agentResponse.content.length > 0) {
-      history.push({ role: "assistant", ...agentResponse });
+      history.push({
+        role: "assistant",
+        ...agentResponse,
+        label: agentResponse.label ?? AGENT_ANSWER,
+      });
     }
   }
 
@@ -61,6 +68,8 @@ export function ToolCallItemPane({
       history={history}
       passed={true}
       highlightEvalTarget
+      toolCallLabel={AGENT_ANSWER}
+      afterHistory={<ExpectedToolCalls payload={payload} />}
     />
   );
 }

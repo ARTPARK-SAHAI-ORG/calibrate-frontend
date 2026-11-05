@@ -988,7 +988,7 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("numbers a question in a circle that turns green once answered, and draws none for a list of one", () => {
+  it("numbers a question in a circle that fills in once answered, and draws none for a list of one", () => {
     const { rerender } = render(
       <EvaluatorVerdictCard
         mode="write"
@@ -998,7 +998,7 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
       />,
     );
     expect(screen.getByLabelText("Question 3 of 12")).not.toHaveClass(
-      "bg-green-600",
+      "bg-foreground",
     );
     rerender(
       <EvaluatorVerdictCard
@@ -1010,7 +1010,7 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
       />,
     );
     expect(screen.getByLabelText("Question 3 of 12")).toHaveClass(
-      "bg-green-600",
+      "bg-foreground",
     );
     rerender(
       <EvaluatorVerdictCard

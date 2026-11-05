@@ -20,7 +20,6 @@ import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
-import { ExpectedToolCalls } from "./item-panes/ExpectedToolCalls";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
 import {
   ItemValueFilter,
@@ -186,37 +185,6 @@ function requiredOnly(evaluators: Evaluator[]): Evaluator[] {
 
 function hasFieldValue(f?: FieldValue): boolean {
   return !!f && f.value !== undefined && f.value !== null && f.value !== "";
-}
-
-function ProgressBar({
-  label,
-  done,
-  total,
-  text,
-}: {
-  label: string;
-  done: number;
-  total: number;
-  text: string;
-}) {
-  return (
-    <>
-      <div
-        role="progressbar"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={total}
-        aria-valuenow={done}
-        className="flex-1 h-2 rounded-full bg-muted overflow-hidden"
-      >
-        <div
-          className="h-full rounded-full bg-green-500 transition-[width] duration-300"
-          style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }}
-        />
-      </div>
-      <span className="shrink-0 text-sm font-medium">{text}</span>
-    </>
-  );
 }
 
 function drawableOutputType(ev: Evaluator): "binary" | "rating" | null {
@@ -1122,7 +1090,7 @@ function AnnotateView({
   return (
     <div className={wrapperClass}>
       {!isAdmin && (
-        <div className="px-4 md:px-6 pt-4 md:pt-6 pb-3 shrink-0 flex flex-wrap md:flex-nowrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="px-4 md:px-6 pt-4 md:pt-6 pb-3 shrink-0 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
             <h1 className="text-lg md:text-xl font-semibold truncate">
               {data.task.name}
@@ -1146,14 +1114,6 @@ function AnnotateView({
               </span>
             )}
           </div>
-          <div className="order-last md:order-none w-full md:w-auto md:flex-1 md:max-w-xl min-w-0 flex items-center gap-3">
-            <ProgressBar
-              label="Items done"
-              done={itemsDone}
-              total={items.length}
-              text={`${itemsDone} of ${items.length} items done`}
-            />
-          </div>
           <JobInfoButton
             labeller={data.annotator.name}
             itemCount={items.length}
@@ -1168,6 +1128,23 @@ function AnnotateView({
             : "flex-1 min-h-0 flex flex-col overflow-hidden border border-border rounded-xl mx-4 md:mx-6 mb-4 md:mb-6"
         }
       >
+        {!isAdmin && (
+          <div
+            role="progressbar"
+            aria-label="Items done"
+            aria-valuemin={0}
+            aria-valuemax={items.length}
+            aria-valuenow={itemsDone}
+            className="h-1 shrink-0 bg-muted"
+          >
+            <div
+              className="h-full bg-green-500 transition-[width] duration-300"
+              style={{
+                width: `${items.length > 0 ? (itemsDone / items.length) * 100 : 0}%`,
+              }}
+            />
+          </div>
+        )}
         <header className="border-b border-border px-4 md:px-6 py-3 flex flex-col gap-3 md:grid md:grid-cols-3 md:items-center md:gap-4">
           <div className="min-w-0 flex items-center gap-3">
             {currentItem && (
@@ -1562,7 +1539,6 @@ function EvaluatorsPane({
   if (evaluators.length === 0) {
     return (
       <div className="space-y-3">
-        <ExpectedToolCalls payload={itemPayload} />
         <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
         {commentBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
@@ -1600,18 +1576,32 @@ function EvaluatorsPane({
   };
   const answeredCount = questions.filter((ev) => !isUnanswered(ev)).length;
   const showGuidance = !readOnly && questions.length > 0;
+  // The outline on the first question left is what says where to answer.
+  const nextQuestion = questions.find(isUnanswered);
 
   return (
     <div className="space-y-3 pb-4 md:pb-6">
       {showGuidance && (
         <div className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-background border-b border-border space-y-2">
           <div className="flex items-center gap-3">
-            <ProgressBar
-              label="Questions answered"
-              done={answeredCount}
-              total={questions.length}
-              text={`${answeredCount} of ${questions.length} answered`}
-            />
+            <div
+              role="progressbar"
+              aria-label="Questions answered"
+              aria-valuemin={0}
+              aria-valuemax={questions.length}
+              aria-valuenow={answeredCount}
+              className="flex-1 h-2 rounded-full bg-muted overflow-hidden"
+            >
+              <div
+                className="h-full rounded-full bg-green-500 transition-[width] duration-300"
+                style={{
+                  width: `${(answeredCount / questions.length) * 100}%`,
+                }}
+              />
+            </div>
+            <span className="sr-only">
+              {answeredCount} of {questions.length} answered
+            </span>
           </div>
           {questions.length > 1 && (
             <div className="flex flex-wrap gap-1.5">
@@ -1627,12 +1617,12 @@ function EvaluatorsPane({
                         .getElementById(`question-${ev.uuid}`)
                         ?.scrollIntoView({ behavior: "smooth", block: "start" })
                     }
-                    className={`w-7 h-7 rounded-md border text-xs font-medium cursor-pointer transition-colors ${
+                    className={`w-7 h-7 rounded-md border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
                       missingAnswerKeys.has(k)
                         ? "border-red-500 text-red-600 dark:text-red-400"
                         : isUnanswered(ev)
                           ? "border-border bg-background text-foreground hover:bg-muted/50"
-                          : "border-green-600 bg-green-600 text-white"
+                          : "border-foreground bg-foreground text-background"
                     }`}
                   >
                     {i + 1}
@@ -1643,16 +1633,8 @@ function EvaluatorsPane({
           )}
         </div>
       )}
-      <ExpectedToolCalls payload={itemPayload} />
       <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
       {readOnly && commentBlock}
-      {showGuidance && (
-        <h2 className="pt-3 mt-1 border-t border-border text-base font-semibold">
-          {questions.length > 1
-            ? "Answer these questions"
-            : "Answer this question"}
-        </h2>
-      )}
       {forItem.map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);
         const f = fields[k];
@@ -1731,7 +1713,9 @@ function EvaluatorsPane({
             className={
               missingAnswerKeys.has(k)
                 ? "rounded-xl ring-2 ring-red-500"
-                : undefined
+                : ev === nextQuestion
+                  ? "rounded-lg ring-2 ring-foreground/60"
+                  : undefined
             }
           >
             <EvaluatorVerdictCard

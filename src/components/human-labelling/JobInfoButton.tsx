@@ -57,7 +57,7 @@ export function JobInfoButton({
       <button
         type="button"
         aria-label="About this job"
-        className="w-9 h-9 flex items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+        className="w-9 h-9 flex items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
       >
         <svg
           className="w-[18px] h-[18px]"
