@@ -359,3 +359,34 @@ body {
   border-bottom-color: var(--popover);
   border-bottom-width: 13px;
 }
+
+/* The reason box lighting up as it appears, once an answer has been picked. */
+@keyframes reason-box-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+    box-shadow: 0 0 0 3px rgb(245 158 11 / 0.7);
+    border-color: rgb(245 158 11);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  70% {
+    box-shadow: 0 0 0 3px rgb(245 158 11 / 0.7);
+    border-color: rgb(245 158 11);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(245 158 11 / 0);
+  }
+}
+
+.reason-box-appear {
+  animation: reason-box-appear 1.6s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reason-box-appear {
+    animation: none;
+  }
+}

@@ -975,6 +975,24 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
     expect(screen.getByRole("textbox")).toBeInTheDocument();
   });
 
+  it("highlights the reason box when it appears after an answer, not when it was already there", () => {
+    const card = (value?: boolean) => (
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        value={value}
+      />
+    );
+    const { rerender, unmount } = render(card());
+    rerender(card(true));
+    expect(screen.getByRole("textbox")).toHaveClass("reason-box-appear");
+    unmount();
+
+    render(card(true));
+    expect(screen.getByRole("textbox")).not.toHaveClass("reason-box-appear");
+  });
+
   it("shows an optional reason that is already written, even with no answer", () => {
     render(
       <EvaluatorVerdictCard

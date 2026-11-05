@@ -763,7 +763,11 @@ function WriteReasoning({
   answered?: boolean;
 }) {
   // An optional reason is only asked for once there is an answer to explain.
-  if (!required && !disabled && !answered && !value) return null;
+  const visible = !!(required || disabled || answered || value);
+  // Only a box that arrives because of an answer just given is highlighted,
+  // never one already there when the item opened.
+  const [startedHidden] = useState(!visible);
+  if (!visible) return null;
   return (
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-muted-foreground">
@@ -776,8 +780,8 @@ function WriteReasoning({
         placeholder={disabled ? "" : "Add your reasoning"}
         rows={2}
         className={`w-full text-sm rounded-md border bg-background px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20 disabled:opacity-60 ${
-          missing ? "border-red-500" : "border-border"
-        }`}
+          startedHidden ? "reason-box-appear " : ""
+        }${missing ? "border-red-500" : "border-border"}`}
       />
       {missing && (
         <p className="text-xs text-red-500">
