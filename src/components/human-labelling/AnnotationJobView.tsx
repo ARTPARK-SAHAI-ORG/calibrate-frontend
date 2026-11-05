@@ -8,6 +8,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
 import { ItemDetailsBlock } from "./ItemDetailsBlock";
 import { JobInfoButton } from "./JobInfoButton";
+import { ArrowDownIcon } from "@/components/icons";
 import { useDialogNavKeys } from "@/hooks/useDialogNavKeys";
 import { JobItemColumns } from "./JobItemColumns";
 import {
@@ -1661,6 +1662,11 @@ function EvaluatorsPane({
                   />
                 </svg>
                 All questions answered
+              </span>
+            ) : answeredCount === 0 ? (
+              <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-foreground">
+                Answer the questions below
+                <ArrowDownIcon className="w-4 h-4" />
               </span>
             ) : (
               <span

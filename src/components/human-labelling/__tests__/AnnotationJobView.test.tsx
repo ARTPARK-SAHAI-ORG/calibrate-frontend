@@ -2341,9 +2341,13 @@ describe("AnnotationJobView message versions", () => {
       fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
       const user = setupUser();
       render(<AnnotationJobView token="tok" mode="public" />);
-      await screen.findByText("0/2");
+      await screen.findByText("Answer the questions below");
+      expect(screen.queryByText("0/2")).not.toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Correct" }));
       expect(screen.getByText("1/2")).toBeInTheDocument();
+      expect(
+        screen.queryByText("Answer the questions below"),
+      ).not.toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "3" }));
       expect(screen.getByText("All questions answered")).toBeInTheDocument();
       expect(screen.queryByText("2/2")).not.toBeInTheDocument();
