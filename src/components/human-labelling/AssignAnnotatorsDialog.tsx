@@ -88,7 +88,7 @@ function SettingChoice<T extends string>({
   return (
     <fieldset className="space-y-1" disabled={disabled}>
       <legend className="text-sm font-medium">{label}</legend>
-      <p className="text-xs text-muted-foreground">{help}</p>
+      <p className="text-sm text-foreground">{help}</p>
       <div className="pt-1">
         {options.map((option) => (
           <label
@@ -740,11 +740,20 @@ export function AssignAnnotatorsDialog({
                     <legend className="text-sm font-medium">
                       Ask annotators to explain each score
                     </legend>
-                    <p className="text-xs text-muted-foreground">
-                      Required means annotators must explain their score before
-                      they can save. Optional means they can skip it. Do not
-                      show removes the box.
-                    </p>
+                    <ul className="space-y-1 text-sm text-foreground">
+                      <li>
+                        <span className="font-medium">Required:</span>{" "}
+                        annotators must explain the score before they can save
+                      </li>
+                      <li>
+                        <span className="font-medium">Optional:</span>{" "}
+                        annotators can skip it
+                      </li>
+                      <li>
+                        <span className="font-medium">Do not show:</span>{" "}
+                        annotators do not see the box
+                      </li>
+                    </ul>
                     {/* The small padding keeps each dropdown's focus ring from
                         being cut off by the scrolling. */}
                     <div className="space-y-2 overflow-y-auto pt-1 pb-0.5 pl-0.5 pr-1 max-h-[50vh]">
@@ -776,7 +785,7 @@ export function AssignAnnotatorsDialog({
                           </Select>
                           {shownLabels.length > 1 && (
                             <DuplicateIconButton
-                              tooltip={`Copy the ${ev.name} choice to all labels`}
+                              tooltip="Copy to all labels"
                               disabled={submitting}
                               className="shrink-0"
                               onClick={() =>

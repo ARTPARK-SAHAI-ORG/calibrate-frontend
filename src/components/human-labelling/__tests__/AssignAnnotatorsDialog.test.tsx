@@ -698,10 +698,14 @@ describe("AssignAnnotatorsDialog", () => {
       name: "Ask annotators to explain each score",
     });
     expect(
-      within(reasoning).getByText(
-        "Required means annotators must explain their score before they can save. Optional means they can skip it. Do not show removes the box.",
-      ),
-    ).toBeInTheDocument();
+      within(reasoning)
+        .getAllByRole("listitem")
+        .map((choice) => choice.textContent),
+    ).toEqual([
+      "Required: annotators must explain the score before they can save",
+      "Optional: annotators can skip it",
+      "Do not show: annotators do not see the box",
+    ]);
     // One dropdown per label, in the order the labels sit on screen, each
     // starting on Optional and offering all three choices.
     const dropdowns = within(reasoning).getAllByRole("combobox");
@@ -779,9 +783,7 @@ describe("AssignAnnotatorsDialog", () => {
     await user.selectOptions(reasoningOn("Relevance"), "Required");
     await user.click(screen.getByRole("checkbox", { name: /Fluency/ }));
     await user.click(
-      screen.getByRole("button", {
-        name: "Copy the Relevance choice to all labels",
-      }),
+      screen.getAllByRole("button", { name: "Copy to all labels" })[0],
     );
     await user.click(screen.getByRole("checkbox", { name: /Fluency/ }));
 
@@ -803,14 +805,10 @@ describe("AssignAnnotatorsDialog", () => {
     await screen.findByText("Alice");
 
     await user.hover(
-      screen.getByRole("button", {
-        name: "Copy the Fluency choice to all labels",
-      }),
+      screen.getAllByRole("button", { name: "Copy to all labels" })[1],
     );
 
-    expect(
-      await screen.findByText("Copy the Fluency choice to all labels"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Copy to all labels")).toBeInTheDocument();
   });
 
   it("changes only the label whose dropdown was used", async () => {
@@ -878,7 +876,7 @@ describe("AssignAnnotatorsDialog", () => {
     await screen.findByText("Alice");
     expect(screen.queryByText("Labels")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /to all labels/ }),
+      screen.queryByRole("button", { name: "Copy to all labels" }),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Alice"));
