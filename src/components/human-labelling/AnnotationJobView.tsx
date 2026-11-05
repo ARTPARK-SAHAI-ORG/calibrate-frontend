@@ -762,10 +762,23 @@ function AnnotateView({
     Set<FieldKey>
   >(new Set());
   const evaluatorsPaneRef = useRef<HTMLDivElement | null>(null);
+  // Required questions marked red after Submit was pressed without them.
+  // Emptied one by one as they are answered, and when the item changes.
+  const [missingAnswerKeys, setMissingAnswerKeys] = useState<Set<FieldKey>>(
+    new Set(),
+  );
 
   const setField = (key: FieldKey, partial: Partial<FieldValue>) => {
     // Removing an answer empties its reasoning box too.
     if (partial.value === null) partial = { value: null, comment: "" };
+    if (partial.value !== undefined && partial.value !== null) {
+      setMissingAnswerKeys((prev) => {
+        if (!prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
     if (
       partial.value === null ||
       (typeof partial.comment === "string" && partial.comment.trim())
@@ -805,13 +818,31 @@ function AnnotateView({
       })
       .map((ev) => fieldKey(itemId, ev.uuid));
 
-  // Each item starts from the top of the right column. On a phone the columns
-  // are stacked, so the row holding them is what scrolls.
+  const firstUnansweredRequired = (itemId: string) =>
+    requiredEvaluatorsFor(itemId).find((ev) => !evaluatorAnswered(itemId, ev));
+  const scrollToQuestion = (ev: Evaluator, behavior: ScrollBehavior) =>
+    document
+      .getElementById(`question-${ev.uuid}`)
+      ?.scrollIntoView({ behavior, block: "start" });
+
+  // A new item starts from the top of the right column, so its details can be
+  // read first. An item already started opens on the first required question
+  // left. On a phone the columns are stacked, so the row holding them is what
+  // scrolls.
   useEffect(() => {
     const pane = evaluatorsPaneRef.current;
-    if (!pane) return;
+    if (!pane || !currentItem) return;
     pane.scrollTop = 0;
     if (pane.parentElement) pane.parentElement.scrollTop = 0;
+    setMissingAnswerKeys(new Set());
+    if (isAdmin) return;
+    const started = evaluatorsFor(currentItem.uuid).some((ev) =>
+      evaluatorAnswered(currentItem.uuid, ev),
+    );
+    const next = firstUnansweredRequired(currentItem.uuid);
+    if (started && next) scrollToQuestion(next, "auto");
+    // Only moving to another item lands the reader, never answering on this one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentItem?.uuid]);
 
   // Red borders are painted first, then the first one is scrolled into view,
@@ -1154,10 +1185,7 @@ function AnnotateView({
                   requiredEvaluatorsFor(currentItem.uuid).every((ev) =>
                     evaluatorAnswered(currentItem.uuid, ev),
                   );
-                const disabled =
-                  submitting ||
-                  total === 0 ||
-                  !(allEvaluatorsAnswered || canSave);
+                const disabled = submitting || total === 0;
                 const label = submitting
                   ? "Saving..."
                   : // Saving a removed required answer does not finish the job.
@@ -1166,24 +1194,35 @@ function AnnotateView({
                     : currentHasSaved
                       ? "Update"
                       : "Submit & Next";
-                const tooltip =
-                  !allEvaluatorsAnswered && !canSave
-                    ? "Judgements should be given for all required evaluators before submitting"
-                    : undefined;
-                const submitButton = (
+                return (
                   <button
-                    onClick={() => handleSubmitItem()}
+                    onClick={() => {
+                      // Nothing to save yet: take the labeller to what is left.
+                      const next =
+                        currentItem &&
+                        !allEvaluatorsAnswered &&
+                        !canSave &&
+                        firstUnansweredRequired(currentItem.uuid);
+                      if (!next) {
+                        handleSubmitItem();
+                        return;
+                      }
+                      setMissingAnswerKeys(
+                        new Set(
+                          requiredEvaluatorsFor(currentItem.uuid)
+                            .filter(
+                              (ev) => !evaluatorAnswered(currentItem.uuid, ev),
+                            )
+                            .map((ev) => fieldKey(currentItem.uuid, ev.uuid)),
+                        ),
+                      );
+                      scrollToQuestion(next, "smooth");
+                    }}
                     disabled={disabled}
                     className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {label}
                   </button>
-                );
-                if (!tooltip) return submitButton;
-                return (
-                  <Tooltip content={tooltip} position="top">
-                    {submitButton}
-                  </Tooltip>
                 );
               })()}
           </div>
@@ -1293,6 +1332,7 @@ function AnnotateView({
                     setField={setField}
                     readOnly={isAdmin}
                     commentsEnabled={commentsEnabled}
+                    missingAnswerKeys={missingAnswerKeys}
                     reasonsStillNeeded={
                       new Set(reasoningMissingFor(currentItem.uuid))
                     }
@@ -1417,6 +1457,7 @@ function EvaluatorsPane({
   readOnly,
   commentsEnabled,
   missingReasoningKeys,
+  missingAnswerKeys,
   reasonsStillNeeded,
   itemComment,
   onItemCommentChange,
@@ -1430,6 +1471,8 @@ function EvaluatorsPane({
   commentsEnabled: boolean;
   /** Labels whose empty reasoning box refused the last save, marked red. */
   missingReasoningKeys: Set<FieldKey>;
+  /** Required questions marked red after Submit was pressed without them. */
+  missingAnswerKeys: Set<FieldKey>;
   /** Answers the save would refuse right now for having no reason. */
   reasonsStillNeeded: Set<FieldKey>;
   /** Current free-text comment for this item — backed by the
@@ -1509,37 +1552,29 @@ function EvaluatorsPane({
     const k = fieldKey(item.uuid, ev.uuid);
     return !hasFieldValue(fields[k]) || reasonsStillNeeded.has(k);
   };
-  const nextUnanswered = questions.find(isUnanswered);
+  const answeredCount = questions.filter((ev) => !isUnanswered(ev)).length;
   const showGuidance = !readOnly && questions.length > 0;
 
   return (
     <div className="space-y-3 pb-4 md:pb-6">
       {showGuidance && (
-        <div className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-2 bg-background border-b border-border flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
-          <span className="font-medium">
-            {questions.filter((ev) => !isUnanswered(ev)).length} of{" "}
-            {questions.length} answered
+        <div className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-background border-b border-border flex items-center gap-3">
+          <div
+            role="progressbar"
+            aria-label="Questions answered"
+            aria-valuemin={0}
+            aria-valuemax={questions.length}
+            aria-valuenow={answeredCount}
+            className="flex-1 h-2 rounded-full bg-muted overflow-hidden"
+          >
+            <div
+              className="h-full rounded-full bg-green-500 transition-[width] duration-300"
+              style={{ width: `${(answeredCount / questions.length) * 100}%` }}
+            />
+          </div>
+          <span className="shrink-0 text-sm font-medium">
+            {answeredCount} of {questions.length} answered
           </span>
-          {nextUnanswered && (
-            <button
-              type="button"
-              onClick={() => {
-                const question = document.getElementById(
-                  `question-${nextUnanswered.uuid}`,
-                );
-                question?.scrollIntoView({
-                  behavior: "smooth",
-                  block: "start",
-                });
-                question
-                  ?.querySelector("button")
-                  ?.focus({ preventScroll: true });
-              }}
-              className="text-xs underline text-muted-foreground hover:text-foreground cursor-pointer"
-            >
-              Go to the next unanswered question
-            </button>
-          )}
         </div>
       )}
       <ExpectedToolCalls payload={itemPayload} />
@@ -1617,7 +1652,15 @@ function EvaluatorsPane({
           );
         }
         return (
-          <div key={ev.uuid} id={`question-${ev.uuid}`}>
+          <div
+            key={ev.uuid}
+            id={`question-${ev.uuid}`}
+            className={
+              missingAnswerKeys.has(k)
+                ? "rounded-xl ring-2 ring-red-500"
+                : undefined
+            }
+          >
             <EvaluatorVerdictCard
               mode="write"
               name={ev.name}
@@ -1641,6 +1684,11 @@ function EvaluatorsPane({
               falseDescription={falseDescription}
               ratingScale={ratingScale}
             />
+            {missingAnswerKeys.has(k) && (
+              <p className="px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400">
+                This question needs an answer
+              </p>
+            )}
           </div>
         );
       })}

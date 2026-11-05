@@ -313,17 +313,11 @@ describe("AnnotationJobView", () => {
       expect(screen.getByText("My Task")).toBeInTheDocument(),
     );
 
-    // Re-read the button each time: while it cannot be used it sits inside the
-    // hover text saying why, so it is redrawn when answering unblocks it.
     const submitButton = () =>
       screen.getByRole("button", { name: "Submit & Next" });
-    expect(submitButton()).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Correct" }));
-    expect(submitButton()).toBeDisabled();
-
     await user.click(screen.getByRole("button", { name: "3" }));
-    expect(submitButton()).toBeEnabled();
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ saved: ["ev-1", "ev-2"], count: 2, status: "pending" }),
@@ -1114,7 +1108,8 @@ describe("AnnotationJobView", () => {
       expect(
         screen.queryByRole("button", { name: "Item 1 (completed)" }),
       ).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Update" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Update" })).toBeEnabled();
+      expect(screen.getByText("1 of 2 answered")).toBeInTheDocument();
     });
   });
 
@@ -1464,23 +1459,16 @@ describe("AnnotationJobView", () => {
         expect(screen.getByText("My Task")).toBeInTheDocument(),
       );
 
-      const submitButton = screen.getByRole("button", {
-        name: "Mark as complete",
-      });
-      expect(submitButton).toBeDisabled();
-      expect(submitButton).not.toHaveAttribute("title");
-      await user.hover(submitButton);
-      expect(
-        await screen.findByText(
-          "Judgements should be given for all required evaluators before submitting",
-        ),
-      ).toBeInTheDocument();
-
       // Answering only the optional one does not unblock it.
       await user.click(screen.getByRole("button", { name: "3" }));
-      expect(
+      fetchMock.mockClear();
+      await user.click(
         screen.getByRole("button", { name: "Mark as complete" }),
-      ).toBeDisabled();
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(
+        screen.getByText("This question needs an answer"),
+      ).toBeInTheDocument();
     });
 
     it("hides a skipped optional evaluator in the admin view but keeps a blank required one", async () => {
@@ -2322,34 +2310,115 @@ describe("AnnotationJobView message versions", () => {
       expect(screen.getByText("1 of 2 answered")).toBeInTheDocument();
     });
 
-    it("jumps to the first question left, and offers no jump once all are answered", async () => {
+    it("fills the green bar as questions are answered", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      const user = setupUser();
+      render(<AnnotationJobView token="tok" mode="public" />);
+      const bar = await screen.findByRole("progressbar", {
+        name: "Questions answered",
+      });
+      expect(bar).toHaveAttribute("aria-valuenow", "0");
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      expect(bar).toHaveAttribute("aria-valuenow", "1");
+      expect(bar.firstElementChild).toHaveStyle({ width: "50%" });
+    });
+
+    it("sends Submit to the first question left, marks those left, and clears each as it is answered", async () => {
       fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
       const user = setupUser();
       const { container } = render(
         <AnnotationJobView token="tok" mode="public" />,
       );
       await screen.findByText("0 of 2 answered");
-      await user.click(screen.getByRole("button", { name: "Correct" }));
-
+      fetchMock.mockClear();
       const scroll = jest.mocked(Element.prototype.scrollIntoView);
       scroll.mockClear();
-      await user.click(
-        screen.getByRole("button", {
-          name: "Go to the next unanswered question",
-        }),
-      );
-      expect(scroll.mock.contexts).toEqual([
-        container.querySelector("#question-ev-2"),
-      ]);
-      expect(screen.getByRole("button", { name: "1" })).toHaveFocus();
 
-      await user.click(screen.getByRole("button", { name: "3" }));
-      expect(screen.getByText("2 of 2 answered")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Submit & Next" }));
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(scroll.mock.contexts).toEqual([
+        container.querySelector("#question-ev-1"),
+      ]);
+      expect(screen.getAllByText("This question needs an answer")).toHaveLength(
+        2,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      expect(screen.getAllByText("This question needs an answer")).toHaveLength(
+        1,
+      );
+    });
+
+    it("opens an item already started on its first required question left", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            annotations: [
+              {
+                uuid: "a1",
+                job_id: "job-1",
+                item_id: "item-1",
+                evaluator_id: "ev-1",
+                value: { value: true },
+                created_at: "",
+                updated_at: "",
+              },
+            ],
+          }),
+        ),
+      );
+      const scroll = jest.mocked(Element.prototype.scrollIntoView);
+      scroll.mockClear();
+      const { container } = render(
+        <AnnotationJobView token="tok" mode="public" />,
+      );
+      await screen.findByText("1 of 2 answered");
+      expect(scroll.mock.contexts).toContain(
+        container.querySelector("#question-ev-2"),
+      );
+    });
+
+    it("clears the red marks when the labeller moves to another item", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      const user = setupUser();
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await screen.findByText("0 of 2 answered");
+      await user.click(screen.getByRole("button", { name: "Submit & Next" }));
+      await user.click(screen.getByRole("button", { name: "Next" }));
+      await screen.findByText("Item Two");
       expect(
-        screen.queryByRole("button", {
-          name: "Go to the next unanswered question",
-        }),
+        screen.queryByText("This question needs an answer"),
       ).not.toBeInTheDocument();
+    });
+
+    it("does not move a read-only reader to a question", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            read_only: true,
+            annotations: [
+              {
+                uuid: "a1",
+                job_id: "job-1",
+                item_id: "item-1",
+                evaluator_id: "ev-1",
+                value: { value: true },
+                created_at: "",
+                updated_at: "",
+              },
+            ],
+          }),
+        ),
+      );
+      const scroll = jest.mocked(Element.prototype.scrollIntoView);
+      scroll.mockClear();
+      const { container } = render(
+        <AnnotationJobView token="tok" mode="admin" />,
+      );
+      await screen.findByText("Correctness");
+      expect(scroll.mock.contexts).not.toContain(
+        container.querySelector("#question-ev-2"),
+      );
     });
 
     it("orders the item details, then the questions, then the comments", async () => {
