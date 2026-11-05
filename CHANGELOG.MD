@@ -1,5 +1,6 @@
 ## November 2026
 
+- The labelling job page and its walkthrough now say case instead of item, and the walkthrough cards are shorter and explain why a reason helps ([#820](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/820))
 - Annotators opening a labelling job for the first time now see a welcome with an example and an optional step-by-step walkthrough of the page, which they can open again with the new How this works button ([#818](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/818))
 - Annotators answering a labelling job now see numbered questions, a progress bar and a button for each question, so it is clear where to answer and how much is left ([#816](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/816))
 - When sending a labelling task to annotators, you can now choose for each label whether reasoning is required, optional or hidden, instead of one choice for the whole job ([#811](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/811))
