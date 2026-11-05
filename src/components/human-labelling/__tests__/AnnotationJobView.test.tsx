@@ -2844,14 +2844,14 @@ describe("AnnotationJobView intro and walkthrough", () => {
     );
     const user = setupUser();
     render(<AnnotationJobView token="tok" mode="public" />);
-    await user.click(await screen.findByRole("button", { name: "Show me how" }));
+    await user.click(await screen.findByRole("button", { name: "Begin" }));
     expect(screen.queryByRole("dialog", { name: introName })).not.toBeInTheDocument();
     const titles = runTourMock.mock.calls[0][0].steps.map((step) => step.title);
     expect(titles).toEqual([
       "Read the conversation",
       "Open Item details for more",
-      "Some questions have choices",
-      "Some questions ask for a score",
+      "Binary questions",
+      "Rating questions",
       "Add a reason",
       "Leave a comment",
       "Check your progress",
@@ -2871,7 +2871,7 @@ describe("AnnotationJobView intro and walkthrough", () => {
     const user = setupUser();
     render(<AnnotationJobView token="tok" mode="public" />);
     expect(await screen.findByText("Is the answer right?")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Show me how" }));
+    await user.click(screen.getByRole("button", { name: "Begin" }));
     expect(runTourMock.mock.calls[0][0].steps[0].title).toBe("Compare the two answers");
   });
 
@@ -2898,14 +2898,16 @@ describe("AnnotationJobView intro and walkthrough", () => {
     ).toHaveTextContent("Comments (optional)");
   });
 
-  it("starts the walkthrough from How this works in the top row, without the intro", async () => {
+  it("opens from the intro when How this works in the top row is pressed", async () => {
     window.localStorage.setItem(TOUR_SEEN_KEY, "skipped");
     const user = setupUser();
     render(<AnnotationJobView token="tok" mode="public" />);
     await user.click(await screen.findByRole("button", { name: "How this works" }));
-    expect(screen.queryByRole("dialog", { name: introName })).not.toBeInTheDocument();
-    expect(runTourMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("dialog", { name: introName })).toBeInTheDocument();
+    expect(runTourMock).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Begin" }));
     expect(runTourMock.mock.calls[0][0].id).toBe("labelling-job:job-1");
+    expect(runTourMock.mock.calls[0][0].showStepCount).toBe(true);
   });
 
   it("opens again on a different job after one was skipped", async () => {

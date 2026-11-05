@@ -24,7 +24,7 @@ describe("LabellingJobIntro", () => {
     expect(screen.getByText("Correct")).toHaveClass("bg-green-600");
   });
 
-  it("reports Skip, Escape and Show me how", async () => {
+  it("reports Skip, Escape and Begin", async () => {
     const user = setupUser();
     const onSkip = jest.fn();
     const onStart = jest.fn();
@@ -33,7 +33,7 @@ describe("LabellingJobIntro", () => {
     expect(onSkip).toHaveBeenCalledTimes(1);
     await user.keyboard("{Escape}");
     expect(onSkip).toHaveBeenCalledTimes(2);
-    await user.click(screen.getByRole("button", { name: "Show me how" }));
+    await user.click(screen.getByRole("button", { name: "Begin" }));
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 });

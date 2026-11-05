@@ -4,7 +4,16 @@
  * and item actually have get a step.
  */
 
+import { EVAL_TARGET_CHIP_CLASS } from "@/components/test-results/evalTargetChip";
 import type { Tour, TourStep } from "../engine";
+
+// A card that names something on the page draws it the way the page does, so
+// the reader can match the two. Headings on the page are bold; buttons and tags
+// look like themselves.
+const heading = (text: string) => `<strong>${text}</strong>`;
+const pageButton = (text: string) =>
+  `<span class="inline-flex items-center px-1.5 rounded border border-border bg-background text-xs font-medium text-foreground">${text}</span>`;
+const EVALUATION_TARGET = `<span class="${EVAL_TARGET_CHIP_CLASS}">Evaluation target</span>`;
 
 /** Each job has its own seen flag: a labeller gets the intro on every new job. */
 export const labellingJobTourId = (jobUuid: string) =>
@@ -17,6 +26,11 @@ export type LabellingTourQuestion = {
   uuid: string;
   outputType: "binary" | "rating";
   reasoningMode: "optional" | "required" | "hidden";
+  /** What a binary question's two answers are called, such as Pass and Fail. */
+  trueLabel?: string;
+  falseLabel?: string;
+  scaleMin?: number;
+  scaleMax?: number;
 };
 
 const READ_STEP: Record<
@@ -25,8 +39,7 @@ const READ_STEP: Record<
 > = {
   llm: {
     title: "Read the conversation",
-    description:
-      "The reply marked Evaluation target is the one you are checking",
+    description: `The reply marked ${EVALUATION_TARGET} is the one you are checking`,
   },
   conversation: {
     title: "Read the conversation",
@@ -34,23 +47,19 @@ const READ_STEP: Record<
   },
   "llm-general": {
     title: "Read the input and output",
-    description:
-      "Input is what the agent was given. Output is what it gave back.",
+    description: `${heading("Input")} is what the agent was given. ${heading("Output")} is what it gave back.`,
   },
   stt: {
     title: "Compare the transcripts",
-    description:
-      "Reference transcript is what the speaker said. Predicted transcript is what the system wrote down.",
+    description: `${heading("Reference transcript")} is what the speaker said. ${heading("Predicted transcript")} is what the system wrote down.`,
   },
   tts: {
     title: "Listen to the audio",
-    description:
-      "Generated audio is what the system said. Reference text is what it was asked to say.",
+    description: `${heading("Generated audio")} is what the system said. ${heading("Reference text")} is what it was asked to say.`,
   },
   "tool-call": {
     title: "Compare the two answers",
-    description:
-      "Agent's answer is what the agent did. Expected answer is what it should have done.",
+    description: `${heading("Agent's answer")} is what the agent did. ${heading("Expected answer")} is what it should have done.`,
   },
 };
 
@@ -59,11 +68,11 @@ function reasonDescription(questions: LabellingTourQuestion[]): string | null {
   const required = modes.filter((m) => m === "required").length;
   const optional = modes.filter((m) => m === "optional").length;
   if (required + optional === 0) return null;
-  const opens = "A box opens under a question once you pick an answer.";
+  const opens = "After you answer, a box opens for your reason.";
   if (required === 0) return `${opens} A reason is optional.`;
   if (optional === 0 && required === modes.length)
-    return `${opens} You need to write a reason before you can save.`;
-  return `${opens} Some questions need a reason before you can save.`;
+    return `${opens} You must write one before you can save.`;
+  return `${opens} Some questions need one before you can save.`;
 }
 
 export function buildLabellingJobTour({
@@ -81,7 +90,7 @@ export function buildLabellingJobTour({
 }): Tour {
   const anchorOf = (q: LabellingTourQuestion) => `#question-${q.uuid}`;
   const firstChoice = questions.find((q) => q.outputType === "binary");
-  const firstScore = questions.find((q) => q.outputType === "rating");
+  const firstRating = questions.find((q) => q.outputType === "rating");
   const reason = reasonDescription(questions);
   const reasonQuestion = questions.find((q) => q.reasoningMode !== "hidden");
 
@@ -93,26 +102,25 @@ export function buildLabellingJobTour({
       anchor: '[data-tutorial="item-details"]',
       side: "left",
       title: "Open Item details for more",
-      description:
-        "Some items come with extra information. Click to open it, and click again to close it.",
+      description: `Click ${heading("Item details")} to see more about the item. Click again to close it.`,
     });
   if (firstChoice)
     steps.push({
       anchor: anchorOf(firstChoice),
       side: "left",
-      title: firstScore
-        ? "Some questions have choices"
-        : "Answer each question",
-      description: "Click the choice that fits. Click it again to unselect it.",
+      title: "Binary questions",
+      description: `Select ${pageButton(firstChoice.trueLabel ?? "Correct")} or ${pageButton(firstChoice.falseLabel ?? "Wrong")}. Click it again to unselect it.`,
     });
-  if (firstScore)
+  if (firstRating)
     steps.push({
-      anchor: anchorOf(firstScore),
+      anchor: anchorOf(firstRating),
       side: "left",
-      title: firstChoice
-        ? "Some questions ask for a score"
-        : "Answer each question",
-      description: "Click the score that fits. Click it again to unselect it.",
+      title: "Rating questions",
+      description: `Select the right rating.${
+        firstRating.scaleMin !== undefined && firstRating.scaleMax !== undefined
+          ? ` ${firstRating.scaleMin} is the lowest and ${firstRating.scaleMax} is the highest.`
+          : ""
+      } Click it again to unselect it.`,
     });
   if (reason && reasonQuestion)
     steps.push({
@@ -126,8 +134,7 @@ export function buildLabellingJobTour({
       anchor: '[data-tutorial="job-comments"]',
       side: "left",
       title: "Leave a comment",
-      description:
-        "Use this for anything else you want to say about the item. It is optional.",
+      description: "Add any notes about the item here. This is optional.",
     });
   if (questions.length > 0)
     steps.push({
@@ -136,17 +143,21 @@ export function buildLabellingJobTour({
       title: "Check your progress",
       description:
         questions.length > 1
-          ? "A green bar appears here and fills as you answer. The numbers take you to each question."
-          : "A green bar appears here and fills as you answer",
+          ? "A green bar fills here as you answer. Click a number to go to that question."
+          : "A green bar fills here as you answer",
     });
   steps.push({
     anchor: '[data-tutorial="job-save"]',
     side: "bottom",
     align: "end",
     title: "Save your answers",
-    description:
-      "Press this when you finish an item. It saves your answers and opens the next one. Previous, Next and the up and down arrow keys also move between items.",
+    description: `Press this to save your answers and go to the next item. You can also move between items with ${pageButton("Previous")}, ${pageButton("Next")} or the up and down arrow keys.`,
     actionLabel: "Start labelling",
   });
-  return { id: labellingJobTourId(jobUuid), steps };
+  return {
+    id: labellingJobTourId(jobUuid),
+    steps,
+    showStepCount: true,
+    allowBack: true,
+  };
 }

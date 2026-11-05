@@ -54,6 +54,10 @@ export type TourStep = {
 export type Tour = {
   id: string;
   steps: TourStep[];
+  /** Show "2 of 8" on each card. */
+  showStepCount?: boolean;
+  /** Offer a Back button from the second card on. */
+  allowBack?: boolean;
 };
 
 type ActiveTour = {
@@ -165,14 +169,20 @@ export async function runTour(tour: Tour): Promise<void> {
       // Keep the highlight cutout in sync with the card on every re-render, so a
       // refresh during setup (driver refreshes on scroll/resize while a dialog
       // opens) cannot bring the stale cutout back over the new surface.
-      document.querySelectorAll<HTMLElement>(".driver-overlay").forEach((el) => {
-        el.style.visibility = popoverHidden ? "hidden" : "visible";
-      });
+      document
+        .querySelectorAll<HTMLElement>(".driver-overlay")
+        .forEach((el) => {
+          el.style.visibility = popoverHidden ? "hidden" : "visible";
+        });
       // A visible "Skip tour" affordance so the guide can be ended any time,
       // placed just left of the advance button. Ensure the footer + nav group
       // exist even on auto-advance cards (which render no next/prev buttons), so
       // Skip still shows there too.
       const footer = popover.footer as HTMLElement | undefined;
+      if (active.tour.showStepCount && popover.progress) {
+        popover.progress.textContent = `${active.index + 1} of ${active.tour.steps.length}`;
+        popover.progress.style.display = "block";
+      }
       if (footer) {
         footer.style.display = "flex";
         let nav = footer.querySelector<HTMLElement>(
@@ -236,18 +246,22 @@ async function showStep(): Promise<void> {
   }
 
   const element = step.anchor
-    ? (await waitForElement(step.anchor, { timeout: step.timeout }))
+    ? await waitForElement(step.anchor, { timeout: step.timeout })
     : null;
   if (!active) return; // torn down while waiting
 
   const isLast = index === tour.steps.length - 1;
   const showButtons: ("next" | "previous" | "close")[] = step.autoAdvance
     ? ["close"]
-    : ["next", "close"];
+    : tour.allowBack && index > 0
+      ? ["previous", "next", "close"]
+      : ["next", "close"];
   const popover = {
     // Set per-step too: the global popoverClass isn't reliably applied on the
     // highlight() path, so the theme class must ride on each step's popover.
-    popoverClass: ["calibrate-tour", step.popoverClass].filter(Boolean).join(" "),
+    popoverClass: ["calibrate-tour", step.popoverClass]
+      .filter(Boolean)
+      .join(" "),
     title: step.title,
     description: step.description,
     side: step.side ?? "bottom",
@@ -256,6 +270,10 @@ async function showStep(): Promise<void> {
     nextBtnText: step.actionLabel ?? (isLast ? "Finish" : "Next"),
     onNextClick: () => {
       void advance();
+    },
+    prevBtnText: "Back",
+    onPrevClick: () => {
+      void goBack();
     },
     onCloseClick: () => {
       finish("skipped");
@@ -313,6 +331,14 @@ async function showStep(): Promise<void> {
       }
     })();
   }
+}
+
+async function goBack(): Promise<void> {
+  if (!active || active.index === 0) return;
+  clearAnchorWatch();
+  setPopoverHidden(true);
+  active.index -= 1;
+  await showStep();
 }
 
 async function advance(): Promise<void> {

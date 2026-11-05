@@ -142,7 +142,7 @@ const INTRO: Record<
 };
 
 /** The first thing a labeller sees on a job: what they are here to do. Skipping
- *  ends here; Show me how goes on to the walkthrough of the real page. */
+ *  ends here; Begin goes on to the walkthrough of the real page. */
 export function LabellingJobIntro({
   kind,
   onSkip,
@@ -223,7 +223,7 @@ export function LabellingJobIntro({
               onClick={onStart}
               className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
             >
-              Show me how
+              Begin
             </button>
           </div>
         </div>

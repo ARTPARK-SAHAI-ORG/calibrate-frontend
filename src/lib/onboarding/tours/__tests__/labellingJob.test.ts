@@ -1,3 +1,4 @@
+import { EVAL_TARGET_CHIP_CLASS } from "@/components/test-results/evalTargetChip";
 import {
   buildLabellingJobTour,
   type LabellingTourQuestion,
@@ -40,10 +41,22 @@ describe("buildLabellingJobTour", () => {
     expect(id("a")).not.toBe(id("b"));
   });
 
+  it("asks for each card to show its place and offer Back", () => {
+    expect(
+      buildLabellingJobTour({
+        jobUuid: "a",
+        kind: "llm",
+        hasItemDetails: false,
+        questions: [],
+        commentsEnabled: false,
+      }),
+    ).toMatchObject({ showStepCount: true, allowBack: true });
+  });
+
   it("has only the steps this job needs", () => {
     expect(titles(build())).toEqual([
       "Read the conversation",
-      "Answer each question",
+      "Binary questions",
       "Check your progress",
       "Save your answers",
     ]);
@@ -57,21 +70,22 @@ describe("buildLabellingJobTour", () => {
 
   it("shows choices and scores separately when a job has both, on the first of each", () => {
     const steps = build({ questions: [binary, rating] });
-    expect(titles(steps)).toContain("Some questions have choices");
-    expect(titles(steps)).toContain("Some questions ask for a score");
-    expect(steps.find((s) => s.title.includes("choices"))?.anchor).toBe("#question-b");
-    expect(steps.find((s) => s.title.includes("score"))?.anchor).toBe("#question-r");
+    expect(titles(steps)).toContain("Binary questions");
+    expect(titles(steps)).toContain("Rating questions");
+    expect(steps.find((s) => s.title === "Binary questions")?.anchor).toBe("#question-b");
+    expect(steps.find((s) => s.title === "Rating questions")?.anchor).toBe("#question-r");
   });
 
-  it("explains a score alone when a job has only scores", () => {
+  it("explains ratings alone when a job has only ratings", () => {
     const steps = build({ questions: [rating] });
-    expect(titles(steps)).toContain("Answer each question");
-    expect(steps[1].description).toContain("score");
+    expect(titles(steps)).toContain("Rating questions");
+    expect(titles(steps)).not.toContain("Binary questions");
+    expect(steps[1].description).toContain("rating");
   });
 
   it.each([
     ["optional", "optional", "A reason is optional"],
-    ["required", "required", "You need to write a reason"],
+    ["required", "required", "You must write one"],
   ] as const)("words the reason step for %s", (_n, reasoningMode, words) => {
     const step = build({ questions: [{ ...binary, reasoningMode }] }).find(
       (s) => s.title === "Add a reason",
@@ -87,7 +101,7 @@ describe("buildLabellingJobTour", () => {
         { uuid: "o", outputType: "binary", reasoningMode: "optional" },
       ],
     }).find((s) => s.title === "Add a reason");
-    expect(step?.description).toContain("Some questions need a reason");
+    expect(step?.description).toContain("Some questions need one");
     expect(step?.anchor).toBe("#question-r");
   });
 
@@ -103,6 +117,37 @@ describe("buildLabellingJobTour", () => {
     ["tool-call", "Compare the two answers"],
   ] as const)("opens a %s job with its own reading step", (kind, title) => {
     expect(build({ kind })[0].title).toBe(title);
+  });
+
+  it("draws what a card names the way the page draws it", () => {
+    expect(build()[0].description).toContain(EVAL_TARGET_CHIP_CLASS);
+    expect(build()[0].description).toContain(">Evaluation target</span>");
+    expect(build({ kind: "stt" })[0].description).toContain(
+      "<strong>Reference transcript</strong>",
+    );
+    expect(build({ kind: "tool-call" })[0].description).toContain(
+      "<strong>Expected answer</strong>",
+    );
+    const save = build().at(-1)?.description;
+    expect(save).toContain(">Previous</span>");
+    expect(save).toContain(">Next</span>");
+  });
+
+  it("names a binary question's own two answers", () => {
+    const text = build({
+      questions: [{ ...binary, trueLabel: "Pass", falseLabel: "Fail" }],
+    })[1].description;
+    expect(text).toContain(">Pass</span>");
+    expect(text).toContain(">Fail</span>");
+  });
+
+  it("says which end of a rating is which, when the scale is known", () => {
+    const rated = (scale: Partial<LabellingTourQuestion>) =>
+      build({ questions: [{ ...rating, ...scale }] })[1].description;
+    expect(rated({ scaleMin: 1, scaleMax: 5 })).toContain(
+      "1 is the lowest and 5 is the highest",
+    );
+    expect(rated({})).not.toContain("lowest");
   });
 
   it("does not offer progress on an item with no questions, and ends on saving", () => {

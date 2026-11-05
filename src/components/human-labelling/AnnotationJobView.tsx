@@ -1134,7 +1134,7 @@ function AnnotateView({
 
   // A labeller's first visit to each job opens on the intro. It is remembered in
   // the browser for that job once skipped or finished, and How this works in the
-  // top row starts the walkthrough again.
+  // top row opens it again.
   const [introOpen, setIntroOpen] = useState(
     () =>
       !isAdmin &&
@@ -1167,6 +1167,16 @@ function AnnotateView({
                   uuid: ev.uuid,
                   outputType,
                   reasoningMode: ev.reasoning_mode ?? "optional",
+                  trueLabel: getBinaryLabel(
+                    ev.output_config?.scale ?? null,
+                    true,
+                  ),
+                  falseLabel: getBinaryLabel(
+                    ev.output_config?.scale ?? null,
+                    false,
+                  ),
+                  scaleMin: ev.scale_min ?? undefined,
+                  scaleMax: ev.scale_max ?? undefined,
                 },
               ]
             : [];
@@ -1232,7 +1242,7 @@ function AnnotateView({
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={startTutorial}
+              onClick={() => setIntroOpen(true)}
               className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
             >
               How this works
