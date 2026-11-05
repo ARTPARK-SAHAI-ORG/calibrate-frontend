@@ -331,6 +331,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
               disabled={props.disabled}
               required={props.reasoningMode === "required"}
               missing={props.reasoningMissing}
+              answered={props.value !== undefined && props.value !== null}
             />
           )}
         </>
@@ -518,7 +519,7 @@ function PickedOptionTooltip({
 }) {
   return (
     <Tooltip
-      content={picked ? "Click again to remove this answer" : null}
+      content={picked ? "Click again to unselect" : null}
       contentStyle={picked ? undefined : { display: "none" }}
       position="top"
       className={className}
@@ -752,36 +753,17 @@ function WriteReasoning({
   disabled,
   required,
   missing,
+  answered,
 }: {
   value: string;
   onChange: (s: string) => void;
   disabled?: boolean;
   required?: boolean;
   missing?: boolean;
+  answered?: boolean;
 }) {
-  // An optional reason stays out of the way until someone wants to write one.
-  const [opened, setOpened] = useState(false);
-  if (!required && !disabled && !opened && !value) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpened(true)}
-        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-dashed border-border text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors cursor-pointer"
-      >
-        <svg
-          className="w-3.5 h-3.5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden
-        >
-          <path strokeLinecap="round" d="M12 5v14M5 12h14" />
-        </svg>
-        Add a reason (optional)
-      </button>
-    );
-  }
+  // An optional reason is only asked for once there is an answer to explain.
+  if (!required && !disabled && !answered && !value) return null;
   return (
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-muted-foreground">

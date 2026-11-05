@@ -2601,7 +2601,7 @@ describe("ItemDetailPane", () => {
       />,
     );
     expect(screen.getByTestId("item-pane")).toHaveTextContent("item-1");
-    expect(screen.getByText("Desc here")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Item details" })).toBeInTheDocument();
     expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
   });
 
@@ -2785,11 +2785,10 @@ describe("ItemDetailPane about column", () => {
     renderPane({ description: "Desc here" }, [{ key: "source", value: "crm" }], false);
     expect(screen.queryByTestId("item-detail-about-pane")).not.toBeInTheDocument();
     const pane = screen.getByTestId("item-detail-left-pane").nextElementSibling as HTMLElement;
-    expect(within(pane).getByText("Description")).toBeInTheDocument();
-    expect(within(pane).getByText("Desc here")).toBeInTheDocument();
-    expect(within(pane).getByText("Metadata")).toBeInTheDocument();
-    expect(within(pane).getByText("crm")).toBeInTheDocument();
-    expect(screen.getAllByText("Desc here")).toHaveLength(1);
+    expect(
+      within(pane).getByRole("button", { name: "Item details" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Desc here")).not.toBeInTheDocument();
   });
 
   it("draws them only once when given a column", () => {

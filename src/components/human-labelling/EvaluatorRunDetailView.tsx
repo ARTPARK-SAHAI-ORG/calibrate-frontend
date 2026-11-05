@@ -1492,7 +1492,11 @@ export function ItemDetailPane({
           data-testid="item-detail-about-pane"
           className="order-last md:order-none md:w-80 border-t md:border-t-0 md:border-r border-border md:min-h-0 md:overflow-y-auto shrink-0 p-4 md:p-6 space-y-4"
         >
-          <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
+          <ItemDetailsBlock
+            payload={item.payload}
+            metadata={item.metadata}
+            defaultOpen
+          />
         </div>
       )}
       <div

@@ -351,11 +351,8 @@ describe("AnnotationJobView", () => {
 
     await user.click(screen.getByRole("button", { name: "Correct" }));
     await user.click(screen.getByRole("button", { name: "3" }));
-    await user.click(
-      screen.getAllByRole("button", { name: "Add a reason (optional)" })[0],
-    );
     await user.type(
-      screen.getByPlaceholderText("Add your reasoning"),
+      screen.getAllByPlaceholderText("Add your reasoning")[0],
       "Solid answer",
     );
 
@@ -1606,7 +1603,7 @@ describe("AnnotationJobView", () => {
         evaluators: evaluatorsWithReasoning(mode),
       });
 
-    it("keeps the comments box and an optional reason behind its link when both settings are absent", async () => {
+    it("keeps the comments box and asks for an optional reason only once answered when both settings are absent", async () => {
       fetchMock.mockResolvedValue(jsonResponse(singleItemJob()));
       render(<AnnotationJobView token="tok" mode="public" />);
       await waitFor(() =>
@@ -1616,11 +1613,12 @@ describe("AnnotationJobView", () => {
         screen.getByPlaceholderText("Add any notes about this item"),
       ).toBeInTheDocument();
       expect(
-        screen.getAllByRole("button", { name: "Add a reason (optional)" }),
-      ).toHaveLength(2);
-      expect(
         screen.queryByPlaceholderText("Add your reasoning"),
       ).not.toBeInTheDocument();
+      await setupUser().click(screen.getByRole("button", { name: "Correct" }));
+      expect(screen.getAllByPlaceholderText("Add your reasoning")).toHaveLength(
+        1,
+      );
     });
 
     it("hides the comments box when the job has comments switched off", async () => {
@@ -1636,9 +1634,10 @@ describe("AnnotationJobView", () => {
       ).not.toBeInTheDocument();
       expect(screen.queryByText("Comments (optional)")).not.toBeInTheDocument();
       // The reasons are untouched by this setting.
+      await setupUser().click(screen.getByRole("button", { name: "Correct" }));
       expect(
-        screen.getAllByRole("button", { name: "Add a reason (optional)" }),
-      ).toHaveLength(2);
+        screen.getByPlaceholderText("Add your reasoning"),
+      ).toBeInTheDocument();
     });
 
     it("keeps the comments box when the job explicitly switches comments on", async () => {
@@ -1947,8 +1946,8 @@ describe("AnnotationJobView", () => {
         const hidden = cardOf("Tone");
         expect(required.getByText("Reasoning")).toBeInTheDocument();
         expect(
-          optional.getByRole("button", { name: "Add a reason (optional)" }),
-        ).toBeInTheDocument();
+          optional.queryByPlaceholderText("Add your reasoning"),
+        ).not.toBeInTheDocument();
         expect(hidden.queryByText(/^Reasoning/)).not.toBeInTheDocument();
         expect(
           hidden.queryByPlaceholderText("Add your reasoning"),
@@ -2083,10 +2082,12 @@ describe("AnnotationJobView", () => {
         }),
       ),
     );
+    const user = setupUser();
     render(<AnnotationJobView token="tok" mode="public" />);
-    await waitFor(() =>
-      expect(screen.getByText("Some context")).toBeInTheDocument(),
-    );
+    const heading = await screen.findByRole("button", { name: "Item details" });
+    expect(screen.queryByText("Some context")).not.toBeInTheDocument();
+    await user.click(heading);
+    expect(screen.getByText("Some context")).toBeInTheDocument();
   });
 
   it("shows the item's metadata when it carries some", async () => {
@@ -2105,10 +2106,12 @@ describe("AnnotationJobView", () => {
         }),
       ),
     );
+    const user = setupUser();
     render(<AnnotationJobView token="tok" mode="public" />);
-    await waitFor(() =>
-      expect(screen.getByText("Metadata")).toBeInTheDocument(),
+    await user.click(
+      await screen.findByRole("button", { name: "Item details" }),
     );
+    expect(screen.getByText("Metadata")).toBeInTheDocument();
     expect(screen.getByText("source")).toBeInTheDocument();
     expect(screen.getByText("support-chat")).toBeInTheDocument();
     expect(screen.getByText("language")).toBeInTheDocument();
@@ -2332,6 +2335,46 @@ describe("AnnotationJobView message versions", () => {
       expect(bar).toHaveAttribute("aria-valuenow", "1");
       expect(bar.firstElementChild).toHaveStyle({ width: "50%" });
       expect(screen.getByText("1/2")).toBeInTheDocument();
+    });
+
+    it("says every question is answered in place of the count", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      const user = setupUser();
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await screen.findByText("0/2");
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      expect(screen.getByText("1/2")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "3" }));
+      expect(screen.getByText("All questions answered")).toBeInTheDocument();
+      expect(screen.queryByText("2/2")).not.toBeInTheDocument();
+    });
+
+    it("says the same when the item has one question", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(jobResponse({ evaluators: [evaluators[0]] })),
+      );
+      const user = setupUser();
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await user.click(await screen.findByRole("button", { name: "Correct" }));
+      expect(screen.getByText("All questions answered")).toBeInTheDocument();
+    });
+
+    it("steps through the items with the up and down arrows, but not while typing", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      const user = setupUser();
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await screen.findByText("Item One");
+      await user.keyboard("{ArrowUp}");
+      expect(screen.getByText("Item One")).toBeInTheDocument();
+      await user.keyboard("{ArrowDown}");
+      await screen.findByText("Item Two");
+      await user.keyboard("{ArrowDown}");
+      expect(screen.getByText("Item Two")).toBeInTheDocument();
+      await user.click(
+        screen.getByPlaceholderText("Add any notes about this item"),
+      );
+      await user.keyboard("{ArrowUp}");
+      expect(screen.getByText("Item Two")).toBeInTheDocument();
     });
 
     it("fills the bar across the job as items are saved, not as they are answered", async () => {

@@ -8,6 +8,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
 import { ItemDetailsBlock } from "./ItemDetailsBlock";
 import { JobInfoButton } from "./JobInfoButton";
+import { useDialogNavKeys } from "@/hooks/useDialogNavKeys";
 import { JobItemColumns } from "./JobItemColumns";
 import {
   getBinaryDescription,
@@ -1074,6 +1075,15 @@ function AnnotateView({
     onJumpTo(target);
   };
 
+  useDialogNavKeys({
+    isOpen: pendingNav === null,
+    vertical: true,
+    hasPrev: currentIndex > 0,
+    onPrev: () => navigateTo(currentIndex - 1),
+    hasNext: currentIndex < total - 1,
+    onNext: () => navigateTo(currentIndex + 1),
+  });
+
   const wrapperClass = fillViewport
     ? "h-screen bg-background text-foreground flex flex-col overflow-hidden"
     : "flex flex-col flex-1 min-h-0";
@@ -1634,12 +1644,32 @@ function EvaluatorsPane({
                   );
                 })}
             </div>
-            <span
-              aria-hidden
-              className="shrink-0 text-sm font-medium text-foreground"
-            >
-              {answeredCount}/{questions.length}
-            </span>
+            {answeredCount === questions.length ? (
+              <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4.5 12.75l6 6 9-13.5"
+                  />
+                </svg>
+                All questions answered
+              </span>
+            ) : (
+              <span
+                aria-hidden
+                className="shrink-0 text-sm font-medium text-foreground"
+              >
+                {answeredCount}/{questions.length}
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -1749,9 +1779,7 @@ function EvaluatorsPane({
           </div>
         );
       })}
-      {!readOnly && commentBlock && (
-        <div className="pt-4 mt-1 border-t border-border">{commentBlock}</div>
-      )}
+      {!readOnly && commentBlock && <div className="pt-1">{commentBlock}</div>}
     </div>
   );
 }
