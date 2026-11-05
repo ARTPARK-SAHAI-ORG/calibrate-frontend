@@ -187,6 +187,37 @@ function hasFieldValue(f?: FieldValue): boolean {
   return !!f && f.value !== undefined && f.value !== null && f.value !== "";
 }
 
+function ProgressBar({
+  label,
+  done,
+  total,
+  text,
+}: {
+  label: string;
+  done: number;
+  total: number;
+  text: string;
+}) {
+  return (
+    <>
+      <div
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={done}
+        className="flex-1 h-2 rounded-full bg-muted overflow-hidden"
+      >
+        <div
+          className="h-full rounded-full bg-green-500 transition-[width] duration-300"
+          style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }}
+        />
+      </div>
+      <span className="shrink-0 text-sm font-medium">{text}</span>
+    </>
+  );
+}
+
 function drawableOutputType(ev: Evaluator): "binary" | "rating" | null {
   return ev.output_type === "binary" || ev.output_type === "rating"
     ? ev.output_type
@@ -756,6 +787,10 @@ function AnnotateView({
     items.map((it) => [it.uuid, itemListStatus(it.uuid)]),
   );
 
+  const itemsDone = items.filter(
+    (it) => statusByItem.get(it.uuid) === "completed",
+  ).length;
+
   // Labels whose reasoning box is empty, marked red after a save was
   // refused. Emptied as soon as the annotator starts typing in one.
   const [missingReasoningKeys, setMissingReasoningKeys] = useState<
@@ -1086,7 +1121,7 @@ function AnnotateView({
   return (
     <div className={wrapperClass}>
       {!isAdmin && (
-        <div className="px-4 md:px-6 pt-4 md:pt-6 pb-3 shrink-0 flex items-center justify-between gap-4">
+        <div className="px-4 md:px-6 pt-4 md:pt-6 pb-3 shrink-0 flex flex-wrap md:flex-nowrap items-center justify-between gap-x-4 gap-y-2">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
             <h1 className="text-lg md:text-xl font-semibold truncate">
               {data.task.name}
@@ -1109,6 +1144,14 @@ function AnnotateView({
                 Completed
               </span>
             )}
+          </div>
+          <div className="order-last md:order-none w-full md:w-auto md:flex-1 md:max-w-xl min-w-0 flex items-center gap-3">
+            <ProgressBar
+              label="Items done"
+              done={itemsDone}
+              total={items.length}
+              text={`${itemsDone} of ${items.length} items done`}
+            />
           </div>
           <p className="text-sm text-muted-foreground truncate shrink-0">
             {data.annotator.name}
@@ -1559,22 +1602,12 @@ function EvaluatorsPane({
     <div className="space-y-3 pb-4 md:pb-6">
       {showGuidance && (
         <div className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-background border-b border-border flex items-center gap-3">
-          <div
-            role="progressbar"
-            aria-label="Questions answered"
-            aria-valuemin={0}
-            aria-valuemax={questions.length}
-            aria-valuenow={answeredCount}
-            className="flex-1 h-2 rounded-full bg-muted overflow-hidden"
-          >
-            <div
-              className="h-full rounded-full bg-green-500 transition-[width] duration-300"
-              style={{ width: `${(answeredCount / questions.length) * 100}%` }}
-            />
-          </div>
-          <span className="shrink-0 text-sm font-medium">
-            {answeredCount} of {questions.length} answered
-          </span>
+          <ProgressBar
+            label="Questions answered"
+            done={answeredCount}
+            total={questions.length}
+            text={`${answeredCount} of ${questions.length} answered`}
+          />
         </div>
       )}
       <ExpectedToolCalls payload={itemPayload} />

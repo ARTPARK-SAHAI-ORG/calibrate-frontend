@@ -2323,6 +2323,35 @@ describe("AnnotationJobView message versions", () => {
       expect(bar.firstElementChild).toHaveStyle({ width: "50%" });
     });
 
+    it("fills the bar across the job as items are saved, not as they are answered", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      const user = setupUser();
+      render(<AnnotationJobView token="tok" mode="public" />);
+      const bar = await screen.findByRole("progressbar", { name: "Items done" });
+      expect(screen.getByText("0 of 2 items done")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      await user.click(screen.getByRole("button", { name: "3" }));
+      expect(bar).toHaveAttribute("aria-valuenow", "0");
+
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ saved: ["ev-1", "ev-2"], count: 2, status: "pending" }),
+      );
+      await user.click(screen.getByRole("button", { name: "Submit & Next" }));
+      await screen.findByText("1 of 2 items done");
+      expect(bar).toHaveAttribute("aria-valuenow", "1");
+      expect(bar.firstElementChild).toHaveStyle({ width: "50%" });
+    });
+
+    it("shows no bar across the job to someone only reading it", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(jobResponse({ read_only: true })),
+      );
+      render(<AnnotationJobView token="tok" mode="admin" />);
+      await screen.findByText("Correctness");
+      expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    });
+
     it("sends Submit to the first question left, marks those left, and clears each as it is answered", async () => {
       fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
       const user = setupUser();
