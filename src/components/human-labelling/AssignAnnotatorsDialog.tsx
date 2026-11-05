@@ -400,9 +400,9 @@ export function AssignAnnotatorsDialog({
               }`}
             >
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-medium text-muted-foreground">
+                <h3 className="text-base font-semibold text-foreground">
                   Annotators
-                </p>
+                </h3>
                 {/* With none yet the button sits in the placeholder below. */}
                 {!noAnnotators && (
                   <button
@@ -614,9 +614,9 @@ export function AssignAnnotatorsDialog({
 
             {showEvaluatorChoice && (
               <div className="space-y-2 flex flex-col min-h-0">
-                <p className="text-xs font-medium text-muted-foreground">
+                <h3 className="text-base font-semibold text-foreground">
                   Labels
-                </p>
+                </h3>
                 <p className="text-xs text-muted-foreground">
                   Pick one or more labels to show in the labelling jobs created
                 </p>
@@ -716,9 +716,9 @@ export function AssignAnnotatorsDialog({
             {/* Always its own column, beside annotators (and labels, when
                 the task has more than one label to pick between). */}
             <div className="space-y-4 flex flex-col min-h-0">
-              <p className="text-xs font-medium text-muted-foreground">
+              <h3 className="text-base font-semibold text-foreground">
                 Settings
-              </p>
+              </h3>
               <div className="space-y-5">
                 <SettingChoice
                   label="Comments on each item"
