@@ -1594,14 +1594,17 @@ function EvaluatorsPane({
     <div className="space-y-3 pb-4 md:pb-6">
       {showGuidance && (
         <div className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-background border-b border-border space-y-2">
-          <div className="flex items-center gap-3">
+          <span className="sr-only">
+            {answeredCount} of {questions.length} answered
+          </span>
+          {answeredCount > 0 && (
             <div
               role="progressbar"
               aria-label="Questions answered"
               aria-valuemin={0}
               aria-valuemax={questions.length}
               aria-valuenow={answeredCount}
-              className="flex-1 h-2 rounded-full bg-muted overflow-hidden"
+              className="h-2 rounded-full bg-muted overflow-hidden"
             >
               <div
                 className="h-full rounded-full bg-green-500 transition-[width] duration-300"
@@ -1610,10 +1613,7 @@ function EvaluatorsPane({
                 }}
               />
             </div>
-            <span className="sr-only">
-              {answeredCount} of {questions.length} answered
-            </span>
-          </div>
+          )}
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-wrap gap-1.5">
               {questions.length > 1 &&

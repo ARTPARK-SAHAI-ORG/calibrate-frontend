@@ -2327,11 +2327,14 @@ describe("AnnotationJobView message versions", () => {
       fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
       const user = setupUser();
       render(<AnnotationJobView token="tok" mode="public" />);
-      const bar = await screen.findByRole("progressbar", {
+      await screen.findByText("Answer the questions below");
+      expect(
+        screen.queryByRole("progressbar", { name: "Questions answered" }),
+      ).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Correct" }));
+      const bar = screen.getByRole("progressbar", {
         name: "Questions answered",
       });
-      expect(bar).toHaveAttribute("aria-valuenow", "0");
-      await user.click(screen.getByRole("button", { name: "Correct" }));
       expect(bar).toHaveAttribute("aria-valuenow", "1");
       expect(bar.firstElementChild).toHaveStyle({ width: "50%" });
       expect(screen.getByText("1/2")).toBeInTheDocument();
