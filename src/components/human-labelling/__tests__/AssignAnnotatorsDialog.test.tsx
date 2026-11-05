@@ -684,15 +684,15 @@ describe("AssignAnnotatorsDialog", () => {
 
     expect(screen.getByText("Settings")).toBeInTheDocument();
     const comments = screen.getByRole("group", {
-      name: "Comments on each item",
+      name: "Let annotators leave a comment on each item",
     });
     expect(
       within(comments).getByText(
         "The box where annotators write notes about an item.",
       ),
     ).toBeInTheDocument();
-    expect(within(comments).getByLabelText("Show")).toBeChecked();
-    expect(within(comments).getByLabelText("Do not show")).not.toBeChecked();
+    expect(within(comments).getByLabelText("Yes")).toBeChecked();
+    expect(within(comments).getByLabelText("No")).not.toBeChecked();
 
     const reasoning = screen.getByRole("group", {
       name: "Reasoning on each label",
@@ -725,7 +725,7 @@ describe("AssignAnnotatorsDialog", () => {
     expect(screen.queryByText("Labels")).not.toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(
-      screen.getByRole("group", { name: "Comments on each item" }),
+      screen.getByRole("group", { name: "Let annotators leave a comment on each item" }),
     ).toBeInTheDocument();
     // No label on the task means nothing to explain a score for.
     expect(
@@ -743,8 +743,8 @@ describe("AssignAnnotatorsDialog", () => {
     await user.click(screen.getByText("Alice"));
     await user.click(
       within(
-        screen.getByRole("group", { name: "Comments on each item" }),
-      ).getByLabelText("Do not show"),
+        screen.getByRole("group", { name: "Let annotators leave a comment on each item" }),
+      ).getByLabelText("No"),
     );
     await user.selectOptions(reasoningOn("Relevance"), "Required");
     await user.selectOptions(reasoningOn("Fluency"), "Do not show");
@@ -863,8 +863,8 @@ describe("AssignAnnotatorsDialog", () => {
 
     await user.click(
       within(
-        screen.getByRole("group", { name: "Comments on each item" }),
-      ).getByLabelText("Do not show"),
+        screen.getByRole("group", { name: "Let annotators leave a comment on each item" }),
+      ).getByLabelText("No"),
     );
     await user.selectOptions(reasoningOn("Relevance"), "Required");
 
@@ -874,8 +874,8 @@ describe("AssignAnnotatorsDialog", () => {
 
     expect(
       within(
-        screen.getByRole("group", { name: "Comments on each item" }),
-      ).getByLabelText("Show"),
+        screen.getByRole("group", { name: "Let annotators leave a comment on each item" }),
+      ).getByLabelText("Yes"),
     ).toBeChecked();
     expect(reasoningOn("Relevance")).toHaveValue("optional");
   });

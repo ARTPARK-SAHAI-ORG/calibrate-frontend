@@ -721,13 +721,13 @@ export function AssignAnnotatorsDialog({
               </h3>
               <div className="space-y-5">
                 <SettingChoice
-                  label="Comments on each item"
+                  label="Let annotators leave a comment on each item"
                   help="The box where annotators write notes about an item."
                   name="comments-on-each-item"
                   value={commentsEnabled ? "show" : "hide"}
                   options={[
-                    { value: "show", label: "Show" },
-                    { value: "hide", label: "Do not show" },
+                    { value: "show", label: "Yes" },
+                    { value: "hide", label: "No" },
                   ]}
                   disabled={submitting}
                   onChange={(v) => setCommentsEnabled(v === "show")}

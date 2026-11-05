@@ -202,9 +202,9 @@ describe("SendForReviewFlow", () => {
     await user.click(await screen.findByRole("checkbox", { name: "Alice" }));
 
     const comments = screen.getByRole("group", {
-      name: /Comments on each item/,
+      name: /Let annotators leave a comment on each item/,
     });
-    await user.click(within(comments).getByRole("radio", { name: "Do not show" }));
+    await user.click(within(comments).getByRole("radio", { name: "No" }));
 
     await user.selectOptions(
       screen.getByRole("combobox", { name: "Reasoning on Correctness" }),
