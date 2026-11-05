@@ -1154,6 +1154,8 @@ function AnnotateView({
   };
   const startTutorial = () => {
     setIntroOpen(false);
+    // Red marks from an earlier Submit would read as part of the walkthrough.
+    setMissingAnswerKeys(new Set());
     if (!currentItem) return;
     void runTour(
       buildLabellingJobTour({

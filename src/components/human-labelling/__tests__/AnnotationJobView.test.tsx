@@ -2910,6 +2910,9 @@ describe("AnnotationJobView intro and walkthrough", () => {
       await step?.prepare?.();
     });
     expect(screen.getByPlaceholderText("Add your reasoning")).toBeInTheDocument();
+    expect(document.querySelector(step?.anchor ?? "")).toContainElement(
+      screen.getByPlaceholderText("Add your reasoning"),
+    );
     expect(screen.getByRole("button", { name: /Correct/ })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -2922,6 +2925,19 @@ describe("AnnotationJobView intro and walkthrough", () => {
     expect(screen.getByText("0 of 2 answered")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Add your reasoning")).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("clears the red marks from an earlier Submit when the walkthrough starts", async () => {
+    window.localStorage.setItem(TOUR_SEEN_KEY, "skipped");
+    const user = setupUser();
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await user.click(await screen.findByRole("button", { name: "Submit & Next" }));
+    expect(screen.getAllByText("This question needs an answer")).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "How this works" }));
+    await user.click(screen.getByRole("button", { name: "Begin" }));
+    expect(
+      screen.queryByText("This question needs an answer"),
+    ).not.toBeInTheDocument();
   });
 
   it("marks the comment box for the walkthrough even on a job with no evaluators", async () => {

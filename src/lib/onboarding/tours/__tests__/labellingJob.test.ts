@@ -114,6 +114,7 @@ describe("buildLabellingJobTour", () => {
       onPreviewAnswer,
       questions: [{ ...binary, reasoningMode: "optional" }],
     }).find((s) => s.title === "Add a reason");
+    expect(step?.anchor).toBe('#question-b [data-tutorial="reason-box"]');
     await step?.prepare?.();
     expect(onPreviewAnswer).toHaveBeenLastCalledWith("b");
     step?.leave?.();

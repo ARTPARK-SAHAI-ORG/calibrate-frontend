@@ -135,7 +135,7 @@ export function buildLabellingJobTour({
     });
   if (reason && reasonQuestion)
     steps.push({
-      anchor: anchorOf(reasonQuestion),
+      anchor: `${anchorOf(reasonQuestion)} [data-tutorial="reason-box"]`,
       side: "left",
       title: "Add a reason",
       description: reason,
