@@ -762,8 +762,8 @@ function WriteReasoning({
   missing?: boolean;
   answered?: boolean;
 }) {
-  // An optional reason is only asked for once there is an answer to explain.
-  const visible = !!(required || disabled || answered || value);
+  // A reason is only asked for once there is an answer to explain.
+  const visible = !!(disabled || answered || value);
   // Only a box that arrives because of an answer just given is highlighted,
   // never one already there when the item opened.
   const [startedHidden] = useState(!visible);

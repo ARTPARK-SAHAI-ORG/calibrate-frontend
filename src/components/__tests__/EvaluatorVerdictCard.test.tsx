@@ -1048,6 +1048,7 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
         name="Eval"
         outputType="binary"
         reasoningMode="required"
+        value={true}
       />,
     );
     expect(screen.queryByText("Reasoning (optional)")).not.toBeInTheDocument();
@@ -1063,6 +1064,7 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
         name="Eval"
         outputType="binary"
         reasoningMode="required"
+        value={true}
         disabled
       />,
     );
@@ -1077,6 +1079,7 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
         name="Eval"
         outputType="binary"
         reasoningMode="required"
+        value={true}
         reasoningMissing
       />,
     );
@@ -1093,6 +1096,7 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
         name="Eval"
         outputType="binary"
         reasoningMode="required"
+        value={true}
       />,
     );
     expect(screen.getByRole("textbox").className).not.toContain(

@@ -1670,7 +1670,8 @@ describe("AnnotationJobView", () => {
       ).toBeInTheDocument();
     });
 
-    it("marks the reasoning boxes as required on labels that require it", async () => {
+    it("marks a reasoning box as required once its label is answered", async () => {
+      const user = setupUser();
       fetchMock.mockResolvedValue(
         jsonResponse(singleItemJobWithReasoning("required")),
       );
@@ -1678,8 +1679,12 @@ describe("AnnotationJobView", () => {
       await waitFor(() =>
         expect(screen.getByText("My Task")).toBeInTheDocument(),
       );
+      expect(
+        screen.queryByPlaceholderText("Add your reasoning"),
+      ).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Correct" }));
       expect(screen.getAllByPlaceholderText("Add your reasoning")).toHaveLength(
-        2,
+        1,
       );
       expect(
         screen.queryByText("Reasoning (optional)"),
@@ -1944,7 +1949,9 @@ describe("AnnotationJobView", () => {
         const required = cardOf("Correctness");
         const optional = cardOf("Quality");
         const hidden = cardOf("Tone");
-        expect(required.getByText("Reasoning")).toBeInTheDocument();
+        expect(
+          required.queryByPlaceholderText("Add your reasoning"),
+        ).not.toBeInTheDocument();
         expect(
           optional.queryByPlaceholderText("Add your reasoning"),
         ).not.toBeInTheDocument();
