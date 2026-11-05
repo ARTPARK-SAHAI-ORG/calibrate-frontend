@@ -365,6 +365,23 @@ describe("onboarding engine", () => {
     expect(shown().title).toBe("One");
   });
 
+  it("runs a step's leave however the step ends", async () => {
+    const leave = jest.fn();
+    const steps = [
+      { title: "One", description: "First", leave },
+      { title: "Two", description: "Last" },
+    ];
+    await runTour({ id: "left", steps, allowBack: true });
+    mockHighlight.mock.calls.at(-1)?.[0].popover.onNextClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(leave).toHaveBeenCalledTimes(1);
+
+    mockHighlight.mock.calls.at(-1)?.[0].popover.onPrevClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    stopTour();
+    expect(leave).toHaveBeenCalledTimes(2);
+  });
+
   it("does not offer Back on a tour that does not allow it", async () => {
     await runTour({
       id: "plain",

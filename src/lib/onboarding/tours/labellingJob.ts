@@ -71,19 +71,23 @@ function reasonDescription(questions: LabellingTourQuestion[]): string | null {
   const opens = "After you answer, a box opens for your reason.";
   if (required === 0) return `${opens} A reason is optional.`;
   if (optional === 0 && required === modes.length)
-    return `${opens} You must write one before you can save.`;
-  return `${opens} Some questions need one before you can save.`;
+    return `${opens} You must write one before you can submit.`;
+  return `${opens} Some questions need one before you can submit.`;
 }
 
 export function buildLabellingJobTour({
   jobUuid,
   kind,
+  onPreviewAnswer,
   hasItemDetails,
   questions,
   commentsEnabled,
 }: {
   jobUuid: string;
   kind: LabellingJobKind;
+  /** Shows a question as answered on screen, saving nothing, so the reason box
+   *  is there to point at. Null ends it. */
+  onPreviewAnswer: (questionUuid: string | null) => void;
   hasItemDetails: boolean;
   questions: LabellingTourQuestion[];
   commentsEnabled: boolean;
@@ -93,6 +97,13 @@ export function buildLabellingJobTour({
   const firstRating = questions.find((q) => q.outputType === "rating");
   const reason = reasonDescription(questions);
   const reasonQuestion = questions.find((q) => q.reasoningMode !== "hidden");
+
+  const previewAnswer = async (uuid: string) => {
+    onPreviewAnswer(uuid);
+    // Let the page redraw before the highlight measures it.
+    await new Promise((resolve) => setTimeout(resolve, 60));
+  };
+  const previewFirstAnswer = () => previewAnswer(questions[0].uuid);
 
   const steps: TourStep[] = [
     { anchor: '[data-tutorial="job-item"]', side: "right", ...READ_STEP[kind] },
@@ -128,6 +139,8 @@ export function buildLabellingJobTour({
       side: "left",
       title: "Add a reason",
       description: reason,
+      prepare: () => previewAnswer(reasonQuestion.uuid),
+      leave: () => onPreviewAnswer(null),
     });
   if (commentsEnabled)
     steps.push({
@@ -143,15 +156,18 @@ export function buildLabellingJobTour({
       title: "Check your progress",
       description:
         questions.length > 1
-          ? "A green bar fills here as you answer. Click a number to go to that question."
-          : "A green bar fills here as you answer",
+          ? "This bar fills as you answer. Click a number to go to that question."
+          : "This bar fills as you answer",
+      // A bar with something in it, whatever the labeller has answered so far.
+      prepare: previewFirstAnswer,
+      leave: () => onPreviewAnswer(null),
     });
   steps.push({
     anchor: '[data-tutorial="job-save"]',
     side: "bottom",
     align: "end",
-    title: "Save your answers",
-    description: `Press this to save your answers and go to the next item. You can also move between items with ${pageButton("Previous")}, ${pageButton("Next")} or the up and down arrow keys.`,
+    title: "Submit your answers",
+    description: "Press this to submit your answers and go to the next item",
     actionLabel: "Start labelling",
   });
   return {

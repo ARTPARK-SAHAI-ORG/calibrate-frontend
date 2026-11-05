@@ -31,6 +31,8 @@ export type TourStep = {
    * so the card explains something the user can already see.
    */
   prepare?: () => Promise<void> | void;
+  /** Runs whenever this step ends, however it ends: undo what `prepare` showed. */
+  leave?: () => void;
   /** Runs when the user clicks the advance button, before moving on. */
   action?: () => Promise<void> | void;
   /** How long to wait for this step's anchor before showing it centered. */
@@ -333,9 +335,14 @@ async function showStep(): Promise<void> {
   }
 }
 
+function leaveStep(): void {
+  if (active) active.tour.steps[active.index]?.leave?.();
+}
+
 async function goBack(): Promise<void> {
   if (!active || active.index === 0) return;
   clearAnchorWatch();
+  leaveStep();
   setPopoverHidden(true);
   active.index -= 1;
   await showStep();
@@ -344,6 +351,7 @@ async function goBack(): Promise<void> {
 async function advance(): Promise<void> {
   if (!active) return;
   clearAnchorWatch();
+  leaveStep();
   const step = active.tour.steps[active.index];
 
   // Hide the card and highlight the moment the user acts, before running the
@@ -375,6 +383,7 @@ async function advance(): Promise<void> {
 function finish(status: TourSeenStatus): void {
   if (!active) return;
   clearAnchorWatch();
+  leaveStep();
   const { tour, driverObj } = active;
   active.ending = true;
   active = null;

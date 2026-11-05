@@ -1143,6 +1143,11 @@ function AnnotateView({
       !hasSeenTour(labellingJobTourId(data.job.uuid)),
   );
   useEffect(() => stopTour, []);
+  // The question the walkthrough is showing as answered, to reveal its reason
+  // box. It is only drawn that way: nothing goes into the answers.
+  const [previewAnswerUuid, setPreviewAnswerUuid] = useState<string | null>(
+    null,
+  );
   const skipIntro = () => {
     setIntroOpen(false);
     markTourSeen(labellingJobTourId(data.job.uuid), "skipped");
@@ -1153,6 +1158,7 @@ function AnnotateView({
     void runTour(
       buildLabellingJobTour({
         jobUuid: data.job.uuid,
+        onPreviewAnswer: setPreviewAnswerUuid,
         kind: currentItem.is_tool_call === true ? "tool-call" : introKind(data),
         hasItemDetails: hasItemDetails(
           currentItem.payload,
@@ -1490,6 +1496,7 @@ function AnnotateView({
                     readOnly={isAdmin}
                     commentsEnabled={commentsEnabled}
                     missingAnswerKeys={missingAnswerKeys}
+                    previewAnswerUuid={previewAnswerUuid}
                     reasonsStillNeeded={
                       new Set(reasoningMissingFor(currentItem.uuid))
                     }
@@ -1629,6 +1636,7 @@ function EvaluatorsPane({
   commentsEnabled,
   missingReasoningKeys,
   missingAnswerKeys,
+  previewAnswerUuid,
   reasonsStillNeeded,
   itemComment,
   onItemCommentChange,
@@ -1644,6 +1652,8 @@ function EvaluatorsPane({
   missingReasoningKeys: Set<FieldKey>;
   /** Required questions marked red after Submit was pressed without them. */
   missingAnswerKeys: Set<FieldKey>;
+  /** The walkthrough showing this question as answered, saving nothing. */
+  previewAnswerUuid: string | null;
   /** Answers the save would refuse right now for having no reason. */
   reasonsStillNeeded: Set<FieldKey>;
   /** Current free-text comment for this item — backed by the
@@ -1722,10 +1732,13 @@ function EvaluatorsPane({
     const k = fieldKey(item.uuid, ev.uuid);
     return !hasFieldValue(fields[k]) || reasonsStillNeeded.has(k);
   };
-  const answeredCount = questions.filter((ev) => !isUnanswered(ev)).length;
+  // The walkthrough can show one question as answered: drawn, never stored.
+  const looksAnswered = (ev: Evaluator) =>
+    !isUnanswered(ev) || previewAnswerUuid === ev.uuid;
+  const answeredCount = questions.filter(looksAnswered).length;
   const showGuidance = !readOnly && questions.length > 0;
   // The outline on the first question left is what says where to answer.
-  const nextQuestion = questions.find(isUnanswered);
+  const nextQuestion = questions.find((ev) => !looksAnswered(ev));
 
   return (
     <div className="space-y-3 pb-4 md:pb-6">
@@ -1766,7 +1779,7 @@ function EvaluatorsPane({
                       className={`shrink-0 w-7 h-7 rounded-md border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
                         missingAnswerKeys.has(k)
                           ? "border-red-500 text-red-600 dark:text-red-400"
-                          : isUnanswered(ev)
+                          : !looksAnswered(ev)
                             ? "border-border bg-background text-foreground hover:bg-muted/50"
                             : "border-foreground bg-foreground text-background"
                       }`}
@@ -1883,6 +1896,7 @@ function EvaluatorsPane({
             />
           );
         }
+        const showPreview = previewAnswerUuid === ev.uuid && !hasFieldValue(f);
         return (
           <div key={k} id={`question-${ev.uuid}`}>
             <EvaluatorVerdictCard
@@ -1893,7 +1907,7 @@ function EvaluatorsPane({
               question={{
                 number: questions.indexOf(ev) + 1,
                 total: questions.length,
-                answered: !isUnanswered(ev),
+                answered: looksAnswered(ev),
               }}
               answerMissing={missingAnswerKeys.has(k)}
               isNextQuestion={ev === nextQuestion}
@@ -1902,7 +1916,11 @@ function EvaluatorsPane({
               scaleMin={scaleMin}
               scaleMax={scaleMax}
               variableValues={variableValues}
-              value={f?.value as boolean | number | undefined}
+              value={
+                showPreview
+                  ? outputType === "binary" || (scaleMin ?? 1)
+                  : (f?.value as boolean | number | undefined)
+              }
               comment={typeof f?.comment === "string" ? f.comment : ""}
               reasoningMissing={missingReasoningKeys.has(k)}
               reasoningMode={ev.reasoning_mode ?? "optional"}

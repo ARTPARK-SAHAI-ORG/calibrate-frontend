@@ -7,6 +7,7 @@ import {
 } from "../AnnotationJobView";
 import { ITEM_PARAM, readUrlParam } from "../valueFilterUrl";
 import { isTourActive, runTour } from "../../../lib/onboarding/engine";
+import { act } from "@/test-utils";
 
 function setSearch(search: string) {
   window.history.replaceState(null, "", `/annotate-job/tok${search}`);
@@ -2855,7 +2856,7 @@ describe("AnnotationJobView intro and walkthrough", () => {
       "Add a reason",
       "Leave a comment",
       "Check your progress",
-      "Save your answers",
+      "Submit your answers",
     ]);
   });
 
@@ -2886,6 +2887,41 @@ describe("AnnotationJobView intro and walkthrough", () => {
     );
     render(<AnnotationJobView token="tok" mode="public" />);
     expect(await screen.findByText(question)).toBeInTheDocument();
+  });
+
+  it("shows a question answered with its reason box for the reason step, saving nothing", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        jobResponse({
+          evaluators: evaluators.map((ev) => ({ ...ev, reasoning_mode: "optional" })),
+        }),
+      ),
+    );
+    const user = setupUser();
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await user.click(await screen.findByRole("button", { name: "Begin" }));
+    const step = runTourMock.mock.calls[0][0].steps.find(
+      (s) => s.title === "Add a reason",
+    );
+    expect(screen.queryByPlaceholderText("Add your reasoning")).not.toBeInTheDocument();
+    fetchMock.mockClear();
+
+    await act(async () => {
+      await step?.prepare?.();
+    });
+    expect(screen.getByPlaceholderText("Add your reasoning")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Correct/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(
+      screen.getByRole("progressbar", { name: "Questions answered" }),
+    ).toHaveAttribute("aria-valuenow", "1");
+
+    act(() => step?.leave?.());
+    expect(screen.getByText("0 of 2 answered")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Add your reasoning")).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("marks the comment box for the walkthrough even on a job with no evaluators", async () => {

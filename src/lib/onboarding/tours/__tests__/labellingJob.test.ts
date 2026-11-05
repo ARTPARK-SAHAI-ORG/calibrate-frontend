@@ -19,6 +19,7 @@ const build = (
 ) =>
   buildLabellingJobTour({
     jobUuid: "job-1",
+    onPreviewAnswer: jest.fn(),
     kind: "llm",
     hasItemDetails: false,
     questions: [binary],
@@ -32,6 +33,7 @@ describe("buildLabellingJobTour", () => {
     const id = (jobUuid: string) =>
       buildLabellingJobTour({
         jobUuid,
+        onPreviewAnswer: jest.fn(),
         kind: "llm",
         hasItemDetails: false,
         questions: [],
@@ -45,6 +47,7 @@ describe("buildLabellingJobTour", () => {
     expect(
       buildLabellingJobTour({
         jobUuid: "a",
+        onPreviewAnswer: jest.fn(),
         kind: "llm",
         hasItemDetails: false,
         questions: [],
@@ -58,7 +61,7 @@ describe("buildLabellingJobTour", () => {
       "Read the conversation",
       "Binary questions",
       "Check your progress",
-      "Save your answers",
+      "Submit your answers",
     ]);
   });
 
@@ -105,6 +108,30 @@ describe("buildLabellingJobTour", () => {
     expect(step?.anchor).toBe("#question-r");
   });
 
+  it("shows the question answered for the reason step only, and undoes it", async () => {
+    const onPreviewAnswer = jest.fn();
+    const step = build({
+      onPreviewAnswer,
+      questions: [{ ...binary, reasoningMode: "optional" }],
+    }).find((s) => s.title === "Add a reason");
+    await step?.prepare?.();
+    expect(onPreviewAnswer).toHaveBeenLastCalledWith("b");
+    step?.leave?.();
+    expect(onPreviewAnswer).toHaveBeenLastCalledWith(null);
+  });
+
+  it("shows the first question answered for the progress step, so the bar has something in it", async () => {
+    const onPreviewAnswer = jest.fn();
+    const step = build({ onPreviewAnswer, questions: [binary, rating] }).find(
+      (s) => s.title === "Check your progress",
+    );
+    expect(step?.description).not.toContain("green");
+    await step?.prepare?.();
+    expect(onPreviewAnswer).toHaveBeenLastCalledWith("b");
+    step?.leave?.();
+    expect(onPreviewAnswer).toHaveBeenLastCalledWith(null);
+  });
+
   it("leaves reasons out when every question hides them", () => {
     expect(titles(build())).not.toContain("Add a reason");
   });
@@ -128,9 +155,9 @@ describe("buildLabellingJobTour", () => {
     expect(build({ kind: "tool-call" })[0].description).toContain(
       "<strong>Expected answer</strong>",
     );
-    const save = build().at(-1)?.description;
-    expect(save).toContain(">Previous</span>");
-    expect(save).toContain(">Next</span>");
+    expect(build().at(-1)?.description).toBe(
+      "Press this to submit your answers and go to the next item",
+    );
   });
 
   it("names a binary question's own two answers", () => {
