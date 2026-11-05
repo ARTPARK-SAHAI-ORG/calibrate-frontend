@@ -161,7 +161,7 @@ describe("SendForReviewFlow", () => {
       evaluator_ids: ["ev-1"],
       item_ids: ["item-1", "item-3"],
       comments_enabled: true,
-      reasoning_mode: "optional",
+      evaluator_reasoning_modes: { "ev-1": "optional" },
     });
 
     expect(await screen.findByText("1 new job created")).toBeInTheDocument();
@@ -189,7 +189,7 @@ describe("SendForReviewFlow", () => {
       evaluator_ids: ["ev-1"],
       item_ids: ["item-1", "item-2", "item-3"],
       comments_enabled: true,
-      reasoning_mode: "optional",
+      evaluator_reasoning_modes: { "ev-1": "optional" },
     });
   });
 
@@ -206,17 +206,17 @@ describe("SendForReviewFlow", () => {
     });
     await user.click(within(comments).getByRole("radio", { name: "Do not show" }));
 
-    const reasoning = screen.getByRole("group", {
-      name: /Reasoning on each label/,
-    });
-    await user.click(within(reasoning).getByRole("radio", { name: "Required" }));
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Reasoning on Correctness" }),
+      "Required",
+    );
 
     await user.click(screen.getByRole("button", { name: "Assign" }));
 
     await waitForCreateCall();
     expect(createCall()![2].body).toMatchObject({
       comments_enabled: false,
-      reasoning_mode: "required",
+      evaluator_reasoning_modes: { "ev-1": "required" },
     });
   });
 

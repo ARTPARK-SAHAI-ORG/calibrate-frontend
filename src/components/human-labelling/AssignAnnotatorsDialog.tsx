@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { ClippedText } from "@/components/ui/ClippedText";
 import { SearchInput } from "@/components/ui/SearchInput";
+import { Select } from "@/components/ui/Select";
 import { apiClient } from "@/lib/api";
 import {
   createAnnotator,
@@ -48,9 +50,16 @@ function parseApiError(err: unknown, fallback: string): string {
 
 export type ReasoningMode = "optional" | "required" | "hidden";
 
+const REASONING_OPTIONS: { value: ReasoningMode; label: string }[] = [
+  { value: "optional", label: "Optional" },
+  { value: "required", label: "Required" },
+  { value: "hidden", label: "Do not show" },
+];
+
 export type LabellingJobSettings = {
   comments_enabled: boolean;
-  reasoning_mode: ReasoningMode;
+  /** One entry per label shown in the job, by evaluator id. */
+  evaluator_reasoning_modes: Record<string, ReasoningMode>;
 };
 
 /**
@@ -154,13 +163,17 @@ export function AssignAnnotatorsDialog({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [commentsEnabled, setCommentsEnabled] = useState(true);
-  const [reasoningMode, setReasoningMode] = useState<ReasoningMode>("optional");
+  // A label with no entry reads as optional. Unticking a label leaves its entry
+  // here, so ticking it again brings the choice back.
+  const [reasoningModes, setReasoningModes] = useState<
+    Record<string, ReasoningMode>
+  >({});
 
   useEffect(() => {
     if (!isOpen) return;
     setPicked(new Set());
     setCommentsEnabled(true);
-    setReasoningMode("optional");
+    setReasoningModes({});
     setSubmitError(null);
     let cancelled = false;
     const run = async () => {
@@ -305,6 +318,14 @@ export function AssignAnnotatorsDialog({
     choosableEvaluators.length + shownToolCallEvaluators.length;
   const showEvaluatorChoice = totalShownLabels > 1;
 
+  // What gets a reasoning choice is what the job will show, in the order the
+  // labels sit on screen. This does not depend on showEvaluatorChoice: a job
+  // with one label has no Labels column, and that label is still in here.
+  const shownLabels = [
+    ...choosableEvaluators.filter((ev) => pickedEvaluators.has(ev.uuid)),
+    ...shownToolCallEvaluators,
+  ];
+
   const handleConfirm = async () => {
     if (picked.size === 0 || !evaluatorSelectionValid || submitting) return;
     setSubmitting(true);
@@ -316,7 +337,9 @@ export function AssignAnnotatorsDialog({
       ];
       await onConfirm(Array.from(picked), evaluatorIds, {
         comments_enabled: commentsEnabled,
-        reasoning_mode: reasoningMode,
+        evaluator_reasoning_modes: Object.fromEntries(
+          evaluatorIds.map((id) => [id, reasoningModes[id] ?? "optional"]),
+        ),
       });
     } catch (err) {
       setSubmitError(parseApiError(err, "Failed to create jobs"));
@@ -709,19 +732,50 @@ export function AssignAnnotatorsDialog({
                   disabled={submitting}
                   onChange={(v) => setCommentsEnabled(v === "show")}
                 />
-                <SettingChoice<ReasoningMode>
-                  label="Reasoning on each label"
-                  help="The box where annotators explain the score they gave."
-                  name="reasoning-on-each-label"
-                  value={reasoningMode}
-                  options={[
-                    { value: "optional", label: "Optional" },
-                    { value: "required", label: "Required" },
-                    { value: "hidden", label: "Do not show" },
-                  ]}
-                  disabled={submitting}
-                  onChange={setReasoningMode}
-                />
+                {shownLabels.length > 0 && (
+                  // min-w-0: a fieldset refuses to shrink below its content
+                  // by default, and a long name would never get cut off.
+                  <fieldset className="space-y-1 min-w-0" disabled={submitting}>
+                    <legend className="text-sm font-medium">
+                      Reasoning on each label
+                    </legend>
+                    <p className="text-xs text-muted-foreground">
+                      The box where annotators explain the score they gave.
+                    </p>
+                    {/* The small padding keeps each dropdown's focus ring from
+                        being cut off by the scrolling. */}
+                    <div className="space-y-2 overflow-y-auto pt-1 pb-0.5 pl-0.5 pr-1 max-h-[50vh]">
+                      {shownLabels.map((ev) => (
+                        <div key={ev.uuid} className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <ClippedText
+                              text={ev.name}
+                              className="block text-sm truncate"
+                            />
+                          </div>
+                          <Select
+                            aria-label={`Reasoning on ${ev.name}`}
+                            value={reasoningModes[ev.uuid] ?? "optional"}
+                            onChange={(e) =>
+                              setReasoningModes((prev) => ({
+                                ...prev,
+                                [ev.uuid]: e.target.value as ReasoningMode,
+                              }))
+                            }
+                            className="cursor-pointer disabled:cursor-not-allowed"
+                            wrapperClassName="w-36 shrink-0"
+                          >
+                            {REASONING_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
               </div>
             </div>
           </div>

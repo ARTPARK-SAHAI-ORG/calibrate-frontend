@@ -45,6 +45,8 @@ const openAddDialog = (user: ReturnType<typeof setupUser>) =>
   user.click(addAnnotatorButtons()[0]);
 const submitAddDialog = (user: ReturnType<typeof setupUser>) =>
   user.click(addAnnotatorButtons()[1]);
+const reasoningOn = (name: string) =>
+  screen.getByRole("combobox", { name: `Reasoning on ${name}` });
 
 describe("AssignAnnotatorsDialog", () => {
   beforeEach(() => {
@@ -153,7 +155,7 @@ describe("AssignAnnotatorsDialog", () => {
     await user.click(assign);
     expect(onConfirm).toHaveBeenCalledWith(["a-9"], ["ev-1", "ev-2"], {
       comments_enabled: true,
-      reasoning_mode: "optional",
+      evaluator_reasoning_modes: { "ev-1": "optional", "ev-2": "optional" },
     });
   });
 
@@ -432,7 +434,7 @@ describe("AssignAnnotatorsDialog", () => {
     await waitFor(() =>
       expect(onConfirm).toHaveBeenCalledWith(["a-1"], [], {
         comments_enabled: true,
-        reasoning_mode: "optional",
+        evaluator_reasoning_modes: {},
       }),
     );
   });
@@ -494,7 +496,7 @@ describe("AssignAnnotatorsDialog", () => {
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
     expect(onConfirm).toHaveBeenCalledWith(["a-1"], ["ev-1", "ev-2"], {
       comments_enabled: true,
-      reasoning_mode: "optional",
+      evaluator_reasoning_modes: { "ev-1": "optional", "ev-2": "optional" },
     });
   });
 
@@ -516,7 +518,7 @@ describe("AssignAnnotatorsDialog", () => {
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
     expect(onConfirm).toHaveBeenCalledWith(["a-1"], ["ev-1"], {
       comments_enabled: true,
-      reasoning_mode: "optional",
+      evaluator_reasoning_modes: { "ev-1": "optional" },
     });
   });
 
@@ -700,9 +702,19 @@ describe("AssignAnnotatorsDialog", () => {
         "The box where annotators explain the score they gave.",
       ),
     ).toBeInTheDocument();
-    expect(within(reasoning).getByLabelText("Optional")).toBeChecked();
-    expect(within(reasoning).getByLabelText("Required")).not.toBeChecked();
-    expect(within(reasoning).getByLabelText("Do not show")).not.toBeChecked();
+    // One dropdown per label, in the order the labels sit on screen, each
+    // starting on Optional and offering all three choices.
+    const dropdowns = within(reasoning).getAllByRole("combobox");
+    expect(dropdowns.map((d) => d.getAttribute("aria-label"))).toEqual([
+      "Reasoning on Relevance",
+      "Reasoning on Fluency",
+    ]);
+    dropdowns.forEach((d) => expect(d).toHaveValue("optional"));
+    expect(
+      within(dropdowns[0])
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Optional", "Required", "Do not show"]);
   });
 
   it("shows the settings section in the narrow single-column layout too", async () => {
@@ -715,9 +727,10 @@ describe("AssignAnnotatorsDialog", () => {
     expect(
       screen.getByRole("group", { name: "Comments on each item" }),
     ).toBeInTheDocument();
+    // No label on the task means nothing to explain a score for.
     expect(
-      screen.getByRole("group", { name: "Reasoning on each label" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("group", { name: "Reasoning on each label" }),
+    ).not.toBeInTheDocument();
   });
 
   it("confirms with the chosen settings", async () => {
@@ -733,18 +746,105 @@ describe("AssignAnnotatorsDialog", () => {
         screen.getByRole("group", { name: "Comments on each item" }),
       ).getByLabelText("Do not show"),
     );
-    await user.click(
-      within(
-        screen.getByRole("group", { name: "Reasoning on each label" }),
-      ).getByLabelText("Required"),
-    );
+    await user.selectOptions(reasoningOn("Relevance"), "Required");
+    await user.selectOptions(reasoningOn("Fluency"), "Do not show");
     await user.click(screen.getByRole("button", { name: "Assign" }));
 
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+    // Each label keeps its own choice, sent under its own id.
     expect(onConfirm).toHaveBeenCalledWith(["a-1"], ["ev-1", "ev-2"], {
       comments_enabled: false,
-      reasoning_mode: "required",
+      evaluator_reasoning_modes: { "ev-1": "required", "ev-2": "hidden" },
     });
+  });
+
+  it("changes only the label whose dropdown was used", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByText("Alice"));
+    await user.selectOptions(reasoningOn("Fluency"), "Required");
+    expect(reasoningOn("Relevance")).toHaveValue("optional");
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+    expect(onConfirm.mock.calls[0][2].evaluator_reasoning_modes).toEqual({
+      "ev-1": "optional",
+      "ev-2": "required",
+    });
+  });
+
+  it("removes an unticked label's row and leaves it out of what is sent", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByText("Alice"));
+    await user.selectOptions(reasoningOn("Fluency"), "Required");
+    await user.click(screen.getByRole("checkbox", { name: /Fluency/ }));
+    expect(
+      screen.queryByRole("combobox", { name: "Reasoning on Fluency" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+    expect(onConfirm.mock.calls[0][2].evaluator_reasoning_modes).toEqual({
+      "ev-1": "optional",
+    });
+  });
+
+  it("brings a label's choice back when it is ticked again", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog();
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByText("Alice"));
+    await user.selectOptions(reasoningOn("Fluency"), "Required");
+    await user.click(screen.getByRole("checkbox", { name: /Fluency/ }));
+    await user.click(screen.getByRole("checkbox", { name: /Fluency/ }));
+    expect(reasoningOn("Fluency")).toHaveValue("required");
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+    expect(onConfirm.mock.calls[0][2].evaluator_reasoning_modes).toEqual({
+      "ev-1": "optional",
+      "ev-2": "required",
+    });
+  });
+
+  it("gives a job with one label a row, and sends it, with no Labels column", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog({ evaluators: [evaluators[0]] });
+    await screen.findByText("Alice");
+    expect(screen.queryByText("Labels")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Alice"));
+    await user.selectOptions(reasoningOn("Relevance"), "Required");
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+    expect(onConfirm).toHaveBeenCalledWith(["a-1"], ["ev-1"], {
+      comments_enabled: true,
+      evaluator_reasoning_modes: { "ev-1": "required" },
+    });
+  });
+
+  it("disables the dropdowns while assigning", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const onConfirm = jest.fn(() => new Promise<void>(() => {}));
+    renderDialog({ onConfirm });
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByText("Alice"));
+    expect(reasoningOn("Relevance")).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+    expect(reasoningOn("Relevance")).toBeDisabled();
   });
 
   it("resets the settings back to the defaults when reopened", async () => {
@@ -753,6 +853,8 @@ describe("AssignAnnotatorsDialog", () => {
     const props = {
       accessToken: "tok",
       evaluators,
+      hasToolCallItems: false,
+      hasNonToolCallItems: true,
       onClose: jest.fn(),
       onConfirm: jest.fn(),
     };
@@ -764,11 +866,7 @@ describe("AssignAnnotatorsDialog", () => {
         screen.getByRole("group", { name: "Comments on each item" }),
       ).getByLabelText("Do not show"),
     );
-    await user.click(
-      within(
-        screen.getByRole("group", { name: "Reasoning on each label" }),
-      ).getByLabelText("Required"),
-    );
+    await user.selectOptions(reasoningOn("Relevance"), "Required");
 
     rerender(<AssignAnnotatorsDialog isOpen={false} {...props} />);
     rerender(<AssignAnnotatorsDialog isOpen {...props} />);
@@ -779,11 +877,7 @@ describe("AssignAnnotatorsDialog", () => {
         screen.getByRole("group", { name: "Comments on each item" }),
       ).getByLabelText("Show"),
     ).toBeChecked();
-    expect(
-      within(
-        screen.getByRole("group", { name: "Reasoning on each label" }),
-      ).getByLabelText("Optional"),
-    ).toBeChecked();
+    expect(reasoningOn("Relevance")).toHaveValue("optional");
   });
 });
 
@@ -865,7 +959,11 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     });
     await screen.findByText("Alice");
     expect(screen.queryByText("Labels")).not.toBeInTheDocument();
-    expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", {
+        name: "Tool call correctness is always included",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("still sends the tool-call label even with the picker hidden", async () => {
@@ -881,5 +979,54 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     await user.click(screen.getByRole("button", { name: /Assign/ }));
     await waitFor(() => expect(onConfirm).toHaveBeenCalled());
     expect(onConfirm.mock.calls[0][1]).toEqual(["ev-tool"]);
+  });
+
+  it("gives the locked label a row beside the chosen ones and sends its choice", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog({
+      evaluators: [...evaluators, TOOL_CALL],
+      hasToolCallItems: true,
+    });
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("checkbox", { name: "Alice" }));
+    expect(
+      within(screen.getByRole("group", { name: "Reasoning on each label" }))
+        .getAllByRole("combobox")
+        .map((d) => d.getAttribute("aria-label")),
+    ).toEqual([
+      "Reasoning on Relevance",
+      "Reasoning on Fluency",
+      "Reasoning on Tool call correctness",
+    ]);
+    await user.selectOptions(
+      reasoningOn("Tool call correctness"),
+      "Do not show",
+    );
+    await user.click(screen.getByRole("button", { name: /Assign/ }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onConfirm.mock.calls[0][2].evaluator_reasoning_modes).toEqual({
+      "ev-1": "optional",
+      "ev-2": "optional",
+      "ev-tool": "hidden",
+    });
+  });
+
+  it("gives the locked label a row and sends it when it is the only label", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog({
+      evaluators: [...evaluators, TOOL_CALL],
+      hasToolCallItems: true,
+      hasNonToolCallItems: false,
+    });
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("checkbox", { name: "Alice" }));
+    await user.selectOptions(reasoningOn("Tool call correctness"), "Required");
+    await user.click(screen.getByRole("button", { name: /Assign/ }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onConfirm.mock.calls[0][2].evaluator_reasoning_modes).toEqual({
+      "ev-tool": "required",
+    });
   });
 });
