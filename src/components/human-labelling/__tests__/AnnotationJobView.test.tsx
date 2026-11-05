@@ -6,6 +6,7 @@ import {
   type AnnotationJobMeta,
 } from "../AnnotationJobView";
 import { ITEM_PARAM, readUrlParam } from "../valueFilterUrl";
+import { isTourActive, runTour } from "../../../lib/onboarding/engine";
 
 function setSearch(search: string) {
   window.history.replaceState(null, "", `/annotate-job/tok${search}`);
@@ -16,6 +17,18 @@ function setSearch(search: string) {
 // in view.
 beforeAll(() => {
   Element.prototype.scrollIntoView = jest.fn();
+});
+
+jest.mock("../../../lib/onboarding/engine", () => ({
+  runTour: jest.fn(),
+  stopTour: jest.fn(),
+  isTourActive: jest.fn(() => false),
+}));
+
+const TOUR_SEEN_KEY = "calibrate:onboarding:v1:labelling-job";
+// Only the tests about the intro start without having seen it.
+beforeEach(() => {
+  window.localStorage.setItem(TOUR_SEEN_KEY, "skipped");
 });
 
 const confettiMock = jest.fn();
@@ -2771,5 +2784,128 @@ describe("AnnotationJobView message versions", () => {
       expect(screen.queryByText(/answered$/)).not.toBeInTheDocument();
       expect(screen.queryByLabelText(/^Question 1/)).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("AnnotationJobView intro and walkthrough", () => {
+  let fetchMock: jest.Mock;
+  const introName = "Welcome to your labelling task";
+  const runTourMock = jest.mocked(runTour);
+  const isTourActiveMock = jest.mocked(isTourActive);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    window.localStorage.removeItem(TOUR_SEEN_KEY);
+    fetchMock = jest.fn().mockResolvedValue(jsonResponse(jobResponse()));
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  it("opens on a labeller's first visit, and Skip is remembered", async () => {
+    const user = setupUser();
+    const first = render(<AnnotationJobView token="tok" mode="public" />);
+    expect(await screen.findByRole("dialog", { name: introName })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Skip" }));
+    expect(screen.queryByRole("dialog", { name: introName })).not.toBeInTheDocument();
+    expect(runTourMock).not.toHaveBeenCalled();
+    first.unmount();
+
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await screen.findByText("Correctness");
+    expect(screen.queryByRole("dialog", { name: introName })).not.toBeInTheDocument();
+  });
+
+  it("does not open for someone only reading the job, or on a finished job", async () => {
+    const reading = render(<AnnotationJobView token="tok" mode="admin" />);
+    await screen.findByText("Correctness");
+    expect(screen.queryByRole("dialog", { name: introName })).not.toBeInTheDocument();
+    reading.unmount();
+
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        jobResponse({ job: { ...jobResponse().job, status: "completed" } }),
+      ),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await screen.findByText("Correctness");
+    expect(screen.queryByRole("dialog", { name: introName })).not.toBeInTheDocument();
+  });
+
+  it("starts the walkthrough from what this item actually has", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        jobResponse({
+          items: [
+            { ...items[0], payload: { ...items[0].payload, description: "Context" } },
+          ],
+          comments_enabled: true,
+          evaluators: [{ ...evaluators[0], reasoning_mode: "required" }, evaluators[1]],
+        }),
+      ),
+    );
+    const user = setupUser();
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await user.click(await screen.findByRole("button", { name: "Show me how" }));
+    expect(screen.queryByRole("dialog", { name: introName })).not.toBeInTheDocument();
+    const titles = runTourMock.mock.calls[0][0].steps.map((step) => step.title);
+    expect(titles).toEqual([
+      "Read the conversation",
+      "Open Item details for more",
+      "Some questions have choices",
+      "Some questions ask for a score",
+      "Add a reason",
+      "Leave a comment",
+      "Check your progress",
+      "Save your answers",
+    ]);
+  });
+
+  it("uses the tool-call steps on a tool-call item, and the tool-call intro when every item is one", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        jobResponse({
+          evaluators: [{ ...evaluators[0], evaluator_type: "tool-call" }],
+          items: [{ ...items[0], is_tool_call: true }],
+        }),
+      ),
+    );
+    const user = setupUser();
+    render(<AnnotationJobView token="tok" mode="public" />);
+    expect(await screen.findByText("Is the answer right?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show me how" }));
+    expect(runTourMock.mock.calls[0][0].steps[0].title).toBe("Compare the two answers");
+  });
+
+  it.each([
+    ["stt", "Do they match?"],
+    ["tts", "Does the audio match?"],
+    ["conversation", "Was the agent polite?"],
+    ["llm-general", "Is the output correct?"],
+  ])("shows a %s job its own intro", async (type, question) => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(jobResponse({ task: { uuid: "task-1", name: "My Task", type } })),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    expect(await screen.findByText(question)).toBeInTheDocument();
+  });
+
+  it("brings the intro back from How this works", async () => {
+    window.localStorage.setItem(TOUR_SEEN_KEY, "skipped");
+    const user = setupUser();
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await user.click(await screen.findByRole("button", { name: "How this works" }));
+    expect(screen.getByRole("dialog", { name: introName })).toBeInTheDocument();
+  });
+
+  it("keeps the arrow keys from moving items while the intro or walkthrough is up", async () => {
+    const user = setupUser();
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await screen.findByRole("dialog", { name: introName });
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByText("Item One")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Skip" }));
+    isTourActiveMock.mockReturnValueOnce(true);
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByText("Item One")).toBeInTheDocument();
   });
 });

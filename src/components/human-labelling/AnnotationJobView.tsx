@@ -6,8 +6,16 @@ import { getBackendUrl } from "@/lib/api";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
-import { ItemDetailsBlock } from "./ItemDetailsBlock";
+import { hasItemDetails, ItemDetailsBlock } from "./ItemDetailsBlock";
 import { JobInfoButton } from "./JobInfoButton";
+import { LabellingJobIntro } from "./LabellingJobIntro";
+import { isTourActive, runTour, stopTour } from "@/lib/onboarding/engine";
+import { hasSeenTour, markTourSeen } from "@/lib/onboarding/state";
+import {
+  buildLabellingJobTour,
+  LABELLING_JOB_TOUR_ID,
+  type LabellingJobKind,
+} from "@/lib/onboarding/tours/labellingJob";
 import { ArrowDownIcon } from "@/components/icons";
 import { useDialogNavKeys } from "@/hooks/useDialogNavKeys";
 import { JobItemColumns } from "./JobItemColumns";
@@ -215,6 +223,23 @@ function GreenBar({
       />
     </div>
   );
+}
+
+/** Which intro a job gets. Tool-call items are not a kind of task of their own,
+ *  so a job counts as one only when every item is a tool call. */
+function introKind(data: JobResponse): LabellingJobKind {
+  if (
+    data.items.length > 0 &&
+    data.items.every((it) => it.is_tool_call === true)
+  )
+    return "tool-call";
+  const type = data.task.type;
+  return type === "conversation" ||
+    type === "llm-general" ||
+    type === "stt" ||
+    type === "tts"
+    ? type
+    : "llm";
 }
 
 function drawableOutputType(ev: Evaluator): "binary" | "rating" | null {
@@ -1107,13 +1132,59 @@ function AnnotateView({
     onJumpTo(target);
   };
 
+  // A labeller's first visit opens on the intro. It is remembered in the browser
+  // once skipped or finished, and How this works brings it back.
+  const [introOpen, setIntroOpen] = useState(
+    () =>
+      !isAdmin &&
+      data.items.length > 0 &&
+      data.job.status !== "completed" &&
+      !hasSeenTour(LABELLING_JOB_TOUR_ID),
+  );
+  useEffect(() => stopTour, []);
+  const skipIntro = () => {
+    setIntroOpen(false);
+    markTourSeen(LABELLING_JOB_TOUR_ID, "skipped");
+  };
+  const startTutorial = () => {
+    setIntroOpen(false);
+    if (!currentItem) return;
+    void runTour(
+      buildLabellingJobTour({
+        kind: currentItem.is_tool_call === true ? "tool-call" : introKind(data),
+        hasItemDetails: hasItemDetails(
+          currentItem.payload,
+          currentItem.metadata,
+        ),
+        commentsEnabled,
+        questions: evaluatorsFor(currentItem.uuid).flatMap((ev) => {
+          const outputType = drawableOutputType(ev);
+          return outputType
+            ? [
+                {
+                  uuid: ev.uuid,
+                  outputType,
+                  reasoningMode: ev.reasoning_mode ?? "optional",
+                },
+              ]
+            : [];
+        }),
+      }),
+    );
+  };
+
+  // The arrows belong to the page only while nothing is on top of it.
   useDialogNavKeys({
-    isOpen: pendingNav === null,
+    isOpen: pendingNav === null && !introOpen,
     vertical: true,
     hasPrev: currentIndex > 0,
-    onPrev: () => navigateTo(currentIndex - 1),
+    onPrev: () => {
+      if (!isTourActive()) navigateTo(currentIndex - 1);
+    },
     hasNext: currentIndex < total - 1,
-    onNext: () => navigateTo(currentIndex + 1),
+    onNext: () => {
+      if (!isTourActive()) navigateTo(currentIndex + 1);
+    },
   });
 
   const wrapperClass = fillViewport
@@ -1160,6 +1231,7 @@ function AnnotateView({
             labeller={data.annotator.name}
             itemCount={items.length}
             createdAt={data.job.created_at}
+            onShowHowItWorks={() => setIntroOpen(true)}
           />
         </div>
       )}
@@ -1260,6 +1332,7 @@ function AnnotateView({
                       : "Submit & Next";
                 return (
                   <button
+                    data-tutorial="job-save"
                     onClick={() => {
                       // Nothing to save yet: take the labeller to what is left.
                       const next =
@@ -1421,6 +1494,13 @@ function AnnotateView({
           </main>
         </div>
       </div>
+      {introOpen && (
+        <LabellingJobIntro
+          kind={introKind(data)}
+          onSkip={skipIntro}
+          onStart={startTutorial}
+        />
+      )}
       {pendingNav !== null && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -1630,7 +1710,10 @@ function EvaluatorsPane({
   return (
     <div className="space-y-3 pb-4 md:pb-6">
       {showGuidance && (
-        <div className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-background border-b border-border space-y-2">
+        <div
+          data-tutorial="job-progress"
+          className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-background border-b border-border space-y-2"
+        >
           <span className="sr-only">
             {answeredCount} of {questions.length} answered
           </span>
@@ -1814,7 +1897,11 @@ function EvaluatorsPane({
           </div>
         );
       })}
-      {!readOnly && commentBlock && <div className="pt-1">{commentBlock}</div>}
+      {!readOnly && commentBlock && (
+        <div data-tutorial="job-comments" className="pt-1">
+          {commentBlock}
+        </div>
+      )}
     </div>
   );
 }

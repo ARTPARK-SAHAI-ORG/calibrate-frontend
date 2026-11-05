@@ -52,7 +52,7 @@ export function JobItemColumns({
           leftHasOwnPadding ? "pb-4 md:pb-6" : "py-4 md:py-6"
         }`}
       >
-        {left}
+        <div data-tutorial="job-item">{left}</div>
       </div>
       {canResize && (
         <ResizeHandle onMouseDown={startDrag} label="Resize the columns" />

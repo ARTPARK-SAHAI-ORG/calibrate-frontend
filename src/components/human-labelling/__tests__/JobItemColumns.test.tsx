@@ -31,13 +31,16 @@ describe("JobItemColumns", () => {
     ["conversation", "40%"],
     ["stt", "50%"],
     ["tts", "50%"],
-  ])("gives a labeller on a %s task a divider and a %s right column", (type, width) => {
-    const rightRef = draw(type, true);
-    expect(
-      screen.getByRole("separator", { name: "Resize the columns" }),
-    ).toBeInTheDocument();
-    expect(widthOf(rightRef.current)).toBe(width);
-  });
+  ])(
+    "gives a labeller on a %s task a divider and a %s right column",
+    (type, width) => {
+      const rightRef = draw(type, true);
+      expect(
+        screen.getByRole("separator", { name: "Resize the columns" }),
+      ).toBeInTheDocument();
+      expect(widthOf(rightRef.current)).toBe(width);
+    },
+  );
 
   it("opens at the width saved in this browser", () => {
     window.localStorage.setItem(KEY, "45");
@@ -59,23 +62,25 @@ describe("JobItemColumns", () => {
 
   it("draws no line on the left column when the divider is there", () => {
     draw("conversation", true);
-    expect(screen.getByText("the item").parentElement).not.toHaveClass(
-      "md:border-r",
-    );
+    expect(
+      screen.getByText("the item").closest("[data-tutorial]")!.parentElement,
+    ).not.toHaveClass("md:border-r");
   });
 
   it.each([
     ["conversation", "md:flex-[6]", "md:flex-[4]"],
     ["stt", "md:flex-1", "md:flex-1"],
-  ])("gives a reader on a %s task fixed widths and no divider", (type, left, right) => {
-    window.localStorage.setItem(KEY, "45");
-    const rightRef = draw(type, false);
-    expect(screen.queryByRole("separator")).not.toBeInTheDocument();
-    expect(screen.getByText("the item").parentElement).toHaveClass(
-      left,
-      "md:border-r",
-    );
-    expect(rightRef.current).toHaveClass(right);
-    expect(widthOf(rightRef.current)).toBeFalsy();
-  });
+  ])(
+    "gives a reader on a %s task fixed widths and no divider",
+    (type, left, right) => {
+      window.localStorage.setItem(KEY, "45");
+      const rightRef = draw(type, false);
+      expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+      expect(
+        screen.getByText("the item").closest("[data-tutorial]")!.parentElement,
+      ).toHaveClass(left, "md:border-r");
+      expect(rightRef.current).toHaveClass(right);
+      expect(widthOf(rightRef.current)).toBeFalsy();
+    },
+  );
 });
