@@ -8,12 +8,10 @@ export function JobInfoButton({
   labeller,
   itemCount,
   createdAt,
-  onShowHowItWorks,
 }: {
   labeller: string;
   itemCount: number;
   createdAt: string;
-  onShowHowItWorks: () => void;
 }) {
   const rows: [string, string | number][] = [
     ["Labeller", labeller],
@@ -72,13 +70,6 @@ export function JobInfoButton({
               </div>
             ))}
           </dl>
-          <button
-            type="button"
-            onClick={onShowHowItWorks}
-            className="w-full text-left px-4 py-2.5 text-sm font-medium border-t border-border hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:bg-muted/50"
-          >
-            How this works
-          </button>
         </div>
       </div>
     </div>

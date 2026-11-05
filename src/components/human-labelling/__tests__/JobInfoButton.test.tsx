@@ -1,25 +1,15 @@
-import { render, screen, setupUser } from "@/test-utils";
+import { render, screen } from "@/test-utils";
 import { JobInfoButton } from "../JobInfoButton";
 
 describe("JobInfoButton", () => {
-  const onShowHowItWorks = jest.fn();
   beforeEach(() => {
-    onShowHowItWorks.mockClear();
     render(
       <JobInfoButton
         labeller="Aman"
         itemCount={9}
         createdAt="2026-11-03 20:00:00"
-        onShowHowItWorks={onShowHowItWorks}
       />,
     );
-  });
-
-  it("brings the walkthrough back from How this works", async () => {
-    await setupUser().click(
-      screen.getByRole("button", { name: "How this works" }),
-    );
-    expect(onShowHowItWorks).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the box hidden until hovered, tapped or tabbed to", () => {

@@ -25,7 +25,7 @@ jest.mock("../../../lib/onboarding/engine", () => ({
   isTourActive: jest.fn(() => false),
 }));
 
-const TOUR_SEEN_KEY = "calibrate:onboarding:v1:labelling-job";
+const TOUR_SEEN_KEY = "calibrate:onboarding:v1:labelling-job:job-1";
 // Only the tests about the intro start without having seen it.
 beforeEach(() => {
   window.localStorage.setItem(TOUR_SEEN_KEY, "skipped");
@@ -2898,12 +2898,26 @@ describe("AnnotationJobView intro and walkthrough", () => {
     ).toHaveTextContent("Comments (optional)");
   });
 
-  it("brings the intro back from How this works", async () => {
+  it("starts the walkthrough from How this works in the top row, without the intro", async () => {
     window.localStorage.setItem(TOUR_SEEN_KEY, "skipped");
     const user = setupUser();
     render(<AnnotationJobView token="tok" mode="public" />);
     await user.click(await screen.findByRole("button", { name: "How this works" }));
-    expect(screen.getByRole("dialog", { name: introName })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: introName })).not.toBeInTheDocument();
+    expect(runTourMock).toHaveBeenCalledTimes(1);
+    expect(runTourMock.mock.calls[0][0].id).toBe("labelling-job:job-1");
+  });
+
+  it("opens again on a different job after one was skipped", async () => {
+    window.localStorage.setItem(TOUR_SEEN_KEY, "skipped");
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        jobResponse({ job: { ...jobResponse().job, uuid: "job-2" } }),
+      ),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    expect(await screen.findByRole("dialog", { name: introName })).toBeInTheDocument();
+    window.localStorage.removeItem("calibrate:onboarding:v1:labelling-job:job-2");
   });
 
   it("keeps the arrow keys from moving items while the intro or walkthrough is up", async () => {

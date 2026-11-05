@@ -13,7 +13,7 @@ import { isTourActive, runTour, stopTour } from "@/lib/onboarding/engine";
 import { hasSeenTour, markTourSeen } from "@/lib/onboarding/state";
 import {
   buildLabellingJobTour,
-  LABELLING_JOB_TOUR_ID,
+  labellingJobTourId,
   type LabellingJobKind,
 } from "@/lib/onboarding/tours/labellingJob";
 import { ArrowDownIcon } from "@/components/icons";
@@ -1132,25 +1132,27 @@ function AnnotateView({
     onJumpTo(target);
   };
 
-  // A labeller's first visit opens on the intro. It is remembered in the browser
-  // once skipped or finished, and How this works brings it back.
+  // A labeller's first visit to each job opens on the intro. It is remembered in
+  // the browser for that job once skipped or finished, and How this works in the
+  // top row starts the walkthrough again.
   const [introOpen, setIntroOpen] = useState(
     () =>
       !isAdmin &&
       data.items.length > 0 &&
       data.job.status !== "completed" &&
-      !hasSeenTour(LABELLING_JOB_TOUR_ID),
+      !hasSeenTour(labellingJobTourId(data.job.uuid)),
   );
   useEffect(() => stopTour, []);
   const skipIntro = () => {
     setIntroOpen(false);
-    markTourSeen(LABELLING_JOB_TOUR_ID, "skipped");
+    markTourSeen(labellingJobTourId(data.job.uuid), "skipped");
   };
   const startTutorial = () => {
     setIntroOpen(false);
     if (!currentItem) return;
     void runTour(
       buildLabellingJobTour({
+        jobUuid: data.job.uuid,
         kind: currentItem.is_tool_call === true ? "tool-call" : introKind(data),
         hasItemDetails: hasItemDetails(
           currentItem.payload,
@@ -1227,12 +1229,20 @@ function AnnotateView({
               </span>
             )}
           </div>
-          <JobInfoButton
-            labeller={data.annotator.name}
-            itemCount={items.length}
-            createdAt={data.job.created_at}
-            onShowHowItWorks={() => setIntroOpen(true)}
-          />
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={startTutorial}
+              className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+            >
+              How this works
+            </button>
+            <JobInfoButton
+              labeller={data.annotator.name}
+              itemCount={items.length}
+              createdAt={data.job.created_at}
+            />
+          </div>
         </div>
       )}
       <div
@@ -1897,11 +1907,7 @@ function EvaluatorsPane({
           </div>
         );
       })}
-      {!readOnly && commentBlock && (
-        <div className="pt-1">
-          {commentBlock}
-        </div>
-      )}
+      {!readOnly && commentBlock && <div className="pt-1">{commentBlock}</div>}
     </div>
   );
 }

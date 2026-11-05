@@ -17,6 +17,7 @@ const build = (
   overrides: Partial<Parameters<typeof buildLabellingJobTour>[0]> = {},
 ) =>
   buildLabellingJobTour({
+    jobUuid: "job-1",
     kind: "llm",
     hasItemDetails: false,
     questions: [binary],
@@ -26,6 +27,19 @@ const build = (
 const titles = (steps: ReturnType<typeof build>) => steps.map((s) => s.title);
 
 describe("buildLabellingJobTour", () => {
+  it("has its own seen flag for each job", () => {
+    const id = (jobUuid: string) =>
+      buildLabellingJobTour({
+        jobUuid,
+        kind: "llm",
+        hasItemDetails: false,
+        questions: [],
+        commentsEnabled: false,
+      }).id;
+    expect(id("a")).toBe("labelling-job:a");
+    expect(id("a")).not.toBe(id("b"));
+  });
+
   it("has only the steps this job needs", () => {
     expect(titles(build())).toEqual([
       "Read the conversation",

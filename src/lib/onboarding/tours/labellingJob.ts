@@ -6,7 +6,9 @@
 
 import type { Tour, TourStep } from "../engine";
 
-export const LABELLING_JOB_TOUR_ID = "labelling-job";
+/** Each job has its own seen flag: a labeller gets the intro on every new job. */
+export const labellingJobTourId = (jobUuid: string) =>
+  `labelling-job:${jobUuid}`;
 
 export type LabellingJobKind =
   "llm" | "conversation" | "llm-general" | "stt" | "tts" | "tool-call";
@@ -65,11 +67,13 @@ function reasonDescription(questions: LabellingTourQuestion[]): string | null {
 }
 
 export function buildLabellingJobTour({
+  jobUuid,
   kind,
   hasItemDetails,
   questions,
   commentsEnabled,
 }: {
+  jobUuid: string;
   kind: LabellingJobKind;
   hasItemDetails: boolean;
   questions: LabellingTourQuestion[];
@@ -144,5 +148,5 @@ export function buildLabellingJobTour({
       "Press this when you finish an item. It saves your answers and opens the next one. Previous, Next and the up and down arrow keys also move between items.",
     actionLabel: "Start labelling",
   });
-  return { id: LABELLING_JOB_TOUR_ID, steps };
+  return { id: labellingJobTourId(jobUuid), steps };
 }
