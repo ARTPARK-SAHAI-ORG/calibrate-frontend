@@ -39,10 +39,10 @@ type CommonProps = {
   name: string;
   /** Short evaluator description, shown under the name. */
   description?: string | null;
-  /** "Question 3 of 12" above the name, for someone answering a list of
-   * these. The description is then the question they are reading, so it is
-   * drawn larger and darker. */
-  questionLabel?: string;
+  /** This card's place in a list of questions someone is answering. Makes the
+   * name a heading above a quieter description, and draws the number in a
+   * circle that turns green once answered. A list of one draws no circle. */
+  question?: { number: number; total: number };
   /** Optional version label (e.g. "v3") shown as a small monospace pill
    * next to the name. Use this when annotators are evaluating against a
    * specific evaluator version so it stays visually distinct from the
@@ -204,6 +204,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
         uuid={props.evaluatorUuid}
         enableLink={props.enableLink}
         onOpenPreview={setPreviewEvaluator}
+        asHeading={!!props.question}
       />
     </span>
   );
@@ -213,12 +214,21 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
       {/* Header: name + verdict pill + toggle on one row; description
           on its own row below so it can use the full card width. */}
       <div className="space-y-1">
-        {props.questionLabel && (
-          <p className="text-xs font-medium text-muted-foreground">
-            {props.questionLabel}
-          </p>
-        )}
         <div className="flex items-center justify-between gap-2">
+          {props.question && props.question.total > 1 && (
+            <span
+              aria-label={`Question ${props.question.number} of ${props.question.total}`}
+              className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
+                props.mode === "write" &&
+                props.value !== undefined &&
+                props.value !== null
+                  ? "bg-green-600 text-white"
+                  : "border border-foreground/30 bg-background text-foreground"
+              }`}
+            >
+              {props.question.number}
+            </span>
+          )}
           {/* Name and version pill on one line. A long name is shortened
               with an ellipsis so the version pill always stays whole: it
               used to be clipped mid-character by a sideways scroll box
@@ -274,8 +284,8 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
         {props.description && (
           <p
             className={`${
-              props.questionLabel
-                ? "text-sm text-foreground"
+              props.question
+                ? "text-sm text-muted-foreground"
                 : "text-xs text-muted-foreground"
             } whitespace-normal break-words`}
           >
@@ -346,16 +356,18 @@ function NameLabel({
   uuid,
   enableLink,
   onOpenPreview,
+  asHeading,
 }: {
   name: string;
   uuid?: string;
   enableLink?: boolean;
   onOpenPreview: (evaluator: { uuid: string; name: string }) => void;
+  asHeading?: boolean;
 }) {
   const cls =
     // Stays inline so the wrapper around it can shorten a long name with an
     // ellipsis and keep the version pill beside it whole.
-    "text-sm font-medium text-foreground align-middle";
+    `${asHeading ? "text-base font-semibold" : "text-sm font-medium"} text-foreground align-middle`;
   if (enableLink && uuid) {
     return (
       <button
@@ -719,6 +731,29 @@ function WriteReasoning({
   required?: boolean;
   missing?: boolean;
 }) {
+  // An optional reason stays out of the way until someone wants to write one.
+  const [opened, setOpened] = useState(false);
+  if (!required && !disabled && !opened && !value) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpened(true)}
+        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-dashed border-border text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors cursor-pointer"
+      >
+        <svg
+          className="w-3.5 h-3.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+          aria-hidden
+        >
+          <path strokeLinecap="round" d="M12 5v14M5 12h14" />
+        </svg>
+        Add a reason (optional)
+      </button>
+    );
+  }
   return (
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-muted-foreground">

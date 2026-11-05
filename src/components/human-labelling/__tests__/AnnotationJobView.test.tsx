@@ -351,8 +351,13 @@ describe("AnnotationJobView", () => {
 
     await user.click(screen.getByRole("button", { name: "Correct" }));
     await user.click(screen.getByRole("button", { name: "3" }));
-    const reasoningBoxes = screen.getAllByPlaceholderText(/reasoning/i);
-    await user.type(reasoningBoxes[0], "Solid answer");
+    await user.click(
+      screen.getAllByRole("button", { name: "Add a reason (optional)" })[0],
+    );
+    await user.type(
+      screen.getByPlaceholderText("Add your reasoning"),
+      "Solid answer",
+    );
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ saved: [], count: 1, status: "completed" }),
@@ -1601,7 +1606,7 @@ describe("AnnotationJobView", () => {
         evaluators: evaluatorsWithReasoning(mode),
       });
 
-    it("keeps the comments box and the reasoning box when both settings are absent", async () => {
+    it("keeps the comments box and an optional reason behind its link when both settings are absent", async () => {
       fetchMock.mockResolvedValue(jsonResponse(singleItemJob()));
       render(<AnnotationJobView token="tok" mode="public" />);
       await waitFor(() =>
@@ -1610,10 +1615,12 @@ describe("AnnotationJobView", () => {
       expect(
         screen.getByPlaceholderText("Add any notes about this item"),
       ).toBeInTheDocument();
-      expect(screen.getAllByPlaceholderText("Add your reasoning")).toHaveLength(
-        2,
-      );
-      expect(screen.getAllByText("Reasoning (optional)")).toHaveLength(2);
+      expect(
+        screen.getAllByRole("button", { name: "Add a reason (optional)" }),
+      ).toHaveLength(2);
+      expect(
+        screen.queryByPlaceholderText("Add your reasoning"),
+      ).not.toBeInTheDocument();
     });
 
     it("hides the comments box when the job has comments switched off", async () => {
@@ -1628,10 +1635,10 @@ describe("AnnotationJobView", () => {
         screen.queryByPlaceholderText("Add any notes about this item"),
       ).not.toBeInTheDocument();
       expect(screen.queryByText("Comments (optional)")).not.toBeInTheDocument();
-      // The reasoning boxes are untouched by this setting.
-      expect(screen.getAllByPlaceholderText("Add your reasoning")).toHaveLength(
-        2,
-      );
+      // The reasons are untouched by this setting.
+      expect(
+        screen.getAllByRole("button", { name: "Add a reason (optional)" }),
+      ).toHaveLength(2);
     });
 
     it("keeps the comments box when the job explicitly switches comments on", async () => {
@@ -1939,7 +1946,9 @@ describe("AnnotationJobView", () => {
         const optional = cardOf("Quality");
         const hidden = cardOf("Tone");
         expect(required.getByText("Reasoning")).toBeInTheDocument();
-        expect(optional.getByText("Reasoning (optional)")).toBeInTheDocument();
+        expect(
+          optional.getByRole("button", { name: "Add a reason (optional)" }),
+        ).toBeInTheDocument();
         expect(hidden.queryByText(/^Reasoning/)).not.toBeInTheDocument();
         expect(
           hidden.queryByPlaceholderText("Add your reasoning"),
@@ -2302,8 +2311,8 @@ describe("AnnotationJobView message versions", () => {
       fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
       const user = setupUser();
       render(<AnnotationJobView token="tok" mode="public" />);
-      await screen.findByText("Question 1 of 2");
-      expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
+      await screen.findByLabelText("Question 1 of 2");
+      expect(screen.getByLabelText("Question 2 of 2")).toBeInTheDocument();
       expect(screen.getByText("0 of 2 answered")).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Correct" }));
@@ -2350,6 +2359,37 @@ describe("AnnotationJobView message versions", () => {
       render(<AnnotationJobView token="tok" mode="admin" />);
       await screen.findByText("Correctness");
       expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    });
+
+    it("gives each question a button that goes to it and turns green once answered", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      const user = setupUser();
+      const { container } = render(
+        <AnnotationJobView token="tok" mode="public" />,
+      );
+      const second = await screen.findByRole("button", {
+        name: "Go to question 2",
+      });
+      const scroll = jest.mocked(Element.prototype.scrollIntoView);
+      scroll.mockClear();
+      await user.click(second);
+      expect(scroll.mock.contexts).toEqual([
+        container.querySelector("#question-ev-2"),
+      ]);
+      expect(second).not.toHaveClass("bg-green-600");
+      await user.click(screen.getByRole("button", { name: "3" }));
+      expect(second).toHaveClass("bg-green-600");
+    });
+
+    it("draws no question buttons for an item with one question", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(jobResponse({ evaluators: [evaluators[0]] })),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await screen.findByText("Answer this question");
+      expect(
+        screen.queryByRole("button", { name: "Go to question 1" }),
+      ).not.toBeInTheDocument();
     });
 
     it("sends Submit to the first question left, marks those left, and clears each as it is answered", async () => {
@@ -2456,7 +2496,7 @@ describe("AnnotationJobView message versions", () => {
       );
       render(<AnnotationJobView token="tok" mode="public" />);
       const details = await screen.findByText("Item details");
-      const question = screen.getByText("Question 1 of 2");
+      const question = screen.getByLabelText("Question 1 of 2");
       const comments = screen.getByText("Comments (optional)");
       expect(
         details.compareDocumentPosition(question) &
@@ -2521,7 +2561,7 @@ describe("AnnotationJobView message versions", () => {
       fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
       const user = setupUser();
       render(<AnnotationJobView token="tok" mode="public" />);
-      const pane = (await screen.findByText("Question 1 of 2")).closest(
+      const pane = (await screen.findByLabelText("Question 1 of 2")).closest(
         ".md\\:overflow-y-auto",
       ) as HTMLElement;
       const row = pane.parentElement as HTMLElement;
@@ -2563,7 +2603,7 @@ describe("AnnotationJobView message versions", () => {
       render(<AnnotationJobView token="tok" mode="admin" />);
       await screen.findByText("Correctness");
       expect(screen.queryByText(/answered$/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/^Question 1/)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^Question 1/)).not.toBeInTheDocument();
     });
   });
 });

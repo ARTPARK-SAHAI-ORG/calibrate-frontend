@@ -26,9 +26,9 @@ describe("JobItemColumns", () => {
   beforeEach(() => window.localStorage.clear());
 
   it.each([
-    ["llm", "30%"],
-    ["llm-general", "30%"],
-    ["conversation", "30%"],
+    ["llm", "40%"],
+    ["llm-general", "40%"],
+    ["conversation", "40%"],
     ["stt", "50%"],
     ["tts", "50%"],
   ])("gives a labeller on a %s task a divider and a %s right column", (type, width) => {

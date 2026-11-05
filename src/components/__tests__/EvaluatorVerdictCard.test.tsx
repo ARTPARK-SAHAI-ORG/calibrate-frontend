@@ -935,6 +935,9 @@ describe("EvaluatorVerdictCard - write mode variables + reasoning", () => {
         onCommentChange={onCommentChange}
       />,
     );
+    await user.click(
+      screen.getByRole("button", { name: "Add a reason (optional)" }),
+    );
     const textarea = screen.getByPlaceholderText("Add your reasoning");
     await user.type(textarea, "x");
     expect(onCommentChange).toHaveBeenCalledWith("x");
@@ -957,15 +960,70 @@ describe("EvaluatorVerdictCard - write mode variables + reasoning", () => {
 });
 
 describe("EvaluatorVerdictCard - reasoningMode", () => {
-  it("shows 'Reasoning (optional)' when reasoningMode is absent", () => {
+  it("keeps an optional reason behind a link when reasoningMode is absent, and opens the box on click", async () => {
+    const user = setupUser();
     render(
       <EvaluatorVerdictCard mode="write" name="Eval" outputType="binary" />,
+    );
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Add a reason (optional)" }),
     );
     expect(screen.getByText("Reasoning (optional)")).toBeInTheDocument();
     expect(screen.getByRole("textbox")).toBeInTheDocument();
   });
 
-  it("shows 'Reasoning (optional)' when reasoningMode is optional", () => {
+  it("shows an optional reason that is already written, with no link", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        comment="Written earlier"
+      />,
+    );
+    expect(screen.getByRole("textbox")).toHaveValue("Written earlier");
+    expect(
+      screen.queryByRole("button", { name: "Add a reason (optional)" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("numbers a question in a circle that turns green once answered, and draws none for a list of one", () => {
+    const { rerender } = render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        question={{ number: 3, total: 12 }}
+      />,
+    );
+    expect(screen.getByLabelText("Question 3 of 12")).not.toHaveClass(
+      "bg-green-600",
+    );
+    rerender(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        value={true}
+        question={{ number: 3, total: 12 }}
+      />,
+    );
+    expect(screen.getByLabelText("Question 3 of 12")).toHaveClass(
+      "bg-green-600",
+    );
+    rerender(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Eval"
+        outputType="binary"
+        question={{ number: 1, total: 1 }}
+      />,
+    );
+    expect(screen.queryByLabelText("Question 1 of 1")).not.toBeInTheDocument();
+  });
+
+  it("keeps the reason behind a link when reasoningMode is optional", () => {
     render(
       <EvaluatorVerdictCard
         mode="write"
@@ -974,7 +1032,9 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
         reasoningMode="optional"
       />,
     );
-    expect(screen.getByText("Reasoning (optional)")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add a reason (optional)" }),
+    ).toBeInTheDocument();
   });
 
   it("drops the optional wording when reasoning is required, with no star", () => {

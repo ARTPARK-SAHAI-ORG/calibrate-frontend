@@ -1353,7 +1353,7 @@ function AnnotateView({
             </div>
           </div>
 
-          <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden scroll-pt-14">
+          <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden scroll-pt-28">
             {!currentItem ? (
               <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground w-full">
                 {filterActive
@@ -1601,18 +1601,55 @@ function EvaluatorsPane({
   return (
     <div className="space-y-3 pb-4 md:pb-6">
       {showGuidance && (
-        <div className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-background border-b border-border flex items-center gap-3">
-          <ProgressBar
-            label="Questions answered"
-            done={answeredCount}
-            total={questions.length}
-            text={`${answeredCount} of ${questions.length} answered`}
-          />
+        <div className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-background border-b border-border space-y-2">
+          <div className="flex items-center gap-3">
+            <ProgressBar
+              label="Questions answered"
+              done={answeredCount}
+              total={questions.length}
+              text={`${answeredCount} of ${questions.length} answered`}
+            />
+          </div>
+          {questions.length > 1 && (
+            <div className="flex flex-wrap gap-1.5">
+              {questions.map((ev, i) => {
+                const k = fieldKey(item.uuid, ev.uuid);
+                return (
+                  <button
+                    key={ev.uuid}
+                    type="button"
+                    aria-label={`Go to question ${i + 1}`}
+                    onClick={() =>
+                      document
+                        .getElementById(`question-${ev.uuid}`)
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                    }
+                    className={`w-7 h-7 rounded-md border text-xs font-medium cursor-pointer transition-colors ${
+                      missingAnswerKeys.has(k)
+                        ? "border-red-500 text-red-600 dark:text-red-400"
+                        : isUnanswered(ev)
+                          ? "border-border bg-background text-foreground hover:bg-muted/50"
+                          : "border-green-600 bg-green-600 text-white"
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
       <ExpectedToolCalls payload={itemPayload} />
       <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
       {readOnly && commentBlock}
+      {showGuidance && (
+        <h2 className="pt-3 mt-1 border-t border-border text-base font-semibold">
+          {questions.length > 1
+            ? "Answer these questions"
+            : "Answer this question"}
+        </h2>
+      )}
       {forItem.map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);
         const f = fields[k];
@@ -1686,7 +1723,7 @@ function EvaluatorsPane({
         }
         return (
           <div
-            key={ev.uuid}
+            key={k}
             id={`question-${ev.uuid}`}
             className={
               missingAnswerKeys.has(k)
@@ -1699,7 +1736,10 @@ function EvaluatorsPane({
               name={ev.name}
               isOptional={ev.is_optional === true}
               description={ev.description}
-              questionLabel={`Question ${questions.indexOf(ev) + 1} of ${questions.length}`}
+              question={{
+                number: questions.indexOf(ev) + 1,
+                total: questions.length,
+              }}
               outputType={outputType}
               evaluatorUuid={ev.uuid}
               scaleMin={scaleMin}
@@ -1725,7 +1765,9 @@ function EvaluatorsPane({
           </div>
         );
       })}
-      {!readOnly && commentBlock}
+      {!readOnly && commentBlock && (
+        <div className="pt-4 mt-1 border-t border-border">{commentBlock}</div>
+      )}
     </div>
   );
 }

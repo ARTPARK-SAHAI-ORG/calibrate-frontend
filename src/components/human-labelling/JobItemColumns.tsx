@@ -31,7 +31,7 @@ export function JobItemColumns({
   const isSpeech = taskType === "stt" || taskType === "tts";
   const { percent, startDrag } = useSavedColumnWidth(
     WIDTH_KEY,
-    isSpeech ? 50 : 30,
+    isSpeech ? 50 : 40,
     MIN_PERCENT,
     MAX_PERCENT,
   );
@@ -64,7 +64,7 @@ export function JobItemColumns({
             ? ({ "--right-column-width": `${percent}%` } as CSSProperties)
             : undefined
         }
-        className={`${rightWidth} md:min-h-0 md:overflow-y-auto md:scroll-pt-14 p-4 md:p-6`}
+        className={`${rightWidth} md:min-h-0 md:overflow-y-auto md:scroll-pt-28 p-4 md:p-6`}
       >
         {right}
       </div>
