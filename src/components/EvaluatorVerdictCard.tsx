@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReasoningMode } from "@/components/human-labelling/AssignAnnotatorsDialog";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote } from "@/components/ui";
 
@@ -104,7 +105,7 @@ type WriteProps = CommonProps & {
   /** Renders the controls but disables interaction (e.g. saving in flight). */
   disabled?: boolean;
   /** How the reasoning box behaves on this job. Absent means optional, which is how every job created before this behaves. */
-  reasoningMode?: "optional" | "required" | "hidden";
+  reasoningMode?: ReasoningMode;
   /** Marks the reasoning box red, after a save was refused because it is
    * empty on a job that requires reasoning. */
   reasoningMissing?: boolean;

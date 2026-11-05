@@ -779,7 +779,9 @@ describe("AssignAnnotatorsDialog", () => {
     await user.selectOptions(reasoningOn("Relevance"), "Required");
     await user.click(screen.getByRole("checkbox", { name: /Fluency/ }));
     await user.click(
-      screen.getAllByRole("button", { name: "Copy to all labels" })[0],
+      screen.getByRole("button", {
+        name: "Copy the Relevance choice to all labels",
+      }),
     );
     await user.click(screen.getByRole("checkbox", { name: /Fluency/ }));
 
@@ -801,7 +803,9 @@ describe("AssignAnnotatorsDialog", () => {
     await screen.findByText("Alice");
 
     await user.hover(
-      screen.getAllByRole("button", { name: "Copy to all labels" })[1],
+      screen.getByRole("button", {
+        name: "Copy the Fluency choice to all labels",
+      }),
     );
 
     expect(await screen.findByText("Copy to all labels")).toBeInTheDocument();
@@ -818,7 +822,18 @@ describe("AssignAnnotatorsDialog", () => {
     expect(reasoningOn("Relevance")).toHaveClass("bg-amber-500/10!");
     expect(reasoningOn("Fluency")).toHaveClass("bg-emerald-500/10!");
     await user.selectOptions(reasoningOn("Fluency"), "Do not show");
-    expect(reasoningOn("Fluency")).toHaveClass("bg-muted!");
+    expect(reasoningOn("Fluency")).toHaveClass("bg-slate-500/10!");
+  });
+
+  it("only fills the screen height once there are annotators to list", async () => {
+    mockedApiClient.mockResolvedValue([]);
+    renderDialog();
+    const heading = await screen.findByRole("heading", {
+      name: "Assign annotators",
+    });
+    await waitFor(() =>
+      expect(heading.closest(".shadow-2xl")).not.toHaveClass("md:h-[92vh]"),
+    );
   });
 
   it("changes only the label whose dropdown was used", async () => {
@@ -886,7 +901,7 @@ describe("AssignAnnotatorsDialog", () => {
     await screen.findByText("Alice");
     expect(screen.queryByText("Labels")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Copy to all labels" }),
+      screen.queryByRole("button", { name: /to all labels/ }),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Alice"));
