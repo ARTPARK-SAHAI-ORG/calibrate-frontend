@@ -14,6 +14,8 @@ type TooltipProps = {
   /** Styles on the popup itself. Use this for width: a utility class would
    *  fight the built-in cap and lose, depending on stylesheet order. */
   contentStyle?: React.CSSProperties;
+  /** The pointer moves through the popup to whatever is under it. */
+  passThrough?: boolean;
 };
 
 export function Tooltip({
@@ -23,6 +25,7 @@ export function Tooltip({
   className = "",
   alignEnd = false,
   contentStyle,
+  passThrough = false,
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   // `side` is the side the popup ended up on, which is not always the one
@@ -180,7 +183,7 @@ export function Tooltip({
   const tooltipContent = isVisible && (
     <div
       ref={tooltipRef}
-      className="fixed z-[9999]"
+      className={`fixed z-[9999] ${passThrough ? "pointer-events-none" : ""}`}
       onMouseEnter={show}
       onMouseLeave={hide}
       // Clicking something inside the popup usually opens a dialog over it,

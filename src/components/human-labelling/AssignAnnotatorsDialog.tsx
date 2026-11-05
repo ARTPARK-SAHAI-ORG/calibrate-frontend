@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { ClippedText } from "@/components/ui/ClippedText";
+import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
+import { CheckCircleIcon, GearIcon, UserIcon } from "@/components/icons";
 import { SearchInput } from "@/components/ui/SearchInput";
+import { Select } from "@/components/ui/Select";
 import { apiClient } from "@/lib/api";
 import {
   createAnnotator,
@@ -48,10 +52,49 @@ function parseApiError(err: unknown, fallback: string): string {
 
 export type ReasoningMode = "optional" | "required" | "hidden";
 
+const REASONING_OPTIONS: { value: ReasoningMode; label: string }[] = [
+  { value: "optional", label: "Optional" },
+  { value: "required", label: "Required" },
+  { value: "hidden", label: "Do not show" },
+];
+
+const REASONING_TONES: Record<ReasoningMode, string> = {
+  required:
+    "bg-amber-500/10! border-amber-500/40! text-amber-800! dark:text-amber-300! focus:ring-amber-500/40!",
+  optional:
+    "bg-emerald-500/10! border-emerald-500/40! text-emerald-800! dark:text-emerald-300! focus:ring-emerald-500/40!",
+  hidden:
+    "bg-slate-500/10! border-slate-500/40! text-slate-800! dark:text-slate-300! focus:ring-slate-500/40!",
+};
+
 export type LabellingJobSettings = {
   comments_enabled: boolean;
-  reasoning_mode: ReasoningMode;
+  /** One entry per label shown in the job, by evaluator id. */
+  evaluator_reasoning_modes: Record<string, ReasoningMode>;
 };
+
+/** min-h-8 matches the Add annotator button beside the Annotators heading, so
+ * the three headings line up. */
+function ColumnHeading({
+  icon: Icon,
+  tone,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  tone: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <h3 className="flex items-center gap-2 min-h-8 text-base font-semibold text-foreground">
+      <span
+        className={`w-7 h-7 flex items-center justify-center rounded-md ${tone}`}
+      >
+        <Icon className="w-4 h-4" />
+      </span>
+      {children}
+    </h3>
+  );
+}
 
 /**
  * One choice out of a short list, laid out like the checkbox rows above it.
@@ -78,7 +121,7 @@ function SettingChoice<T extends string>({
   return (
     <fieldset className="space-y-1" disabled={disabled}>
       <legend className="text-sm font-medium">{label}</legend>
-      <p className="text-xs text-muted-foreground">{help}</p>
+      <p className="text-xs text-foreground/80">{help}</p>
       <div className="pt-1">
         {options.map((option) => (
           <label
@@ -154,13 +197,17 @@ export function AssignAnnotatorsDialog({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [commentsEnabled, setCommentsEnabled] = useState(true);
-  const [reasoningMode, setReasoningMode] = useState<ReasoningMode>("optional");
+  // A label with no entry reads as optional. Unticking a label leaves its entry
+  // here, so ticking it again brings the choice back.
+  const [reasoningModes, setReasoningModes] = useState<
+    Record<string, ReasoningMode>
+  >({});
 
   useEffect(() => {
     if (!isOpen) return;
     setPicked(new Set());
     setCommentsEnabled(true);
-    setReasoningMode("optional");
+    setReasoningModes({});
     setSubmitError(null);
     let cancelled = false;
     const run = async () => {
@@ -305,6 +352,16 @@ export function AssignAnnotatorsDialog({
     choosableEvaluators.length + shownToolCallEvaluators.length;
   const showEvaluatorChoice = totalShownLabels > 1;
 
+  const reasoningModeOf = (id: string) => reasoningModes[id] ?? "optional";
+
+  // What gets a reasoning choice is what the job will show, in the order the
+  // labels sit on screen. This does not depend on showEvaluatorChoice: a job
+  // with one label has no Labels column, and that label is still in here.
+  const shownLabels = [
+    ...choosableEvaluators.filter((ev) => pickedEvaluators.has(ev.uuid)),
+    ...shownToolCallEvaluators,
+  ];
+
   const handleConfirm = async () => {
     if (picked.size === 0 || !evaluatorSelectionValid || submitting) return;
     setSubmitting(true);
@@ -316,7 +373,9 @@ export function AssignAnnotatorsDialog({
       ];
       await onConfirm(Array.from(picked), evaluatorIds, {
         comments_enabled: commentsEnabled,
-        reasoning_mode: reasoningMode,
+        evaluator_reasoning_modes: Object.fromEntries(
+          evaluatorIds.map((id) => [id, reasoningModeOf(id)]),
+        ),
       });
     } catch (err) {
       setSubmitError(parseApiError(err, "Failed to create jobs"));
@@ -333,8 +392,8 @@ export function AssignAnnotatorsDialog({
       }}
     >
       <div
-        className={`bg-background border border-border rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] ${
-          showEvaluatorChoice ? "max-w-6xl" : "max-w-4xl"
+        className={`bg-background border border-border rounded-xl shadow-2xl w-full flex flex-col max-h-[92vh] ${noAnnotators ? "" : "md:h-[92vh]"} ${
+          showEvaluatorChoice ? "max-w-[92rem]" : "max-w-6xl"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -365,9 +424,9 @@ export function AssignAnnotatorsDialog({
             </svg>
           </button>
         </div>
-        <div className="p-4 md:p-6 overflow-y-auto">
+        <div className="p-4 md:p-6 overflow-y-auto flex-1 min-h-0">
           <div
-            className={`grid grid-cols-1 gap-x-10 gap-y-4 ${
+            className={`grid grid-cols-1 md:h-full md:grid-rows-[minmax(0,1fr)] gap-x-10 gap-y-4 ${
               showEvaluatorChoice ? "md:grid-cols-3" : "md:grid-cols-2"
             }`}
           >
@@ -377,9 +436,12 @@ export function AssignAnnotatorsDialog({
               }`}
             >
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-medium text-muted-foreground">
+                <ColumnHeading
+                  icon={UserIcon}
+                  tone="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                >
                   Annotators
-                </p>
+                </ColumnHeading>
                 {/* With none yet the button sits in the placeholder below. */}
                 {!noAnnotators && (
                   <button
@@ -402,7 +464,7 @@ export function AssignAnnotatorsDialog({
                   placeholder="Search annotators"
                 />
               )}
-              <div className="space-y-2 overflow-y-auto pr-1 max-h-[55vh]">
+              <div className="space-y-2 overflow-y-auto pr-1 max-h-[60vh] md:max-h-none md:flex-1 min-h-0">
                 {loading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <svg
@@ -527,7 +589,11 @@ export function AssignAnnotatorsDialog({
                       ) : (
                         <div
                           key={a.uuid}
-                          className="flex items-center gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors"
+                          className={`flex items-center gap-3 px-3 py-2 rounded-md border transition-colors ${
+                            picked.has(a.uuid)
+                              ? "border-blue-500/40 bg-blue-500/5"
+                              : "border-border hover:bg-muted/30"
+                          }`}
                         >
                           <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
                             <input
@@ -591,10 +657,13 @@ export function AssignAnnotatorsDialog({
 
             {showEvaluatorChoice && (
               <div className="space-y-2 flex flex-col min-h-0">
-                <p className="text-xs font-medium text-muted-foreground">
+                <ColumnHeading
+                  icon={CheckCircleIcon}
+                  tone="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+                >
                   Labels
-                </p>
-                <p className="text-xs text-muted-foreground">
+                </ColumnHeading>
+                <p className="text-xs text-foreground/80">
                   Pick one or more labels to show in the labelling jobs created
                 </p>
                 {choosableEvaluators.length > 1 && (
@@ -628,13 +697,17 @@ export function AssignAnnotatorsDialog({
                     </span>
                   </label>
                 )}
-                <div className="grid grid-cols-1 gap-2 overflow-y-auto pr-1 max-h-[50vh]">
+                <div className="grid grid-cols-1 content-start gap-2 overflow-y-auto pr-1 max-h-[50vh] md:max-h-none md:flex-1 min-h-0">
                   {choosableEvaluators.map((ev) => {
                     const checked = pickedEvaluators.has(ev.uuid);
                     return (
                       <label
                         key={ev.uuid}
-                        className="flex items-start gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                        className={`flex items-start gap-3 px-3 py-2 rounded-md border transition-colors cursor-pointer ${
+                          checked
+                            ? "border-violet-500/40 bg-violet-500/5"
+                            : "border-border hover:bg-muted/30"
+                        }`}
                       >
                         <span className="flex h-5 items-center flex-shrink-0">
                           <input
@@ -692,36 +765,93 @@ export function AssignAnnotatorsDialog({
 
             {/* Always its own column, beside annotators (and labels, when
                 the task has more than one label to pick between). */}
-            <div className="space-y-4 flex flex-col min-h-0">
-              <p className="text-xs font-medium text-muted-foreground">
+            <div className="space-y-4 flex flex-col min-h-0 md:overflow-y-auto pr-1">
+              <ColumnHeading
+                icon={GearIcon}
+                tone="bg-rose-500/10 text-rose-600 dark:text-rose-400"
+              >
                 Settings
-              </p>
+              </ColumnHeading>
               <div className="space-y-5">
                 <SettingChoice
-                  label="Comments on each item"
-                  help="The box where annotators write notes about an item."
+                  label="Let annotators leave a comment on each item"
+                  help="Yes shows a box where annotators can write notes about the item. No removes the box."
                   name="comments-on-each-item"
                   value={commentsEnabled ? "show" : "hide"}
                   options={[
-                    { value: "show", label: "Show" },
-                    { value: "hide", label: "Do not show" },
+                    { value: "show", label: "Yes" },
+                    { value: "hide", label: "No" },
                   ]}
                   disabled={submitting}
                   onChange={(v) => setCommentsEnabled(v === "show")}
                 />
-                <SettingChoice<ReasoningMode>
-                  label="Reasoning on each label"
-                  help="The box where annotators explain the score they gave."
-                  name="reasoning-on-each-label"
-                  value={reasoningMode}
-                  options={[
-                    { value: "optional", label: "Optional" },
-                    { value: "required", label: "Required" },
-                    { value: "hidden", label: "Do not show" },
-                  ]}
-                  disabled={submitting}
-                  onChange={setReasoningMode}
-                />
+                {shownLabels.length > 0 && (
+                  // min-w-0: a fieldset refuses to shrink below its content
+                  // by default, and a long name would never get cut off.
+                  <fieldset className="space-y-1 min-w-0" disabled={submitting}>
+                    <legend className="text-sm font-medium">
+                      Let annotators add reasoning
+                    </legend>
+                    <p className="text-xs text-foreground/80">
+                      Whether you want annotators to give a reasoning for their
+                      scores. Set this separately for each label.
+                    </p>
+                    {/* The small padding keeps each dropdown's focus ring from
+                        being cut off by the scrolling. */}
+                    <div className="space-y-2 overflow-y-auto pt-1 pb-0.5 pl-0.5 pr-1 max-h-[50vh] md:max-h-none md:overflow-visible">
+                      {shownLabels.map((ev) => (
+                        <div key={ev.uuid} className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <ClippedText
+                              text={ev.name}
+                              className="block text-sm truncate"
+                            />
+                          </div>
+                          <Select
+                            aria-label={`Reasoning on ${ev.name}`}
+                            value={reasoningModeOf(ev.uuid)}
+                            onChange={(e) =>
+                              setReasoningModes((prev) => ({
+                                ...prev,
+                                [ev.uuid]: e.target.value as ReasoningMode,
+                              }))
+                            }
+                            className={`cursor-pointer disabled:cursor-not-allowed ${REASONING_TONES[reasoningModeOf(ev.uuid)]}`}
+                            wrapperClassName="w-36 shrink-0"
+                          >
+                            {REASONING_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </Select>
+                          {shownLabels.length > 1 && (
+                            <DuplicateIconButton
+                              tooltip="Copy to all labels"
+                              ariaLabel={`Copy the ${ev.name} choice to all labels`}
+                              tooltipPassThrough
+                              disabled={submitting}
+                              className="shrink-0"
+                              onClick={() =>
+                                setReasoningModes(
+                                  Object.fromEntries(
+                                    [
+                                      ...choosableEvaluators,
+                                      ...shownToolCallEvaluators,
+                                    ].map((other) => [
+                                      other.uuid,
+                                      reasoningModeOf(ev.uuid),
+                                    ]),
+                                  ),
+                                )
+                              }
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
               </div>
             </div>
           </div>

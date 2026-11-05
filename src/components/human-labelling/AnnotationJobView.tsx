@@ -35,6 +35,7 @@ import {
   writeUrlParam,
 } from "./valueFilterUrl";
 import { scheduleScrollToFirstFieldError } from "./scrollToFieldError";
+import type { ReasoningMode } from "./AssignAnnotatorsDialog";
 import type { ReviewItem } from "./SendForReviewFlow";
 import { buildJobHumanScoreCards, readSavedValue } from "./jobHumanScores";
 import type { EvaluatorScoreCard } from "./EvaluatorScoreCards";
@@ -67,10 +68,6 @@ type Job = {
   /** Whether the per-item comments box is offered to the annotator.
    * Absent means true, which is how every job created before this behaves. */
   comments_enabled?: boolean;
-  /** How the per-evaluator reasoning box behaves for the annotator.
-   * Absent means "optional", which is how every job created before this
-   * behaves. */
-  reasoning_mode?: "optional" | "required" | "hidden";
 };
 
 type Annotator = { uuid: string; name: string };
@@ -91,6 +88,9 @@ type Evaluator = {
   /** When true the annotator may leave this one blank and still submit.
    * Frozen on the job at creation time; absent means required. */
   is_optional?: boolean;
+  /** How this label's reasoning box behaves for the annotator. Resolved by the
+   * backend: the label's own value, or the job's value on older jobs. */
+  reasoning_mode?: ReasoningMode;
   // Rating bounds returned by the backend (null/absent for binary
   // evaluators). Threaded into EvaluatorVerdictCard so the rating
   // buttons render `scale_min..scale_max` instead of the default 1..5.
@@ -638,10 +638,8 @@ function AnnotateView({
 }: ViewProps) {
   const total = items.length;
   const isCompleted = data.job.status === "completed";
-  // Both settings are frozen on the job. Absent keeps today's behaviour:
-  // the comments box is offered and reasoning is optional.
+  // Frozen on the job. Absent keeps the comments box offered.
   const commentsEnabled = data.job.comments_enabled !== false;
-  const reasoningMode = data.job.reasoning_mode ?? "optional";
   const filterActive =
     canFilterByValue &&
     usableValueFilters(valueFilters, data.evaluators).length > 0;
@@ -750,12 +748,6 @@ function AnnotateView({
     items.map((it) => [it.uuid, itemListStatus(it.uuid)]),
   );
 
-  // Labels the annotator touched in this sitting. A job that asks for
-  // reasoning asks for it on these only: a label that arrived already
-  // answered (a bulk upload of existing labels can carry a score with no
-  // reasoning) is not the annotator's to explain, and asking would leave
-  // them unable to save the item at all.
-  const [touchedKeys, setTouchedKeys] = useState<Set<FieldKey>>(new Set());
   // Labels whose reasoning box is empty, marked red after a save was
   // refused. Emptied as soon as the annotator starts typing in one.
   const [missingReasoningKeys, setMissingReasoningKeys] = useState<
@@ -764,7 +756,6 @@ function AnnotateView({
   const evaluatorsPaneRef = useRef<HTMLDivElement | null>(null);
 
   const setField = (key: FieldKey, partial: Partial<FieldValue>) => {
-    setTouchedKeys((prev) => new Set(prev).add(key));
     // Removing an answer empties its reasoning box too.
     if (partial.value === null) partial = { value: null, comment: "" };
     if (
@@ -788,19 +779,23 @@ function AnnotateView({
     }));
   };
 
-  /** Labels on this item the annotator answered in this sitting and left
-   * without reasoning, on a job that requires it. */
-  const reasoningMissingFor = (itemId: string): FieldKey[] => {
-    if (reasoningMode !== "required") return [];
-    return evaluatorsFor(itemId)
-      .map((ev) => fieldKey(itemId, ev.uuid))
-      .filter(
-        (k) =>
-          touchedKeys.has(k) &&
-          hasFieldValue(fields[k]) &&
-          !(fields[k]?.comment ?? "").trim(),
-      );
-  };
+  /** Labels on this item that require reasoning, differ from what is saved,
+   * and have none. A label that arrived already answered with no reasoning (a
+   * bulk upload of existing labels can carry a score alone) is not asked for
+   * it unless the annotator changes it: it is not theirs to explain, and
+   * asking would leave them unable to save the item at all. */
+  const reasoningMissingFor = (itemId: string): FieldKey[] =>
+    evaluatorsFor(itemId)
+      .filter((ev) => {
+        const f = fields[fieldKey(itemId, ev.uuid)];
+        return (
+          ev.reasoning_mode === "required" &&
+          fieldDirty(itemId, ev) &&
+          hasFieldValue(f) &&
+          !(f?.comment ?? "").trim()
+        );
+      })
+      .map((ev) => fieldKey(itemId, ev.uuid));
 
   // Red borders are painted first, then the first one is scrolled into view,
   // the same as the item dialogs do with their invalid fields.
@@ -821,8 +816,8 @@ function AnnotateView({
     if (!currentItem || submitting) return false;
     setTopError(null);
 
-    // Nothing is sent until every label answered in this sitting has its
-    // reasoning. The boxes go red and the first one is scrolled to, so the
+    // Nothing is sent until every changed label that requires reasoning has
+    // it. The boxes go red and the first one is scrolled to, so the
     // annotator is told where to write rather than only that something is
     // wrong.
     const missing = reasoningMissingFor(currentItem.uuid);
@@ -984,15 +979,11 @@ function AnnotateView({
       ...prev,
       [itemId]: savedComments[itemId] ?? "",
     }));
-    const drop = (prev: Set<FieldKey>) => {
+    setMissingReasoningKeys((prev) => {
       const next = new Set(prev);
       keys.forEach((k) => next.delete(k));
       return next;
-    };
-    setMissingReasoningKeys(drop);
-    // Put back answers count as untouched, so they are not asked for
-    // reasoning they never had.
-    setTouchedKeys(drop);
+    });
   };
 
   const navigateTo = async (target: number) => {
@@ -1292,8 +1283,13 @@ function AnnotateView({
                     setField={setField}
                     readOnly={isAdmin}
                     commentsEnabled={commentsEnabled}
-                    reasoningMode={reasoningMode}
-                    missingReasoningKeys={missingReasoningKeys}
+                    missingReasoningKeys={
+                      new Set(
+                        reasoningMissingFor(currentItem.uuid).filter((k) =>
+                          missingReasoningKeys.has(k),
+                        ),
+                      )
+                    }
                     itemComment={itemComments[currentItem.uuid] ?? ""}
                     onItemCommentChange={(s) =>
                       setItemComments((prev) => ({
@@ -1409,7 +1405,6 @@ function EvaluatorsPane({
   setField,
   readOnly,
   commentsEnabled,
-  reasoningMode,
   missingReasoningKeys,
   itemComment,
   onItemCommentChange,
@@ -1421,8 +1416,6 @@ function EvaluatorsPane({
   readOnly: boolean;
   /** Job setting: false hides the comments box from the annotator. */
   commentsEnabled: boolean;
-  /** Job setting: how the per-evaluator reasoning box behaves in write mode. */
-  reasoningMode: "optional" | "required" | "hidden";
   /** Labels whose empty reasoning box refused the last save, marked red. */
   missingReasoningKeys: Set<FieldKey>;
   /** Current free-text comment for this item — backed by the
@@ -1588,7 +1581,7 @@ function EvaluatorsPane({
             value={f?.value as boolean | number | undefined}
             comment={typeof f?.comment === "string" ? f.comment : ""}
             reasoningMissing={missingReasoningKeys.has(k)}
-            reasoningMode={reasoningMode}
+            reasoningMode={ev.reasoning_mode ?? "optional"}
             onValueChange={(v) => setField(k, { value: v })}
             onCommentChange={(s) => setField(k, { comment: s })}
             trueLabel={trueLabel}

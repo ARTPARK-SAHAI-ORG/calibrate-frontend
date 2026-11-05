@@ -10,12 +10,18 @@ type DuplicateIconButtonProps = {
   onClick: () => void;
   /** Tooltip text shown on hover. Also used as the accessible label. */
   tooltip?: string;
+  /** What a screen reader says, when the tooltip alone does not say which row
+   *  this button belongs to. Defaults to the tooltip. */
+  ariaLabel?: string;
   /** Shows a spinner and disables the button while the source data loads. */
   loading?: boolean;
   /** Disables the button with no spinner, e.g. while another row is loading. */
   disabled?: boolean;
   /** Extra classes appended to the base styling. */
   className?: string;
+  /** The pointer moves through the tooltip. Use it when rows of these sit one
+   *  above the other, so the tooltip never blocks the button above. */
+  tooltipPassThrough?: boolean;
 };
 
 /**
@@ -28,12 +34,14 @@ type DuplicateIconButtonProps = {
 export function DuplicateIconButton({
   onClick,
   tooltip = "Duplicate",
+  ariaLabel = tooltip,
   loading = false,
   disabled = false,
   className = "",
+  tooltipPassThrough = false,
 }: DuplicateIconButtonProps) {
   return (
-    <Tooltip content={tooltip}>
+    <Tooltip content={tooltip} passThrough={tooltipPassThrough}>
       <button
         type="button"
         disabled={loading || disabled}
@@ -42,7 +50,7 @@ export function DuplicateIconButton({
           if (loading || disabled) return;
           onClick();
         }}
-        aria-label={tooltip}
+        aria-label={ariaLabel}
         aria-busy={loading}
         className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
           loading || disabled ? "cursor-not-allowed" : "cursor-pointer"

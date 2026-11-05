@@ -1,4 +1,4 @@
-import { render, screen, setupUser, waitFor } from "@/test-utils";
+import { render, screen, setupUser, waitFor, within } from "@/test-utils";
 import {
   AnnotationJobView,
   jobStatusLabel,
@@ -55,6 +55,9 @@ const evaluators = [
     scale_max: 5,
   },
 ];
+
+const evaluatorsWithReasoning = (mode: "optional" | "required" | "hidden") =>
+  evaluators.map((ev) => ({ ...ev, reasoning_mode: mode }));
 
 const items = [
   {
@@ -1041,9 +1044,7 @@ describe("AnnotationJobView", () => {
 
     it("does not ask for reasoning on answers put back by Discard", async () => {
       const user = setupUser();
-      await renderJob({
-        job: { ...jobResponse().job, reasoning_mode: "required" },
-      });
+      await renderJob({ evaluators: evaluatorsWithReasoning("required") });
       await user.click(screen.getByRole("button", { name: "5" }));
       await user.click(screen.getByRole("button", { name: "Next" }));
       await user.click(screen.getByRole("button", { name: "Discard changes" }));
@@ -1604,6 +1605,13 @@ describe("AnnotationJobView", () => {
         items: [items[0]],
         job: { ...jobResponse().job, ...job },
       });
+    const singleItemJobWithReasoning = (
+      mode: "optional" | "required" | "hidden",
+    ) =>
+      jobResponse({
+        items: [items[0]],
+        evaluators: evaluatorsWithReasoning(mode),
+      });
 
     it("keeps the comments box and the reasoning box when both settings are absent", async () => {
       fetchMock.mockResolvedValue(jsonResponse(singleItemJob()));
@@ -1651,9 +1659,9 @@ describe("AnnotationJobView", () => {
       ).toBeInTheDocument();
     });
 
-    it("hides the reasoning box when the job hides reasoning", async () => {
+    it("hides the reasoning box on labels that hide reasoning", async () => {
       fetchMock.mockResolvedValue(
-        jsonResponse(singleItemJob({ reasoning_mode: "hidden" })),
+        jsonResponse(singleItemJobWithReasoning("hidden")),
       );
       render(<AnnotationJobView token="tok" mode="public" />);
       await waitFor(() =>
@@ -1668,9 +1676,9 @@ describe("AnnotationJobView", () => {
       ).toBeInTheDocument();
     });
 
-    it("marks the reasoning boxes as required when the job requires it", async () => {
+    it("marks the reasoning boxes as required on labels that require it", async () => {
       fetchMock.mockResolvedValue(
-        jsonResponse(singleItemJob({ reasoning_mode: "required" })),
+        jsonResponse(singleItemJobWithReasoning("required")),
       );
       render(<AnnotationJobView token="tok" mode="public" />);
       await waitFor(() =>
@@ -1687,7 +1695,7 @@ describe("AnnotationJobView", () => {
     it("marks each empty reasoning box instead of only warning at the top", async () => {
       const user = setupUser();
       fetchMock.mockResolvedValueOnce(
-        jsonResponse(singleItemJob({ reasoning_mode: "required" })),
+        jsonResponse(singleItemJobWithReasoning("required")),
       );
       render(<AnnotationJobView token="tok" mode="public" />);
       await waitFor(() =>
@@ -1752,9 +1760,7 @@ describe("AnnotationJobView", () => {
       const user = setupUser();
       fetchMock.mockResolvedValueOnce(
         jsonResponse(
-          jobResponse({
-            job: { ...jobResponse().job, reasoning_mode: "required" },
-          }),
+          jobResponse({ evaluators: evaluatorsWithReasoning("required") }),
         ),
       );
       render(<AnnotationJobView token="tok" mode="public" />);
@@ -1785,7 +1791,7 @@ describe("AnnotationJobView", () => {
         jsonResponse(
           jobResponse({
             items: [items[0]],
-            job: { ...jobResponse().job, reasoning_mode: "required" },
+            evaluators: evaluatorsWithReasoning("required"),
             annotations: [
               {
                 uuid: "a-1",
@@ -1830,11 +1836,14 @@ describe("AnnotationJobView", () => {
         jsonResponse(
           jobResponse({
             evaluators: [
-              evaluators[0],
-              { ...evaluators[1], is_optional: true },
+              { ...evaluators[0], reasoning_mode: "required" },
+              {
+                ...evaluators[1],
+                is_optional: true,
+                reasoning_mode: "required",
+              },
             ],
             items: [items[0]],
-            job: { ...jobResponse().job, reasoning_mode: "required" },
           }),
         ),
       );
@@ -1868,7 +1877,7 @@ describe("AnnotationJobView", () => {
           jobResponse({
             read_only: true,
             items: [items[0]],
-            job: { ...jobResponse().job, reasoning_mode: "hidden" },
+            evaluators: evaluatorsWithReasoning("hidden"),
             annotations: [
               {
                 uuid: "a1",
@@ -1892,6 +1901,175 @@ describe("AnnotationJobView", () => {
       expect(
         screen.getByRole("button", { name: "See reasoning" }),
       ).toBeInTheDocument();
+    });
+
+    describe("a different reasoning setting on each label", () => {
+      const REASONING_ERROR = "Add your reasoning for this score";
+      const cardOf = (name: string) =>
+        within(screen.getByText(name).closest(".p-3") as HTMLElement);
+      const saveButton = () =>
+        screen.getByRole("button", { name: /Mark as complete|Update/ });
+
+      async function renderLabels(overrides: Record<string, unknown>) {
+        fetchMock.mockResolvedValueOnce(
+          jsonResponse(jobResponse({ items: [items[0]], ...overrides })),
+        );
+        render(<AnnotationJobView token="tok" mode="public" />);
+        await waitFor(() =>
+          expect(screen.getByText("My Task")).toBeInTheDocument(),
+        );
+      }
+
+      const annotation = (ev: string, value: unknown, reasoning?: string) => ({
+        uuid: `a-${ev}`,
+        job_id: "job-1",
+        item_id: "item-1",
+        evaluator_id: ev,
+        value: { value, ...(reasoning ? { reasoning } : {}) },
+        created_at: "",
+        updated_at: "",
+      });
+
+      it("shows each label its own box and refuses a save only for the required one", async () => {
+        const user = setupUser();
+        await renderLabels({
+          evaluators: [
+            { ...evaluators[0], reasoning_mode: "required" },
+            { ...evaluators[1], reasoning_mode: "optional" },
+            {
+              ...evaluators[1],
+              uuid: "ev-3",
+              name: "Tone",
+              scale_min: 6,
+              scale_max: 8,
+              reasoning_mode: "hidden",
+            },
+          ],
+        });
+
+        const required = cardOf("Correctness");
+        const optional = cardOf("Quality");
+        const hidden = cardOf("Tone");
+        expect(required.getByText("Reasoning")).toBeInTheDocument();
+        expect(optional.getByText("Reasoning (optional)")).toBeInTheDocument();
+        expect(hidden.queryByText(/^Reasoning/)).not.toBeInTheDocument();
+        expect(
+          hidden.queryByPlaceholderText("Add your reasoning"),
+        ).not.toBeInTheDocument();
+
+        await user.click(required.getByRole("button", { name: "Correct" }));
+        await user.click(optional.getByRole("button", { name: "3" }));
+        await user.click(hidden.getByRole("button", { name: "7" }));
+        await user.click(saveButton());
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(required.getByText(REASONING_ERROR)).toBeInTheDocument();
+        expect(optional.queryByText(REASONING_ERROR)).not.toBeInTheDocument();
+        expect(hidden.queryByText(REASONING_ERROR)).not.toBeInTheDocument();
+
+        await user.type(
+          required.getByPlaceholderText("Add your reasoning"),
+          "It is right",
+        );
+        fetchMock.mockResolvedValueOnce(
+          jsonResponse({ saved: [], count: 3, status: "pending" }),
+        );
+        await user.click(saveButton());
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+        expect(JSON.parse(fetchMock.mock.calls[1][1].body).annotations).toEqual(
+          [
+            {
+              evaluator_id: "ev-1",
+              value: { value: true, reasoning: "It is right" },
+            },
+            { evaluator_id: "ev-2", value: { value: 3 } },
+            { evaluator_id: "ev-3", value: { value: 7 } },
+          ],
+        );
+      });
+
+      it("does not ask for reasoning on an uploaded label unticked and ticked again", async () => {
+        const user = setupUser();
+        await renderLabels({
+          evaluators: evaluatorsWithReasoning("required"),
+          annotations: [annotation("ev-1", true), annotation("ev-2", 3)],
+        });
+
+        const correct = cardOf("Correctness").getByRole("button", {
+          name: "Correct",
+        });
+        await user.click(correct);
+        await user.click(correct);
+
+        fetchMock.mockResolvedValueOnce(
+          jsonResponse({ saved: [], count: 2, status: "pending" }),
+        );
+        await user.click(saveButton());
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+        expect(screen.queryByText(REASONING_ERROR)).not.toBeInTheDocument();
+      });
+
+      it("refuses a save when saved reasoning on a required label is cleared", async () => {
+        const user = setupUser();
+        await renderLabels({
+          evaluators: evaluatorsWithReasoning("required"),
+          annotations: [
+            annotation("ev-1", true, "Written earlier"),
+            annotation("ev-2", 3, "Also earlier"),
+          ],
+        });
+
+        await user.clear(
+          cardOf("Correctness").getByPlaceholderText("Add your reasoning"),
+        );
+        await user.click(saveButton());
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(
+          cardOf("Correctness").getByText(REASONING_ERROR),
+        ).toBeInTheDocument();
+      });
+
+      it("refuses a save when the score of an uploaded label with no reasoning changes", async () => {
+        const user = setupUser();
+        await renderLabels({
+          evaluators: evaluatorsWithReasoning("required"),
+          annotations: [annotation("ev-1", true), annotation("ev-2", 3)],
+        });
+
+        await user.click(cardOf("Quality").getByRole("button", { name: "5" }));
+        await user.click(saveButton());
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(
+          cardOf("Quality").getByText(REASONING_ERROR),
+        ).toBeInTheDocument();
+        expect(
+          cardOf("Correctness").queryByText(REASONING_ERROR),
+        ).not.toBeInTheDocument();
+      });
+
+      it("drops the reasoning error when the uploaded score is put back", async () => {
+        const user = setupUser();
+        await renderLabels({
+          evaluators: evaluatorsWithReasoning("required"),
+          annotations: [annotation("ev-1", true), annotation("ev-2", 3)],
+        });
+
+        await user.click(cardOf("Quality").getByRole("button", { name: "5" }));
+        await user.click(saveButton());
+        expect(
+          cardOf("Quality").getByText(REASONING_ERROR),
+        ).toBeInTheDocument();
+
+        await user.click(cardOf("Quality").getByRole("button", { name: "3" }));
+
+        expect(
+          cardOf("Quality").queryByText(REASONING_ERROR),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 
