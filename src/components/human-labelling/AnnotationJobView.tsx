@@ -1272,7 +1272,7 @@ function AnnotateView({
       >
         {!isAdmin && (
           <GreenBar
-            label="Items done"
+            label="Cases done"
             done={itemsDone}
             total={items.length}
             className="h-1 shrink-0"
@@ -1282,7 +1282,7 @@ function AnnotateView({
           <div className="min-w-0 flex items-center gap-3">
             {currentItem && (
               <h2 className="text-sm font-semibold truncate">
-                {currentItemName || "Item"}
+                {currentItemName || "Case"}
               </h2>
             )}
           </div>
@@ -1295,7 +1295,7 @@ function AnnotateView({
               Previous
             </button>
             <span className="text-sm text-muted-foreground tabular-nums px-2">
-              Item {Math.min(currentIndex + 1, total)} of {total}
+              Case {Math.min(currentIndex + 1, total)} of {total}
             </span>
             <button
               onClick={() => navigateTo(Math.min(total - 1, currentIndex + 1))}
@@ -1424,7 +1424,7 @@ function AnnotateView({
                   >
                     <button
                       onClick={() => navigateTo(i)}
-                      aria-label={`Item ${position}${status ? ` (${status})` : ""}`}
+                      aria-label={`Case ${position}${status ? ` (${status})` : ""}`}
                       className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                         isCurrent
                           ? "border-foreground bg-foreground text-background"
@@ -1457,7 +1457,7 @@ function AnnotateView({
                     >
                       <button
                         onClick={() => navigateTo(i)}
-                        aria-label={`Item ${position}${status ? ` (${status})` : ""}`}
+                        aria-label={`Case ${position}${status ? ` (${status})` : ""}`}
                         className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                           isCurrent
                             ? "border-foreground bg-foreground text-background"
@@ -1479,8 +1479,8 @@ function AnnotateView({
             {!currentItem ? (
               <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground w-full">
                 {filterActive
-                  ? "No items match this filter."
-                  : "No items in this job."}
+                  ? "No cases match this filter."
+                  : "No cases in this job."}
               </div>
             ) : (
               <JobItemColumns
@@ -1546,10 +1546,10 @@ function AnnotateView({
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
               {pendingNavReason === "discard"
-                ? "You made changes to this item but did not press Update. If you leave, those changes are discarded."
+                ? "You made changes to this case but did not press Update. If you leave, those changes are discarded."
                 : pendingNavReason === "reasoning"
-                  ? "This sample cannot be saved yet because some labels still need reasoning. If you leave, your answers will not be saved."
-                  : "This sample is not completely reviewed yet and a few questions are still unanswered. If you leave, your answers will not be saved."}
+                  ? "This case cannot be saved yet because some labels still need reasoning. If you leave, your answers will not be saved."
+                  : "This case is not completely reviewed yet and a few questions are still unanswered. If you leave, your answers will not be saved."}
             </p>
             <div className="mt-5 flex items-center justify-end gap-2 md:gap-3">
               <button
@@ -1688,7 +1688,7 @@ function EvaluatorsPane({
         <textarea
           value={itemComment}
           onChange={(e) => onItemCommentChange(e.target.value)}
-          placeholder="Add any notes about this item"
+          placeholder="Add any notes about this case"
           rows={2}
           className="w-full text-sm rounded-md border border-border bg-background px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20"
         />
@@ -1699,7 +1699,11 @@ function EvaluatorsPane({
   if (evaluators.length === 0) {
     return (
       <div className="space-y-3">
-        <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
+        <ItemDetailsBlock
+          heading="Case details"
+          payload={item.payload}
+          metadata={item.metadata}
+        />
         {commentBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
           No evaluators are attached to this task.
@@ -1825,7 +1829,11 @@ function EvaluatorsPane({
           </div>
         </div>
       )}
-      <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
+      <ItemDetailsBlock
+        heading="Case details"
+        payload={item.payload}
+        metadata={item.metadata}
+      />
       {readOnly && commentBlock}
       {forItem.map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);

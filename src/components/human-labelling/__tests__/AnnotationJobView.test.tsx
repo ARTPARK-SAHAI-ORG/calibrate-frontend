@@ -245,14 +245,14 @@ describe("AnnotationJobView", () => {
       expect(screen.getByText("My Task")).toBeInTheDocument(),
     );
     // item-1 has both evaluators saved, so it starts on item-2.
-    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Case 2 of 2")).toBeInTheDocument();
   });
 
   it("always starts on item 1 in admin / read-only mode even with incomplete items", async () => {
     fetchMock.mockResolvedValue(jsonResponse(jobResponse({ read_only: true })));
     render(<AnnotationJobView token="tok" mode="admin" fillViewport={false} />);
     await waitFor(() =>
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
     );
     // Admin mode hides the top task header row.
     expect(screen.queryByText("My Task")).not.toBeInTheDocument();
@@ -263,20 +263,20 @@ describe("AnnotationJobView", () => {
     fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
     );
 
     await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Case 2 of 2")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Previous" }));
-    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Case 1 of 2")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
 
-    const sidebarButtons = screen.getAllByLabelText(/^Item 2/);
+    const sidebarButtons = screen.getAllByLabelText(/^Case 2/);
     await user.click(sidebarButtons[0]);
-    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Case 2 of 2")).toBeInTheDocument();
   });
 
   it("keeps the address bar pointed at whichever item is open", async () => {
@@ -284,12 +284,12 @@ describe("AnnotationJobView", () => {
     fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
     );
     expect(readUrlParam(ITEM_PARAM)).toBe("item-1");
 
     await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Case 2 of 2")).toBeInTheDocument();
     expect(readUrlParam(ITEM_PARAM)).toBe("item-2");
   });
 
@@ -298,7 +298,7 @@ describe("AnnotationJobView", () => {
     fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("Item 2 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 2 of 2")).toBeInTheDocument(),
     );
   });
 
@@ -307,15 +307,15 @@ describe("AnnotationJobView", () => {
     fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
     );
   });
 
-  it("shows 'No items in this job.' when there are no items", async () => {
+  it("shows 'No cases in this job.' when there are no items", async () => {
     fetchMock.mockResolvedValue(jsonResponse(jobResponse({ items: [] })));
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("No items in this job.")).toBeInTheDocument(),
+      expect(screen.getByText("No cases in this job.")).toBeInTheDocument(),
     );
   });
 
@@ -339,7 +339,7 @@ describe("AnnotationJobView", () => {
     await user.click(submitButton());
 
     await waitFor(() =>
-      expect(screen.getByText("Item 2 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 2 of 2")).toBeInTheDocument(),
     );
     const postCall = fetchMock.mock.calls[1];
     expect(postCall[0]).toBe(
@@ -576,7 +576,7 @@ describe("AnnotationJobView", () => {
     );
 
     await user.type(
-      screen.getByPlaceholderText("Add any notes about this item"),
+      screen.getByPlaceholderText("Add any notes about this case"),
       "A note",
     );
     await user.click(screen.getByRole("button", { name: "Correct" }));
@@ -791,7 +791,7 @@ describe("AnnotationJobView", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
     );
 
     await user.click(screen.getByRole("button", { name: "Correct" }));
@@ -801,7 +801,7 @@ describe("AnnotationJobView", () => {
       jsonResponse({ saved: ["ev-1", "ev-2"], count: 2, status: "pending" }),
     );
     // Jump straight to item 2 via the index list, never touching Submit & Next.
-    const item2Buttons = screen.getAllByLabelText(/^Item 2/);
+    const item2Buttons = screen.getAllByLabelText(/^Case 2/);
     await user.click(item2Buttons[0]);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
@@ -811,7 +811,7 @@ describe("AnnotationJobView", () => {
       { evaluator_id: "ev-1", value: { value: true } },
       { evaluator_id: "ev-2", value: { value: 3 } },
     ]);
-    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Case 2 of 2")).toBeInTheDocument();
   });
 
   it("also auto-submits when leaving via the Next button", async () => {
@@ -819,7 +819,7 @@ describe("AnnotationJobView", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
     );
 
     await user.click(screen.getByRole("button", { name: "Correct" }));
@@ -832,7 +832,7 @@ describe("AnnotationJobView", () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).item_id).toBe("item-1");
-    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Case 2 of 2")).toBeInTheDocument();
   });
 
   it("warns before leaving a partially-answered item and stays on cancel", async () => {
@@ -840,7 +840,7 @@ describe("AnnotationJobView", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
     );
 
     // Answer only one of the two evaluators, then try to move on.
@@ -849,11 +849,11 @@ describe("AnnotationJobView", () => {
 
     expect(screen.getByText("Review incomplete")).toBeInTheDocument();
     // Still on item 1, nothing saved.
-    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Case 1 of 2")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Stay" }));
     expect(screen.queryByText("Review incomplete")).not.toBeInTheDocument();
-    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Case 1 of 2")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -862,7 +862,7 @@ describe("AnnotationJobView", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
     );
 
     await user.click(screen.getByRole("button", { name: "Correct" }));
@@ -871,7 +871,7 @@ describe("AnnotationJobView", () => {
       screen.getByRole("button", { name: "Leave without saving" }),
     );
 
-    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Case 2 of 2")).toBeInTheDocument();
     // Still just the initial GET — the partial answer was never sent.
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -881,11 +881,11 @@ describe("AnnotationJobView", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
     );
 
     await user.type(
-      screen.getByPlaceholderText("Add any notes about this item"),
+      screen.getByPlaceholderText("Add any notes about this case"),
       "work in progress",
     );
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -918,11 +918,11 @@ describe("AnnotationJobView", () => {
     );
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
     );
 
     await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Case 2 of 2")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -951,7 +951,7 @@ describe("AnnotationJobView", () => {
       );
       render(<AnnotationJobView token="tok" mode="public" />);
       await waitFor(() =>
-        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+        expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
       );
     }
     afterEach(() => setSearch(""));
@@ -965,7 +965,7 @@ describe("AnnotationJobView", () => {
       await user.click(screen.getByRole("button", { name: "3" }));
       // Not saved yet, so the item reads as started rather than finished.
       expect(
-        screen.getAllByRole("button", { name: "Item 1 (in progress)" }).length,
+        screen.getAllByRole("button", { name: "Case 1 (in progress)" }).length,
       ).toBeGreaterThan(0);
 
       fetchMock.mockResolvedValueOnce(
@@ -976,17 +976,17 @@ describe("AnnotationJobView", () => {
 
       await waitFor(() =>
         expect(
-          screen.getAllByRole("button", { name: "Item 1 (completed)" }).length,
+          screen.getAllByRole("button", { name: "Case 1 (completed)" }).length,
         ).toBeGreaterThan(0),
       );
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument();
     });
 
     it("sends a null value for a removed saved answer and unmarks the item", async () => {
       const user = setupUser();
       await renderJob();
       expect(
-        screen.getAllByRole("button", { name: "Item 1 (completed)" }).length,
+        screen.getAllByRole("button", { name: "Case 1 (completed)" }).length,
       ).toBeGreaterThan(0);
 
       await user.click(screen.getByRole("button", { name: "Correct" }));
@@ -1002,12 +1002,12 @@ describe("AnnotationJobView", () => {
       ]);
       await waitFor(() =>
         expect(
-          screen.queryByRole("button", { name: "Item 1 (completed)" }),
+          screen.queryByRole("button", { name: "Case 1 (completed)" }),
         ).not.toBeInTheDocument(),
       );
       // The rating is still answered, so the item reads as started.
       expect(
-        screen.getAllByRole("button", { name: "Item 1 (in progress)" }).length,
+        screen.getAllByRole("button", { name: "Case 1 (in progress)" }).length,
       ).toBeGreaterThan(0);
     });
 
@@ -1016,22 +1016,22 @@ describe("AnnotationJobView", () => {
       fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
       render(<AnnotationJobView token="tok" mode="public" />);
       await waitFor(() =>
-        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+        expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
       );
       expect(
-        screen.queryByRole("button", { name: "Item 1 (in progress)" }),
+        screen.queryByRole("button", { name: "Case 1 (in progress)" }),
       ).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Correct" }));
 
       const started = screen.getAllByRole("button", {
-        name: "Item 1 (in progress)",
+        name: "Case 1 (in progress)",
       });
       await user.hover(started[0]);
       // The hover text names only the state, not the item again.
       expect(await screen.findByText("In progress")).toBeInTheDocument();
       expect(
-        screen.queryByText("Item 1 (in progress)"),
+        screen.queryByText("Case 1 (in progress)"),
       ).not.toBeInTheDocument();
     });
 
@@ -1044,11 +1044,11 @@ describe("AnnotationJobView", () => {
       expect(screen.getByText("Discard your changes?")).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Discard changes" }));
 
-      expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+      expect(screen.getByText("Case 2 of 2")).toBeInTheDocument();
       expect(fetchMock).toHaveBeenCalledTimes(1);
       // Back to what was saved, so item 1 is finished again.
       expect(
-        screen.getAllByRole("button", { name: "Item 1 (completed)" }).length,
+        screen.getAllByRole("button", { name: "Case 1 (completed)" }).length,
       ).toBeGreaterThan(0);
     });
 
@@ -1059,7 +1059,7 @@ describe("AnnotationJobView", () => {
       await user.click(screen.getByRole("button", { name: "Next" }));
       await user.click(screen.getByRole("button", { name: "Discard changes" }));
       await user.click(screen.getByRole("button", { name: "Previous" }));
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument();
 
       fetchMock.mockResolvedValueOnce(
         jsonResponse({ saved: [], count: 2, status: "in_progress" }),
@@ -1080,7 +1080,7 @@ describe("AnnotationJobView", () => {
 
       expect(screen.getByText("Discard your changes?")).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Stay" }));
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument();
       expect(fetchMock).toHaveBeenCalledTimes(1);
 
       fetchMock.mockResolvedValueOnce(
@@ -1122,7 +1122,7 @@ describe("AnnotationJobView", () => {
         annotations: [ann("item-1", "ev-1", null), ann("item-1", "ev-2", 3)],
       });
       expect(
-        screen.queryByRole("button", { name: "Item 1 (completed)" }),
+        screen.queryByRole("button", { name: "Case 1 (completed)" }),
       ).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Update" })).toBeEnabled();
       expect(screen.getByText("1 of 2 answered")).toBeInTheDocument();
@@ -1134,7 +1134,7 @@ describe("AnnotationJobView", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public" />);
     await waitFor(() =>
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
     );
 
     await user.click(screen.getByRole("button", { name: "Correct" }));
@@ -1146,7 +1146,7 @@ describe("AnnotationJobView", () => {
     await waitFor(() =>
       expect(screen.getByText("Save failed (500)")).toBeInTheDocument(),
     );
-    expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Case 1 of 2")).toBeInTheDocument();
   });
 
   describe("admin value filter", () => {
@@ -1182,7 +1182,7 @@ describe("AnnotationJobView", () => {
         <AnnotationJobView token="tok" mode="admin" fillViewport={false} />,
       );
       await waitFor(() =>
-        expect(screen.getByText(`Item 1 of ${itemCount}`)).toBeInTheDocument(),
+        expect(screen.getByText(`Case 1 of ${itemCount}`)).toBeInTheDocument(),
       );
       return user;
     };
@@ -1208,7 +1208,7 @@ describe("AnnotationJobView", () => {
       fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
       render(<AnnotationJobView token="tok" mode="public" />);
       await waitFor(() =>
-        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+        expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
       );
       expect(queryAddFilter()).not.toBeInTheDocument();
     });
@@ -1221,7 +1221,7 @@ describe("AnnotationJobView", () => {
         <AnnotationJobView token="tok" mode="admin" fillViewport={false} />,
       );
       await waitFor(() =>
-        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+        expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
       );
       expect(queryAddFilter()).not.toBeInTheDocument();
     });
@@ -1240,7 +1240,7 @@ describe("AnnotationJobView", () => {
         />,
       );
       await waitFor(() =>
-        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+        expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
       );
       expect(queryAddFilter()).not.toBeInTheDocument();
     });
@@ -1252,10 +1252,10 @@ describe("AnnotationJobView", () => {
       expect(
         screen.getByRole("button", { name: "Quality is 5" }),
       ).toBeInTheDocument();
-      expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+      expect(screen.getByText("Case 1 of 1")).toBeInTheDocument();
       // Only item-2 matched, and it keeps its original number.
-      expect(screen.getAllByLabelText(/^Item 2/)).toHaveLength(2);
-      expect(screen.queryByLabelText(/^Item 1/)).not.toBeInTheDocument();
+      expect(screen.getAllByLabelText(/^Case 2/)).toHaveLength(2);
+      expect(screen.queryByLabelText(/^Case 1/)).not.toBeInTheDocument();
       expect(screen.getByText("Item Two")).toBeInTheDocument();
     });
 
@@ -1266,8 +1266,8 @@ describe("AnnotationJobView", () => {
       expect(
         screen.getByRole("button", { name: "Correctness is Wrong" }),
       ).toBeInTheDocument();
-      expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
-      expect(screen.getAllByLabelText(/^Item 2/)).toHaveLength(2);
+      expect(screen.getByText("Case 1 of 1")).toBeInTheDocument();
+      expect(screen.getAllByLabelText(/^Case 2/)).toHaveLength(2);
     });
 
     it("keeps only the items matching every filter when two are on", async () => {
@@ -1294,14 +1294,14 @@ describe("AnnotationJobView", () => {
 
       await addFilter(user, "Correctness", "Correct");
       // Correct alone still leaves item-1 and item-3.
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument();
 
       await addFilter(user, "Quality", "5");
-      expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+      expect(screen.getByText("Case 1 of 1")).toBeInTheDocument();
       expect(screen.getByText("Item Three")).toBeInTheDocument();
-      expect(screen.getAllByLabelText(/^Item 3/)).toHaveLength(2);
-      expect(screen.queryByLabelText(/^Item 1/)).not.toBeInTheDocument();
-      expect(screen.queryByLabelText(/^Item 2/)).not.toBeInTheDocument();
+      expect(screen.getAllByLabelText(/^Case 3/)).toHaveLength(2);
+      expect(screen.queryByLabelText(/^Case 1/)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^Case 2/)).not.toBeInTheDocument();
     });
 
     it("says nothing matches when no item has the picked value", async () => {
@@ -1309,21 +1309,21 @@ describe("AnnotationJobView", () => {
       await addFilter(user, "Quality", "4");
 
       expect(
-        screen.getByText("No items match this filter."),
+        screen.getByText("No cases match this filter."),
       ).toBeInTheDocument();
-      expect(screen.getByText("Item 0 of 0")).toBeInTheDocument();
+      expect(screen.getByText("Case 0 of 0")).toBeInTheDocument();
     });
 
     it("restores the full list when the filter tag is removed", async () => {
       const user = await renderAdmin();
       await addFilter(user, "Quality", "5");
-      expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+      expect(screen.getByText("Case 1 of 1")).toBeInTheDocument();
 
       await user.click(
         screen.getByRole("button", { name: "Remove Quality is 5" }),
       );
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
-      expect(screen.getAllByLabelText(/^Item 1/)).toHaveLength(2);
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument();
+      expect(screen.getAllByLabelText(/^Case 1/)).toHaveLength(2);
       expect(screen.getByText("Item One")).toBeInTheDocument();
     });
 
@@ -1337,7 +1337,7 @@ describe("AnnotationJobView", () => {
       await addFilter(user, "Quality", "5");
       await user.click(screen.getByRole("button", { name: "Clear all" }));
 
-      expect(screen.getByText("Item 1 of 2")).toBeInTheDocument();
+      expect(screen.getByText("Case 1 of 2")).toBeInTheDocument();
       expect(
         screen.queryByText("Correctness is Wrong"),
       ).not.toBeInTheDocument();
@@ -1372,7 +1372,7 @@ describe("AnnotationJobView", () => {
         />,
       );
       await waitFor(() =>
-        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+        expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
       );
       expect(
         onVisibleItemsChange.mock.calls
@@ -1401,14 +1401,14 @@ describe("AnnotationJobView", () => {
         />,
       );
       await waitFor(() =>
-        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+        expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
       );
 
       await user.click(screen.getByRole("button", { name: "+ Add filter" }));
       await user.click(screen.getByRole("button", { name: "Quality ›" }));
       await user.click(screen.getByRole("button", { name: "5" }));
 
-      expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
+      expect(screen.getByText("Case 1 of 1")).toBeInTheDocument();
       expect(
         onVisibleItemsChange.mock.calls
           .at(-1)![0]
@@ -1426,7 +1426,7 @@ describe("AnnotationJobView", () => {
         />,
       );
       await waitFor(() =>
-        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+        expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
       );
       expect(filterStrips()).toHaveLength(0);
     });
@@ -1549,12 +1549,12 @@ describe("AnnotationJobView", () => {
       // so the view opens on item 2. Go back to item 1, answer the optional
       // evaluator there, and move on: the annotator is asked, so the new
       // answer is never dropped without them knowing.
-      await user.click(screen.getAllByLabelText(/^Item 1/)[0]);
+      await user.click(screen.getAllByLabelText(/^Case 1/)[0]);
       await waitFor(() =>
-        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+        expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
       );
       await user.click(screen.getByRole("button", { name: "3" }));
-      await user.click(screen.getAllByLabelText(/^Item 2/)[0]);
+      await user.click(screen.getAllByLabelText(/^Case 2/)[0]);
 
       expect(screen.getByText("Discard your changes?")).toBeInTheDocument();
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -1593,12 +1593,12 @@ describe("AnnotationJobView", () => {
       );
       render(<AnnotationJobView token="tok" mode="public" />);
       await waitFor(() =>
-        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+        expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
       );
 
       await user.click(screen.getByRole("button", { name: "Submit & Next" }));
 
-      expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+      expect(screen.getByText("Case 2 of 2")).toBeInTheDocument();
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   });
@@ -1624,7 +1624,7 @@ describe("AnnotationJobView", () => {
         expect(screen.getByText("My Task")).toBeInTheDocument(),
       );
       expect(
-        screen.getByPlaceholderText("Add any notes about this item"),
+        screen.getByPlaceholderText("Add any notes about this case"),
       ).toBeInTheDocument();
       expect(
         screen.queryByPlaceholderText("Add your reasoning"),
@@ -1644,7 +1644,7 @@ describe("AnnotationJobView", () => {
         expect(screen.getByText("My Task")).toBeInTheDocument(),
       );
       expect(
-        screen.queryByPlaceholderText("Add any notes about this item"),
+        screen.queryByPlaceholderText("Add any notes about this case"),
       ).not.toBeInTheDocument();
       expect(screen.queryByText("Comments (optional)")).not.toBeInTheDocument();
       // The reasons are untouched by this setting.
@@ -1663,7 +1663,7 @@ describe("AnnotationJobView", () => {
         expect(screen.getByText("My Task")).toBeInTheDocument(),
       );
       expect(
-        screen.getByPlaceholderText("Add any notes about this item"),
+        screen.getByPlaceholderText("Add any notes about this case"),
       ).toBeInTheDocument();
     });
 
@@ -1680,7 +1680,7 @@ describe("AnnotationJobView", () => {
       ).not.toBeInTheDocument();
       // The comments box is untouched by this setting.
       expect(
-        screen.getByPlaceholderText("Add any notes about this item"),
+        screen.getByPlaceholderText("Add any notes about this case"),
       ).toBeInTheDocument();
     });
 
@@ -1778,7 +1778,7 @@ describe("AnnotationJobView", () => {
       );
       render(<AnnotationJobView token="tok" mode="public" />);
       await waitFor(() =>
-        expect(screen.getByText("Item 1 of 2")).toBeInTheDocument(),
+        expect(screen.getByText("Case 1 of 2")).toBeInTheDocument(),
       );
 
       await user.click(screen.getByRole("button", { name: "Correct" }));
@@ -1788,14 +1788,14 @@ describe("AnnotationJobView", () => {
       // The annotator is not trapped: they are told why and can move on.
       expect(
         screen.getByText(
-          "This sample cannot be saved yet because some labels still need reasoning. If you leave, your answers will not be saved.",
+          "This case cannot be saved yet because some labels still need reasoning. If you leave, your answers will not be saved.",
         ),
       ).toBeInTheDocument();
       expect(fetchMock).toHaveBeenCalledTimes(1);
       await user.click(
         screen.getByRole("button", { name: "Leave without saving" }),
       );
-      expect(screen.getByText("Item 2 of 2")).toBeInTheDocument();
+      expect(screen.getByText("Case 2 of 2")).toBeInTheDocument();
     });
 
     it("does not demand reasoning for a label that arrived already answered", async () => {
@@ -2105,7 +2105,7 @@ describe("AnnotationJobView", () => {
     );
     const user = setupUser();
     render(<AnnotationJobView token="tok" mode="public" />);
-    const heading = await screen.findByRole("button", { name: "Item details" });
+    const heading = await screen.findByRole("button", { name: "Case details" });
     expect(screen.queryByText("Some context")).not.toBeInTheDocument();
     await user.click(heading);
     expect(screen.getByText("Some context")).toBeInTheDocument();
@@ -2130,7 +2130,7 @@ describe("AnnotationJobView", () => {
     const user = setupUser();
     render(<AnnotationJobView token="tok" mode="public" />);
     await user.click(
-      await screen.findByRole("button", { name: "Item details" }),
+      await screen.findByRole("button", { name: "Case details" }),
     );
     expect(screen.getByText("Metadata")).toBeInTheDocument();
     expect(screen.getByText("source")).toBeInTheDocument();
@@ -2435,7 +2435,7 @@ describe("AnnotationJobView message versions", () => {
       await user.keyboard("{ArrowDown}");
       expect(screen.getByText("Item Two")).toBeInTheDocument();
       await user.click(
-        screen.getByPlaceholderText("Add any notes about this item"),
+        screen.getByPlaceholderText("Add any notes about this case"),
       );
       await user.keyboard("{ArrowUp}");
       expect(screen.getByText("Item Two")).toBeInTheDocument();
@@ -2445,7 +2445,7 @@ describe("AnnotationJobView message versions", () => {
       fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
       const user = setupUser();
       render(<AnnotationJobView token="tok" mode="public" />);
-      const bar = await screen.findByRole("progressbar", { name: "Items done" });
+      const bar = await screen.findByRole("progressbar", { name: "Cases done" });
       expect(bar).toHaveAttribute("aria-valuenow", "0");
 
       await user.click(screen.getByRole("button", { name: "Correct" }));
@@ -2675,7 +2675,7 @@ describe("AnnotationJobView message versions", () => {
         jsonResponse(jobResponse({ items: [itemWithDetails] })),
       );
       render(<AnnotationJobView token="tok" mode="public" />);
-      const details = await screen.findByText("Item details");
+      const details = await screen.findByText("Case details");
       const question = screen.getByLabelText("Question 1 of 2");
       const comments = screen.getByText("Comments (optional)");
       expect(
@@ -2850,7 +2850,7 @@ describe("AnnotationJobView intro and walkthrough", () => {
     const titles = runTourMock.mock.calls[0][0].steps.map((step) => step.title);
     expect(titles).toEqual([
       "Read the conversation",
-      "Open Item details for more",
+      "Case details",
       "Binary questions",
       "Rating questions",
       "Add a reason",

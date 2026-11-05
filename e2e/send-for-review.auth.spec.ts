@@ -312,9 +312,10 @@ test.describe("Send for review (authenticated, real backend)", () => {
           .click({ timeout: 45000 });
       // Wait for the items to be on screen, so "no button" is a real absence
       // and not a page that had not loaded yet.
-      await expect(page.getByText("Item 1 of 3")).toBeVisible({
-        timeout: 45000,
-      });
+      // The labelling job pages say "case"; the evaluation run page says "item".
+      await expect(
+        page.getByText(url === runUrl ? "Item 1 of 3" : "Case 1 of 3"),
+      ).toBeVisible({ timeout: 45000 });
       await expect(
         page.getByRole("button", { name: /for review/ }),
         `"Send for review" must not appear on ${url}`,
