@@ -363,7 +363,7 @@ body {
 /* The reason box lighting up as it appears, once an answer has been picked. */
 @keyframes reason-box-appear {
   0%,
-  70% {
+  40% {
     box-shadow: 0 0 0 3px rgb(245 158 11 / 0.7);
     border-color: rgb(245 158 11);
   }
@@ -373,5 +373,5 @@ body {
 }
 
 .reason-box-appear {
-  animation: reason-box-appear 3s ease-out;
+  animation: reason-box-appear 1.5s ease-out;
 }
