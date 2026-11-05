@@ -68,11 +68,11 @@ function reasonDescription(questions: LabellingTourQuestion[]): string | null {
   const required = modes.filter((m) => m === "required").length;
   const optional = modes.filter((m) => m === "optional").length;
   if (required + optional === 0) return null;
-  const opens = "After you answer, a box opens for your reason.";
-  if (required === 0) return `${opens} A reason is optional.`;
+  const opens = "After you answer, a box opens for your reason";
+  if (required === 0) return opens;
   if (optional === 0 && required === modes.length)
-    return `${opens} You must write one before you can submit.`;
-  return `${opens} Some questions need one before you can submit.`;
+    return `${opens}. You must write one before you can submit.`;
+  return `${opens}. Some questions need one before you can submit.`;
 }
 
 export function buildLabellingJobTour({
@@ -147,7 +147,7 @@ export function buildLabellingJobTour({
       anchor: '[data-tutorial="job-comments"]',
       side: "left",
       title: "Leave a comment",
-      description: "Add any notes about the item here. This is optional.",
+      description: "Add any notes about the item here",
     });
   if (questions.length > 0)
     steps.push({

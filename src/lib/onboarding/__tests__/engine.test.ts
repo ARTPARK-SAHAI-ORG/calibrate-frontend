@@ -307,6 +307,30 @@ describe("onboarding engine", () => {
   it("injects a Skip tour button that ends the tour", async () => {
     await runTour({
       id: "demo",
+      steps: [
+        { title: "One", description: "First" },
+        { title: "Two", description: "Last" },
+      ],
+    });
+
+    const footer = document.createElement("div");
+    capturedDriverConfig?.onPopoverRender?.({
+      wrapper: document.createElement("div"),
+      footer,
+    });
+
+    const skip = footer.querySelector<HTMLButtonElement>(
+      ".calibrate-tour-skip",
+    );
+    expect(skip?.textContent).toBe("Skip tour");
+    skip?.click();
+
+    expect(getTourStatus("demo")).toBe("skipped");
+  });
+
+  it("leaves Skip tour off the last card", async () => {
+    await runTour({
+      id: "demo",
       steps: [{ title: "One", description: "Only" }],
     });
 
@@ -316,11 +340,7 @@ describe("onboarding engine", () => {
       footer,
     });
 
-    const skip = footer.querySelector<HTMLButtonElement>(".calibrate-tour-skip");
-    expect(skip?.textContent).toBe("Skip tour");
-    skip?.click();
-
-    expect(getTourStatus("demo")).toBe("skipped");
+    expect(footer.querySelector(".calibrate-tour-skip")).toBeNull();
   });
 
   it("shows the step's place only on a tour that asks for it, and keeps it current", async () => {

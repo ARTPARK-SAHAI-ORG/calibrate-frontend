@@ -195,7 +195,13 @@ export async function runTour(tour: Tour): Promise<void> {
           nav.className = "driver-popover-navigation-btns";
           footer.appendChild(nav);
         }
-        if (!nav.querySelector(".calibrate-tour-skip")) {
+        // Nothing is left to skip on the last card of a tour with a button to end it.
+        const step = active.tour.steps[active.index];
+        const lastCard =
+          active.index === active.tour.steps.length - 1 && !step.autoAdvance;
+        if (lastCard) {
+          nav.querySelector(".calibrate-tour-skip")?.remove();
+        } else if (!nav.querySelector(".calibrate-tour-skip")) {
           const skip = document.createElement("button");
           skip.type = "button";
           skip.className = "calibrate-tour-skip";

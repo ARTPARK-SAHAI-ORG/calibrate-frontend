@@ -66,7 +66,9 @@ describe("buildLabellingJobTour", () => {
   });
 
   it("adds Item details and comments only when they are there", () => {
-    const steps = titles(build({ hasItemDetails: true, commentsEnabled: true }));
+    const steps = titles(
+      build({ hasItemDetails: true, commentsEnabled: true }),
+    );
     expect(steps).toContain("Open Item details for more");
     expect(steps).toContain("Leave a comment");
   });
@@ -75,8 +77,12 @@ describe("buildLabellingJobTour", () => {
     const steps = build({ questions: [binary, rating] });
     expect(titles(steps)).toContain("Binary questions");
     expect(titles(steps)).toContain("Rating questions");
-    expect(steps.find((s) => s.title === "Binary questions")?.anchor).toBe("#question-b");
-    expect(steps.find((s) => s.title === "Rating questions")?.anchor).toBe("#question-r");
+    expect(steps.find((s) => s.title === "Binary questions")?.anchor).toBe(
+      "#question-b",
+    );
+    expect(steps.find((s) => s.title === "Rating questions")?.anchor).toBe(
+      "#question-r",
+    );
   });
 
   it("explains ratings alone when a job has only ratings", () => {
@@ -87,13 +93,16 @@ describe("buildLabellingJobTour", () => {
   });
 
   it.each([
-    ["optional", "optional", "A reason is optional"],
-    ["required", "required", "You must write one"],
-  ] as const)("words the reason step for %s", (_n, reasoningMode, words) => {
+    ["optional", "After you answer, a box opens for your reason"],
+    [
+      "required",
+      "After you answer, a box opens for your reason. You must write one before you can submit.",
+    ],
+  ] as const)("words the reason step for %s", (reasoningMode, words) => {
     const step = build({ questions: [{ ...binary, reasoningMode }] }).find(
       (s) => s.title === "Add a reason",
     );
-    expect(step?.description).toContain(words);
+    expect(step?.description).toBe(words);
   });
 
   it("says some need a reason when a job mixes them, and points at one that has a box", () => {
@@ -105,7 +114,7 @@ describe("buildLabellingJobTour", () => {
       ],
     }).find((s) => s.title === "Add a reason");
     expect(step?.description).toContain("Some questions need one");
-    expect(step?.anchor).toBe("#question-r");
+    expect(step?.anchor).toBe('#question-r [data-tutorial="reason-box"]');
   });
 
   it("shows the question answered for the reason step only, and undoes it", async () => {
