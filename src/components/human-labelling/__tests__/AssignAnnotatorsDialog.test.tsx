@@ -807,6 +807,20 @@ describe("AssignAnnotatorsDialog", () => {
     expect(await screen.findByText("Copy to all labels")).toBeInTheDocument();
   });
 
+  it("colours each dropdown by its choice", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    expect(reasoningOn("Relevance")).toHaveClass("bg-blue-500/10!");
+    await user.selectOptions(reasoningOn("Relevance"), "Required");
+    expect(reasoningOn("Relevance")).toHaveClass("bg-amber-500/10!");
+    expect(reasoningOn("Fluency")).toHaveClass("bg-blue-500/10!");
+    await user.selectOptions(reasoningOn("Fluency"), "Do not show");
+    expect(reasoningOn("Fluency")).toHaveClass("bg-muted!");
+  });
+
   it("changes only the label whose dropdown was used", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValue(annotators);

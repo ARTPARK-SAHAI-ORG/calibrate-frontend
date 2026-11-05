@@ -16,9 +16,9 @@ type DuplicateIconButtonProps = {
   disabled?: boolean;
   /** Extra classes appended to the base styling. */
   className?: string;
-  /** Where the tooltip opens. Use a side when rows of these sit one above the
-   *  other, so it does not cover the button above. */
-  tooltipPosition?: "top" | "right";
+  /** The pointer moves through the tooltip. Use it when rows of these sit one
+   *  above the other, so the tooltip never blocks the button above. */
+  tooltipPassThrough?: boolean;
 };
 
 /**
@@ -34,10 +34,10 @@ export function DuplicateIconButton({
   loading = false,
   disabled = false,
   className = "",
-  tooltipPosition = "top",
+  tooltipPassThrough = false,
 }: DuplicateIconButtonProps) {
   return (
-    <Tooltip content={tooltip} position={tooltipPosition}>
+    <Tooltip content={tooltip} passThrough={tooltipPassThrough}>
       <button
         type="button"
         disabled={loading || disabled}

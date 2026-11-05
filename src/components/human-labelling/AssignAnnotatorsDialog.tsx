@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ClippedText } from "@/components/ui/ClippedText";
 import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
+import { CheckCircleIcon, GearIcon, UserIcon } from "@/components/icons";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
 import { apiClient } from "@/lib/api";
@@ -56,6 +57,14 @@ const REASONING_OPTIONS: { value: ReasoningMode; label: string }[] = [
   { value: "required", label: "Required" },
   { value: "hidden", label: "Do not show" },
 ];
+
+const REASONING_TONES: Record<ReasoningMode, string> = {
+  required:
+    "bg-amber-500/10! border-amber-500/40! text-amber-800! dark:text-amber-300!",
+  optional:
+    "bg-blue-500/10! border-blue-500/40! text-blue-800! dark:text-blue-300!",
+  hidden: "bg-muted! text-muted-foreground!",
+};
 
 export type LabellingJobSettings = {
   comments_enabled: boolean;
@@ -401,7 +410,10 @@ export function AssignAnnotatorsDialog({
               }`}
             >
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-base font-semibold text-foreground">
+                <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
+                  <span className="w-7 h-7 flex items-center justify-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                    <UserIcon className="w-4 h-4" />
+                  </span>
                   Annotators
                 </h3>
                 {/* With none yet the button sits in the placeholder below. */}
@@ -551,7 +563,11 @@ export function AssignAnnotatorsDialog({
                       ) : (
                         <div
                           key={a.uuid}
-                          className="flex items-center gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors"
+                          className={`flex items-center gap-3 px-3 py-2 rounded-md border transition-colors ${
+                            picked.has(a.uuid)
+                              ? "border-blue-500/40 bg-blue-500/5"
+                              : "border-border hover:bg-muted/30"
+                          }`}
                         >
                           <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
                             <input
@@ -615,7 +631,10 @@ export function AssignAnnotatorsDialog({
 
             {showEvaluatorChoice && (
               <div className="space-y-2 flex flex-col min-h-0">
-                <h3 className="text-base font-semibold text-foreground">
+                <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
+                  <span className="w-7 h-7 flex items-center justify-center rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                    <CheckCircleIcon className="w-4 h-4" />
+                  </span>
                   Labels
                 </h3>
                 <p className="text-xs text-muted-foreground">
@@ -658,7 +677,11 @@ export function AssignAnnotatorsDialog({
                     return (
                       <label
                         key={ev.uuid}
-                        className="flex items-start gap-3 px-3 py-2 rounded-md border border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                        className={`flex items-start gap-3 px-3 py-2 rounded-md border transition-colors cursor-pointer ${
+                          checked
+                            ? "border-violet-500/40 bg-violet-500/5"
+                            : "border-border hover:bg-muted/30"
+                        }`}
                       >
                         <span className="flex h-5 items-center flex-shrink-0">
                           <input
@@ -717,7 +740,10 @@ export function AssignAnnotatorsDialog({
             {/* Always its own column, beside annotators (and labels, when
                 the task has more than one label to pick between). */}
             <div className="space-y-4 flex flex-col min-h-0">
-              <h3 className="text-base font-semibold text-foreground">
+              <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
+                <span className="w-7 h-7 flex items-center justify-center rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <GearIcon className="w-4 h-4" />
+                </span>
                 Settings
               </h3>
               <div className="space-y-5">
@@ -764,7 +790,7 @@ export function AssignAnnotatorsDialog({
                                 [ev.uuid]: e.target.value as ReasoningMode,
                               }))
                             }
-                            className="cursor-pointer disabled:cursor-not-allowed"
+                            className={`cursor-pointer disabled:cursor-not-allowed ${REASONING_TONES[reasoningModes[ev.uuid] ?? "optional"]}`}
                             wrapperClassName="w-36 shrink-0"
                           >
                             {REASONING_OPTIONS.map((option) => (
@@ -776,7 +802,7 @@ export function AssignAnnotatorsDialog({
                           {shownLabels.length > 1 && (
                             <DuplicateIconButton
                               tooltip="Copy to all labels"
-                              tooltipPosition="right"
+                              tooltipPassThrough
                               disabled={submitting}
                               className="shrink-0"
                               onClick={() =>
