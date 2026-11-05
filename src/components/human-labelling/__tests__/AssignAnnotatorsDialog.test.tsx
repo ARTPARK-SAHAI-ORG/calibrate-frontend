@@ -813,10 +813,10 @@ describe("AssignAnnotatorsDialog", () => {
     renderDialog();
     await screen.findByText("Alice");
 
-    expect(reasoningOn("Relevance")).toHaveClass("bg-blue-500/10!");
+    expect(reasoningOn("Relevance")).toHaveClass("bg-emerald-500/10!");
     await user.selectOptions(reasoningOn("Relevance"), "Required");
     expect(reasoningOn("Relevance")).toHaveClass("bg-amber-500/10!");
-    expect(reasoningOn("Fluency")).toHaveClass("bg-blue-500/10!");
+    expect(reasoningOn("Fluency")).toHaveClass("bg-emerald-500/10!");
     await user.selectOptions(reasoningOn("Fluency"), "Do not show");
     expect(reasoningOn("Fluency")).toHaveClass("bg-muted!");
   });

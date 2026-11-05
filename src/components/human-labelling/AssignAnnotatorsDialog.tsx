@@ -60,10 +60,10 @@ const REASONING_OPTIONS: { value: ReasoningMode; label: string }[] = [
 
 const REASONING_TONES: Record<ReasoningMode, string> = {
   required:
-    "bg-amber-500/10! border-amber-500/40! text-amber-800! dark:text-amber-300!",
+    "bg-amber-500/10! border-amber-500/40! text-amber-800! dark:text-amber-300! focus:ring-amber-500/40!",
   optional:
-    "bg-blue-500/10! border-blue-500/40! text-blue-800! dark:text-blue-300!",
-  hidden: "bg-muted! text-muted-foreground!",
+    "bg-emerald-500/10! border-emerald-500/40! text-emerald-800! dark:text-emerald-300! focus:ring-emerald-500/40!",
+  hidden: "bg-muted! text-muted-foreground! focus:ring-border!",
 };
 
 export type LabellingJobSettings = {
@@ -741,7 +741,7 @@ export function AssignAnnotatorsDialog({
                 the task has more than one label to pick between). */}
             <div className="space-y-4 flex flex-col min-h-0">
               <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-                <span className="w-7 h-7 flex items-center justify-center rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                <span className="w-7 h-7 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400">
                   <GearIcon className="w-4 h-4" />
                 </span>
                 Settings
