@@ -1717,17 +1717,7 @@ function EvaluatorsPane({
           );
         }
         return (
-          <div
-            key={k}
-            id={`question-${ev.uuid}`}
-            className={
-              missingAnswerKeys.has(k)
-                ? "rounded-xl ring-2 ring-red-500"
-                : ev === nextQuestion
-                  ? "rounded-lg ring-2 ring-foreground/60"
-                  : undefined
-            }
-          >
+          <div key={k} id={`question-${ev.uuid}`}>
             <EvaluatorVerdictCard
               mode="write"
               name={ev.name}
@@ -1737,6 +1727,8 @@ function EvaluatorsPane({
                 number: questions.indexOf(ev) + 1,
                 total: questions.length,
               }}
+              answerMissing={missingAnswerKeys.has(k)}
+              isNextQuestion={ev === nextQuestion}
               outputType={outputType}
               evaluatorUuid={ev.uuid}
               scaleMin={scaleMin}
@@ -1754,11 +1746,6 @@ function EvaluatorsPane({
               falseDescription={falseDescription}
               ratingScale={ratingScale}
             />
-            {missingAnswerKeys.has(k) && (
-              <p className="px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400">
-                This question needs an answer
-              </p>
-            )}
           </div>
         );
       })}

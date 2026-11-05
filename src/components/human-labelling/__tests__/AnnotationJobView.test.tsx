@@ -2511,8 +2511,8 @@ describe("AnnotationJobView message versions", () => {
         <AnnotationJobView token="tok" mode="public" />,
       );
       await screen.findByText("Correctness");
-      const first = container.querySelector("#question-ev-1");
-      const second = container.querySelector("#question-ev-2");
+      const first = container.querySelector("#question-ev-1 > div");
+      const second = container.querySelector("#question-ev-2 > div");
       expect(first).toHaveClass("ring-foreground/60");
       expect(second).not.toHaveClass("ring-foreground/60");
       await user.click(screen.getByRole("button", { name: "Correct" }));

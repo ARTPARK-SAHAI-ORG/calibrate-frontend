@@ -43,6 +43,10 @@ type CommonProps = {
    * name a heading above a quieter description, and draws the number in a
    * circle that fills in once answered, whichever answer was picked. A list of one draws no circle. */
   question?: { number: number; total: number };
+  /** Marks the card red and says it needs an answer. */
+  answerMissing?: boolean;
+  /** Outlines the card as the next one to answer. */
+  isNextQuestion?: boolean;
   /** Optional version label (e.g. "v3") shown as a small monospace pill
    * next to the name. Use this when annotators are evaluating against a
    * specific evaluator version so it stays visually distinct from the
@@ -210,7 +214,15 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
   );
 
   return (
-    <div className={`${surface} p-3 space-y-3`}>
+    <div
+      className={`${surface} p-3 space-y-3 ${
+        props.answerMissing
+          ? "ring-2 ring-red-500"
+          : props.isNextQuestion
+            ? "ring-2 ring-foreground/60"
+            : ""
+      }`}
+    >
       {/* Header: name + verdict pill + toggle on one row; description
           on its own row below so it can use the full card width. */}
       <div className="space-y-1">
@@ -322,6 +334,12 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             />
           )}
         </>
+      )}
+
+      {props.answerMissing && (
+        <p className="text-xs font-medium text-red-600 dark:text-red-400">
+          This question needs an answer
+        </p>
       )}
 
       {props.mode === "read" && open && toggleKind && (
