@@ -61,7 +61,7 @@ describe("ToolCallItemPane", () => {
     ).toBeInTheDocument();
   });
 
-  it("does not render the expected tool calls (that's the other side's job now)", () => {
+  it("draws the expected tool call under the conversation, headed as the expected answer", () => {
     render(
       <ToolCallItemPane
         payload={{
@@ -73,8 +73,8 @@ describe("ToolCallItemPane", () => {
         }}
       />,
     );
-    expect(screen.queryByText("Expected Tool Calls")).not.toBeInTheDocument();
-    expect(screen.queryByText("book_flight")).not.toBeInTheDocument();
+    expect(screen.getByText("Expected answer")).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
   });
 
   it("never shows a pass/fail badge — a person is the one judging this item", () => {
@@ -123,5 +123,14 @@ describe("ToolCallItemPane", () => {
     );
     expect(screen.getByText("Hi")).toBeInTheDocument();
     expect(screen.queryByText("English")).not.toBeInTheDocument();
+  });
+
+  it("still draws the expected answer when the agent's side is empty", () => {
+    render(
+      <ToolCallItemPane
+        payload={{ expected_tool_calls: [{ tool: "book_train", arguments: {} }] }}
+      />,
+    );
+    expect(screen.getByText("Expected answer")).toBeInTheDocument();
   });
 });

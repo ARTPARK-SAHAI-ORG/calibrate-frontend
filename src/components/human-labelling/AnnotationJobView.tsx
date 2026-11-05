@@ -7,6 +7,9 @@ import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
 import { ItemDetailsBlock } from "./ItemDetailsBlock";
+import { JobInfoButton } from "./JobInfoButton";
+import { ArrowDownIcon } from "@/components/icons";
+import { useDialogNavKeys } from "@/hooks/useDialogNavKeys";
 import { JobItemColumns } from "./JobItemColumns";
 import {
   getBinaryDescription,
@@ -19,7 +22,6 @@ import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
-import { ExpectedToolCalls } from "./item-panes/ExpectedToolCalls";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
 import {
   ItemValueFilter,
@@ -181,6 +183,44 @@ function evaluatorsForItem(
  * Everything that asks "is this item finished?" goes through here. */
 function requiredOnly(evaluators: Evaluator[]): Evaluator[] {
   return evaluators.filter((ev) => ev.is_optional !== true);
+}
+
+function hasFieldValue(f?: FieldValue): boolean {
+  return !!f && f.value !== undefined && f.value !== null && f.value !== "";
+}
+
+function GreenBar({
+  label,
+  done,
+  total,
+  className,
+}: {
+  label: string;
+  done: number;
+  total: number;
+  className: string;
+}) {
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={total}
+      aria-valuenow={done}
+      className={`bg-muted ${className}`}
+    >
+      <div
+        className="h-full bg-green-500 transition-[width] duration-300"
+        style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }}
+      />
+    </div>
+  );
+}
+
+function drawableOutputType(ev: Evaluator): "binary" | "rating" | null {
+  return ev.output_type === "binary" || ev.output_type === "rating"
+    ? ev.output_type
+    : null;
 }
 
 function readSavedComment(v: unknown): string {
@@ -691,8 +731,6 @@ function AnnotateView({
 
   // Shared answered / dirty checks, so the submit guard, the navigate guard,
   // and the button label all agree on what counts as answered or edited.
-  const hasFieldValue = (f?: FieldValue) =>
-    !!f && f.value !== undefined && f.value !== null && f.value !== "";
   const evaluatorAnswered = (itemId: string, ev: Evaluator) =>
     hasFieldValue(fields[fieldKey(itemId, ev.uuid)]);
 
@@ -748,16 +786,33 @@ function AnnotateView({
     items.map((it) => [it.uuid, itemListStatus(it.uuid)]),
   );
 
+  const itemsDone = items.filter(
+    (it) => statusByItem.get(it.uuid) === "completed",
+  ).length;
+
   // Labels whose reasoning box is empty, marked red after a save was
   // refused. Emptied as soon as the annotator starts typing in one.
   const [missingReasoningKeys, setMissingReasoningKeys] = useState<
     Set<FieldKey>
   >(new Set());
   const evaluatorsPaneRef = useRef<HTMLDivElement | null>(null);
+  // Required questions marked red after Submit was pressed without them.
+  // Emptied one by one as they are answered, and when the item changes.
+  const [missingAnswerKeys, setMissingAnswerKeys] = useState<Set<FieldKey>>(
+    new Set(),
+  );
 
   const setField = (key: FieldKey, partial: Partial<FieldValue>) => {
     // Removing an answer empties its reasoning box too.
     if (partial.value === null) partial = { value: null, comment: "" };
+    if (partial.value !== undefined && partial.value !== null) {
+      setMissingAnswerKeys((prev) => {
+        if (!prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
     if (
       partial.value === null ||
       (typeof partial.comment === "string" && partial.comment.trim())
@@ -796,6 +851,36 @@ function AnnotateView({
         );
       })
       .map((ev) => fieldKey(itemId, ev.uuid));
+
+  // Only a question the page can draw can be gone to.
+  const firstUnansweredRequired = (itemId: string) =>
+    requiredEvaluatorsFor(itemId)
+      .filter(drawableOutputType)
+      .find((ev) => !evaluatorAnswered(itemId, ev));
+  const scrollToQuestion = (ev: Evaluator, behavior: ScrollBehavior) =>
+    document
+      .getElementById(`question-${ev.uuid}`)
+      ?.scrollIntoView({ behavior, block: "start" });
+
+  // A new item starts from the top of the right column, so its details can be
+  // read first. An item already started opens on the first required question
+  // left. On a phone the columns are stacked, so the row holding them is what
+  // scrolls.
+  useEffect(() => {
+    const pane = evaluatorsPaneRef.current;
+    if (!pane || !currentItem) return;
+    pane.scrollTop = 0;
+    if (pane.parentElement) pane.parentElement.scrollTop = 0;
+    setMissingAnswerKeys(new Set());
+    if (isAdmin) return;
+    const started = evaluatorsFor(currentItem.uuid).some((ev) =>
+      evaluatorAnswered(currentItem.uuid, ev),
+    );
+    const next = firstUnansweredRequired(currentItem.uuid);
+    if (started && next) scrollToQuestion(next, "auto");
+    // Only moving to another item lands the reader, never answering on this one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentItem?.uuid]);
 
   // Red borders are painted first, then the first one is scrolled into view,
   // the same as the item dialogs do with their invalid fields.
@@ -1022,6 +1107,15 @@ function AnnotateView({
     onJumpTo(target);
   };
 
+  useDialogNavKeys({
+    isOpen: pendingNav === null,
+    vertical: true,
+    hasPrev: currentIndex > 0,
+    onPrev: () => navigateTo(currentIndex - 1),
+    hasNext: currentIndex < total - 1,
+    onNext: () => navigateTo(currentIndex + 1),
+  });
+
   const wrapperClass = fillViewport
     ? "h-screen bg-background text-foreground flex flex-col overflow-hidden"
     : "flex flex-col flex-1 min-h-0";
@@ -1062,9 +1156,11 @@ function AnnotateView({
               </span>
             )}
           </div>
-          <p className="text-sm text-muted-foreground truncate shrink-0">
-            {data.annotator.name}
-          </p>
+          <JobInfoButton
+            labeller={data.annotator.name}
+            itemCount={items.length}
+            createdAt={data.job.created_at}
+          />
         </div>
       )}
       <div
@@ -1074,6 +1170,14 @@ function AnnotateView({
             : "flex-1 min-h-0 flex flex-col overflow-hidden border border-border rounded-xl mx-4 md:mx-6 mb-4 md:mb-6"
         }
       >
+        {!isAdmin && (
+          <GreenBar
+            label="Items done"
+            done={itemsDone}
+            total={items.length}
+            className="h-1 shrink-0"
+          />
+        )}
         <header className="border-b border-border px-4 md:px-6 py-3 flex flex-col gap-3 md:grid md:grid-cols-3 md:items-center md:gap-4">
           <div className="min-w-0 flex items-center gap-3">
             {currentItem && (
@@ -1137,10 +1241,15 @@ function AnnotateView({
                   requiredEvaluatorsFor(currentItem.uuid).every((ev) =>
                     evaluatorAnswered(currentItem.uuid, ev),
                   );
-                const disabled =
-                  submitting ||
-                  total === 0 ||
-                  !(allEvaluatorsAnswered || canSave);
+                // Answers left to give send the labeller to them. With
+                // nothing to answer and nothing to save, pressing it would do
+                // nothing, so it says so instead.
+                const nothingToDo =
+                  !!currentItem &&
+                  !allEvaluatorsAnswered &&
+                  !canSave &&
+                  !firstUnansweredRequired(currentItem.uuid);
+                const disabled = submitting || total === 0 || nothingToDo;
                 const label = submitting
                   ? "Saving..."
                   : // Saving a removed required answer does not finish the job.
@@ -1149,24 +1258,35 @@ function AnnotateView({
                     : currentHasSaved
                       ? "Update"
                       : "Submit & Next";
-                const tooltip =
-                  !allEvaluatorsAnswered && !canSave
-                    ? "Judgements should be given for all required evaluators before submitting"
-                    : undefined;
-                const submitButton = (
+                return (
                   <button
-                    onClick={() => handleSubmitItem()}
+                    onClick={() => {
+                      // Nothing to save yet: take the labeller to what is left.
+                      const next =
+                        currentItem &&
+                        !allEvaluatorsAnswered &&
+                        !canSave &&
+                        firstUnansweredRequired(currentItem.uuid);
+                      if (!next) {
+                        handleSubmitItem();
+                        return;
+                      }
+                      setMissingAnswerKeys(
+                        new Set(
+                          requiredEvaluatorsFor(currentItem.uuid)
+                            .filter(
+                              (ev) => !evaluatorAnswered(currentItem.uuid, ev),
+                            )
+                            .map((ev) => fieldKey(currentItem.uuid, ev.uuid)),
+                        ),
+                      );
+                      scrollToQuestion(next, "smooth");
+                    }}
                     disabled={disabled}
                     className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {label}
                   </button>
-                );
-                if (!tooltip) return submitButton;
-                return (
-                  <Tooltip content={tooltip} position="top">
-                    {submitButton}
-                  </Tooltip>
                 );
               })()}
           </div>
@@ -1183,9 +1303,7 @@ function AnnotateView({
         )}
 
         {topError && (
-          <ErrorNote className="mx-4 md:mx-6 mt-3">
-            {topError}
-          </ErrorNote>
+          <ErrorNote className="mx-4 md:mx-6 mt-3">{topError}</ErrorNote>
         )}
 
         <div className="flex-1 flex flex-col md:flex-row min-h-0">
@@ -1256,7 +1374,7 @@ function AnnotateView({
             </div>
           </div>
 
-          <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden">
+          <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden scroll-pt-28">
             {!currentItem ? (
               <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground w-full">
                 {filterActive
@@ -1269,12 +1387,7 @@ function AnnotateView({
                 canResize={!isAdmin}
                 leftHasOwnPadding={itemPaneHasOwnPadding(data.task.type)}
                 rightRef={evaluatorsPaneRef}
-                left={
-                  <ItemPane
-                    item={currentItem}
-                    taskType={data.task.type}
-                  />
-                }
+                left={<ItemPane item={currentItem} taskType={data.task.type} />}
                 right={
                   <EvaluatorsPane
                     evaluators={evaluators}
@@ -1283,6 +1396,10 @@ function AnnotateView({
                     setField={setField}
                     readOnly={isAdmin}
                     commentsEnabled={commentsEnabled}
+                    missingAnswerKeys={missingAnswerKeys}
+                    reasonsStillNeeded={
+                      new Set(reasoningMissingFor(currentItem.uuid))
+                    }
                     missingReasoningKeys={
                       new Set(
                         reasoningMissingFor(currentItem.uuid).filter((k) =>
@@ -1381,10 +1498,15 @@ export function ItemPane({
   // the tool-call pane, which reads `chat_history` / `agent_response`.
   if (taskType === "llm-general")
     return <LlmGeneralItemPane payload={payload} />;
-  if (item.is_tool_call === true)
+  // The flag is stamped by the backend and absent on a run's copy of an item
+  // and on older responses, so the lists it is worked out from count too.
+  if (
+    item.is_tool_call === true ||
+    Array.isArray(payload.expected_tool_calls) ||
+    Array.isArray(payload.actual_tool_calls)
+  )
     return <ToolCallItemPane payload={payload} />;
-  if (taskType === "llm")
-    return <LlmItemPane payload={payload} />;
+  if (taskType === "llm") return <LlmItemPane payload={payload} />;
   if (taskType === "conversation")
     return <ConversationItemPane payload={payload} />;
   return (
@@ -1406,6 +1528,8 @@ function EvaluatorsPane({
   readOnly,
   commentsEnabled,
   missingReasoningKeys,
+  missingAnswerKeys,
+  reasonsStillNeeded,
   itemComment,
   onItemCommentChange,
 }: {
@@ -1418,6 +1542,10 @@ function EvaluatorsPane({
   commentsEnabled: boolean;
   /** Labels whose empty reasoning box refused the last save, marked red. */
   missingReasoningKeys: Set<FieldKey>;
+  /** Required questions marked red after Submit was pressed without them. */
+  missingAnswerKeys: Set<FieldKey>;
+  /** Answers the save would refuse right now for having no reason. */
+  reasonsStillNeeded: Set<FieldKey>;
   /** Current free-text comment for this item — backed by the
    * `evaluator_id IS NULL` annotation slot. */
   itemComment: string;
@@ -1459,7 +1587,6 @@ function EvaluatorsPane({
   if (evaluators.length === 0) {
     return (
       <div className="space-y-3">
-        <ExpectedToolCalls payload={itemPayload} />
         <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
         {commentBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
@@ -1486,24 +1613,111 @@ function EvaluatorsPane({
     return out;
   })();
 
+  const forItem = evaluatorsForItem(evaluators, item);
+  // An evaluator of a type this page cannot draw has nothing to answer, so it
+  // gets no number and does not count towards the total.
+  const questions = forItem.filter(drawableOutputType);
+  // An answer the save would refuse for having no reason is not finished yet.
+  const isUnanswered = (ev: Evaluator) => {
+    const k = fieldKey(item.uuid, ev.uuid);
+    return !hasFieldValue(fields[k]) || reasonsStillNeeded.has(k);
+  };
+  const answeredCount = questions.filter((ev) => !isUnanswered(ev)).length;
+  const showGuidance = !readOnly && questions.length > 0;
+  // The outline on the first question left is what says where to answer.
+  const nextQuestion = questions.find(isUnanswered);
+
   return (
     <div className="space-y-3 pb-4 md:pb-6">
-      <ExpectedToolCalls payload={itemPayload} />
+      {showGuidance && (
+        <div className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-background border-b border-border space-y-2">
+          <span className="sr-only">
+            {answeredCount} of {questions.length} answered
+          </span>
+          {answeredCount > 0 && (
+            <GreenBar
+              label="Questions answered"
+              done={answeredCount}
+              total={questions.length}
+              className="h-2 rounded-full overflow-hidden"
+            />
+          )}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex gap-1.5 min-w-0 overflow-x-auto">
+              {questions.length > 1 &&
+                questions.map((ev, i) => {
+                  const k = fieldKey(item.uuid, ev.uuid);
+                  return (
+                    <button
+                      key={ev.uuid}
+                      type="button"
+                      aria-label={`Go to question ${i + 1}`}
+                      onClick={() =>
+                        document
+                          .getElementById(`question-${ev.uuid}`)
+                          ?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          })
+                      }
+                      className={`shrink-0 w-7 h-7 rounded-md border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
+                        missingAnswerKeys.has(k)
+                          ? "border-red-500 text-red-600 dark:text-red-400"
+                          : isUnanswered(ev)
+                            ? "border-border bg-background text-foreground hover:bg-muted/50"
+                            : "border-foreground bg-foreground text-background"
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  );
+                })}
+            </div>
+            {answeredCount === questions.length ? (
+              <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4.5 12.75l6 6 9-13.5"
+                  />
+                </svg>
+                All questions answered
+              </span>
+            ) : answeredCount === 0 ? (
+              <span className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-300">
+                Answer the questions below
+                <ArrowDownIcon className="w-4 h-4 motion-safe:animate-bounce" />
+              </span>
+            ) : (
+              <span
+                aria-hidden
+                className="shrink-0 text-sm font-medium text-foreground"
+              >
+                {answeredCount}/{questions.length}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
       <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
-      {commentBlock}
-      {evaluatorsForItem(evaluators, item).map((ev) => {
+      {readOnly && commentBlock}
+      {forItem.map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);
         const f = fields[k];
         // Reviewing what came back: an optional evaluator the annotator
         // skipped has nothing to show, so drop the card entirely.
-        const blank =
-          !f || f.value === undefined || f.value === null || f.value === "";
-        if (readOnly && ev.is_optional === true && blank) return null;
+        if (readOnly && ev.is_optional === true && !hasFieldValue(f))
+          return null;
         const variableValues = itemEvaluatorVariables[ev.uuid];
-        const outputType =
-          ev.output_type === "binary" || ev.output_type === "rating"
-            ? ev.output_type
-            : null;
+        const outputType = drawableOutputType(ev);
         if (!outputType) {
           return (
             <div
@@ -1567,31 +1781,40 @@ function EvaluatorsPane({
           );
         }
         return (
-          <EvaluatorVerdictCard
-            key={ev.uuid}
-            mode="write"
-            name={ev.name}
-            isOptional={ev.is_optional === true}
-            description={ev.description}
-            outputType={outputType}
-            evaluatorUuid={ev.uuid}
-            scaleMin={scaleMin}
-            scaleMax={scaleMax}
-            variableValues={variableValues}
-            value={f?.value as boolean | number | undefined}
-            comment={typeof f?.comment === "string" ? f.comment : ""}
-            reasoningMissing={missingReasoningKeys.has(k)}
-            reasoningMode={ev.reasoning_mode ?? "optional"}
-            onValueChange={(v) => setField(k, { value: v })}
-            onCommentChange={(s) => setField(k, { comment: s })}
-            trueLabel={trueLabel}
-            falseLabel={falseLabel}
-            trueDescription={trueDescription}
-            falseDescription={falseDescription}
-            ratingScale={ratingScale}
-          />
+          <div key={k} id={`question-${ev.uuid}`}>
+            <EvaluatorVerdictCard
+              mode="write"
+              name={ev.name}
+              isOptional={ev.is_optional === true}
+              description={ev.description}
+              question={{
+                number: questions.indexOf(ev) + 1,
+                total: questions.length,
+                answered: !isUnanswered(ev),
+              }}
+              answerMissing={missingAnswerKeys.has(k)}
+              isNextQuestion={ev === nextQuestion}
+              outputType={outputType}
+              evaluatorUuid={ev.uuid}
+              scaleMin={scaleMin}
+              scaleMax={scaleMax}
+              variableValues={variableValues}
+              value={f?.value as boolean | number | undefined}
+              comment={typeof f?.comment === "string" ? f.comment : ""}
+              reasoningMissing={missingReasoningKeys.has(k)}
+              reasoningMode={ev.reasoning_mode ?? "optional"}
+              onValueChange={(v) => setField(k, { value: v })}
+              onCommentChange={(s) => setField(k, { comment: s })}
+              trueLabel={trueLabel}
+              falseLabel={falseLabel}
+              trueDescription={trueDescription}
+              falseDescription={falseDescription}
+              ratingScale={ratingScale}
+            />
+          </div>
         );
       })}
+      {!readOnly && commentBlock && <div className="pt-1">{commentBlock}</div>}
     </div>
   );
 }

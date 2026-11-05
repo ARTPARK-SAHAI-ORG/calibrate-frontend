@@ -39,6 +39,14 @@ type CommonProps = {
   name: string;
   /** Short evaluator description, shown under the name. */
   description?: string | null;
+  /** This card's place in a list of questions someone is answering. Makes the
+   * name a heading above a quieter description, and draws the number in a
+   * circle that fills in once answered, whichever answer was picked. A list of one draws no circle. */
+  question?: { number: number; total: number; answered: boolean };
+  /** Marks the card red and says it needs an answer. */
+  answerMissing?: boolean;
+  /** Outlines the card as the next one to answer. */
+  isNextQuestion?: boolean;
   /** Optional version label (e.g. "v3") shown as a small monospace pill
    * next to the name. Use this when annotators are evaluating against a
    * specific evaluator version so it stays visually distinct from the
@@ -200,16 +208,37 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
         uuid={props.evaluatorUuid}
         enableLink={props.enableLink}
         onOpenPreview={setPreviewEvaluator}
+        asHeading={!!props.question}
       />
     </span>
   );
 
   return (
-    <div className={`${surface} p-3 space-y-3`}>
+    <div
+      className={`${surface} p-3 space-y-3 ${
+        props.answerMissing
+          ? "ring-2 ring-red-500"
+          : props.isNextQuestion
+            ? "ring-2 ring-foreground/60"
+            : ""
+      }`}
+    >
       {/* Header: name + verdict pill + toggle on one row; description
           on its own row below so it can use the full card width. */}
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-2">
+          {props.question && props.question.total > 1 && (
+            <span
+              aria-label={`Question ${props.question.number} of ${props.question.total}`}
+              className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
+                props.question.answered
+                  ? "bg-foreground text-background"
+                  : "border border-foreground/30 bg-background text-foreground"
+              }`}
+            >
+              {props.question.number}
+            </span>
+          )}
           {/* Name and version pill on one line. A long name is shortened
               with an ellipsis so the version pill always stays whole: it
               used to be clipped mid-character by a sideways scroll box
@@ -263,7 +292,13 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
           </div>
         </div>
         {props.description && (
-          <p className="text-xs text-muted-foreground whitespace-normal break-words">
+          <p
+            className={`${
+              props.question
+                ? "text-sm text-muted-foreground"
+                : "text-xs text-muted-foreground"
+            } whitespace-normal break-words`}
+          >
             {props.description}
           </p>
         )}
@@ -294,9 +329,16 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
               disabled={props.disabled}
               required={props.reasoningMode === "required"}
               missing={props.reasoningMissing}
+              answered={props.value !== undefined && props.value !== null}
             />
           )}
         </>
+      )}
+
+      {props.answerMissing && (
+        <p className="text-xs font-medium text-red-600 dark:text-red-400">
+          This question needs an answer
+        </p>
       )}
 
       {props.mode === "read" && open && toggleKind && (
@@ -331,16 +373,18 @@ function NameLabel({
   uuid,
   enableLink,
   onOpenPreview,
+  asHeading,
 }: {
   name: string;
   uuid?: string;
   enableLink?: boolean;
   onOpenPreview: (evaluator: { uuid: string; name: string }) => void;
+  asHeading?: boolean;
 }) {
   const cls =
     // Stays inline so the wrapper around it can shorten a long name with an
     // ellipsis and keep the version pill beside it whole.
-    "text-sm font-medium text-foreground align-middle";
+    `${asHeading ? "text-base font-semibold" : "text-sm font-medium"} text-foreground align-middle`;
   if (enableLink && uuid) {
     return (
       <button
@@ -431,11 +475,13 @@ function ReadVerdictPill({
 }
 
 // Shared classes for an option button that carries a rubric underneath.
-// Left-aligned so the description has room to wrap, `flex-1` so a row of
-// options shares the width evenly, and `min-w-40` so they wrap to the
-// next line rather than squeezing the text into a column.
+// Left-aligned so the description has room to wrap, and full width of its grid
+// cell so every option is the same size, even one alone on the last row.
 const DESCRIBED_OPTION_BTN =
-  "flex-1 min-w-40 text-left rounded-md border px-3 py-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed";
+  "w-full text-left rounded-md border px-3 py-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-foreground/30";
+// Two equal columns, or one when the column is too narrow for two. Answer
+// buttons never pick up the browser's own blue outline when clicked.
+const DESCRIBED_OPTIONS_GRID = "grid grid-cols-1 @xs:grid-cols-2 gap-2";
 
 function OptionDescription({
   text,
@@ -471,7 +517,7 @@ function PickedOptionTooltip({
 }) {
   return (
     <Tooltip
-      content={picked ? "Click again to remove this answer" : null}
+      content={picked ? "Click again to unselect" : null}
       contentStyle={picked ? undefined : { display: "none" }}
       position="top"
       className={className}
@@ -516,67 +562,67 @@ function WriteControls({
     const described = !!(trueText || falseText);
     const baseBtn = described
       ? `${DESCRIBED_OPTION_BTN} text-sm font-medium`
-      : "h-9 px-4 rounded-md text-sm font-medium border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed";
-    // The tooltip wrapper is the flex item now, so it carries the stretch.
-    const wrapClass = described ? "flex flex-1 min-w-40" : "flex";
+      : "h-9 px-4 rounded-md text-sm font-medium border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-foreground/30";
+    // The tooltip wrapper is the grid item now, so it carries the stretch.
+    const wrapClass = "flex";
     return (
-      <div
-        className={
-          described
-            ? "flex items-stretch gap-2 flex-wrap"
-            : "flex items-center gap-2"
-        }
-      >
-        <PickedOptionTooltip
-          picked={value === true && !disabled}
-          className={wrapClass}
+      <div className="@container">
+        <div
+          className={
+            described ? DESCRIBED_OPTIONS_GRID : "flex items-center gap-2"
+          }
         >
-          <button
-            type="button"
-            disabled={disabled}
-            aria-pressed={value === true}
-            onClick={() => onChange(value === true ? null : true)}
-            className={`${baseBtn} ${
-              value === true
-                ? "border-green-600 bg-green-600 text-white"
-                : "border-border bg-background text-foreground hover:bg-muted/50"
-            }`}
+          <PickedOptionTooltip
+            picked={value === true && !disabled}
+            className={wrapClass}
           >
-            {trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL}
-            {trueText && (
-              <OptionDescription
-                text={trueText}
-                active={value === true}
-                activeClass="text-white/80"
-              />
-            )}
-          </button>
-        </PickedOptionTooltip>
-        <PickedOptionTooltip
-          picked={value === false && !disabled}
-          className={wrapClass}
-        >
-          <button
-            type="button"
-            disabled={disabled}
-            aria-pressed={value === false}
-            onClick={() => onChange(value === false ? null : false)}
-            className={`${baseBtn} ${
-              value === false
-                ? "border-red-600 bg-red-600 text-white"
-                : "border-border bg-background text-foreground hover:bg-muted/50"
-            }`}
+            <button
+              type="button"
+              disabled={disabled}
+              aria-pressed={value === true}
+              onClick={() => onChange(value === true ? null : true)}
+              className={`${baseBtn} ${
+                value === true
+                  ? "border-green-600 bg-green-600 text-white"
+                  : "border-border bg-background text-foreground hover:bg-muted/50"
+              }`}
+            >
+              {trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL}
+              {trueText && (
+                <OptionDescription
+                  text={trueText}
+                  active={value === true}
+                  activeClass="text-white/80"
+                />
+              )}
+            </button>
+          </PickedOptionTooltip>
+          <PickedOptionTooltip
+            picked={value === false && !disabled}
+            className={wrapClass}
           >
-            {falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL}
-            {falseText && (
-              <OptionDescription
-                text={falseText}
-                active={value === false}
-                activeClass="text-white/80"
-              />
-            )}
-          </button>
-        </PickedOptionTooltip>
+            <button
+              type="button"
+              disabled={disabled}
+              aria-pressed={value === false}
+              onClick={() => onChange(value === false ? null : false)}
+              className={`${baseBtn} ${
+                value === false
+                  ? "border-red-600 bg-red-600 text-white"
+                  : "border-border bg-background text-foreground hover:bg-muted/50"
+              }`}
+            >
+              {falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL}
+              {falseText && (
+                <OptionDescription
+                  text={falseText}
+                  active={value === false}
+                  activeClass="text-white/80"
+                />
+              )}
+            </button>
+          </PickedOptionTooltip>
+        </div>
       </div>
     );
   }
@@ -609,66 +655,74 @@ function WriteControls({
   // left-aligned layout so every option lines up.
   const described = !!ratingScale?.some((e) => e.description?.trim());
   return (
-    <div className="flex items-stretch gap-1.5 flex-wrap">
-      {options.map((n) => {
-        const active = value === n;
-        const entry = ratingScale?.find((e) => e.value === n);
-        const label = entry?.name?.trim() || null;
-        const text = entry?.description?.trim() || null;
-        // The picked level wears the same colour the read view gives it.
-        const activeClass =
-          RATING_ACTIVE_CLASS[
-            readVerdictTone({ score: n, scaleMin, scaleMax })
-          ];
-        return (
-          <PickedOptionTooltip
-            key={n}
-            picked={active && !disabled}
-            className={described ? "flex flex-1 min-w-40" : "flex"}
-          >
-            <button
-              type="button"
-              disabled={disabled}
-              aria-pressed={active}
-              onClick={() => onChange(active ? null : n)}
-              className={`${
-                described
-                  ? DESCRIBED_OPTION_BTN
-                  : hasLabels
-                    ? "min-w-[3.25rem] px-2.5 h-auto py-1.5 flex flex-col items-center gap-0.5 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    : "w-9 h-9 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-              } text-sm font-medium ${
-                active
-                  ? activeClass
-                  : "border-border bg-background hover:bg-muted/50"
-              }`}
+    <div className="@container">
+      <div
+        className={
+          described
+            ? DESCRIBED_OPTIONS_GRID
+            : "flex items-stretch gap-1.5 flex-wrap"
+        }
+      >
+        {options.map((n) => {
+          const active = value === n;
+          const entry = ratingScale?.find((e) => e.value === n);
+          const label = entry?.name?.trim() || null;
+          const text = entry?.description?.trim() || null;
+          // The picked level wears the same colour the read view gives it.
+          const activeClass =
+            RATING_ACTIVE_CLASS[
+              readVerdictTone({ score: n, scaleMin, scaleMax })
+            ];
+          return (
+            <PickedOptionTooltip
+              key={n}
+              picked={active && !disabled}
+              className="flex"
             >
-              {described ? (
-                <span>{label ? `${n} · ${label}` : n}</span>
-              ) : (
-                <span>{n}</span>
-              )}
-              {described
-                ? text && (
-                    <OptionDescription
-                      text={text}
-                      active={active}
-                      activeClass="text-white/80"
-                    />
-                  )
-                : hasLabels && (
-                    <span
-                      className={`text-[10px] font-normal leading-tight ${
-                        active ? "text-white/80" : "text-muted-foreground"
-                      }`}
-                    >
-                      {label ?? ""}
-                    </span>
-                  )}
-            </button>
-          </PickedOptionTooltip>
-        );
-      })}
+              <button
+                type="button"
+                disabled={disabled}
+                aria-pressed={active}
+                onClick={() => onChange(active ? null : n)}
+                className={`${
+                  described
+                    ? DESCRIBED_OPTION_BTN
+                    : hasLabels
+                      ? "outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 min-w-[3.25rem] px-2.5 h-auto py-1.5 flex flex-col items-center gap-0.5 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      : "outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 w-9 h-9 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                } text-sm font-medium ${
+                  active
+                    ? activeClass
+                    : "border-border bg-background hover:bg-muted/50"
+                }`}
+              >
+                {described ? (
+                  <span>{label ? `${n} · ${label}` : n}</span>
+                ) : (
+                  <span>{n}</span>
+                )}
+                {described
+                  ? text && (
+                      <OptionDescription
+                        text={text}
+                        active={active}
+                        activeClass="text-white/80"
+                      />
+                    )
+                  : hasLabels && (
+                      <span
+                        className={`text-[10px] font-normal leading-tight ${
+                          active ? "text-white/80" : "text-muted-foreground"
+                        }`}
+                      >
+                        {label ?? ""}
+                      </span>
+                    )}
+              </button>
+            </PickedOptionTooltip>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -697,13 +751,23 @@ function WriteReasoning({
   disabled,
   required,
   missing,
+  answered,
 }: {
   value: string;
   onChange: (s: string) => void;
   disabled?: boolean;
   required?: boolean;
   missing?: boolean;
+  answered?: boolean;
 }) {
+  // A reason is only asked for once there is an answer to explain.
+  const visible = !!(disabled || answered || value);
+  // Only a box that arrives because of an answer just given is highlighted,
+  // never one already there when the item opened. An answer unselected and
+  // picked again counts as arriving.
+  const [hasBeenHidden, setHasBeenHidden] = useState(!visible);
+  if (!visible && !hasBeenHidden) setHasBeenHidden(true);
+  if (!visible) return null;
   return (
     <div className="space-y-1.5">
       <div className="text-xs font-medium text-muted-foreground">
@@ -716,8 +780,8 @@ function WriteReasoning({
         placeholder={disabled ? "" : "Add your reasoning"}
         rows={2}
         className={`w-full text-sm rounded-md border bg-background px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20 disabled:opacity-60 ${
-          missing ? "border-red-500" : "border-border"
-        }`}
+          hasBeenHidden ? "reason-box-appear " : ""
+        }${missing ? "border-red-500" : "border-border"}`}
       />
       {missing && (
         <p className="text-xs text-red-500">

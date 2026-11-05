@@ -531,6 +531,7 @@ export function ToolCallCard({
   args,
   output,
   expected = false,
+  alwaysOpen = false,
 }: {
   toolName: string;
   args: Record<string, any>;
@@ -541,6 +542,8 @@ export function ToolCallCard({
    * value / criteria) instead of a plain value. Used for "Expected Tool
    * Calls"; actual agent tool calls leave this false. */
   expected?: boolean;
+  /** Leaves out the toggle that collapses an expected call's parameters. */
+  alwaysOpen?: boolean;
 }) {
   const hasOutput = output !== undefined && output !== null;
   const outputValue = hasOutput ? formatParamValue(output) : "";
@@ -550,7 +553,7 @@ export function ToolCallCard({
   );
   const hasParams = paramEntries.length > 0;
   // Expected tool calls collapse the whole parameter block behind one toggle.
-  const collapsible = expected && hasParams;
+  const collapsible = expected && hasParams && !alwaysOpen;
   const [open, setOpen] = useState(true);
   const showParams = hasParams && (!collapsible || open);
   return (
@@ -950,9 +953,15 @@ export function TestDetailView({
   legacyDefaultEvaluator,
   enableEvaluatorLinks = true,
   highlightEvalTarget = false,
+  toolCallLabel = "Agent Tool Call",
+  afterHistory,
   showVerdict = true,
   markOutput = true,
 }: {
+  /** The heading above a tool call the agent made. */
+  toolCallLabel?: string;
+  /** Drawn right under the conversation, lined up with it. */
+  afterHistory?: React.ReactNode;
   history: TestCaseHistory[];
   /** `test_case.input` — set only for a test written as one input rather
    * than a conversation. Switches this view to the Input/Output boxes. */
@@ -1217,7 +1226,7 @@ export function TestDetailView({
                         <>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium text-foreground">
-                              Agent Tool Call
+                              {toolCallLabel}
                             </span>
                             {isEvalTarget && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -1254,6 +1263,7 @@ export function TestDetailView({
               })}
             </div>
           )}
+          {afterHistory}
         </div>
       )}
 

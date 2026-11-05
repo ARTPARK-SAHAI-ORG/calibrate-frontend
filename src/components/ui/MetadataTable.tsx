@@ -6,11 +6,17 @@ const CELL = "px-3 py-2 border-b border-border";
 
 /** Key-value pairs sent with a trace or a labelling item, under a "Metadata"
  *  heading. Draws nothing when there are none. */
-export function MetadataTable({ entries }: { entries?: MetadataEntry[] | null }) {
+export function MetadataTable({
+  entries,
+  headingClassName = "text-sm font-semibold text-foreground",
+}: {
+  entries?: MetadataEntry[] | null;
+  headingClassName?: string;
+}) {
   if (!entries || entries.length === 0) return null;
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-foreground">Metadata</h3>
+      <h3 className={headingClassName}>Metadata</h3>
       {/* The field column is as wide as its longest name, up to half, and the
           value takes the rest. Only a name or value too long for its column
           breaks inside a word. */}

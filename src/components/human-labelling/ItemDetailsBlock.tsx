@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import { Tooltip } from "@/components/Tooltip";
 import { MetadataTable, type MetadataEntry } from "@/components/ui";
 
 export function itemDescriptionOf(payload: unknown): string {
@@ -15,27 +19,68 @@ export function hasItemDetails(
   return Boolean(itemDescriptionOf(payload)) || Boolean(metadata?.length);
 }
 
-/** An item's description and metadata, the way every view that shows one
- *  item draws them. Renders nothing when the item has neither. */
+/** An item's description and metadata in one box headed "Item details", the
+ *  way every view that shows one item draws them. Closed unless `defaultOpen`;
+ *  the heading opens and closes it. Renders nothing when the item has neither. */
 export function ItemDetailsBlock({
   payload,
   metadata,
+  defaultOpen = false,
 }: {
   payload: unknown;
   metadata?: MetadataEntry[] | null;
+  defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+  if (!hasItemDetails(payload, metadata)) return null;
   const description = itemDescriptionOf(payload);
   return (
-    <>
-      {description && (
-        <div className="space-y-1.5">
-          <h3 className="text-sm font-semibold">Description</h3>
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-            {description}
-          </p>
+    <section className="border border-border rounded-xl bg-muted/20">
+      <Tooltip
+        content={open ? "Hide the details" : "Show the details"}
+        position="top"
+      >
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-base font-semibold text-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+        >
+          Item details
+          <svg
+            className={`w-4 h-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </button>
+      </Tooltip>
+      {open && (
+        <div className="px-3 pb-3 space-y-3">
+          {description && (
+            <div className="space-y-1">
+              <h3 className="text-xs font-medium text-muted-foreground">
+                Description
+              </h3>
+              <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+                {description}
+              </p>
+            </div>
+          )}
+          <MetadataTable
+            entries={metadata}
+            headingClassName="text-xs font-medium text-muted-foreground"
+          />
         </div>
       )}
-      <MetadataTable entries={metadata} />
-    </>
+    </section>
   );
 }

@@ -52,7 +52,7 @@ describe("LlmGeneralItemPane", () => {
           actual_tool_calls: [
             { tool: "book_flight", arguments: { destination: "Delhi" } },
           ],
-          expected_tool_calls: [{ tool: "should_not_render", arguments: {} }],
+          expected_tool_calls: [{ tool: "book_train", arguments: {} }],
         }}
       />,
     );
@@ -61,7 +61,8 @@ describe("LlmGeneralItemPane", () => {
     expect(screen.getByText("destination")).toBeInTheDocument();
     expect(screen.getByText("Delhi")).toBeInTheDocument();
     expect(screen.queryByText("Item payload")).not.toBeInTheDocument();
-    expect(screen.queryByText("should_not_render")).not.toBeInTheDocument();
+    expect(screen.getByText("Expected answer")).toBeInTheDocument();
+    expect(screen.getByText("book_train")).toBeInTheDocument();
   });
 
   it("shows the text reply above the tool calls when there is both", () => {
@@ -150,5 +151,14 @@ describe("LlmGeneralItemPane name pills", () => {
     for (const name of ["AI draft", "Nurse"]) {
       expect(screen.getByText(name).className).toContain("bg-purple-500/10");
     }
+  });
+
+  it("still draws the expected answer when input and output are empty", () => {
+    render(
+      <LlmGeneralItemPane
+        payload={{ expected_tool_calls: [{ tool: "book_train", arguments: {} }] }}
+      />,
+    );
+    expect(screen.getByText("Expected answer")).toBeInTheDocument();
   });
 });

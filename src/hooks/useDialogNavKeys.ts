@@ -19,6 +19,7 @@ export function useDialogNavKeys({
   onPrev,
   hasNext,
   onNext,
+  vertical = false,
 }: {
   isOpen: boolean;
   onClose?: () => void;
@@ -26,6 +27,8 @@ export function useDialogNavKeys({
   onPrev?: () => void;
   hasNext?: boolean;
   onNext?: () => void;
+  /** Steps with the up and down arrows, for a list that runs down the page. */
+  vertical?: boolean;
 }) {
   useEffect(() => {
     if (!isOpen) return;
@@ -46,15 +49,17 @@ export function useDialogNavKeys({
           return;
         }
       }
-      if (e.key === "ArrowLeft" && hasPrev && onPrev) {
+      const prevKey = vertical ? "ArrowUp" : "ArrowLeft";
+      const nextKey = vertical ? "ArrowDown" : "ArrowRight";
+      if (e.key === prevKey && hasPrev && onPrev) {
         e.preventDefault();
         onPrev();
-      } else if (e.key === "ArrowRight" && hasNext && onNext) {
+      } else if (e.key === nextKey && hasNext && onNext) {
         e.preventDefault();
         onNext();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isOpen, onClose, hasPrev, hasNext, onPrev, onNext]);
+  }, [isOpen, onClose, hasPrev, hasNext, onPrev, onNext, vertical]);
 }

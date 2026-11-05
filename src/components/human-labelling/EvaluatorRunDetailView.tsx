@@ -46,7 +46,6 @@ import {
   useUrlValueFilters,
   writeUrlParam,
 } from "@/components/human-labelling/valueFilterUrl";
-import { ExpectedToolCalls } from "@/components/human-labelling/item-panes/ExpectedToolCalls";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
 import { hasItemDetails, ItemDetailsBlock } from "./ItemDetailsBlock";
 import type { ReviewItem } from "./SendForReviewFlow";
@@ -1479,10 +1478,6 @@ export function ItemDetailPane({
     comment: string;
   }[];
 }) {
-  const itemPayload =
-    item.payload && typeof item.payload === "object"
-      ? (item.payload as Record<string, unknown>)
-      : null;
 
   // The llm / conversation panes render `TestDetailView`, which brings its own
   // padding and a `sticky top-0` UI/JSON toggle. Adding top padding here would
@@ -1497,7 +1492,11 @@ export function ItemDetailPane({
           data-testid="item-detail-about-pane"
           className="order-last md:order-none md:w-80 border-t md:border-t-0 md:border-r border-border md:min-h-0 md:overflow-y-auto shrink-0 p-4 md:p-6 space-y-4"
         >
-          <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />
+          <ItemDetailsBlock
+            payload={item.payload}
+            metadata={item.metadata}
+            defaultOpen
+          />
         </div>
       )}
       <div
@@ -1519,7 +1518,6 @@ export function ItemDetailPane({
         <ItemPane item={item} taskType={taskType} />
       </div>
       <div className="md:flex-[3] md:min-h-0 md:overflow-y-auto p-4 md:p-6 space-y-3">
-        {itemPayload && <ExpectedToolCalls payload={itemPayload} />}
         <EvaluatorResultsPane
           evaluators={evaluators}
           evaluatorNamesById={evaluatorNamesById}

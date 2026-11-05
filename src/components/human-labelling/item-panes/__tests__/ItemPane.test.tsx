@@ -33,7 +33,7 @@ describe("ItemPane picks the pane by task type first", () => {
     );
     expect(screen.getByText("Input")).toBeInTheDocument();
     expect(screen.getByText("Book me a slot in Bengaluru")).toBeInTheDocument();
-    expect(screen.getByText("book_appointment")).toBeInTheDocument();
+    expect(screen.getAllByText("book_appointment")[0]).toBeInTheDocument();
   });
 
   it("draws a next-reply tool-call item as a conversation", () => {
@@ -52,5 +52,20 @@ describe("ItemPane picks the pane by task type first", () => {
     expect(screen.getByText("Book me a slot")).toBeInTheDocument();
     expect(screen.getByText("book_appointment")).toBeInTheDocument();
     expect(screen.queryByText("Input")).not.toBeInTheDocument();
+  });
+
+  it("draws the expected answer when an item carries one but no tool-call flag", () => {
+    render(
+      <ItemPane
+        item={item({
+          chat_history: [{ role: "user", content: "Hi" }],
+          agent_response: "",
+          expected_tool_calls: [{ tool: "book_train", arguments: {} }],
+          actual_tool_calls: [],
+        })}
+        taskType="llm"
+      />,
+    );
+    expect(screen.getByText("Expected answer")).toBeInTheDocument();
   });
 });
