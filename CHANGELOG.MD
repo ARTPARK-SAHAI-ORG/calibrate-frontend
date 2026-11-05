@@ -1,5 +1,6 @@
 ## November 2026
 
+- When sending a labelling task to annotators, you can now choose for each label whether reasoning is required, optional or hidden, instead of one choice for the whole job ([#811](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/811))
 - The partner cards on the landing page now loop across the screen on a laptop, can be stepped with arrow buttons, and can be filtered by Health, Education, Livelihoods or Agriculture ([#801](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/801))
 - The quote on the Noora Health card on the landing page now names who said it, Zezhen Wu of The Agency Fund ([#799](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/799))
 - The labelling job page no longer has the All versions / Default only switch, and every version of a message always shows ([#797](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/797))
