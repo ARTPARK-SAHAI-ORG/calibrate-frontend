@@ -695,11 +695,11 @@ describe("AssignAnnotatorsDialog", () => {
     expect(within(comments).getByLabelText("No")).not.toBeChecked();
 
     const reasoning = screen.getByRole("group", {
-      name: "Ask annotators to explain each score",
+      name: "Let annotators add reasoning",
     });
     expect(
       within(reasoning).getByText(
-        "Annotators can write why they gave each score. Set this separately for each label.",
+        "Whether you want annotators to give a reasoning for their scores. Set this separately for each label.",
       ),
     ).toBeInTheDocument();
     // One dropdown per label, in the order the labels sit on screen, each
@@ -732,7 +732,7 @@ describe("AssignAnnotatorsDialog", () => {
     // No label on the task means nothing to explain a score for.
     expect(
       screen.queryByRole("group", {
-        name: "Ask annotators to explain each score",
+        name: "Let annotators add reasoning",
       }),
     ).not.toBeInTheDocument();
   });
@@ -1049,7 +1049,7 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     expect(
       within(
         screen.getByRole("group", {
-          name: "Ask annotators to explain each score",
+          name: "Let annotators add reasoning",
         }),
       )
         .getAllByRole("combobox")

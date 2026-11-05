@@ -738,11 +738,11 @@ export function AssignAnnotatorsDialog({
                   // by default, and a long name would never get cut off.
                   <fieldset className="space-y-1 min-w-0" disabled={submitting}>
                     <legend className="text-sm font-medium">
-                      Ask annotators to explain each score
+                      Let annotators add reasoning
                     </legend>
                     <p className="text-xs text-foreground/80">
-                      Annotators can write why they gave each score. Set this
-                      separately for each label.
+                      Whether you want annotators to give a reasoning for their
+                      scores. Set this separately for each label.
                     </p>
                     {/* The small padding keeps each dropdown's focus ring from
                         being cut off by the scrolling. */}
