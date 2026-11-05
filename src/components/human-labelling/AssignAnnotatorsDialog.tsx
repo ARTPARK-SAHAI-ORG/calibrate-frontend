@@ -357,8 +357,8 @@ export function AssignAnnotatorsDialog({
       }}
     >
       <div
-        className={`bg-background border border-border rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] ${
-          showEvaluatorChoice ? "max-w-6xl" : "max-w-4xl"
+        className={`bg-background border border-border rounded-xl shadow-2xl w-full flex flex-col max-h-[92vh] md:h-[92vh] ${
+          showEvaluatorChoice ? "max-w-[92rem]" : "max-w-6xl"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -389,7 +389,7 @@ export function AssignAnnotatorsDialog({
             </svg>
           </button>
         </div>
-        <div className="p-4 md:p-6 overflow-y-auto">
+        <div className="p-4 md:p-6 overflow-y-auto flex-1 min-h-0">
           <div
             className={`grid grid-cols-1 gap-x-10 gap-y-4 ${
               showEvaluatorChoice ? "md:grid-cols-3" : "md:grid-cols-2"
@@ -426,7 +426,7 @@ export function AssignAnnotatorsDialog({
                   placeholder="Search annotators"
                 />
               )}
-              <div className="space-y-2 overflow-y-auto pr-1 max-h-[55vh]">
+              <div className="space-y-2 overflow-y-auto pr-1 max-h-[60vh]">
                 {loading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <svg
@@ -741,8 +741,8 @@ export function AssignAnnotatorsDialog({
                       Ask annotators to explain each score
                     </legend>
                     <p className="text-xs text-foreground/80">
-                      Choose for each label whether annotators explain the score
-                      they gave
+                      Annotators can write why they gave each score. Set this
+                      separately for each label.
                     </p>
                     {/* The small padding keeps each dropdown's focus ring from
                         being cut off by the scrolling. */}

@@ -699,7 +699,7 @@ describe("AssignAnnotatorsDialog", () => {
     });
     expect(
       within(reasoning).getByText(
-        "Choose for each label whether annotators explain the score they gave",
+        "Annotators can write why they gave each score. Set this separately for each label.",
       ),
     ).toBeInTheDocument();
     // One dropdown per label, in the order the labels sit on screen, each
