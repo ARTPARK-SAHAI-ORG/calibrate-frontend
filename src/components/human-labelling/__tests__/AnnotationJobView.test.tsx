@@ -2850,7 +2850,7 @@ describe("AnnotationJobView intro and walkthrough", () => {
     const titles = runTourMock.mock.calls[0][0].steps.map((step) => step.title);
     expect(titles).toEqual([
       "Read the conversation",
-      "Open Item details for more",
+      "Item details",
       "Binary questions",
       "Rating questions",
       "Add a reason",

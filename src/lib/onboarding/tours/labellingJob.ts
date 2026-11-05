@@ -112,8 +112,8 @@ export function buildLabellingJobTour({
     steps.push({
       anchor: '[data-tutorial="item-details"]',
       side: "left",
-      title: "Open Item details for more",
-      description: `Click ${heading("Item details")} to see more about the item. Click again to close it.`,
+      title: "Item details",
+      description: "Click to see more about the item",
     });
   if (firstChoice)
     steps.push({

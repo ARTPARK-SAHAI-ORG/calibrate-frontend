@@ -69,7 +69,7 @@ describe("buildLabellingJobTour", () => {
     const steps = titles(
       build({ hasItemDetails: true, commentsEnabled: true }),
     );
-    expect(steps).toContain("Open Item details for more");
+    expect(steps).toContain("Item details");
     expect(steps).toContain("Leave a comment");
   });
 
