@@ -88,7 +88,7 @@ function SettingChoice<T extends string>({
   return (
     <fieldset className="space-y-1" disabled={disabled}>
       <legend className="text-sm font-medium">{label}</legend>
-      <p className="text-sm text-foreground">{help}</p>
+      <p className="text-xs text-foreground/80">{help}</p>
       <div className="pt-1">
         {options.map((option) => (
           <label
@@ -740,20 +740,10 @@ export function AssignAnnotatorsDialog({
                     <legend className="text-sm font-medium">
                       Ask annotators to explain each score
                     </legend>
-                    <ul className="space-y-1 text-sm text-foreground">
-                      <li>
-                        <span className="font-medium">Required:</span>{" "}
-                        annotators must explain the score before they can save
-                      </li>
-                      <li>
-                        <span className="font-medium">Optional:</span>{" "}
-                        annotators can skip it
-                      </li>
-                      <li>
-                        <span className="font-medium">Do not show:</span>{" "}
-                        annotators do not see the box
-                      </li>
-                    </ul>
+                    <p className="text-xs text-foreground/80">
+                      Choose for each label whether annotators explain the score
+                      they gave
+                    </p>
                     {/* The small padding keeps each dropdown's focus ring from
                         being cut off by the scrolling. */}
                     <div className="space-y-2 overflow-y-auto pt-1 pb-0.5 pl-0.5 pr-1 max-h-[50vh]">
@@ -786,6 +776,7 @@ export function AssignAnnotatorsDialog({
                           {shownLabels.length > 1 && (
                             <DuplicateIconButton
                               tooltip="Copy to all labels"
+                              tooltipPosition="right"
                               disabled={submitting}
                               className="shrink-0"
                               onClick={() =>

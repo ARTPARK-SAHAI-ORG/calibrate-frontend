@@ -16,6 +16,9 @@ type DuplicateIconButtonProps = {
   disabled?: boolean;
   /** Extra classes appended to the base styling. */
   className?: string;
+  /** Where the tooltip opens. Use a side when rows of these sit one above the
+   *  other, so it does not cover the button above. */
+  tooltipPosition?: "top" | "right";
 };
 
 /**
@@ -31,9 +34,10 @@ export function DuplicateIconButton({
   loading = false,
   disabled = false,
   className = "",
+  tooltipPosition = "top",
 }: DuplicateIconButtonProps) {
   return (
-    <Tooltip content={tooltip}>
+    <Tooltip content={tooltip} position={tooltipPosition}>
       <button
         type="button"
         disabled={loading || disabled}

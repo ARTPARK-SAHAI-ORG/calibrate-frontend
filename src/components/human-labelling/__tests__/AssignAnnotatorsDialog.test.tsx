@@ -698,14 +698,10 @@ describe("AssignAnnotatorsDialog", () => {
       name: "Ask annotators to explain each score",
     });
     expect(
-      within(reasoning)
-        .getAllByRole("listitem")
-        .map((choice) => choice.textContent),
-    ).toEqual([
-      "Required: annotators must explain the score before they can save",
-      "Optional: annotators can skip it",
-      "Do not show: annotators do not see the box",
-    ]);
+      within(reasoning).getByText(
+        "Choose for each label whether annotators explain the score they gave",
+      ),
+    ).toBeInTheDocument();
     // One dropdown per label, in the order the labels sit on screen, each
     // starting on Optional and offering all three choices.
     const dropdowns = within(reasoning).getAllByRole("combobox");
