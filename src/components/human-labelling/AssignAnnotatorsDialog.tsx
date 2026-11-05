@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ClippedText } from "@/components/ui/ClippedText";
+import { DuplicateIconButton } from "@/components/ui/DuplicateIconButton";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
 import { apiClient } from "@/lib/api";
@@ -737,10 +738,12 @@ export function AssignAnnotatorsDialog({
                   // by default, and a long name would never get cut off.
                   <fieldset className="space-y-1 min-w-0" disabled={submitting}>
                     <legend className="text-sm font-medium">
-                      Reasoning on each label
+                      Ask annotators to explain each score
                     </legend>
                     <p className="text-xs text-muted-foreground">
-                      The box where annotators explain the score they gave.
+                      Required means annotators must explain their score before
+                      they can save. Optional means they can skip it. Do not
+                      show removes the box.
                     </p>
                     {/* The small padding keeps each dropdown's focus ring from
                         being cut off by the scrolling. */}
@@ -771,6 +774,26 @@ export function AssignAnnotatorsDialog({
                               </option>
                             ))}
                           </Select>
+                          {shownLabels.length > 1 && (
+                            <DuplicateIconButton
+                              tooltip={`Copy the ${ev.name} choice to all labels`}
+                              disabled={submitting}
+                              className="shrink-0"
+                              onClick={() =>
+                                setReasoningModes(
+                                  Object.fromEntries(
+                                    [
+                                      ...choosableEvaluators,
+                                      ...shownToolCallEvaluators,
+                                    ].map((other) => [
+                                      other.uuid,
+                                      reasoningModes[ev.uuid] ?? "optional",
+                                    ]),
+                                  ),
+                                )
+                              }
+                            />
+                          )}
                         </div>
                       ))}
                     </div>

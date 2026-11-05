@@ -695,11 +695,11 @@ describe("AssignAnnotatorsDialog", () => {
     expect(within(comments).getByLabelText("No")).not.toBeChecked();
 
     const reasoning = screen.getByRole("group", {
-      name: "Reasoning on each label",
+      name: "Ask annotators to explain each score",
     });
     expect(
       within(reasoning).getByText(
-        "The box where annotators explain the score they gave.",
+        "Required means annotators must explain their score before they can save. Optional means they can skip it. Do not show removes the box.",
       ),
     ).toBeInTheDocument();
     // One dropdown per label, in the order the labels sit on screen, each
@@ -725,11 +725,15 @@ describe("AssignAnnotatorsDialog", () => {
     expect(screen.queryByText("Labels")).not.toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(
-      screen.getByRole("group", { name: "Let annotators leave a comment on each item" }),
+      screen.getByRole("group", {
+        name: "Let annotators leave a comment on each item",
+      }),
     ).toBeInTheDocument();
     // No label on the task means nothing to explain a score for.
     expect(
-      screen.queryByRole("group", { name: "Reasoning on each label" }),
+      screen.queryByRole("group", {
+        name: "Ask annotators to explain each score",
+      }),
     ).not.toBeInTheDocument();
   });
 
@@ -743,7 +747,9 @@ describe("AssignAnnotatorsDialog", () => {
     await user.click(screen.getByText("Alice"));
     await user.click(
       within(
-        screen.getByRole("group", { name: "Let annotators leave a comment on each item" }),
+        screen.getByRole("group", {
+          name: "Let annotators leave a comment on each item",
+        }),
       ).getByLabelText("No"),
     );
     await user.selectOptions(reasoningOn("Relevance"), "Required");
@@ -756,6 +762,55 @@ describe("AssignAnnotatorsDialog", () => {
       comments_enabled: false,
       evaluator_reasoning_modes: { "ev-1": "required", "ev-2": "hidden" },
     });
+  });
+
+  it("copies one label's choice to all labels, including an unticked one", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog({
+      evaluators: [
+        ...evaluators,
+        { ...evaluators[0], uuid: "ev-3", name: "Tone" },
+      ],
+    });
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByText("Alice"));
+    await user.selectOptions(reasoningOn("Relevance"), "Required");
+    await user.click(screen.getByRole("checkbox", { name: /Fluency/ }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "Copy the Relevance choice to all labels",
+      }),
+    );
+    await user.click(screen.getByRole("checkbox", { name: /Fluency/ }));
+
+    expect(reasoningOn("Fluency")).toHaveValue("required");
+    await user.click(screen.getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+    expect(onConfirm.mock.calls[0][2].evaluator_reasoning_modes).toEqual({
+      "ev-1": "required",
+      "ev-2": "required",
+      "ev-3": "required",
+    });
+  });
+
+  it("explains the copy button when it is hovered", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+
+    await user.hover(
+      screen.getByRole("button", {
+        name: "Copy the Fluency choice to all labels",
+      }),
+    );
+
+    expect(
+      await screen.findByText("Copy the Fluency choice to all labels"),
+    ).toBeInTheDocument();
   });
 
   it("changes only the label whose dropdown was used", async () => {
@@ -822,6 +877,9 @@ describe("AssignAnnotatorsDialog", () => {
     const { onConfirm } = renderDialog({ evaluators: [evaluators[0]] });
     await screen.findByText("Alice");
     expect(screen.queryByText("Labels")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /to all labels/ }),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Alice"));
     await user.selectOptions(reasoningOn("Relevance"), "Required");
@@ -863,7 +921,9 @@ describe("AssignAnnotatorsDialog", () => {
 
     await user.click(
       within(
-        screen.getByRole("group", { name: "Let annotators leave a comment on each item" }),
+        screen.getByRole("group", {
+          name: "Let annotators leave a comment on each item",
+        }),
       ).getByLabelText("No"),
     );
     await user.selectOptions(reasoningOn("Relevance"), "Required");
@@ -874,7 +934,9 @@ describe("AssignAnnotatorsDialog", () => {
 
     expect(
       within(
-        screen.getByRole("group", { name: "Let annotators leave a comment on each item" }),
+        screen.getByRole("group", {
+          name: "Let annotators leave a comment on each item",
+        }),
       ).getByLabelText("Yes"),
     ).toBeChecked();
     expect(reasoningOn("Relevance")).toHaveValue("optional");
@@ -991,7 +1053,11 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     await screen.findByText("Alice");
     await user.click(screen.getByRole("checkbox", { name: "Alice" }));
     expect(
-      within(screen.getByRole("group", { name: "Reasoning on each label" }))
+      within(
+        screen.getByRole("group", {
+          name: "Ask annotators to explain each score",
+        }),
+      )
         .getAllByRole("combobox")
         .map((d) => d.getAttribute("aria-label")),
     ).toEqual([
