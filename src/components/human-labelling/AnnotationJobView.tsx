@@ -1603,34 +1603,44 @@ function EvaluatorsPane({
               {answeredCount} of {questions.length} answered
             </span>
           </div>
-          {questions.length > 1 && (
+          <div className="flex items-start justify-between gap-3">
             <div className="flex flex-wrap gap-1.5">
-              {questions.map((ev, i) => {
-                const k = fieldKey(item.uuid, ev.uuid);
-                return (
-                  <button
-                    key={ev.uuid}
-                    type="button"
-                    aria-label={`Go to question ${i + 1}`}
-                    onClick={() =>
-                      document
-                        .getElementById(`question-${ev.uuid}`)
-                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                    }
-                    className={`w-7 h-7 rounded-md border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
-                      missingAnswerKeys.has(k)
-                        ? "border-red-500 text-red-600 dark:text-red-400"
-                        : isUnanswered(ev)
-                          ? "border-border bg-background text-foreground hover:bg-muted/50"
-                          : "border-foreground bg-foreground text-background"
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
+              {questions.length > 1 &&
+                questions.map((ev, i) => {
+                  const k = fieldKey(item.uuid, ev.uuid);
+                  return (
+                    <button
+                      key={ev.uuid}
+                      type="button"
+                      aria-label={`Go to question ${i + 1}`}
+                      onClick={() =>
+                        document
+                          .getElementById(`question-${ev.uuid}`)
+                          ?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          })
+                      }
+                      className={`w-7 h-7 rounded-md border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
+                        missingAnswerKeys.has(k)
+                          ? "border-red-500 text-red-600 dark:text-red-400"
+                          : isUnanswered(ev)
+                            ? "border-border bg-background text-foreground hover:bg-muted/50"
+                            : "border-foreground bg-foreground text-background"
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  );
+                })}
             </div>
-          )}
+            <span
+              aria-hidden
+              className="shrink-0 text-sm font-medium text-foreground"
+            >
+              {answeredCount}/{questions.length}
+            </span>
+          </div>
         </div>
       )}
       <ItemDetailsBlock payload={item.payload} metadata={item.metadata} />

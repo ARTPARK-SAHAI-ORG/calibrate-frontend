@@ -2331,6 +2331,7 @@ describe("AnnotationJobView message versions", () => {
       await user.click(screen.getByRole("button", { name: "Correct" }));
       expect(bar).toHaveAttribute("aria-valuenow", "1");
       expect(bar.firstElementChild).toHaveStyle({ width: "50%" });
+      expect(screen.getByText("1/2")).toBeInTheDocument();
     });
 
     it("fills the bar across the job as items are saved, not as they are answered", async () => {
