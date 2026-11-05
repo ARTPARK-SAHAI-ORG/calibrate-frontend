@@ -1,4 +1,4 @@
-import { render, screen, setupUser } from "@/test-utils";
+import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { JobInfoButton } from "../JobInfoButton";
 
 describe("JobInfoButton", () => {
@@ -11,16 +11,16 @@ describe("JobInfoButton", () => {
       />,
     );
 
-  it("shows nothing about the job until opened", () => {
+  it("shows nothing about the job until hovered", () => {
     renderIt();
     expect(screen.queryByText("Aman")).not.toBeInTheDocument();
   });
 
-  it("opens the labeller, the item count and the date, reading the backend's time as UTC", async () => {
+  it("shows the labeller, the item count and the date on hover, reading the backend's time as UTC", async () => {
     const user = setupUser();
     renderIt();
-    await user.click(screen.getByRole("button", { name: "About this job" }));
-    expect(screen.getByText("Labeller")).toBeInTheDocument();
+    await user.hover(screen.getByRole("button", { name: "About this job" }));
+    expect(await screen.findByText("Labeller")).toBeInTheDocument();
     expect(screen.getByText("Aman")).toBeInTheDocument();
     expect(screen.getByText("Items to label")).toBeInTheDocument();
     expect(screen.getByText("9")).toBeInTheDocument();
@@ -29,15 +29,15 @@ describe("JobInfoButton", () => {
     expect(screen.getByText("4 Nov 2026")).toBeInTheDocument();
   });
 
-  it("closes on a second click and on Escape", async () => {
+  it("hides again when the pointer leaves", async () => {
     const user = setupUser();
     renderIt();
     const button = screen.getByRole("button", { name: "About this job" });
-    await user.click(button);
-    await user.click(button);
-    expect(screen.queryByText("Aman")).not.toBeInTheDocument();
-    await user.click(button);
-    await user.keyboard("{Escape}");
-    expect(screen.queryByText("Aman")).not.toBeInTheDocument();
+    await user.hover(button);
+    await screen.findByText("Aman");
+    await user.unhover(button);
+    await waitFor(() =>
+      expect(screen.queryByText("Aman")).not.toBeInTheDocument(),
+    );
   });
 });

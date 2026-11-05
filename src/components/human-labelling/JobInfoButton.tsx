@@ -1,10 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useDismissOnOutside } from "@/hooks/useDismissOnOutside";
+import { Tooltip } from "@/components/Tooltip";
 import { parseBackendTime } from "@/lib/relativeTime";
 
-/** An "i" button beside the job's progress, opening who the job is for, how
+/** An "i" beside the job's progress. Hovering it shows who the job is for, how
  *  big it is and when it was made. */
 export function JobInfoButton({
   labeller,
@@ -15,10 +14,6 @@ export function JobInfoButton({
   itemCount: number;
   createdAt: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  useDismissOnOutside(open, rootRef, () => setOpen(false));
-
   const rows: [string, string | number][] = [
     ["Labeller", labeller],
     ["Items to label", itemCount],
@@ -33,12 +28,35 @@ export function JobInfoButton({
   ];
 
   return (
-    <div ref={rootRef} className="relative shrink-0">
+    <Tooltip
+      position="bottom"
+      alignEnd
+      className="shrink-0"
+      contentStyle={{ width: "18rem", maxWidth: "calc(100vw - 2rem)" }}
+      content={
+        <div>
+          <h2 className="pb-2 mb-1 text-base font-semibold border-b border-gray-200">
+            About this job
+          </h2>
+          <dl className="divide-y divide-gray-200">
+            {rows.map(([name, value]) => (
+              <div
+                key={name}
+                className="flex items-center justify-between gap-4 py-2 text-sm"
+              >
+                <dt>{name}</dt>
+                <dd className="font-medium text-right break-words min-w-0">
+                  {value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      }
+    >
       <button
         type="button"
         aria-label="About this job"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
         className="w-9 h-9 flex items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
       >
         <svg
@@ -56,26 +74,6 @@ export function JobInfoButton({
           />
         </svg>
       </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-2 z-40 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-background shadow-lg overflow-hidden">
-          <h2 className="px-4 py-3 text-base font-semibold text-foreground bg-muted border-b border-border">
-            About this job
-          </h2>
-          <dl className="divide-y divide-border">
-            {rows.map(([name, value]) => (
-              <div
-                key={name}
-                className="flex items-center justify-between gap-4 px-4 py-2.5 text-sm text-foreground"
-              >
-                <dt>{name}</dt>
-                <dd className="font-medium text-right break-words min-w-0">
-                  {value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      )}
-    </div>
+    </Tooltip>
   );
 }
