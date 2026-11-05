@@ -7,6 +7,7 @@ import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
 import { ItemDetailsBlock } from "./ItemDetailsBlock";
+import { JobInfoButton } from "./JobInfoButton";
 import { JobItemColumns } from "./JobItemColumns";
 import {
   getBinaryDescription,
@@ -1153,9 +1154,11 @@ function AnnotateView({
               text={`${itemsDone} of ${items.length} items done`}
             />
           </div>
-          <p className="text-sm text-muted-foreground truncate shrink-0">
-            {data.annotator.name}
-          </p>
+          <JobInfoButton
+            labeller={data.annotator.name}
+            itemCount={items.length}
+            createdAt={data.job.created_at}
+          />
         </div>
       )}
       <div
