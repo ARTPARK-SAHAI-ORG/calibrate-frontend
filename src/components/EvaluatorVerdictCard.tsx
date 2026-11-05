@@ -769,7 +769,7 @@ function WriteReasoning({
   if (!visible && !hasBeenHidden) setHasBeenHidden(true);
   if (!visible) return null;
   return (
-    <div className="space-y-1.5">
+    <div data-tutorial="reason-box" className="space-y-1.5">
       <div className="text-xs font-medium text-muted-foreground">
         Reasoning{disabled || required ? "" : " (optional)"}
       </div>

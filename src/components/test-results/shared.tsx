@@ -1,5 +1,6 @@
 "use client";
 
+import { EVAL_TARGET_CHIP_CLASS } from "./evalTargetChip";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   EvaluatorVerdictCard,
@@ -1191,7 +1192,7 @@ export function TestDetailView({
                             {turnLabel || "Agent"}
                           </span>
                           {isEvalTarget && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                            <span className={EVAL_TARGET_CHIP_CLASS}>
                               Evaluation target
                             </span>
                           )}
@@ -1229,7 +1230,7 @@ export function TestDetailView({
                               {toolCallLabel}
                             </span>
                             {isEvalTarget && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                              <span className={EVAL_TARGET_CHIP_CLASS}>
                                 Evaluation target
                               </span>
                             )}

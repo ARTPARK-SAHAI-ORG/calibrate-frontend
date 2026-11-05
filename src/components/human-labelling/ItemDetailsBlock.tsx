@@ -35,7 +35,10 @@ export function ItemDetailsBlock({
   if (!hasItemDetails(payload, metadata)) return null;
   const description = itemDescriptionOf(payload);
   return (
-    <section className="border border-border rounded-xl bg-muted/20">
+    <section
+      data-tutorial="item-details"
+      className="border border-border rounded-xl bg-muted/20"
+    >
       <Tooltip
         content={open ? "Hide the details" : "Show the details"}
         position="top"

@@ -6,8 +6,16 @@ import { getBackendUrl } from "@/lib/api";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
-import { ItemDetailsBlock } from "./ItemDetailsBlock";
+import { hasItemDetails, ItemDetailsBlock } from "./ItemDetailsBlock";
 import { JobInfoButton } from "./JobInfoButton";
+import { LabellingJobIntro } from "./LabellingJobIntro";
+import { isTourActive, runTour, stopTour } from "@/lib/onboarding/engine";
+import { hasSeenTour, markTourSeen } from "@/lib/onboarding/state";
+import {
+  buildLabellingJobTour,
+  labellingJobTourId,
+  type LabellingJobKind,
+} from "@/lib/onboarding/tours/labellingJob";
 import { ArrowDownIcon } from "@/components/icons";
 import { useDialogNavKeys } from "@/hooks/useDialogNavKeys";
 import { JobItemColumns } from "./JobItemColumns";
@@ -215,6 +223,23 @@ function GreenBar({
       />
     </div>
   );
+}
+
+/** Which intro a job gets. Tool-call items are not a kind of task of their own,
+ *  so a job counts as one only when every item is a tool call. */
+function introKind(data: JobResponse): LabellingJobKind {
+  if (
+    data.items.length > 0 &&
+    data.items.every((it) => it.is_tool_call === true)
+  )
+    return "tool-call";
+  const type = data.task.type;
+  return type === "conversation" ||
+    type === "llm-general" ||
+    type === "stt" ||
+    type === "tts"
+    ? type
+    : "llm";
 }
 
 function drawableOutputType(ev: Evaluator): "binary" | "rating" | null {
@@ -1107,13 +1132,79 @@ function AnnotateView({
     onJumpTo(target);
   };
 
+  // A labeller's first visit to each job opens on the intro. It is remembered in
+  // the browser for that job once skipped or finished, and How this works in the
+  // top row opens it again.
+  const [introOpen, setIntroOpen] = useState(
+    () =>
+      !isAdmin &&
+      data.items.length > 0 &&
+      data.job.status !== "completed" &&
+      !hasSeenTour(labellingJobTourId(data.job.uuid)),
+  );
+  useEffect(() => stopTour, []);
+  // The question the walkthrough is showing as answered, to reveal its reason
+  // box. It is only drawn that way: nothing goes into the answers.
+  const [previewAnswerUuid, setPreviewAnswerUuid] = useState<string | null>(
+    null,
+  );
+  const skipIntro = () => {
+    setIntroOpen(false);
+    markTourSeen(labellingJobTourId(data.job.uuid), "skipped");
+  };
+  const startTutorial = () => {
+    setIntroOpen(false);
+    // Red marks from an earlier Submit would read as part of the walkthrough.
+    setMissingAnswerKeys(new Set());
+    if (!currentItem) return;
+    void runTour(
+      buildLabellingJobTour({
+        jobUuid: data.job.uuid,
+        onPreviewAnswer: setPreviewAnswerUuid,
+        kind: currentItem.is_tool_call === true ? "tool-call" : introKind(data),
+        hasItemDetails: hasItemDetails(
+          currentItem.payload,
+          currentItem.metadata,
+        ),
+        commentsEnabled,
+        questions: evaluatorsFor(currentItem.uuid).flatMap((ev) => {
+          const outputType = drawableOutputType(ev);
+          return outputType
+            ? [
+                {
+                  uuid: ev.uuid,
+                  outputType,
+                  reasoningMode: ev.reasoning_mode ?? "optional",
+                  trueLabel: getBinaryLabel(
+                    ev.output_config?.scale ?? null,
+                    true,
+                  ),
+                  falseLabel: getBinaryLabel(
+                    ev.output_config?.scale ?? null,
+                    false,
+                  ),
+                  scaleMin: ev.scale_min ?? undefined,
+                  scaleMax: ev.scale_max ?? undefined,
+                },
+              ]
+            : [];
+        }),
+      }),
+    );
+  };
+
+  // The arrows belong to the page only while nothing is on top of it.
   useDialogNavKeys({
-    isOpen: pendingNav === null,
+    isOpen: pendingNav === null && !introOpen,
     vertical: true,
     hasPrev: currentIndex > 0,
-    onPrev: () => navigateTo(currentIndex - 1),
+    onPrev: () => {
+      if (!isTourActive()) navigateTo(currentIndex - 1);
+    },
     hasNext: currentIndex < total - 1,
-    onNext: () => navigateTo(currentIndex + 1),
+    onNext: () => {
+      if (!isTourActive()) navigateTo(currentIndex + 1);
+    },
   });
 
   const wrapperClass = fillViewport
@@ -1156,11 +1247,20 @@ function AnnotateView({
               </span>
             )}
           </div>
-          <JobInfoButton
-            labeller={data.annotator.name}
-            itemCount={items.length}
-            createdAt={data.job.created_at}
-          />
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIntroOpen(true)}
+              className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+            >
+              How this works
+            </button>
+            <JobInfoButton
+              labeller={data.annotator.name}
+              itemCount={items.length}
+              createdAt={data.job.created_at}
+            />
+          </div>
         </div>
       )}
       <div
@@ -1260,6 +1360,7 @@ function AnnotateView({
                       : "Submit & Next";
                 return (
                   <button
+                    data-tutorial="job-save"
                     onClick={() => {
                       // Nothing to save yet: take the labeller to what is left.
                       const next =
@@ -1397,6 +1498,7 @@ function AnnotateView({
                     readOnly={isAdmin}
                     commentsEnabled={commentsEnabled}
                     missingAnswerKeys={missingAnswerKeys}
+                    previewAnswerUuid={previewAnswerUuid}
                     reasonsStillNeeded={
                       new Set(reasoningMissingFor(currentItem.uuid))
                     }
@@ -1421,6 +1523,13 @@ function AnnotateView({
           </main>
         </div>
       </div>
+      {introOpen && (
+        <LabellingJobIntro
+          kind={introKind(data)}
+          onSkip={skipIntro}
+          onStart={startTutorial}
+        />
+      )}
       {pendingNav !== null && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -1529,6 +1638,7 @@ function EvaluatorsPane({
   commentsEnabled,
   missingReasoningKeys,
   missingAnswerKeys,
+  previewAnswerUuid,
   reasonsStillNeeded,
   itemComment,
   onItemCommentChange,
@@ -1544,6 +1654,8 @@ function EvaluatorsPane({
   missingReasoningKeys: Set<FieldKey>;
   /** Required questions marked red after Submit was pressed without them. */
   missingAnswerKeys: Set<FieldKey>;
+  /** The walkthrough showing this question as answered, saving nothing. */
+  previewAnswerUuid: string | null;
   /** Answers the save would refuse right now for having no reason. */
   reasonsStillNeeded: Set<FieldKey>;
   /** Current free-text comment for this item — backed by the
@@ -1564,7 +1676,7 @@ function EvaluatorsPane({
     ? trimmedComment.length > 0
     : commentsEnabled;
   const commentBlock = showCommentBlock ? (
-    <div className="space-y-1.5">
+    <div data-tutorial="job-comments" className="space-y-1.5">
       <h3 className="text-sm font-semibold">
         Comments {readOnly ? "" : "(optional)"}
       </h3>
@@ -1622,15 +1734,21 @@ function EvaluatorsPane({
     const k = fieldKey(item.uuid, ev.uuid);
     return !hasFieldValue(fields[k]) || reasonsStillNeeded.has(k);
   };
-  const answeredCount = questions.filter((ev) => !isUnanswered(ev)).length;
+  // The walkthrough can show one question as answered: drawn, never stored.
+  const looksAnswered = (ev: Evaluator) =>
+    !isUnanswered(ev) || previewAnswerUuid === ev.uuid;
+  const answeredCount = questions.filter(looksAnswered).length;
   const showGuidance = !readOnly && questions.length > 0;
   // The outline on the first question left is what says where to answer.
-  const nextQuestion = questions.find(isUnanswered);
+  const nextQuestion = questions.find((ev) => !looksAnswered(ev));
 
   return (
     <div className="space-y-3 pb-4 md:pb-6">
       {showGuidance && (
-        <div className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-background border-b border-border space-y-2">
+        <div
+          data-tutorial="job-progress"
+          className="sticky top-0 md:-top-6 z-10 -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-background border-b border-border space-y-2"
+        >
           <span className="sr-only">
             {answeredCount} of {questions.length} answered
           </span>
@@ -1663,7 +1781,7 @@ function EvaluatorsPane({
                       className={`shrink-0 w-7 h-7 rounded-md border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
                         missingAnswerKeys.has(k)
                           ? "border-red-500 text-red-600 dark:text-red-400"
-                          : isUnanswered(ev)
+                          : !looksAnswered(ev)
                             ? "border-border bg-background text-foreground hover:bg-muted/50"
                             : "border-foreground bg-foreground text-background"
                       }`}
@@ -1780,6 +1898,7 @@ function EvaluatorsPane({
             />
           );
         }
+        const showPreview = previewAnswerUuid === ev.uuid && !hasFieldValue(f);
         return (
           <div key={k} id={`question-${ev.uuid}`}>
             <EvaluatorVerdictCard
@@ -1790,7 +1909,7 @@ function EvaluatorsPane({
               question={{
                 number: questions.indexOf(ev) + 1,
                 total: questions.length,
-                answered: !isUnanswered(ev),
+                answered: looksAnswered(ev),
               }}
               answerMissing={missingAnswerKeys.has(k)}
               isNextQuestion={ev === nextQuestion}
@@ -1799,7 +1918,11 @@ function EvaluatorsPane({
               scaleMin={scaleMin}
               scaleMax={scaleMax}
               variableValues={variableValues}
-              value={f?.value as boolean | number | undefined}
+              value={
+                showPreview
+                  ? outputType === "binary" || (scaleMin ?? 1)
+                  : (f?.value as boolean | number | undefined)
+              }
               comment={typeof f?.comment === "string" ? f.comment : ""}
               reasoningMissing={missingReasoningKeys.has(k)}
               reasoningMode={ev.reasoning_mode ?? "optional"}

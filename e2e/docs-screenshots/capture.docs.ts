@@ -25,6 +25,16 @@ test("docs screenshots", async ({ page, browser, request }) => {
 
   // New pages take the project's options, sign-in included, so clear it.
   const signedOut = await browser.newPage({ storageState: { cookies: [], origins: [] } });
+  // The labeller's first-visit intro would otherwise cover every picture of the job.
+  await signedOut.addInitScript(() => {
+    // The flag is per job and the jobs are made during this run, so answer for all.
+    const read = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key: string) {
+      return key.startsWith("calibrate:onboarding:v1:labelling-job:")
+        ? "skipped"
+        : read.call(this, key);
+    };
+  });
 
   // Every shot is tried, so one run names all the broken ones.
   const failed: string[] = [];

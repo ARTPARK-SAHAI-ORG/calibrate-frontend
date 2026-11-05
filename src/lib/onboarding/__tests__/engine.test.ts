@@ -4,6 +4,7 @@ let capturedDriverConfig: {
   onPopoverRender?: (popover: {
     wrapper?: HTMLElement;
     footer?: HTMLElement;
+    progress?: HTMLElement;
   }) => void;
 } | null = null;
 
@@ -306,6 +307,30 @@ describe("onboarding engine", () => {
   it("injects a Skip tour button that ends the tour", async () => {
     await runTour({
       id: "demo",
+      steps: [
+        { title: "One", description: "First" },
+        { title: "Two", description: "Last" },
+      ],
+    });
+
+    const footer = document.createElement("div");
+    capturedDriverConfig?.onPopoverRender?.({
+      wrapper: document.createElement("div"),
+      footer,
+    });
+
+    const skip = footer.querySelector<HTMLButtonElement>(
+      ".calibrate-tour-skip",
+    );
+    expect(skip?.textContent).toBe("Skip tour");
+    skip?.click();
+
+    expect(getTourStatus("demo")).toBe("skipped");
+  });
+
+  it("leaves Skip tour off the last card", async () => {
+    await runTour({
+      id: "demo",
       steps: [{ title: "One", description: "Only" }],
     });
 
@@ -315,11 +340,80 @@ describe("onboarding engine", () => {
       footer,
     });
 
-    const skip = footer.querySelector<HTMLButtonElement>(".calibrate-tour-skip");
-    expect(skip?.textContent).toBe("Skip tour");
-    skip?.click();
+    expect(footer.querySelector(".calibrate-tour-skip")).toBeNull();
+  });
 
-    expect(getTourStatus("demo")).toBe("skipped");
+  it("shows the step's place only on a tour that asks for it, and keeps it current", async () => {
+    const render = (progress: HTMLElement) =>
+      capturedDriverConfig?.onPopoverRender?.({ progress });
+    const steps = [
+      { title: "One", description: "First" },
+      { title: "Two", description: "Last" },
+    ];
+    await runTour({ id: "plain", steps });
+    const plain = document.createElement("span");
+    render(plain);
+    expect(plain.textContent).toBe("");
+
+    await runTour({ id: "counted", steps, showStepCount: true });
+    const counted = document.createElement("span");
+    render(counted);
+    expect(counted.textContent).toBe("1 of 2");
+    expect(counted.style.display).toBe("block");
+
+    mockHighlight.mock.calls.at(-1)?.[0].popover.onNextClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    render(counted);
+    expect(counted.textContent).toBe("2 of 2");
+  });
+
+  it("offers Back from the second card on a tour that allows it, and steps back", async () => {
+    const steps = [
+      { title: "One", description: "First" },
+      { title: "Two", description: "Last" },
+    ];
+    await runTour({ id: "back", steps, allowBack: true });
+    const shown = () => mockHighlight.mock.calls.at(-1)?.[0].popover;
+    expect(shown().showButtons).toEqual(["next", "close"]);
+    shown().onNextClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(shown().title).toBe("Two");
+    expect(shown().showButtons).toEqual(["previous", "next", "close"]);
+    expect(shown().prevBtnText).toBe("Back");
+    shown().onPrevClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(shown().title).toBe("One");
+  });
+
+  it("runs a step's leave however the step ends", async () => {
+    const leave = jest.fn();
+    const steps = [
+      { title: "One", description: "First", leave },
+      { title: "Two", description: "Last" },
+    ];
+    await runTour({ id: "left", steps, allowBack: true });
+    mockHighlight.mock.calls.at(-1)?.[0].popover.onNextClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(leave).toHaveBeenCalledTimes(1);
+
+    mockHighlight.mock.calls.at(-1)?.[0].popover.onPrevClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    stopTour();
+    expect(leave).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not offer Back on a tour that does not allow it", async () => {
+    await runTour({
+      id: "plain",
+      steps: [
+        { title: "One", description: "First" },
+        { title: "Two", description: "Last" },
+      ],
+    });
+    const shown = () => mockHighlight.mock.calls.at(-1)?.[0].popover;
+    shown().onNextClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(shown().showButtons).toEqual(["next", "close"]);
   });
 
   it("destroys a previous tour when a new one starts", async () => {

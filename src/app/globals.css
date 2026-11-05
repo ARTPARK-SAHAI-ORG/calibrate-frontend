@@ -232,8 +232,9 @@ body {
 }
 
 .driver-popover.calibrate-tour .driver-popover-progress-text {
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
 }
 
 /* "Skip tour" affordance injected into the footer nav group. */
