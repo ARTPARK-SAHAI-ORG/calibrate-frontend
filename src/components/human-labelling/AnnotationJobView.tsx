@@ -1664,9 +1664,9 @@ function EvaluatorsPane({
                 All questions answered
               </span>
             ) : answeredCount === 0 ? (
-              <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <span className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-300">
                 Answer the questions below
-                <ArrowDownIcon className="w-4 h-4" />
+                <ArrowDownIcon className="w-4 h-4 motion-safe:animate-bounce" />
               </span>
             ) : (
               <span
