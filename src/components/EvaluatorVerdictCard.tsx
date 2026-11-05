@@ -765,8 +765,10 @@ function WriteReasoning({
   // A reason is only asked for once there is an answer to explain.
   const visible = !!(disabled || answered || value);
   // Only a box that arrives because of an answer just given is highlighted,
-  // never one already there when the item opened.
-  const [startedHidden] = useState(!visible);
+  // never one already there when the item opened. An answer unselected and
+  // picked again counts as arriving.
+  const [hasBeenHidden, setHasBeenHidden] = useState(!visible);
+  if (!visible && !hasBeenHidden) setHasBeenHidden(true);
   if (!visible) return null;
   return (
     <div className="space-y-1.5">
@@ -780,7 +782,7 @@ function WriteReasoning({
         placeholder={disabled ? "" : "Add your reasoning"}
         rows={2}
         className={`w-full text-sm rounded-md border bg-background px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20 disabled:opacity-60 ${
-          startedHidden ? "reason-box-appear " : ""
+          hasBeenHidden ? "reason-box-appear " : ""
         }${missing ? "border-red-500" : "border-border"}`}
       />
       {missing && (

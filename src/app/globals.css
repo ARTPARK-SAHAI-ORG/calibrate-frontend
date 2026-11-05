@@ -362,16 +362,7 @@ body {
 
 /* The reason box lighting up as it appears, once an answer has been picked. */
 @keyframes reason-box-appear {
-  0% {
-    opacity: 0;
-    transform: translateY(-4px);
-    box-shadow: 0 0 0 3px rgb(245 158 11 / 0.7);
-    border-color: rgb(245 158 11);
-  }
-  20% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  0%,
   70% {
     box-shadow: 0 0 0 3px rgb(245 158 11 / 0.7);
     border-color: rgb(245 158 11);
@@ -382,11 +373,5 @@ body {
 }
 
 .reason-box-appear {
-  animation: reason-box-appear 1.6s ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .reason-box-appear {
-    animation: none;
-  }
+  animation: reason-box-appear 3s ease-out;
 }

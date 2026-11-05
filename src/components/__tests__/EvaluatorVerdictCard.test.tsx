@@ -989,8 +989,13 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
     expect(screen.getByRole("textbox")).toHaveClass("reason-box-appear");
     unmount();
 
-    render(card(true));
+    const saved = render(card(true));
     expect(screen.getByRole("textbox")).not.toHaveClass("reason-box-appear");
+
+    // A saved answer unselected and picked again counts as arriving.
+    saved.rerender(card());
+    saved.rerender(card(true));
+    expect(screen.getByRole("textbox")).toHaveClass("reason-box-appear");
   });
 
   it("shows an optional reason that is already written, even with no answer", () => {
