@@ -1644,7 +1644,7 @@ function EvaluatorsPane({
     ? trimmedComment.length > 0
     : commentsEnabled;
   const commentBlock = showCommentBlock ? (
-    <div className="space-y-1.5">
+    <div data-tutorial="job-comments" className="space-y-1.5">
       <h3 className="text-sm font-semibold">
         Comments {readOnly ? "" : "(optional)"}
       </h3>
@@ -1898,7 +1898,7 @@ function EvaluatorsPane({
         );
       })}
       {!readOnly && commentBlock && (
-        <div data-tutorial="job-comments" className="pt-1">
+        <div className="pt-1">
           {commentBlock}
         </div>
       )}

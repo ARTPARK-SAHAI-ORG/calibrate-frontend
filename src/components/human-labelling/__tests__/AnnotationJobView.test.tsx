@@ -2888,6 +2888,16 @@ describe("AnnotationJobView intro and walkthrough", () => {
     expect(await screen.findByText(question)).toBeInTheDocument();
   });
 
+  it("marks the comment box for the walkthrough even on a job with no evaluators", async () => {
+    window.localStorage.setItem(TOUR_SEEN_KEY, "skipped");
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse({ evaluators: [] })));
+    const { container } = render(<AnnotationJobView token="tok" mode="public" />);
+    await screen.findByText("Comments (optional)");
+    expect(
+      container.querySelector('[data-tutorial="job-comments"]'),
+    ).toHaveTextContent("Comments (optional)");
+  });
+
   it("brings the intro back from How this works", async () => {
     window.localStorage.setItem(TOUR_SEEN_KEY, "skipped");
     const user = setupUser();
