@@ -113,8 +113,8 @@ export function buildLabellingJobTour({
     steps.push({
       anchor: '[data-tutorial="item-details"]',
       side: "left",
-      title: "Item details",
-      description: "Click to see more about the item",
+      title: "Case details",
+      description: "Click to see more about the case",
     });
   if (firstChoice)
     steps.push({
@@ -148,7 +148,7 @@ export function buildLabellingJobTour({
       anchor: '[data-tutorial="job-comments"]',
       side: "left",
       title: "Leave a comment",
-      description: "Add any notes about the item here",
+      description: "Add any notes about the case here",
     });
   if (questions.length > 0)
     steps.push({
@@ -168,7 +168,7 @@ export function buildLabellingJobTour({
     side: "bottom",
     align: "end",
     title: "Submit your answers",
-    description: "Press this to submit your answers and go to the next item",
+    description: "Press this to submit your answers and go to the next case",
     actionLabel: "Start labelling",
   });
   return {

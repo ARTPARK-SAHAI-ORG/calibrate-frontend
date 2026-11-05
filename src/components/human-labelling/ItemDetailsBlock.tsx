@@ -26,10 +26,12 @@ export function ItemDetailsBlock({
   payload,
   metadata,
   defaultOpen = false,
+  heading = "Item details",
 }: {
   payload: unknown;
   metadata?: MetadataEntry[] | null;
   defaultOpen?: boolean;
+  heading?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   if (!hasItemDetails(payload, metadata)) return null;
@@ -49,7 +51,7 @@ export function ItemDetailsBlock({
           onClick={() => setOpen((o) => !o)}
           className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-base font-semibold text-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
         >
-          Item details
+          {heading}
           <svg
             className={`w-4 h-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
             fill="none"

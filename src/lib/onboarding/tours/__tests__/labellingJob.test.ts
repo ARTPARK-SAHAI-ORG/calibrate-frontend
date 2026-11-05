@@ -69,7 +69,7 @@ describe("buildLabellingJobTour", () => {
     const steps = titles(
       build({ hasItemDetails: true, commentsEnabled: true }),
     );
-    expect(steps).toContain("Item details");
+    expect(steps).toContain("Case details");
     expect(steps).toContain("Leave a comment");
   });
 
@@ -169,7 +169,7 @@ describe("buildLabellingJobTour", () => {
       "<strong>Expected answer</strong>",
     );
     expect(build().at(-1)?.description).toBe(
-      "Press this to submit your answers and go to the next item",
+      "Press this to submit your answers and go to the next case",
     );
   });
 

@@ -15,7 +15,7 @@ export function JobInfoButton({
 }) {
   const rows: [string, string | number][] = [
     ["Labeller", labeller],
-    ["Items to label", itemCount],
+    ["Cases to label", itemCount],
     [
       "Date created",
       parseBackendTime(createdAt).toLocaleDateString("en-GB", {

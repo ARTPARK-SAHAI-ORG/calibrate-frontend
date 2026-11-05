@@ -1,5 +1,9 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { hasItemDetails, ItemDetailsBlock, itemDescriptionOf } from "../ItemDetailsBlock";
+import {
+  hasItemDetails,
+  ItemDetailsBlock,
+  itemDescriptionOf,
+} from "../ItemDetailsBlock";
 
 describe("ItemDetailsBlock", () => {
   it("draws the trimmed description and the metadata", () => {
@@ -23,9 +27,9 @@ describe("ItemDetailsBlock", () => {
         defaultOpen
       />,
     );
-    const box = screen.getByRole("button", { name: "Item details" }).closest(
-      "section",
-    );
+    const box = screen
+      .getByRole("button", { name: "Item details" })
+      .closest("section");
     expect(box).toContainElement(screen.getByText("Mother asks"));
     expect(box).toContainElement(screen.getByText("district"));
   });
@@ -60,5 +64,17 @@ describe("ItemDetailsBlock", () => {
     expect(itemDescriptionOf({ description: 3 })).toBe("");
     expect(hasItemDetails({}, [{ key: "a", value: "b" }])).toBe(true);
     expect(hasItemDetails({ description: " " }, null)).toBe(false);
+  });
+
+  it("uses the heading it is given", () => {
+    render(
+      <ItemDetailsBlock
+        heading="Case details"
+        payload={{ description: "D" }}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Case details" }),
+    ).toBeInTheDocument();
   });
 });

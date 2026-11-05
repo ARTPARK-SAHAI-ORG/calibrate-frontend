@@ -312,7 +312,7 @@ test.describe("Send for review (authenticated, real backend)", () => {
           .click({ timeout: 45000 });
       // Wait for the items to be on screen, so "no button" is a real absence
       // and not a page that had not loaded yet.
-      await expect(page.getByText("Item 1 of 3")).toBeVisible({
+      await expect(page.getByText("Case 1 of 3")).toBeVisible({
         timeout: 45000,
       });
       await expect(
