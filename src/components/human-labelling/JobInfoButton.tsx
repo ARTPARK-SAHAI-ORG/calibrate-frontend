@@ -58,7 +58,7 @@ export function JobInfoButton({
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-2 z-40 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-background shadow-lg overflow-hidden">
-          <h2 className="px-4 py-3 text-sm font-semibold text-foreground border-b border-border">
+          <h2 className="px-4 py-3 text-base font-semibold text-foreground bg-muted border-b border-border">
             About this job
           </h2>
           <dl className="divide-y divide-border">
@@ -68,7 +68,7 @@ export function JobInfoButton({
                 className="flex items-center justify-between gap-4 px-4 py-2.5 text-sm text-foreground"
               >
                 <dt>{name}</dt>
-                <dd className="font-semibold text-right break-words min-w-0">
+                <dd className="font-medium text-right break-words min-w-0">
                   {value}
                 </dd>
               </div>
