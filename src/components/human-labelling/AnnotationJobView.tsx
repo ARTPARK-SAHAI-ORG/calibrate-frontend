@@ -1292,12 +1292,7 @@ function AnnotateView({
                 canResize={!isAdmin}
                 leftHasOwnPadding={itemPaneHasOwnPadding(data.task.type)}
                 rightRef={evaluatorsPaneRef}
-                left={
-                  <ItemPane
-                    item={currentItem}
-                    taskType={data.task.type}
-                  />
-                }
+                left={<ItemPane item={currentItem} taskType={data.task.type} />}
                 right={
                   <EvaluatorsPane
                     evaluators={evaluators}
@@ -1307,6 +1302,9 @@ function AnnotateView({
                     setField={setField}
                     readOnly={isAdmin}
                     commentsEnabled={commentsEnabled}
+                    reasonsStillNeeded={
+                      new Set(reasoningMissingFor(currentItem.uuid))
+                    }
                     missingReasoningKeys={
                       new Set(
                         reasoningMissingFor(currentItem.uuid).filter((k) =>
@@ -1405,10 +1403,8 @@ export function ItemPane({
   // the tool-call pane, which reads `chat_history` / `agent_response`.
   if (taskType === "llm-general")
     return <LlmGeneralItemPane payload={payload} />;
-  if (item.is_tool_call === true)
-    return <ToolCallItemPane payload={payload} />;
-  if (taskType === "llm")
-    return <LlmItemPane payload={payload} />;
+  if (item.is_tool_call === true) return <ToolCallItemPane payload={payload} />;
+  if (taskType === "llm") return <LlmItemPane payload={payload} />;
   if (taskType === "conversation")
     return <ConversationItemPane payload={payload} />;
   return (
@@ -1431,6 +1427,7 @@ function EvaluatorsPane({
   readOnly,
   commentsEnabled,
   missingReasoningKeys,
+  reasonsStillNeeded,
   itemComment,
   onItemCommentChange,
 }: {
@@ -1444,6 +1441,8 @@ function EvaluatorsPane({
   commentsEnabled: boolean;
   /** Labels whose empty reasoning box refused the last save, marked red. */
   missingReasoningKeys: Set<FieldKey>;
+  /** Answers the save would refuse right now for having no reason. */
+  reasonsStillNeeded: Set<FieldKey>;
   /** Current free-text comment for this item — backed by the
    * `evaluator_id IS NULL` annotation slot. */
   itemComment: string;
@@ -1516,13 +1515,10 @@ function EvaluatorsPane({
   // An evaluator of a type this page cannot draw has nothing to answer, so it
   // gets no number and does not count towards the total.
   const questions = forItem.filter(drawableOutputType);
-  // A job that requires reasoning refuses an answer with no reason, so that
-  // answer is not finished yet.
+  // An answer the save would refuse for having no reason is not finished yet.
   const isUnanswered = (ev: Evaluator) => {
-    const f = fields[fieldKey(item.uuid, ev.uuid)];
-    return (
-      !hasFieldValue(f) || (reasoningMode === "required" && !f?.comment?.trim())
-    );
+    const k = fieldKey(item.uuid, ev.uuid);
+    return !hasFieldValue(fields[k]) || reasonsStillNeeded.has(k);
   };
   const nextUnanswered = questions.find(isUnanswered);
   const showGuidance = !readOnly && questions.length > 0;

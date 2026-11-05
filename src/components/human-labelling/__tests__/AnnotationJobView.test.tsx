@@ -2392,10 +2392,10 @@ describe("AnnotationJobView message versions", () => {
       fetchMock.mockResolvedValue(
         jsonResponse(
           jobResponse({
-            job: {
-              ...jobResponse().job,
+            evaluators: evaluators.map((ev) => ({
+              ...ev,
               reasoning_mode: "required",
-            },
+            })),
           }),
         ),
       );
@@ -2409,6 +2409,32 @@ describe("AnnotationJobView message versions", () => {
         "Because",
       );
       expect(screen.getByText("1 of 2 answered")).toBeInTheDocument();
+    });
+
+    it("counts an answer that arrived saved with no reason, since the save accepts it", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            evaluators: evaluators.map((ev) => ({
+              ...ev,
+              reasoning_mode: "required",
+            })),
+            annotations: [
+              {
+                uuid: "a1",
+                job_id: "job-1",
+                item_id: "item-1",
+                evaluator_id: "ev-1",
+                value: { value: true },
+                created_at: "",
+                updated_at: "",
+              },
+            ],
+          }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      expect(await screen.findByText("1 of 2 answered")).toBeInTheDocument();
     });
 
     it("starts each item from the top of the right column", async () => {
