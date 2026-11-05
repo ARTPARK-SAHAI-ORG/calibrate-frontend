@@ -152,4 +152,13 @@ describe("LlmGeneralItemPane name pills", () => {
       expect(screen.getByText(name).className).toContain("bg-purple-500/10");
     }
   });
+
+  it("still draws the expected answer when input and output are empty", () => {
+    render(
+      <LlmGeneralItemPane
+        payload={{ expected_tool_calls: [{ tool: "book_train", arguments: {} }] }}
+      />,
+    );
+    expect(screen.getByText("Expected answer")).toBeInTheDocument();
+  });
 });

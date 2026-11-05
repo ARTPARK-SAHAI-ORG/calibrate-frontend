@@ -1016,7 +1016,7 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
         mode="write"
         name="Eval"
         outputType="binary"
-        question={{ number: 3, total: 12 }}
+        question={{ number: 3, total: 12, answered: false }}
       />,
     );
     expect(screen.getByLabelText("Question 3 of 12")).not.toHaveClass(
@@ -1028,7 +1028,7 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
         name="Eval"
         outputType="binary"
         value={true}
-        question={{ number: 3, total: 12 }}
+        question={{ number: 3, total: 12, answered: true }}
       />,
     );
     expect(screen.getByLabelText("Question 3 of 12")).toHaveClass(
@@ -1039,7 +1039,7 @@ describe("EvaluatorVerdictCard - reasoningMode", () => {
         mode="write"
         name="Eval"
         outputType="binary"
-        question={{ number: 1, total: 1 }}
+        question={{ number: 1, total: 1, answered: false }}
       />,
     );
     expect(screen.queryByLabelText("Question 1 of 1")).not.toBeInTheDocument();

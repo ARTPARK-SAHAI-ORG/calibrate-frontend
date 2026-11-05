@@ -57,8 +57,13 @@ export function ToolCallItemPane({
 
   if (history.length === 0) {
     return (
-      <div className="border border-border rounded-xl p-4">
-        <p className="text-sm text-muted-foreground">—</p>
+      <div className="space-y-4">
+        <div className="border border-border rounded-xl p-4">
+          <p className="text-sm text-muted-foreground">—</p>
+        </div>
+        <div className="pl-4">
+          <ExpectedToolCalls payload={payload} />
+        </div>
       </div>
     );
   }

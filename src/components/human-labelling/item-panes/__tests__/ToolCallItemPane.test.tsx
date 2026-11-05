@@ -124,4 +124,13 @@ describe("ToolCallItemPane", () => {
     expect(screen.getByText("Hi")).toBeInTheDocument();
     expect(screen.queryByText("English")).not.toBeInTheDocument();
   });
+
+  it("still draws the expected answer when the agent's side is empty", () => {
+    render(
+      <ToolCallItemPane
+        payload={{ expected_tool_calls: [{ tool: "book_train", arguments: {} }] }}
+      />,
+    );
+    expect(screen.getByText("Expected answer")).toBeInTheDocument();
+  });
 });

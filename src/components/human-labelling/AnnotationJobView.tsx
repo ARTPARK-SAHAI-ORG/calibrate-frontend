@@ -189,6 +189,34 @@ function hasFieldValue(f?: FieldValue): boolean {
   return !!f && f.value !== undefined && f.value !== null && f.value !== "";
 }
 
+function GreenBar({
+  label,
+  done,
+  total,
+  className,
+}: {
+  label: string;
+  done: number;
+  total: number;
+  className: string;
+}) {
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={total}
+      aria-valuenow={done}
+      className={`bg-muted ${className}`}
+    >
+      <div
+        className="h-full bg-green-500 transition-[width] duration-300"
+        style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }}
+      />
+    </div>
+  );
+}
+
 function drawableOutputType(ev: Evaluator): "binary" | "rating" | null {
   return ev.output_type === "binary" || ev.output_type === "rating"
     ? ev.output_type
@@ -824,8 +852,11 @@ function AnnotateView({
       })
       .map((ev) => fieldKey(itemId, ev.uuid));
 
+  // Only a question the page can draw can be gone to.
   const firstUnansweredRequired = (itemId: string) =>
-    requiredEvaluatorsFor(itemId).find((ev) => !evaluatorAnswered(itemId, ev));
+    requiredEvaluatorsFor(itemId)
+      .filter(drawableOutputType)
+      .find((ev) => !evaluatorAnswered(itemId, ev));
   const scrollToQuestion = (ev: Evaluator, behavior: ScrollBehavior) =>
     document
       .getElementById(`question-${ev.uuid}`)
@@ -1140,21 +1171,12 @@ function AnnotateView({
         }
       >
         {!isAdmin && (
-          <div
-            role="progressbar"
-            aria-label="Items done"
-            aria-valuemin={0}
-            aria-valuemax={items.length}
-            aria-valuenow={itemsDone}
-            className="h-1 shrink-0 bg-muted"
-          >
-            <div
-              className="h-full bg-green-500 transition-[width] duration-300"
-              style={{
-                width: `${items.length > 0 ? (itemsDone / items.length) * 100 : 0}%`,
-              }}
-            />
-          </div>
+          <GreenBar
+            label="Items done"
+            done={itemsDone}
+            total={items.length}
+            className="h-1 shrink-0"
+          />
         )}
         <header className="border-b border-border px-4 md:px-6 py-3 flex flex-col gap-3 md:grid md:grid-cols-3 md:items-center md:gap-4">
           <div className="min-w-0 flex items-center gap-3">
@@ -1219,7 +1241,15 @@ function AnnotateView({
                   requiredEvaluatorsFor(currentItem.uuid).every((ev) =>
                     evaluatorAnswered(currentItem.uuid, ev),
                   );
-                const disabled = submitting || total === 0;
+                // Answers left to give send the labeller to them. With
+                // nothing to answer and nothing to save, pressing it would do
+                // nothing, so it says so instead.
+                const nothingToDo =
+                  !!currentItem &&
+                  !allEvaluatorsAnswered &&
+                  !canSave &&
+                  !firstUnansweredRequired(currentItem.uuid);
+                const disabled = submitting || total === 0 || nothingToDo;
                 const label = submitting
                   ? "Saving..."
                   : // Saving a removed required answer does not finish the job.
@@ -1468,7 +1498,14 @@ export function ItemPane({
   // the tool-call pane, which reads `chat_history` / `agent_response`.
   if (taskType === "llm-general")
     return <LlmGeneralItemPane payload={payload} />;
-  if (item.is_tool_call === true) return <ToolCallItemPane payload={payload} />;
+  // The flag is stamped by the backend and absent on a run's copy of an item
+  // and on older responses, so the lists it is worked out from count too.
+  if (
+    item.is_tool_call === true ||
+    Array.isArray(payload.expected_tool_calls) ||
+    Array.isArray(payload.actual_tool_calls)
+  )
+    return <ToolCallItemPane payload={payload} />;
   if (taskType === "llm") return <LlmItemPane payload={payload} />;
   if (taskType === "conversation")
     return <ConversationItemPane payload={payload} />;
@@ -1598,24 +1635,15 @@ function EvaluatorsPane({
             {answeredCount} of {questions.length} answered
           </span>
           {answeredCount > 0 && (
-            <div
-              role="progressbar"
-              aria-label="Questions answered"
-              aria-valuemin={0}
-              aria-valuemax={questions.length}
-              aria-valuenow={answeredCount}
-              className="h-2 rounded-full bg-muted overflow-hidden"
-            >
-              <div
-                className="h-full rounded-full bg-green-500 transition-[width] duration-300"
-                style={{
-                  width: `${(answeredCount / questions.length) * 100}%`,
-                }}
-              />
-            </div>
+            <GreenBar
+              label="Questions answered"
+              done={answeredCount}
+              total={questions.length}
+              className="h-2 rounded-full overflow-hidden"
+            />
           )}
           <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex gap-1.5 min-w-0 overflow-x-auto">
               {questions.length > 1 &&
                 questions.map((ev, i) => {
                   const k = fieldKey(item.uuid, ev.uuid);
@@ -1632,7 +1660,7 @@ function EvaluatorsPane({
                             block: "start",
                           })
                       }
-                      className={`w-7 h-7 rounded-md border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
+                      className={`shrink-0 w-7 h-7 rounded-md border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
                         missingAnswerKeys.has(k)
                           ? "border-red-500 text-red-600 dark:text-red-400"
                           : isUnanswered(ev)
@@ -1762,6 +1790,7 @@ function EvaluatorsPane({
               question={{
                 number: questions.indexOf(ev) + 1,
                 total: questions.length,
+                answered: !isUnanswered(ev),
               }}
               answerMissing={missingAnswerKeys.has(k)}
               isNextQuestion={ev === nextQuestion}

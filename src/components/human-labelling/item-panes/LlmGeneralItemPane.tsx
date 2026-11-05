@@ -41,6 +41,9 @@ export function LlmGeneralItemPane({
             {JSON.stringify(payload, null, 2)}
           </pre>
         </Section>
+        <div className="pl-4">
+          <ExpectedToolCalls payload={payload} />
+        </div>
       </div>
     );
   }

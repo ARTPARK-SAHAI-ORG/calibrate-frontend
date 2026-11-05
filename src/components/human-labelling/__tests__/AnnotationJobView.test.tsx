@@ -2347,6 +2347,42 @@ describe("AnnotationJobView message versions", () => {
       expect(screen.getByText("1/2")).toBeInTheDocument();
     });
 
+    it("keeps the question number and its button agreeing while a required reason is missing", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            evaluators: evaluators.map((ev) => ({
+              ...ev,
+              reasoning_mode: "required",
+            })),
+          }),
+        ),
+      );
+      const user = setupUser();
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await user.click(await screen.findByRole("button", { name: "Correct" }));
+      expect(screen.getByLabelText("Question 1 of 2")).not.toHaveClass(
+        "bg-foreground",
+      );
+      expect(
+        screen.getByRole("button", { name: "Go to question 1" }),
+      ).not.toHaveClass("bg-foreground");
+    });
+
+    it("disables the save button when a row has nothing to answer and nothing to save", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          jobResponse({
+            items: [{ ...items[0], is_tool_call: true }],
+          }),
+        ),
+      );
+      render(<AnnotationJobView token="tok" mode="public" />);
+      expect(
+        await screen.findByRole("button", { name: /Mark as complete/ }),
+      ).toBeDisabled();
+    });
+
     it("says every question is answered in place of the count", async () => {
       fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
       const user = setupUser();

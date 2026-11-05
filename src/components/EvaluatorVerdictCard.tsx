@@ -42,7 +42,7 @@ type CommonProps = {
   /** This card's place in a list of questions someone is answering. Makes the
    * name a heading above a quieter description, and draws the number in a
    * circle that fills in once answered, whichever answer was picked. A list of one draws no circle. */
-  question?: { number: number; total: number };
+  question?: { number: number; total: number; answered: boolean };
   /** Marks the card red and says it needs an answer. */
   answerMissing?: boolean;
   /** Outlines the card as the next one to answer. */
@@ -231,9 +231,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             <span
               aria-label={`Question ${props.question.number} of ${props.question.total}`}
               className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
-                props.mode === "write" &&
-                props.value !== undefined &&
-                props.value !== null
+                props.question.answered
                   ? "bg-foreground text-background"
                   : "border border-foreground/30 bg-background text-foreground"
               }`}

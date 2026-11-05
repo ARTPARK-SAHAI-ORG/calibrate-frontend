@@ -1,9 +1,8 @@
 "use client";
 
-import { Tooltip } from "@/components/Tooltip";
 import { parseBackendTime } from "@/lib/relativeTime";
 
-/** An "i" beside the job's progress. Hovering it shows who the job is for, how
+/** An "i" beside the job's progress. Hovering, tapping or tabbing to it shows who the job is for, how
  *  big it is and when it was made. */
 export function JobInfoButton({
   labeller,
@@ -27,33 +26,9 @@ export function JobInfoButton({
     ],
   ];
 
+  // Hover for a mouse, focus for a keyboard or a tap on a phone.
   return (
-    <Tooltip
-      position="bottom"
-      alignEnd
-      className="shrink-0"
-      contentStyle={{ width: "18rem", maxWidth: "calc(100vw - 2rem)" }}
-      content={
-        <div>
-          <h2 className="pb-2 mb-1 text-base font-semibold border-b border-gray-200">
-            About this job
-          </h2>
-          <dl className="divide-y divide-gray-200">
-            {rows.map(([name, value]) => (
-              <div
-                key={name}
-                className="flex items-center justify-between gap-4 py-2 text-sm"
-              >
-                <dt>{name}</dt>
-                <dd className="font-medium text-right break-words min-w-0">
-                  {value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      }
-    >
+    <div className="group relative shrink-0">
       <button
         type="button"
         aria-label="About this job"
@@ -74,6 +49,29 @@ export function JobInfoButton({
           />
         </svg>
       </button>
-    </Tooltip>
+      <div
+        data-testid="job-info-box"
+        className="hidden group-hover:block group-focus-within:block absolute right-0 top-full z-40 pt-2 w-72 max-w-[calc(100vw-2rem)]"
+      >
+        <div className="rounded-xl border border-border bg-background text-foreground shadow-lg overflow-hidden">
+          <h2 className="px-4 py-3 text-base font-semibold bg-muted border-b border-border">
+            About this job
+          </h2>
+          <dl className="divide-y divide-border">
+            {rows.map(([name, value]) => (
+              <div
+                key={name}
+                className="flex items-center justify-between gap-4 px-4 py-2.5 text-sm"
+              >
+                <dt>{name}</dt>
+                <dd className="font-medium text-right break-words min-w-0">
+                  {value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </div>
+    </div>
   );
 }
