@@ -723,7 +723,7 @@ export function AssignAnnotatorsDialog({
               <div className="space-y-5">
                 <SettingChoice
                   label="Let annotators leave a comment on each item"
-                  help="The box where annotators write notes about an item."
+                  help="Yes shows a box where annotators can write notes about the item. No removes the box."
                   name="comments-on-each-item"
                   value={commentsEnabled ? "show" : "hide"}
                   options={[

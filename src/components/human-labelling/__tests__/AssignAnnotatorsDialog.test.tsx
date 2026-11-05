@@ -688,7 +688,7 @@ describe("AssignAnnotatorsDialog", () => {
     });
     expect(
       within(comments).getByText(
-        "The box where annotators write notes about an item.",
+        "Yes shows a box where annotators can write notes about the item. No removes the box.",
       ),
     ).toBeInTheDocument();
     expect(within(comments).getByLabelText("Yes")).toBeChecked();
