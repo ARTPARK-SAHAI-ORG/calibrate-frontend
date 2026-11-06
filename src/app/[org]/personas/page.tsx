@@ -920,10 +920,10 @@ export default function PersonasPage() {
                         {(["none", "low", "medium", "high"] as const).map(
                           (level, index) => {
                             const tooltipContent: Record<string, string> = {
-                              low: "25% chance that the user will interrupt the agent",
+                              low: "After each word the agent speaks, a 20% chance that the user interrupts",
                               medium:
-                                "50% chance that the user will interrupt the agent",
-                              high: "80% chance that the user will interrupt the agent",
+                                "After each word the agent speaks, a 40% chance that the user interrupts",
+                              high: "After each word the agent speaks, a 60% chance that the user interrupts",
                             };
                             const button = (
                               <button

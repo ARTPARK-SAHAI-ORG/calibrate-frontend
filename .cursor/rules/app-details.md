@@ -630,9 +630,9 @@ A reusable sidebar dialog for creating and editing tools. Contains all form logi
   - **Gender**: Male or Female (affects voice synthesis)
   - **Language**: English, Hindi, or Kannada
   - **Interruption Sensitivity**: None, Low, Medium, or High (simulates real users interrupting agents mid-sentence)
-    - Low: 25% probability of interruption
-    - Medium: 50% probability of interruption
-    - High: 80% probability of interruption
+    - Low: 20% chance of interrupting after each word the agent speaks
+    - Medium: 40% chance of interrupting after each word the agent speaks
+    - High: 60% chance of interrupting after each word the agent speaks
     - UI includes helper text and tooltips showing probability percentages
 - **Edit existing personas**
 - **Delete personas**
