@@ -40,6 +40,9 @@ describe("WorkspacesTable owner", () => {
     expect(writeText).toHaveBeenLastCalledWith("Asha Rao");
     await user.click(screen.getByRole("button", { name: "Copy email" }));
     expect(writeText).toHaveBeenLastCalledWith("a@x.org");
+    // Copying keeps the owner box open, so the other one can be copied too.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.getByText("Asha Rao")).toBeInTheDocument();
   });
 
   it("shows only the email when the names are empty", async () => {

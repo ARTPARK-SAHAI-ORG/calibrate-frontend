@@ -101,6 +101,7 @@ export function WorkspacesTable({ rows }: { rows: AnalyticsWorkspaceRow[] }) {
                       >
                         {i === 0 && row.owner ? (
                           <Tooltip
+                            keepOpenOnClick
                             content={
                               <>
                                 {ownerName(row.owner) && (
