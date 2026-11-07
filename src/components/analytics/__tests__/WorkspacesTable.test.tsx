@@ -34,6 +34,12 @@ describe("WorkspacesTable owner", () => {
     await user.hover(tableCell("Alpha"));
     expect(await screen.findByText("Asha Rao")).toBeInTheDocument();
     expect(screen.getByText("a@x.org")).toBeInTheDocument();
+
+    const writeText = jest.spyOn(navigator.clipboard, "writeText");
+    await user.click(screen.getByRole("button", { name: "Copy name" }));
+    expect(writeText).toHaveBeenLastCalledWith("Asha Rao");
+    await user.click(screen.getByRole("button", { name: "Copy email" }));
+    expect(writeText).toHaveBeenLastCalledWith("a@x.org");
   });
 
   it("shows only the email when the names are empty", async () => {

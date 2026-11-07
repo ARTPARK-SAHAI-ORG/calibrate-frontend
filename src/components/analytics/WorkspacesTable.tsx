@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { AnalyticsWorkspaceRow } from "@/lib/analyticsApi";
 import { Tooltip } from "@/components/Tooltip";
+import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 import { CARD_GROUPS, formatCost, formatCount, formatWhen } from "./format";
 
 type Key = Exclude<keyof AnalyticsWorkspaceRow, "owner">;
@@ -100,8 +101,16 @@ export function WorkspacesTable({ rows }: { rows: AnalyticsWorkspaceRow[] }) {
                           <Tooltip
                             content={
                               <>
-                                {ownerName(row.owner) && <div>{ownerName(row.owner)}</div>}
-                                <div>{row.owner.email}</div>
+                                {ownerName(row.owner) && (
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span>{ownerName(row.owner)}</span>
+                                    <CopyLinkButton value={ownerName(row.owner)} label="Copy name" />
+                                  </div>
+                                )}
+                                <div className="mt-1 flex items-center justify-between gap-2">
+                                  <span>{row.owner.email}</span>
+                                  <CopyLinkButton value={row.owner.email} label="Copy email" />
+                                </div>
                               </>
                             }
                           >
