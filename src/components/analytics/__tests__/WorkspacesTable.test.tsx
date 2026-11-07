@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen, setupUser, within } from "@/test-utils";
-import { WorkspacesTable } from "../WorkspacesTable";
+import { WorkspacesTable, sortWorkspaces } from "../WorkspacesTable";
 import type { AnalyticsWorkspaceRow } from "@/lib/analyticsApi";
 
 function row(name: string, over: Partial<AnalyticsWorkspaceRow> = {}): AnalyticsWorkspaceRow {
@@ -90,5 +90,12 @@ describe("WorkspacesTable created", () => {
       .slice(1)
       .map((r) => r.querySelector("td")!.textContent);
     expect(names).toEqual(["New", "Old", "Unknown"]);
+  });
+});
+
+describe("sortWorkspaces", () => {
+  it("reads a missing cost as zero", () => {
+    const rows = [row("Free", { cost: null }), row("Paid", { cost: 2 }), row("None", { cost: null })];
+    expect(sortWorkspaces(rows, "cost", false).map((r) => r.name)).toEqual(["Free", "None", "Paid"]);
   });
 });

@@ -35,9 +35,10 @@ export function sortWorkspaces(
   key: Key,
   desc: boolean,
 ): AnalyticsWorkspaceRow[] {
+  const blank = key === "last_active_at" || key === "created_at" ? "" : 0;
   const sorted = [...rows].sort((a, b) => {
-    const x = a[key] ?? (key === "last_active_at" || key === "created_at" ? "" : 0);
-    const y = b[key] ?? (key === "last_active_at" || key === "created_at" ? "" : 0);
+    const x = a[key] ?? blank;
+    const y = b[key] ?? blank;
     if (typeof x === "string" && typeof y === "string") return x.localeCompare(y);
     return Number(x) - Number(y);
   });
