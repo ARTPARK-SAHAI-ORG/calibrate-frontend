@@ -3,6 +3,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ViewMoreToggle, InfoNote } from "@/components/ui";
 import { getBinaryLabel } from "@/lib/binaryLabels";
+import { ratingRank, scaleBounds } from "@/lib/ratingRank";
+import { RANKS, RatingRankPill } from "./RatingScaleEditor";
 
 // Pixel height used as the collapsed cap for prompt bodies. Matches the
 // max-h-[7.5rem] applied to the <pre> below (7.5rem at 16px root).
@@ -98,6 +100,10 @@ export function VersionCard({
       setTimeout(() => setCopied(false), 1500);
     });
   }
+
+  const { lowest, highest } = scaleBounds(
+    (version.output_config?.scale ?? []).map((e) => Number(e.value)),
+  );
 
   return (
     <div
@@ -391,26 +397,36 @@ export function VersionCard({
             Output
           </div>
           <div className="border border-border rounded-md p-3 md:p-4 bg-muted/10 space-y-2">
-            {version.output_config.scale.map((entry) => (
-              <div
-                key={`${String(entry.value)}-${entry.name}`}
-                className="flex items-start gap-3"
-              >
-                <span className="inline-flex items-center justify-center min-w-[28px] h-6 px-2 rounded-md text-xs font-semibold bg-muted text-foreground">
-                  {String(entry.value)}
-                </span>
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-foreground">
-                    {entry.name}
-                  </div>
-                  {entry.description && (
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {entry.description}
+            {version.output_config.scale.map((entry) => {
+              const rank = ratingRank(Number(entry.value), lowest, highest);
+              return (
+                <div
+                  key={`${String(entry.value)}-${entry.name}`}
+                  className="flex items-start gap-3"
+                >
+                  <span
+                    className={`inline-flex items-center justify-center min-w-[28px] h-6 px-2 rounded-md text-xs font-semibold border ${
+                      rank
+                        ? RANKS[rank].box
+                        : "border-transparent bg-muted text-foreground"
+                    }`}
+                  >
+                    {String(entry.value)}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      {entry.name}
+                      <RatingRankPill rank={rank} />
                     </div>
-                  )}
+                    {entry.description && (
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {entry.description}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : null}

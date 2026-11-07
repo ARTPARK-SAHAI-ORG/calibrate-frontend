@@ -296,6 +296,42 @@ describe("VersionCard", () => {
     expect(screen.getByText("Good")).toBeInTheDocument();
   });
 
+  it("tags the lowest number Worst and the highest Best", () => {
+    setup({
+      isLive: true,
+      outputType: "rating",
+      version: makeVersion({
+        output_config: {
+          scale: [
+            { value: 1, name: "Yes" },
+            { value: 3, name: "Maybe" },
+            { value: 5, name: "No" },
+          ],
+        },
+      }),
+    });
+    expect(screen.getByText("Yes").parentElement).toHaveTextContent("Worst");
+    expect(screen.getByText("No").parentElement).toHaveTextContent("Best");
+    expect(screen.getByText("Maybe").parentElement).not.toHaveTextContent(/Best|Worst/);
+  });
+
+  it("shows no Worst or Best tag when every row has the same number", () => {
+    setup({
+      isLive: true,
+      outputType: "rating",
+      version: makeVersion({
+        output_config: {
+          scale: [
+            { value: 1, name: "One" },
+            { value: 1, name: "Also one" },
+          ],
+        },
+      }),
+    });
+    expect(screen.queryByText("Worst")).not.toBeInTheDocument();
+    expect(screen.queryByText("Best")).not.toBeInTheDocument();
+  });
+
   it("does not render rating output block when scale is empty", () => {
     setup({
       isLive: true,

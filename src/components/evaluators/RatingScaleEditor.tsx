@@ -1,5 +1,7 @@
 import React from "react";
 import { Tooltip } from "@/components/Tooltip";
+import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
+import { ratingRank, scaleBounds, type RatingRank } from "@/lib/ratingRank";
 
 export type RatingScaleRow = {
   value: number | string;
@@ -11,11 +13,12 @@ function numericValue(value: number | string) {
   return typeof value === "number" ? value : Number(value) || 0;
 }
 
-const RANKS = {
+export const RANKS = {
   best: {
     box: "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400",
     label: "Best",
-    labelClass: "text-green-700 dark:text-green-400",
+    labelClass:
+      "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500",
   },
   middle: {
     box: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
@@ -25,9 +28,25 @@ const RANKS = {
   worst: {
     box: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
     label: "Worst",
-    labelClass: "text-red-700 dark:text-red-400",
+    labelClass: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500",
   },
 } as const;
+
+// The Worst / Best tag, drawn like the Success / Fail pills on a run.
+export function RatingRankPill({
+  rank,
+  className = "",
+}: {
+  rank: RatingRank | null;
+  className?: string;
+}) {
+  if (!rank || !RANKS[rank].label) return null;
+  return (
+    <span className={`${PILL_CLASS} ${RANKS[rank].labelClass} ${className}`}>
+      {RANKS[rank].label}
+    </span>
+  );
+}
 
 type RatingScaleEditorProps<T extends RatingScaleRow> = {
   rows: T[];
@@ -55,15 +74,11 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
       (max, row) => Math.max(max, numericValue(row.value)),
       0,
     );
-    onChange([
-      ...rows,
-      { value: maxVal + 1, name: "", description: "" } as T,
-    ]);
+    onChange([...rows, { value: maxVal + 1, name: "", description: "" } as T]);
   };
 
   const values = rows.map((row) => numericValue(row.value));
-  const highest = Math.max(...values);
-  const lowest = Math.min(...values);
+  const { lowest, highest } = scaleBounds(values);
 
   return (
     <div>
@@ -87,19 +102,14 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
             d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
           />
         </svg>
-        <span>The highest number is the best and the lowest number is the worst</span>
+        <span>
+          The highest number is the best and the lowest number is the worst
+        </span>
       </div>
       <div className="space-y-4">
         {rows.map((row, idx) => {
           const missingLabel = validationAttempted && !row.name.trim();
-          const rank =
-            highest === lowest
-              ? null
-              : values[idx] === highest
-                ? "best"
-                : values[idx] === lowest
-                  ? "worst"
-                  : "middle";
+          const rank = ratingRank(values[idx], lowest, highest);
           return (
             <div key={idx}>
               <div className="flex items-start gap-2">
@@ -118,13 +128,9 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
                         : "border-border bg-background dark:bg-accent text-foreground"
                     }`}
                   />
-                  {rank && RANKS[rank].label && (
-                    <p
-                      className={`mt-1 text-center text-xs font-medium ${RANKS[rank].labelClass}`}
-                    >
-                      {RANKS[rank].label}
-                    </p>
-                  )}
+                  <div className="flex justify-center">
+                    <RatingRankPill rank={rank} className="mt-1" />
+                  </div>
                 </div>
                 <input
                   type="text"
@@ -132,7 +138,15 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
                   onChange={(e) =>
                     updateRow(idx, { name: e.target.value } as Partial<T>)
                   }
-                  placeholder={["Bad", "Average", "Good"][idx] ?? "Label"}
+                  placeholder={
+                    rank === "worst"
+                      ? "Bad"
+                      : rank === "best"
+                        ? "Good"
+                        : rank === "middle"
+                          ? "Average"
+                          : "Label"
+                  }
                   className={`flex-1 h-9 md:h-10 px-3 rounded-md text-sm md:text-base border bg-background dark:bg-accent text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent ${
                     missingLabel ? "border-red-500" : "border-border"
                   }`}
@@ -196,7 +210,11 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
           stroke="currentColor"
           strokeWidth={2}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 4v16m8-8H4"
+          />
         </svg>
         Add row
       </button>
