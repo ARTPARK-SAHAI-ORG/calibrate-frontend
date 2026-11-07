@@ -315,6 +315,23 @@ describe("VersionCard", () => {
     expect(screen.getByText("Maybe").parentElement).not.toHaveTextContent(/Best|Worst/);
   });
 
+  it("shows no Worst or Best tag when every row has the same number", () => {
+    setup({
+      isLive: true,
+      outputType: "rating",
+      version: makeVersion({
+        output_config: {
+          scale: [
+            { value: 1, name: "One" },
+            { value: 1, name: "Also one" },
+          ],
+        },
+      }),
+    });
+    expect(screen.queryByText("Worst")).not.toBeInTheDocument();
+    expect(screen.queryByText("Best")).not.toBeInTheDocument();
+  });
+
   it("does not render rating output block when scale is empty", () => {
     setup({
       isLive: true,
