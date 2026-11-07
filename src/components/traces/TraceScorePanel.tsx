@@ -1,14 +1,25 @@
 "use client";
 
-import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
+import {
+  evaluatorCardSurfaceClass,
+  EvaluatorVerdictCard,
+} from "@/components/EvaluatorVerdictCard";
 import { SpinnerIcon } from "@/components/icons";
 import { CONTACT_LINK } from "@/constants/limits";
 import { useUsesOwnProviderKeys } from "@/hooks";
 import {
   isTraceScoringInProgress,
+  missingSourcePhrase,
   scoringRunErrorCopy,
 } from "@/lib/traceScoring";
-import type { TraceScoreResult, TraceScoringRun } from "@/lib/tracesApi";
+import type {
+  TraceMissingValue,
+  TraceScoreResult,
+  TraceScoringRun,
+} from "@/lib/tracesApi";
+
+const WARNING_BOX =
+  "rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2";
 
 type TraceScorePanelProps = {
   /** The newest scoring run for this trace. The parent leaves the whole
@@ -31,6 +42,44 @@ function verdictFields(result: TraceScoreResult): {
   return { match: result.passed };
 }
 
+/** One block per evaluator, whichever variables of its could not be filled. */
+function MissingValueBlocks({ values }: { values: TraceMissingValue[] }) {
+  const byEvaluator = new Map<string, TraceMissingValue[]>();
+  for (const value of values) {
+    byEvaluator.set(value.evaluator_uuid, [
+      ...(byEvaluator.get(value.evaluator_uuid) ?? []),
+      value,
+    ]);
+  }
+  return (
+    <>
+      {[...byEvaluator].map(([uuid, missing]) => (
+        <div
+          key={uuid}
+          className={`${evaluatorCardSurfaceClass("neutral")} p-3 space-y-3`}
+        >
+          <p className="text-sm font-medium text-foreground break-words">
+            {missing[0].name}
+          </p>
+          <div className={`${WARNING_BOX} space-y-1`}>
+            {missing.map(({ variable, source }) => (
+              <p
+                key={variable}
+                className="text-sm text-amber-700 dark:text-amber-300"
+              >
+                Could not run.{" "}
+                <span className="font-mono break-all">{`{{${variable}}}`}</span>{" "}
+                reads from {missingSourcePhrase(source)}, and this trace does
+                not have it.
+              </p>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function RunBody({
   run,
   descriptions,
@@ -39,6 +88,7 @@ function RunBody({
   descriptions?: Record<string, string>;
 }) {
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
+  const missingValues = run.missing_values ?? [];
   if (isTraceScoringInProgress(run.status)) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -48,12 +98,24 @@ function RunBody({
     );
   }
 
+  if (
+    run.status === "skipped" &&
+    run.error === "missing_trace_values" &&
+    missingValues.length > 0
+  ) {
+    return (
+      <div className="space-y-3">
+        <MissingValueBlocks values={missingValues} />
+      </div>
+    );
+  }
+
   // A trace that could not be scored is a warning whatever the reason, so
   // every reason gets the same amber box the Traces tab uses. Only the limit
   // has somewhere for the reader to go next, so only it carries the link.
   if (run.status === "failed" || run.status === "skipped") {
     return (
-      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+      <div className={WARNING_BOX}>
         <p className="text-sm text-amber-700 dark:text-amber-300">
           {/* A lone reason takes no full stop. Only the limit one is followed
               by a second sentence, so only it needs one. */}
@@ -79,7 +141,7 @@ function RunBody({
     );
   }
 
-  if (run.results.length === 0) {
+  if (run.results.length === 0 && missingValues.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
         This run produced no scores.
@@ -104,6 +166,7 @@ function RunBody({
           enableLink
         />
       ))}
+      <MissingValueBlocks values={missingValues} />
     </div>
   );
 }

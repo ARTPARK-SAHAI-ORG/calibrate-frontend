@@ -6,6 +6,7 @@ import {
   fetchTraceLabels,
   fetchTraceScores,
   fetchTraceScoringEligibility,
+  previewTraceVariables,
   setAgentTraceScoring,
   configWithTraceScoring,
   fetchTraceUsage,
@@ -280,6 +281,23 @@ describe("fetchTraceScoringEligibility", () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       "/agents/ag-1/trace-scoring-eligibility",
       "tok",
+    );
+  });
+});
+
+describe("previewTraceVariables", () => {
+  it("posts the trace and the choices to the agent's preview route", async () => {
+    const answer = { values: [] };
+    (apiPost as jest.Mock).mockResolvedValueOnce(answer);
+
+    await expect(
+      previewTraceVariables("tok", "ag 1", "t1", { a: "input" }),
+    ).resolves.toBe(answer);
+
+    expect(apiPost).toHaveBeenCalledWith(
+      "/agents/ag%201/trace-variables/preview",
+      "tok",
+      { trace_id: "t1", trace_variables: { a: "input" } },
     );
   });
 });
