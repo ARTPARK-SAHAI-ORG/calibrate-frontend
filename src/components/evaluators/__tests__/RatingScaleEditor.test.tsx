@@ -41,18 +41,29 @@ describe("RatingScaleEditor", () => {
     expect(numberInputs).toHaveLength(3);
   });
 
-  it("uses Bad/Average/Good placeholders for the first three rows, Label beyond", () => {
+  it("puts the Bad example on the lowest number and Good on the highest, whatever the row order", () => {
     const rows: RatingScaleRow[] = [
-      { value: 1, name: "", description: "" },
-      { value: 2, name: "", description: "" },
-      { value: 3, name: "", description: "" },
       { value: 4, name: "", description: "" },
+      { value: 2, name: "", description: "" },
+      { value: 1, name: "", description: "" },
     ];
     setup({ rows });
-    expect(screen.getByPlaceholderText("Bad")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Average")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Good")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Label")).toBeInTheDocument();
+    const [first, second, third] = screen.getAllByRole("textbox").filter(
+      (el) => el.tagName === "INPUT",
+    );
+    expect(first).toHaveAttribute("placeholder", "Good");
+    expect(second).toHaveAttribute("placeholder", "Average");
+    expect(third).toHaveAttribute("placeholder", "Bad");
+  });
+
+  it("uses Label when every row has the same number", () => {
+    setup({
+      rows: [
+        { value: 1, name: "", description: "" },
+        { value: 1, name: "", description: "" },
+      ],
+    });
+    expect(screen.getAllByPlaceholderText("Label")).toHaveLength(2);
   });
 
   it("updates the row value when the number input changes", () => {

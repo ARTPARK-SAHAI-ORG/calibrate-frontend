@@ -1,5 +1,6 @@
 "use client";
 
+import { RANKS, ratingRank } from "./RatingScaleEditor";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ViewMoreToggle, InfoNote } from "@/components/ui";
 import { getBinaryLabel } from "@/lib/binaryLabels";
@@ -391,26 +392,45 @@ export function VersionCard({
             Output
           </div>
           <div className="border border-border rounded-md p-3 md:p-4 bg-muted/10 space-y-2">
-            {version.output_config.scale.map((entry) => (
-              <div
-                key={`${String(entry.value)}-${entry.name}`}
-                className="flex items-start gap-3"
-              >
-                <span className="inline-flex items-center justify-center min-w-[28px] h-6 px-2 rounded-md text-xs font-semibold bg-muted text-foreground">
-                  {String(entry.value)}
-                </span>
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-foreground">
-                    {entry.name}
-                  </div>
-                  {entry.description && (
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {entry.description}
+            {version.output_config.scale.map((entry, _i, scale) => {
+              const rank = ratingRank(
+                scale.map((e) => Number(e.value)),
+                Number(entry.value),
+              );
+              return (
+                <div
+                  key={`${String(entry.value)}-${entry.name}`}
+                  className="flex items-start gap-3"
+                >
+                  <span
+                    className={`inline-flex items-center justify-center min-w-[28px] h-6 px-2 rounded-md text-xs font-semibold border ${
+                      rank
+                        ? RANKS[rank].box
+                        : "border-transparent bg-muted text-foreground"
+                    }`}
+                  >
+                    {String(entry.value)}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-foreground">
+                      {entry.name}
+                      {rank && RANKS[rank].label && (
+                        <span
+                          className={`ml-2 text-xs font-medium ${RANKS[rank].labelClass}`}
+                        >
+                          {RANKS[rank].label}
+                        </span>
+                      )}
                     </div>
-                  )}
+                    {entry.description && (
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {entry.description}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : null}
