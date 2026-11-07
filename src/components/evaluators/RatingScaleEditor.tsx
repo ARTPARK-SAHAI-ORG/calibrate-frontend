@@ -1,5 +1,6 @@
 import React from "react";
 import { Tooltip } from "@/components/Tooltip";
+import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
 
 export type RatingScaleRow = {
   value: number | string;
@@ -15,7 +16,8 @@ export const RANKS = {
   best: {
     box: "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400",
     label: "Best",
-    labelClass: "text-green-700 dark:text-green-400",
+    labelClass:
+      "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-500",
   },
   middle: {
     box: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
@@ -25,7 +27,7 @@ export const RANKS = {
   worst: {
     box: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
     label: "Worst",
-    labelClass: "text-red-700 dark:text-red-400",
+    labelClass: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-500",
   },
 } as const;
 
@@ -39,6 +41,16 @@ export function ratingRank(values: number[], value: number): RatingRank | null {
   if (value === highest) return "best";
   if (value === lowest) return "worst";
   return "middle";
+}
+
+// The Worst / Best tag, drawn like the Success / Fail pills on a run.
+export function RatingRankPill({ rank }: { rank: RatingRank | null }) {
+  if (!rank || !RANKS[rank].label) return null;
+  return (
+    <span className={`${PILL_CLASS} ${RANKS[rank].labelClass}`}>
+      {RANKS[rank].label}
+    </span>
+  );
 }
 
 type RatingScaleEditorProps<T extends RatingScaleRow> = {
@@ -121,11 +133,9 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
                     }`}
                   />
                   {rank && RANKS[rank].label && (
-                    <p
-                      className={`mt-1 text-center text-xs font-medium ${RANKS[rank].labelClass}`}
-                    >
-                      {RANKS[rank].label}
-                    </p>
+                    <div className="mt-1 flex justify-center">
+                      <RatingRankPill rank={rank} />
+                    </div>
                   )}
                 </div>
                 <input

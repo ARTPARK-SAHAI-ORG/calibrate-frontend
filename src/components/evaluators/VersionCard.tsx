@@ -1,6 +1,6 @@
 "use client";
 
-import { RANKS, ratingRank } from "./RatingScaleEditor";
+import { RANKS, RatingRankPill, ratingRank } from "./RatingScaleEditor";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ViewMoreToggle, InfoNote } from "@/components/ui";
 import { getBinaryLabel } from "@/lib/binaryLabels";
@@ -412,15 +412,9 @@ export function VersionCard({
                     {String(entry.value)}
                   </span>
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-foreground">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                       {entry.name}
-                      {rank && RANKS[rank].label && (
-                        <span
-                          className={`ml-2 text-xs font-medium ${RANKS[rank].labelClass}`}
-                        >
-                          {RANKS[rank].label}
-                        </span>
-                      )}
+                      <RatingRankPill rank={rank} />
                     </div>
                     {entry.description && (
                       <div className="text-xs text-muted-foreground mt-0.5">
