@@ -20,6 +20,7 @@ import {
   isRunInProgress,
   isRunStopped,
   modelsUnansweredCount,
+  passRateOf,
   runDisplayName,
   runStateOf,
 } from "@/lib/testTypes";
@@ -279,11 +280,13 @@ function RunResult({ run: rawRun }: { run: AgentRun }) {
   // The same two pills a comparison shows, so both kinds of run read alike. A
   // test that produced no answer is left out of the share, since counting it
   // as a wrong answer would blame the agent for a run that never reached it.
-  const answered = breakdown.passed + breakdown.failed;
+  const rate = passRateOf(
+    breakdown.passed,
+    breakdown.passed + breakdown.failed,
+  );
   // Nothing was answered, so there is no share to give: a run of tests that
   // all failed to run is not a run that scored zero.
-  if (answered === 0) return <RunResultPlaceholder />;
-  const rate = (breakdown.passed / answered) * 100;
+  if (rate === null) return <RunResultPlaceholder />;
   return (
     <>
       <PassRatePill label={`${Math.round(rate)}% passed`} rate={rate} />

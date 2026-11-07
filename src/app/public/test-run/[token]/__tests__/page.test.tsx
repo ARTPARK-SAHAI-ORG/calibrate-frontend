@@ -226,6 +226,26 @@ describe("public test run page", () => {
     );
   });
 
+  it("never shows likely ranges, but uses the backend's pass rate", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ...RUN_SUMMARY,
+          pass_rate: 66.7,
+          pass_rate_ci: { low: 20, high: 94 },
+        }),
+      }),
+    ) as unknown as typeof fetch;
+    render(<PublicTestRunPage />);
+
+    await screen.findByTestId("summary-cards");
+    const props = summaryProps.mock.calls.at(-1)![0];
+    expect(props.passRate).toBe(66.7);
+    expect(props).not.toHaveProperty("likelyRanges");
+    expect(props).not.toHaveProperty("passRateRange");
+  });
+
   it("reads the open test in full and shows its answer", async () => {
     render(<PublicTestRunPage />);
     await screen.findByTestId("summary-cards");

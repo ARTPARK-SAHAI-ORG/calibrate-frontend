@@ -149,6 +149,12 @@ describe("PublicBenchmarkPage", () => {
     );
   });
 
+  it("never shows likely ranges on the shared link", async () => {
+    render(<PublicBenchmarkPage />);
+    await screen.findByTestId("leaderboard");
+    expect(leaderboardProps.mock.calls.at(-1)![0].likelyRanges).toBeUndefined();
+  });
+
   it("names the two charts after what each one shows", async () => {
     const user = setupUser();
     render(<PublicBenchmarkPage />);

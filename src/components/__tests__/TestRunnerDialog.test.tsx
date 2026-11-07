@@ -80,6 +80,13 @@ jest.mock("../eval-details", () => ({
       <span data-testid="summary-evaluators">
         {JSON.stringify(props.evaluatorSummary ?? [])}
       </span>
+      <span data-testid="summary-ranges">
+        {JSON.stringify({
+          likelyRanges: props.likelyRanges,
+          passRate: props.passRate,
+          passRateRange: props.passRateRange,
+        })}
+      </span>
       <button onClick={onReviewUnanswered}>review-unanswered</button>
     </div>
   ),
@@ -1843,6 +1850,21 @@ describe("tests that produced no answer", () => {
     });
     expect(await screen.findByTestId("summary-panel")).toHaveTextContent(
       "summary 1/2",
+    );
+  });
+
+  it("hands the summary the backend's pass rate and its range, with the setting off until the workspace turns it on", async () => {
+    mockRun({
+      pass_rate: 95,
+      pass_rate_ci: { low: 76.4, high: 99.1 },
+      results: [{ test_case_id: "t-1", name: "Passed", passed: true }],
+    });
+    expect(await screen.findByTestId("summary-ranges")).toHaveTextContent(
+      JSON.stringify({
+        likelyRanges: false,
+        passRate: 95,
+        passRateRange: { low: 76.4, high: 99.1 },
+      }),
     );
   });
 
