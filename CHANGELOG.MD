@@ -1,5 +1,6 @@
 ## November 2026
 
+- The evaluator page now marks the lowest number on a rating scale as Worst and the highest as Best, as the create and edit screens already did, and the example labels follow the numbers instead of the row order ([#825](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/825))
 - The persona form now shows the chance that the simulated user interrupts after each word the agent speaks, 20% for low, 40% for medium and 60% for high interruption sensitivity ([#823](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/823))
 - The labelling job page and its walkthrough now say case instead of item, and the walkthrough cards are shorter and explain why a reason helps ([#820](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/820))
 - Annotators opening a labelling job for the first time now see a welcome with an example and an optional step-by-step walkthrough of the page, which they can open again with the new How this works button ([#818](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/818))
