@@ -1,6 +1,7 @@
 import React from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
+import { ratingRank, scaleBounds, type RatingRank } from "@/lib/ratingRank";
 
 export type RatingScaleRow = {
   value: number | string;
@@ -31,23 +32,17 @@ export const RANKS = {
   },
 } as const;
 
-export type RatingRank = keyof typeof RANKS;
-
-// Highest number is the best, lowest the worst. No rank when every number is the same.
-export function ratingRank(values: number[], value: number): RatingRank | null {
-  const highest = Math.max(...values);
-  const lowest = Math.min(...values);
-  if (highest === lowest) return null;
-  if (value === highest) return "best";
-  if (value === lowest) return "worst";
-  return "middle";
-}
-
 // The Worst / Best tag, drawn like the Success / Fail pills on a run.
-export function RatingRankPill({ rank }: { rank: RatingRank | null }) {
+export function RatingRankPill({
+  rank,
+  className = "",
+}: {
+  rank: RatingRank | null;
+  className?: string;
+}) {
   if (!rank || !RANKS[rank].label) return null;
   return (
-    <span className={`${PILL_CLASS} ${RANKS[rank].labelClass}`}>
+    <span className={`${PILL_CLASS} ${RANKS[rank].labelClass} ${className}`}>
       {RANKS[rank].label}
     </span>
   );
@@ -83,6 +78,7 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
   };
 
   const values = rows.map((row) => numericValue(row.value));
+  const { lowest, highest } = scaleBounds(values);
 
   return (
     <div>
@@ -113,7 +109,7 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
       <div className="space-y-4">
         {rows.map((row, idx) => {
           const missingLabel = validationAttempted && !row.name.trim();
-          const rank = ratingRank(values, values[idx]);
+          const rank = ratingRank(values[idx], lowest, highest);
           return (
             <div key={idx}>
               <div className="flex items-start gap-2">
@@ -132,11 +128,9 @@ export function RatingScaleEditor<T extends RatingScaleRow>({
                         : "border-border bg-background dark:bg-accent text-foreground"
                     }`}
                   />
-                  {rank && RANKS[rank].label && (
-                    <div className="mt-1 flex justify-center">
-                      <RatingRankPill rank={rank} />
-                    </div>
-                  )}
+                  <div className="flex justify-center">
+                    <RatingRankPill rank={rank} className="mt-1" />
+                  </div>
                 </div>
                 <input
                   type="text"

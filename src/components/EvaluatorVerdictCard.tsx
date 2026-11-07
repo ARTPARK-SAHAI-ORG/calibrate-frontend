@@ -1,5 +1,6 @@
 "use client";
 
+import { ratingRank } from "@/lib/ratingRank";
 import type { ReasoningMode } from "@/components/human-labelling/AssignAnnotatorsDialog";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote } from "@/components/ui";
@@ -443,12 +444,9 @@ function ReadVerdictPill({
     );
   }
   if (score === null || score === undefined) return null;
+  const rank = ratingRank(score, scaleMin, scaleMax);
   const tone: Tone =
-    scaleMax !== undefined && score === scaleMax
-      ? "green"
-      : scaleMin !== undefined && score === scaleMin
-        ? "red"
-        : "amber";
+    rank === "best" ? "green" : rank === "worst" ? "red" : "amber";
   const toneClass =
     tone === "green"
       ? "bg-green-500/15 text-green-600 dark:text-green-400"
