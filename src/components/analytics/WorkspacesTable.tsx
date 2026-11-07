@@ -20,12 +20,13 @@ const COLUMNS: { key: Key; label: string }[] = [
   // each workspace row carries too.
   ...(CARD_GROUPS.slice(1).flatMap((group) => group.cards) as { key: Key; label: string }[]),
   { key: "last_active_at", label: "Last active" },
+  { key: "created_at", label: "Created" },
 ];
 
 function cell(row: AnalyticsWorkspaceRow, key: Key): string {
   if (key === "name") return row.name;
   if (key === "cost") return formatCost(row.cost);
-  if (key === "last_active_at") return formatWhen(row.last_active_at);
+  if (key === "last_active_at" || key === "created_at") return formatWhen(row[key] ?? null);
   return formatCount(Number(row[key] ?? 0));
 }
 
@@ -35,8 +36,8 @@ export function sortWorkspaces(
   desc: boolean,
 ): AnalyticsWorkspaceRow[] {
   const sorted = [...rows].sort((a, b) => {
-    const x = a[key] ?? (key === "last_active_at" ? "" : 0);
-    const y = b[key] ?? (key === "last_active_at" ? "" : 0);
+    const x = a[key] ?? (key === "last_active_at" || key === "created_at" ? "" : 0);
+    const y = b[key] ?? (key === "last_active_at" || key === "created_at" ? "" : 0);
     if (typeof x === "string" && typeof y === "string") return x.localeCompare(y);
     return Number(x) - Number(y);
   });

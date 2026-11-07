@@ -68,3 +68,27 @@ describe("WorkspacesTable owner", () => {
     expect(screen.queryByText(/@/)).not.toBeInTheDocument();
   });
 });
+
+describe("WorkspacesTable created", () => {
+  it("shows when each workspace was created as the last column and sorts by it", async () => {
+    const user = setupUser();
+    render(
+      <WorkspacesTable
+        rows={[
+          row("Old", { created_at: "2026-01-02T08:00:00Z" }),
+          row("New", { created_at: "2026-10-05T08:00:00Z" }),
+          row("Unknown"),
+        ]}
+      />,
+    );
+    const headers = within(screen.getByRole("table")).getAllByRole("columnheader");
+    expect(headers[headers.length - 1]).toHaveTextContent("Created");
+
+    await user.click(within(headers[headers.length - 1]).getByRole("button"));
+    const names = within(screen.getByRole("table"))
+      .getAllByRole("row")
+      .slice(1)
+      .map((r) => r.querySelector("td")!.textContent);
+    expect(names).toEqual(["New", "Old", "Unknown"]);
+  });
+});
