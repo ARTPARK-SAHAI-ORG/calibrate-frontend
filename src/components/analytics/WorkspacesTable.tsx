@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { AnalyticsWorkspaceRow } from "@/lib/analyticsApi";
 import { Tooltip } from "@/components/Tooltip";
+import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 import { CARD_GROUPS, formatCost, formatCount, formatWhen } from "./format";
 
 type Key = Exclude<keyof AnalyticsWorkspaceRow, "owner">;
@@ -19,12 +20,13 @@ const COLUMNS: { key: Key; label: string }[] = [
   // each workspace row carries too.
   ...(CARD_GROUPS.slice(1).flatMap((group) => group.cards) as { key: Key; label: string }[]),
   { key: "last_active_at", label: "Last active" },
+  { key: "created_at", label: "Created" },
 ];
 
 function cell(row: AnalyticsWorkspaceRow, key: Key): string {
   if (key === "name") return row.name;
   if (key === "cost") return formatCost(row.cost);
-  if (key === "last_active_at") return formatWhen(row.last_active_at);
+  if (key === "last_active_at" || key === "created_at") return formatWhen(row[key] ?? null);
   return formatCount(Number(row[key] ?? 0));
 }
 
@@ -33,9 +35,10 @@ export function sortWorkspaces(
   key: Key,
   desc: boolean,
 ): AnalyticsWorkspaceRow[] {
+  const blank = key === "last_active_at" || key === "created_at" ? "" : 0;
   const sorted = [...rows].sort((a, b) => {
-    const x = a[key] ?? (key === "last_active_at" ? "" : 0);
-    const y = b[key] ?? (key === "last_active_at" ? "" : 0);
+    const x = a[key] ?? blank;
+    const y = b[key] ?? blank;
     if (typeof x === "string" && typeof y === "string") return x.localeCompare(y);
     return Number(x) - Number(y);
   });
@@ -98,10 +101,19 @@ export function WorkspacesTable({ rows }: { rows: AnalyticsWorkspaceRow[] }) {
                       >
                         {i === 0 && row.owner ? (
                           <Tooltip
+                            keepOpenOnClick
                             content={
                               <>
-                                {ownerName(row.owner) && <div>{ownerName(row.owner)}</div>}
-                                <div>{row.owner.email}</div>
+                                {ownerName(row.owner) && (
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span>{ownerName(row.owner)}</span>
+                                    <CopyLinkButton value={ownerName(row.owner)} label="Copy name" />
+                                  </div>
+                                )}
+                                <div className="mt-1 flex items-center justify-between gap-2">
+                                  <span>{row.owner.email}</span>
+                                  <CopyLinkButton value={row.owner.email} label="Copy email" />
+                                </div>
                               </>
                             }
                           >

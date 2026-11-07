@@ -16,6 +16,9 @@ type TooltipProps = {
   contentStyle?: React.CSSProperties;
   /** The pointer moves through the popup to whatever is under it. */
   passThrough?: boolean;
+  /** Clicking inside the popup leaves it open, for a popup holding buttons
+   *  that act in place, such as copy buttons. */
+  keepOpenOnClick?: boolean;
 };
 
 export function Tooltip({
@@ -26,6 +29,7 @@ export function Tooltip({
   alignEnd = false,
   contentStyle,
   passThrough = false,
+  keepOpenOnClick = false,
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   // `side` is the side the popup ended up on, which is not always the one
@@ -190,7 +194,7 @@ export function Tooltip({
       // and the pointer never leaves, so close the popup on the way. Closing
       // is left to `hide`'s timer on purpose: closing here and now tears the
       // popup down mid-click, and whatever was clicked never gets to run.
-      onClickCapture={hide}
+      onClickCapture={keepOpenOnClick ? undefined : hide}
       style={{
         top: `${tooltipPosition.top}px`,
         left: `${tooltipPosition.left}px`,
@@ -233,7 +237,11 @@ export function Tooltip({
         // mouseleave fires — leaving the tooltip stuck on screen. Use the
         // capture phase so it still fires when the child button calls
         // stopPropagation() in its own (bubble-phase) onClick.
-        onClickCapture={hideNow}
+        // A click inside the popup also reaches here, because the popup is
+        // drawn as part of this component; the popup decides that one itself.
+        onClickCapture={(e) => {
+          if (!tooltipRef.current?.contains(e.target as Node)) hideNow();
+        }}
       >
         {children}
       </div>
