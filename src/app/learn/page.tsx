@@ -74,18 +74,51 @@ const ENTRIES: LearnItem[] = [
       {
         label: "IndiaFOSS 2026",
         title: "Evaluating AI systems so they can be trusted",
-        summary:
-          "Our talk at IndiaFOSS 2026 on evaluating AI agents for non-profits, using a voice agent that fills public health forms as the case study.",
+        summary: (
+          <>
+            Our talk at{" "}
+            <a
+              href="https://fossunited.org/indiafoss/2026"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={summaryLinkClass}
+            >
+              IndiaFOSS 2026
+            </a>{" "}
+            on evaluating AI agents for non-profits, using a voice agent that
+            fills public health forms as the case study.
+          </>
+        ),
         recordingEmbedUrl: "https://www.youtube.com/embed/dBmuwQRixjk",
         recordingUrl: "https://youtu.be/dBmuwQRixjk",
         slidesEmbedUrl: "https://www.amandalmia.com/IndiaFOSS-talk/",
         slidesUrl: "https://www.amandalmia.com/IndiaFOSS-talk/#1",
       },
       {
-        label: "Pragati: AI for Impact",
+        label: "Pragati: AI for Impact at The Delta",
         title: "Evaluating AI for impact masterclass",
-        summary:
-          "A masterclass on evaluating AI for impact using Calibrate, at Pragati: AI for Impact by the^delta",
+        summary: (
+          <>
+            A masterclass on evaluating AI for impact using Calibrate, at{" "}
+            <a
+              href="https://thedelta.org.in/pragati/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={summaryLinkClass}
+            >
+              Pragati: AI for Impact
+            </a>{" "}
+            by{" "}
+            <a
+              href="https://thedelta.org.in/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={summaryLinkClass}
+            >
+              the^delta
+            </a>
+          </>
+        ),
         recordingEmbedUrl: "https://www.youtube.com/embed/n3ThJXTPAtw",
         recordingUrl: "https://youtu.be/n3ThJXTPAtw",
         slidesEmbedUrl: "https://www.amandalmia.com/Nudge-talk/",
@@ -94,8 +127,20 @@ const ENTRIES: LearnItem[] = [
       {
         label: "AI Commons for Global Health",
         title: "Challenges with evaluating health AI solutions",
-        summary:
-          "Challenges with evaluating health AI solutions and how to address them with Calibrate, at AI Commons for Global Health",
+        summary: (
+          <>
+            Challenges with evaluating health AI solutions and how to address
+            them with Calibrate, at{" "}
+            <a
+              href="https://aicommonsforglobalhealth.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={summaryLinkClass}
+            >
+              AI Commons for Global Health
+            </a>
+          </>
+        ),
         recordingEmbedUrl: "https://www.youtube.com/embed/4JkhKmg74EE",
         recordingUrl: "https://youtu.be/4JkhKmg74EE",
         slidesEmbedUrl: "https://www.amandalmia.com/calibrate-ai-commons-talk/",

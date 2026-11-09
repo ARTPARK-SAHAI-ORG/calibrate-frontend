@@ -172,9 +172,10 @@ describe("LearnPage", () => {
     render(<LearnPage />);
     const { block } = sessionOnPage("calibrate-demo");
     const title = "Evaluating AI systems so they can be trusted";
+    expect(within(block).getByText(/Our talk at/)).toBeInTheDocument();
     expect(
-      within(block).getByText(/Our talk at IndiaFOSS 2026/),
-    ).toBeInTheDocument();
+      within(block).getByRole("link", { name: "IndiaFOSS 2026" }),
+    ).toHaveAttribute("href", "https://fossunited.org/indiafoss/2026");
     expect(within(block).getByTitle(`Recording of ${title}`)).toHaveAttribute(
       "src",
       "https://www.youtube.com/embed/dBmuwQRixjk",
@@ -199,20 +200,27 @@ describe("LearnPage", () => {
 
   it.each([
     {
-      button: "Pragati: AI for Impact",
+      button: "Pragati: AI for Impact at The Delta",
+      eventLinks: {
+        "Pragati: AI for Impact": "https://thedelta.org.in/pragati/",
+        "the^delta": "https://thedelta.org.in/",
+      },
       title: "Evaluating AI for impact masterclass",
       videoId: "n3ThJXTPAtw",
       slides: "https://www.amandalmia.com/Nudge-talk/",
     },
     {
       button: "AI Commons for Global Health",
+      eventLinks: {
+        "AI Commons for Global Health": "https://aicommonsforglobalhealth.org/",
+      },
       title: "Challenges with evaluating health AI solutions",
       videoId: "4JkhKmg74EE",
       slides: "https://www.amandalmia.com/calibrate-ai-commons-talk/",
     },
   ])(
     "swaps the open talk for $button when its button is clicked",
-    async ({ button, title, videoId, slides }) => {
+    async ({ button, eventLinks, title, videoId, slides }) => {
       const user = setupUser();
       render(<LearnPage />);
       const { block } = sessionOnPage("calibrate-demo");
@@ -257,7 +265,12 @@ describe("LearnPage", () => {
       expect(
         within(block).queryByTitle(`Recording of ${indiaFoss}`),
       ).toBeNull();
-      expect(within(block).queryByText(/Our talk at IndiaFOSS 2026/)).toBeNull();
+      expect(within(block).queryByText(/Our talk at/)).toBeNull();
+      Object.entries(eventLinks).forEach(([name, href]) => {
+        const link = within(block).getByRole("link", { name });
+        expect(link).toHaveAttribute("href", href);
+        expect(link).toHaveAttribute("target", "_blank");
+      });
     },
   );
 
