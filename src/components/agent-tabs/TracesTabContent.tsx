@@ -212,7 +212,14 @@ export function TracesTabContent({
   // Every trace the list matches, not only the ticked ones. The two bulk
   // endpoints re-read the same rows from these filters, so the pages the
   // reader never loaded are included and a stale tick cannot slip through.
-  const [everyTraceMatching, setEveryTraceMatching] = useState(false);
+  // The moment they asked for it. Both endpoints stop at this time, so a trace
+  // that lands after the reader chose is left alone.
+  // ponytail: the browser's clock. One running slow leaves the newest traces
+  // out rather than taking in unseen ones; use a backend time if that matters.
+  const [everyTraceMatchingSince, setEveryTraceMatchingSince] = useState<
+    string | null
+  >(null);
+  const everyTraceMatching = everyTraceMatchingSince !== null;
   const traceFilters = {
     agentId: agentUuid,
     q: search,
@@ -220,6 +227,7 @@ export function TracesTabContent({
     labels: labelFilter,
     scores: scoreFilter,
     conversationId: conversationFilter,
+    createdBefore: everyTraceMatchingSince,
   };
 
   const deletion = useTraceDeletion({
@@ -419,6 +427,7 @@ export function TracesTabContent({
             labels: labelFilter,
             scores: scoreFilter,
             conversationId: conversationFilter,
+            createdBefore: everyTraceMatchingSince,
             outputType,
           }),
         ),
@@ -455,7 +464,7 @@ export function TracesTabContent({
   // what the next action works on.
   useEffect(() => {
     listVersionRef.current += 1;
-    setEveryTraceMatching(false);
+    setEveryTraceMatchingSince(null);
     setWholeListKind(null);
     pickedRef.current.clear();
     deletion.clearSelection();
@@ -467,7 +476,7 @@ export function TracesTabContent({
   // Unticking a row is the reader narrowing what they want, so the whole list
   // is no longer what they asked for.
   useEffect(() => {
-    if (!deletion.allSelected) setEveryTraceMatching(false);
+    if (!deletion.allSelected) setEveryTraceMatchingSince(null);
   }, [deletion.allSelected]);
 
   // The setup steps go away once the first trace lands, so the code that sends
@@ -989,7 +998,9 @@ export function TracesTabContent({
                 {canSelectEveryTrace && (
                   <button
                     type="button"
-                    onClick={() => setEveryTraceMatching(true)}
+                    onClick={() =>
+                      setEveryTraceMatchingSince(new Date().toISOString())
+                    }
                     className="inline-flex items-center h-7 px-2.5 rounded-md text-xs font-medium border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 hover:border-amber-500/60 transition-colors cursor-pointer whitespace-nowrap"
                   >
                     Select all {total} trace{total === 1 ? "" : "s"}
@@ -1195,6 +1206,11 @@ export function TracesTabContent({
               onClick: onViewTests,
             },
           });
+          // Tests that will not run, or that no agent lists. These stay until
+          // the reader closes them, since the tests look fine everywhere else.
+          for (const warning of result.warnings ?? []) {
+            toast.warning(warning, { duration: Infinity });
+          }
           offerAgentDefaults(evaluatorsUsed, (isOne) =>
             created === 1
               ? `The test you just added uses ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`
