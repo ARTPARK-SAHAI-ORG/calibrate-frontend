@@ -15,6 +15,18 @@ describe("displayModelName", () => {
     expect(displayModelName("gpt-4.1")).toBe("gpt-4.1");
   });
 
+  it("names the company serving the model, when one was chosen", () => {
+    expect(displayModelName("deepseek/deepseek-chat-v3.1@deepinfra")).toBe(
+      "deepseek-chat-v3.1 (deepinfra)"
+    );
+  });
+
+  it("names the serving company on the double-underscore form too", () => {
+    expect(displayModelName("google__gemini-3-flash@google-vertex")).toBe(
+      "gemini-3-flash (google-vertex)"
+    );
+  });
+
   it("returns the original string when there is nothing left to show", () => {
     expect(displayModelName("")).toBe("");
     expect(displayModelName("/")).toBe("/");
