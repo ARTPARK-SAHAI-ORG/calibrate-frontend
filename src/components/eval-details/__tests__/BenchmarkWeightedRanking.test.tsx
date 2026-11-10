@@ -1,13 +1,33 @@
 import React from "react";
 import { render, screen, fireEvent } from "@/test-utils";
 import {
-  BenchmarkWeightedRanking,
+  BenchmarkWeightedRanking as Ranking,
   scoreBandClass,
 } from "../BenchmarkWeightedRanking";
-import type {
-  BenchmarkLeaderboardSummaryRow,
-  BenchmarkModelLike,
+import {
+  buildBenchmarkCombinedLeaderboardPayload,
+  type BenchmarkLeaderboardSummaryRow,
+  type BenchmarkModelLike,
 } from "@/lib/benchmarkEvaluatorSummary";
+
+/** The ranking with its payload built from the run, as the result view does. */
+function BenchmarkWeightedRanking({
+  leaderboardSummary,
+  modelResults,
+}: {
+  leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
+  modelResults: BenchmarkModelLike[];
+}) {
+  return (
+    <Ranking
+      payload={buildBenchmarkCombinedLeaderboardPayload(
+        leaderboardSummary,
+        modelResults,
+        "Test pass rate (%)",
+      )}
+    />
+  );
+}
 
 // Names of the ranked rows, top to bottom.
 function rankedOrder(container: HTMLElement): string[] {

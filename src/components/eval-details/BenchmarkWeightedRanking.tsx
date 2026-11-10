@@ -3,11 +3,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { displayModelName } from "@/lib/modelName";
 import { getColorMap } from "@/components/charts/LeaderboardBarChart";
-import {
-  buildBenchmarkCombinedLeaderboardPayload,
-  type BenchmarkLeaderboardSummaryRow,
-  type BenchmarkModelLike,
-} from "@/lib/benchmarkEvaluatorSummary";
+import { type BenchmarkCombinedLeaderboardPayload } from "@/lib/benchmarkEvaluatorSummary";
 import {
   formatCostUsd,
   formatLatencyMs,
@@ -23,9 +19,8 @@ import {
 } from "@/lib/benchmarkWeightedRanking";
 
 type BenchmarkWeightedRankingProps = {
-  leaderboardSummary?: BenchmarkLeaderboardSummaryRow[];
-  modelResults: BenchmarkModelLike[];
-  benchmarkScoreLabel?: string;
+  /** The leaderboard rows, built once by the caller from the run. */
+  payload: BenchmarkCombinedLeaderboardPayload | null;
 };
 
 const DIMENSION_META: Record<
@@ -62,20 +57,8 @@ export function scoreBandClass(score: number): string {
  * nothing unless at least two of the three metrics are present across the run.
  */
 export function BenchmarkWeightedRanking({
-  leaderboardSummary,
-  modelResults,
-  benchmarkScoreLabel = "Test pass rate (%)",
+  payload,
 }: BenchmarkWeightedRankingProps) {
-  const payload = useMemo(
-    () =>
-      buildBenchmarkCombinedLeaderboardPayload(
-        leaderboardSummary,
-        modelResults,
-        benchmarkScoreLabel,
-      ),
-    [leaderboardSummary, modelResults, benchmarkScoreLabel],
-  );
-
   const dims = useMemo<RankingDimension[]>(() => {
     if (!payload) return [];
     const active: RankingDimension[] = [];

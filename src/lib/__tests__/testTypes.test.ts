@@ -11,6 +11,8 @@ import {
   runStateOf,
   getModelPassRange,
   modelsUnansweredCount,
+  answeredCounts,
+  passRateOf,
 } from "../testTypes";
 
 describe("testTypeLabel", () => {
@@ -419,5 +421,43 @@ describe("a comparison where some tests produced no answer", () => {
         { total_tests: 10, passed: 5, failed: 5, unanswered_tests: 5 },
       ]),
     ).toEqual({ lowest: 100, highest: 100, failedModels: 0 });
+  });
+});
+
+describe("answeredCounts", () => {
+  it("keeps a test that gave no answer out of the answered ones", () => {
+    expect(
+      answeredCounts([
+        { passed: false, unanswered: true },
+        { passed: true },
+        { passed: false },
+      ]),
+    ).toEqual({ passed: 1, answered: 2, unanswered: 1 });
+  });
+
+  it("counts a row with no verdict as unanswered once the run is over", () => {
+    expect(answeredCounts([{ passed: null }], true)).toEqual({
+      passed: 0,
+      answered: 0,
+      unanswered: 1,
+    });
+  });
+
+  it("leaves a row still being worked on out of every count", () => {
+    expect(answeredCounts([{ passed: null }, {}])).toEqual({
+      passed: 0,
+      answered: 0,
+      unanswered: 0,
+    });
+  });
+});
+
+describe("passRateOf", () => {
+  it("is passed out of answered, out of 100", () => {
+    expect(passRateOf(3, 4)).toBe(75);
+  });
+
+  it("is null when nothing was answered", () => {
+    expect(passRateOf(0, 0)).toBeNull();
   });
 });

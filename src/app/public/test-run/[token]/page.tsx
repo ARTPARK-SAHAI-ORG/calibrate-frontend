@@ -1,16 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { runErrorText } from "@/lib/testRunApi";
-import { useParams } from "next/navigation";
 import {
-  TestCaseOutput,
-  TestCaseData,
-  JudgeResult,
-  TestRunEvaluator,
-  ResultPager,
-  type PagerNav,
-} from "@/components/test-results/shared";
+  runErrorText,
+  type TestCaseResult,
+  type TestRunStatusResponse,
+} from "@/lib/testRunApi";
+import { useParams } from "next/navigation";
+import { ResultPager, type PagerNav } from "@/components/test-results/shared";
 import {
   PublicPageLayout,
   PublicNotFound,
@@ -28,77 +25,17 @@ import { buildTestRunCsv } from "@/lib/exportTestResults";
 import {
   isToolCallRow,
   rowTestUuid,
-  runEvaluatorSummary,
   toolCallEvaluatorUuidFromRows,
   toolCallPassFail,
 } from "@/lib/testRunSummary";
-import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
-import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import {
+  answeredCounts,
   isRunStopped,
   isUnanswered,
   rowVerdict,
   runDisplayName,
   runStateOf,
 } from "@/lib/testTypes";
-
-type TestCaseResult = {
-  test_case_id?: string;
-  /** The uuid of the test this row ran. Absent on a run answered before the
-   * backend started stamping it, which is why `rowTestUuid` falls back. */
-  test_uuid?: string | null;
-  test_name?: string;
-  name?: string;
-  /** null / absent means the test has not finished. It never means the test
-   * produced no answer — read `unanswered` for that. */
-  passed?: boolean | null;
-  /** True when the test produced no answer. `reasoning` then holds why. */
-  unanswered?: boolean;
-  reasoning?: string;
-  /** True when the run was stopped before this test started. */
-  not_run?: boolean;
-  /** What kind of test this row ran. Sent on every case in both modes. Absent
-   * on runs answered before the backend started sending it, which is why
-   * `rowTestType` falls back to the test's own config. */
-  test_type?: "response" | "general" | "tool_call" | "conversation" | null;
-  /** The four fields below are left out of the summary response. They arrive
-   * when one case is read in full. */
-  output?: TestCaseOutput | null;
-  test_case?: TestCaseData | null;
-  judge_results?: JudgeResult[] | null;
-  inputs?: Record<string, unknown> | null;
-  /** Per-case agent latency (ms) / cost (USD). */
-  latency_ms?: number | null;
-  cost?: number | null;
-};
-
-type TestRunStatusResponse = {
-  task_id: string;
-  status: string;
-  /** What the run is called. Absent on a backend that predates naming. */
-  name?: string | null;
-  total_tests?: number;
-  passed?: number;
-  failed?: number;
-  /** How many of the tests produced no answer. */
-  unanswered_tests?: number;
-  /** True when the run gave up before it started every test. */
-  stopped_early?: boolean;
-  /** True when someone stopped the run before it finished. */
-  aborted?: boolean;
-  results?: TestCaseResult[];
-  /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
-  evaluators?: TestRunEvaluator[];
-  /** The run's totals for each evaluator that judged something. An evaluator
-   * that judged nothing is left out. Read it through `runEvaluatorSummary`. */
-  evaluator_summary?: BenchmarkEvaluatorSummaryEntry[] | null;
-  /** Aggregate per-test latency ({p50,p95,p99,count}; legacy runs use
-   * {mean,min,max,count}) plus cost / total tokens ({mean,min,max,count} | null). */
-  latency_ms?: LatencyStat;
-  cost?: AggStat;
-  total_tokens?: AggStat;
-  error?: string | boolean | null;
-};
 
 /** The run broke: it either says so outright or left an error behind. The same
  * two signals the run window and the shared comparison page read, so a run
@@ -261,20 +198,11 @@ export default function PublicTestRunPage() {
   // How one row reads. The one rule, so this page and the run window in the app
   // cannot show two different pass rates for the same run.
   const statusOf = (r: TestCaseResult) => rowVerdict(r, wasStopped, runOver);
-  const passed = results.filter((r) => statusOf(r) === "passed").length;
-  // A test that produced no answer was never scored; keep it out of the
-  // pass-rate denominator so the rate matches the tests that were.
-  const failed = results.filter(
-    (r) => statusOf(r) === "failed" && !isUnanswered(r),
-  ).length;
+  // A test that produced no answer was never scored; it is kept out of the
+  // pass rate so the rate matches the tests that were.
+  const answered = answeredCounts(results, runOver);
   // Tool-call pass/fail split for the Results tab's dedicated card.
-  const toolCall = toolCallPassFail(
-    results.map((r) => ({
-      toolCall: isToolCallRow(r),
-      passed: statusOf(r) === "passed",
-      failed: statusOf(r) === "failed" && !isUnanswered(r),
-    })),
-  );
+  const toolCall = toolCallPassFail(results);
   const runFailed = runBroke(data);
   // Every test the run has no answer for: the ones it says produced none, and
   // the rows it ended without a verdict for. They are left out of the pass
@@ -299,7 +227,7 @@ export default function PublicTestRunPage() {
   const evaluatorsByUuid = Object.fromEntries(
     (data.evaluators ?? []).map((e) => [e.uuid, e]),
   );
-  const evaluatorSummary = runEvaluatorSummary(data.evaluator_summary);
+  const evaluatorSummary = data.evaluator_summary ?? [];
 
   /** The whole run, read only when someone exports it: the file carries each
    * case's conversation, answer and judge reasoning, none of which the page
@@ -376,8 +304,9 @@ export default function PublicTestRunPage() {
         {/* Results tab */}
         {activeTab === "summary" && (
           <TestRunSummary
-            passed={passed}
-            total={passed + failed}
+            passed={answered.passed}
+            total={answered.answered}
+            passRate={data.pass_rate}
             unanswered={unansweredCount}
             notRun={couldNotRun - unansweredCount}
             stoppedEarly={data.stopped_early === true}

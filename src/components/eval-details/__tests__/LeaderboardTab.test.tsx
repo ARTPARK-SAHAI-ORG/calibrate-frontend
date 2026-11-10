@@ -2,6 +2,19 @@ import React from "react";
 import { render, screen } from "@/test-utils";
 import { LeaderboardTab, type LeaderboardColumn, type ChartConfig } from "../LeaderboardTab";
 
+// The real chart, watched so the ranges each bar is handed can be read.
+const chartProps = jest.fn();
+jest.mock("../../charts/LeaderboardBarChart", () => {
+  const actual = jest.requireActual("../../charts/LeaderboardBarChart");
+  return {
+    ...actual,
+    LeaderboardBarChart: (props: { data: unknown }) => {
+      chartProps(props);
+      return actual.LeaderboardBarChart(props);
+    },
+  };
+});
+
 const columns: LeaderboardColumn[] = [
   { key: "run", header: "Run" },
   { key: "score", header: "Score", render: (v) => `${v}%` },
@@ -135,5 +148,48 @@ describe("LeaderboardTab", () => {
       />,
     );
     expect(container.firstChild).toHaveClass("custom-class");
+  });
+
+  describe("likely ranges", () => {
+    const data = [
+      { run: "run-a", score: 90, score_ci: { low: 80, high: 95 } },
+      { run: "run-b", score: 70, score_ci: null },
+    ];
+    const charts: ChartConfig[][] = [
+      [{ title: "Score Chart", dataKey: "score", rangeKey: "score_ci" }],
+    ];
+    const ranges = () =>
+      chartProps.mock.calls.at(-1)?.[0].data.map(
+        (d: { range?: unknown }) => d.range,
+      );
+
+    beforeEach(() => chartProps.mockClear());
+
+    it("hands each bar its range when asked to show them", () => {
+      render(
+        <LeaderboardTab
+          columns={columns}
+          data={data}
+          charts={charts}
+          filename="test"
+          getLabel={(k) => k}
+          showRanges
+        />,
+      );
+      expect(ranges()).toEqual([{ low: 80, high: 95 }, null]);
+    });
+
+    it("hands the bars no ranges by default", () => {
+      render(
+        <LeaderboardTab
+          columns={columns}
+          data={data}
+          charts={charts}
+          filename="test"
+          getLabel={(k) => k}
+        />,
+      );
+      expect(ranges()).toEqual([undefined, undefined]);
+    });
   });
 });
