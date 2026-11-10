@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { LandingHeader } from "@/components/LandingHeader";
 import { LandingFooter } from "@/components/LandingFooter";
@@ -43,10 +45,14 @@ type LearnItem = {
   slidesEmbedUrl?: string;
   slidesUrl?: string;
   /** More talks on the same subject, drawn inside this entry under its own
-   * recording and slides, each with its own line on what it covered. They get
-   * no place in the list down the left. */
-  more?: Omit<LearnItem, "id" | "more">[];
+   * recording and slides, one at a time, each with its own line on what it
+   * covered. The first is open to begin with. They get no place in the list
+   * down the left. */
+  more?: OtherTalk[];
 };
+
+/** `label` is the words on the button that opens the talk. */
+type OtherTalk = Omit<LearnItem, "id" | "more"> & { label: string };
 
 /**
  * Everything on the page, in the order a reader meets it. Move an entry here
@@ -66,13 +72,79 @@ const ENTRIES: LearnItem[] = [
       "https://docs.google.com/presentation/d/e/2PACX-1vQWZdlG0I_pxmj6ZaZTayng4XsV11TQKprmOT11pZcA2o2aO44RNff7IxlOrBAephygfyp6tv61qAK2/pub?start=false&loop=false&delayms=3000",
     more: [
       {
+        label: "IndiaFOSS 2026",
         title: "Evaluating AI systems so they can be trusted",
-        summary:
-          "Our talk at IndiaFOSS 2026 on evaluating AI agents for non-profits, using a voice agent that fills public health forms as the case study.",
+        summary: (
+          <>
+            Our talk at{" "}
+            <a
+              href="https://fossunited.org/indiafoss/2026"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={summaryLinkClass}
+            >
+              IndiaFOSS 2026
+            </a>{" "}
+            on evaluating AI agents for non-profits, using a voice agent that
+            fills public health forms as the case study.
+          </>
+        ),
         recordingEmbedUrl: "https://www.youtube.com/embed/dBmuwQRixjk",
         recordingUrl: "https://youtu.be/dBmuwQRixjk",
         slidesEmbedUrl: "https://www.amandalmia.com/IndiaFOSS-talk/",
         slidesUrl: "https://www.amandalmia.com/IndiaFOSS-talk/#1",
+      },
+      {
+        label: "Pragati: AI for Impact at The Delta",
+        title: "Evaluating AI for impact masterclass",
+        summary: (
+          <>
+            A masterclass on evaluating AI for impact using Calibrate, at{" "}
+            <a
+              href="https://thedelta.org.in/pragati/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={summaryLinkClass}
+            >
+              Pragati: AI for Impact
+            </a>{" "}
+            by{" "}
+            <a
+              href="https://thedelta.org.in/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={summaryLinkClass}
+            >
+              the^delta
+            </a>
+          </>
+        ),
+        recordingEmbedUrl: "https://www.youtube.com/embed/n3ThJXTPAtw",
+        recordingUrl: "https://youtu.be/n3ThJXTPAtw",
+        slidesEmbedUrl: "https://www.amandalmia.com/Nudge-talk/",
+        slidesUrl: "https://www.amandalmia.com/Nudge-talk/",
+      },
+      {
+        label: "AI Commons for Global Health",
+        title: "Challenges with evaluating health AI solutions",
+        summary: (
+          <>
+            Challenges with evaluating health AI solutions and how to address
+            them with Calibrate, at{" "}
+            <a
+              href="https://aicommonsforglobalhealth.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={summaryLinkClass}
+            >
+              AI Commons for Global Health
+            </a>
+          </>
+        ),
+        recordingEmbedUrl: "https://www.youtube.com/embed/4JkhKmg74EE",
+        recordingUrl: "https://youtu.be/4JkhKmg74EE",
+        slidesEmbedUrl: "https://www.amandalmia.com/calibrate-ai-commons-talk/",
+        slidesUrl: "https://www.amandalmia.com/calibrate-ai-commons-talk/",
       },
     ],
   },
@@ -208,6 +280,9 @@ const ENTRIES: LearnItem[] = [
 
 const topLinkClass =
   "inline-flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 text-sm md:text-base font-medium border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 transition-colors cursor-pointer";
+/** The button for one talk under "Other talks". */
+const talkButtonClass =
+  "px-4 md:px-5 py-2 md:py-2.5 text-sm md:text-base font-medium border rounded-lg transition-colors cursor-pointer";
 /** The emerald eyebrow pill the landing page uses above a block of content. */
 const partLabelClass =
   "mb-3 inline-block rounded-md border border-emerald-200/90 bg-emerald-50/90 px-1.5 py-0.5 text-[10px] md:text-[11px] font-semibold uppercase tracking-wider text-emerald-950 shadow-[0_1px_0_rgba(0,0,0,0.04)]";
@@ -319,6 +394,47 @@ function TalkMedia({ talk }: { talk: Omit<LearnItem, "id" | "more"> }) {
   );
 }
 
+/** The talks under an entry, with a button for each and one open at a time. */
+function OtherTalks({ talks }: { talks: OtherTalk[] }) {
+  const [openIndex, setOpenIndex] = useState(0);
+  const open = talks[openIndex];
+
+  return (
+    <div className="mt-12 md:mt-16">
+      <h3 className="mb-4 text-lg md:text-xl font-semibold text-gray-900">
+        Other talks
+      </h3>
+      <div
+        role="group"
+        aria-label="Choose a talk"
+        className="mb-6 flex flex-wrap gap-2 md:gap-3"
+      >
+        {talks.map((talk, index) => (
+          <button
+            key={talk.label}
+            type="button"
+            aria-pressed={index === openIndex}
+            onClick={() => setOpenIndex(index)}
+            className={`${talkButtonClass} ${
+              index === openIndex
+                ? "bg-gray-900 border-gray-900 text-white"
+                : "border-gray-300 text-gray-900 hover:bg-gray-50"
+            }`}
+          >
+            {talk.label}
+          </button>
+        ))}
+      </div>
+      <div className="mb-6 text-base md:text-lg font-light text-gray-500 leading-relaxed text-pretty">
+        {open.summary}
+      </div>
+      {/* The key gives each talk new frames. Changing the address of a frame
+          already on the page would add a step to the browser's Back button. */}
+      <TalkMedia key={open.label} talk={open} />
+    </div>
+  );
+}
+
 export default function LearnPage() {
   return (
     <div className="min-h-screen bg-white landing-page">
@@ -387,14 +503,7 @@ export default function LearnPage() {
                   </div>
 
                   <TalkMedia talk={talk} />
-                  {talk.more?.map((more) => (
-                    <div key={more.title} className="mt-12 md:mt-16">
-                      <div className="mb-6 text-base md:text-lg font-light text-gray-500 leading-relaxed text-pretty">
-                        {more.summary}
-                      </div>
-                      <TalkMedia talk={more} />
-                    </div>
-                  ))}
+                  {talk.more && <OtherTalks talks={talk.more} />}
                 </section>
               ))}
             </div>

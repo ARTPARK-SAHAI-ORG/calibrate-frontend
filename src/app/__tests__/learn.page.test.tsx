@@ -7,7 +7,7 @@
  * copy that gets reworded; the id is what a shared link carries and what the
  * list down the left points at, so that is what this pins.
  */
-import { render, screen, within } from "@/test-utils";
+import { render, screen, setupUser, within } from "@/test-utils";
 import LearnPage from "../learn/page";
 import { DOCS_URL, WEBINARS_URL } from "@/constants/links";
 
@@ -172,9 +172,10 @@ describe("LearnPage", () => {
     render(<LearnPage />);
     const { block } = sessionOnPage("calibrate-demo");
     const title = "Evaluating AI systems so they can be trusted";
+    expect(within(block).getByText(/Our talk at/)).toBeInTheDocument();
     expect(
-      within(block).getByText(/Our talk at IndiaFOSS 2026/),
-    ).toBeInTheDocument();
+      within(block).getByRole("link", { name: "IndiaFOSS 2026" }),
+    ).toHaveAttribute("href", "https://fossunited.org/indiafoss/2026");
     expect(within(block).getByTitle(`Recording of ${title}`)).toHaveAttribute(
       "src",
       "https://www.youtube.com/embed/dBmuwQRixjk",
@@ -196,6 +197,82 @@ describe("LearnPage", () => {
     // It is part of the tutorial, so it has no place in the list on the left.
     expect(document.getElementById("indiafoss-2026")).toBeNull();
   });
+
+  it.each([
+    {
+      button: "Pragati: AI for Impact at The Delta",
+      eventLinks: {
+        "Pragati: AI for Impact": "https://thedelta.org.in/pragati/",
+        "the^delta": "https://thedelta.org.in/",
+      },
+      title: "Evaluating AI for impact masterclass",
+      videoId: "n3ThJXTPAtw",
+      slides: "https://www.amandalmia.com/Nudge-talk/",
+    },
+    {
+      button: "AI Commons for Global Health",
+      eventLinks: {
+        "AI Commons for Global Health": "https://aicommonsforglobalhealth.org/",
+      },
+      title: "Challenges with evaluating health AI solutions",
+      videoId: "4JkhKmg74EE",
+      slides: "https://www.amandalmia.com/calibrate-ai-commons-talk/",
+    },
+  ])(
+    "swaps the open talk for $button when its button is clicked",
+    async ({ button, eventLinks, title, videoId, slides }) => {
+      const user = setupUser();
+      render(<LearnPage />);
+      const { block } = sessionOnPage("calibrate-demo");
+      const indiaFoss = "Evaluating AI systems so they can be trusted";
+      const oldFrame = within(block).getByTitle(`Recording of ${indiaFoss}`);
+
+      expect(within(block).queryByTitle(`Recording of ${title}`)).toBeNull();
+      expect(
+        within(block).getByRole("button", { name: "IndiaFOSS 2026" }),
+      ).toHaveAttribute("aria-pressed", "true");
+
+      const open = within(block).getByRole("button", { name: button });
+      expect(open).toHaveAttribute("aria-pressed", "false");
+      await user.click(open);
+
+      expect(open).toHaveAttribute("aria-pressed", "true");
+      expect(
+        within(block).getByRole("button", { name: "IndiaFOSS 2026" }),
+      ).toHaveAttribute("aria-pressed", "false");
+      expect(within(block).getByTitle(`Recording of ${title}`)).toHaveAttribute(
+        "src",
+        `https://www.youtube.com/embed/${videoId}`,
+      );
+      expect(within(block).getByTitle(`Slides from ${title}`)).toHaveAttribute(
+        "src",
+        slides,
+      );
+      expect(
+        within(block).getByRole("link", {
+          name: `Open the recording of ${title} in a new tab`,
+        }),
+      ).toHaveAttribute("href", `https://youtu.be/${videoId}`);
+      expect(
+        within(block).getByRole("link", {
+          name: `Open the slides from ${title} in a new tab`,
+        }),
+      ).toHaveAttribute("href", slides);
+      // A new frame, not the old one pointed elsewhere, which would add a step
+      // to the browser's Back button.
+      expect(oldFrame).not.toBeInTheDocument();
+      // One at a time: the talk that was open has left the page.
+      expect(
+        within(block).queryByTitle(`Recording of ${indiaFoss}`),
+      ).toBeNull();
+      expect(within(block).queryByText(/Our talk at/)).toBeNull();
+      Object.entries(eventLinks).forEach(([name, href]) => {
+        const link = within(block).getByRole("link", { name });
+        expect(link).toHaveAttribute("href", href);
+        expect(link).toHaveAttribute("target", "_blank");
+      });
+    },
+  );
 
   it("links to the insights from workshop-for-leaders in that session's summary", () => {
     render(<LearnPage />);
