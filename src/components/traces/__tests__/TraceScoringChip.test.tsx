@@ -38,6 +38,7 @@ function controls(
     },
     eligibilityError: null,
     saveError: null,
+    refreshEligibility: jest.fn(),
     enableBlocked: false,
     cannotEnable: false,
     ...overrides,
@@ -157,7 +158,7 @@ it("shows both evaluator groups and the note for turning it on, on hover", async
   ).toBeInTheDocument();
   expect(
     screen.getByText(
-      "Uses variables, which cannot be filled for a trace automatically",
+      "A variable has no trace value chosen. Configure it in the Evaluators tab",
     ),
   ).toBeInTheDocument();
 

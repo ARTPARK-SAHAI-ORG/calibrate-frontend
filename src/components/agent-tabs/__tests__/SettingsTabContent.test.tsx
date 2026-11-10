@@ -22,6 +22,7 @@ function scoring(
     saveError: null,
     enableBlocked: false,
     cannotEnable: false,
+    refreshEligibility: jest.fn(),
     ...overrides,
   };
   // The hook works this out from the other two; a test that sets either of
@@ -232,7 +233,7 @@ describe("SettingsTabContent", () => {
     const validEvaluators = screen.getByText("valid evaluators");
     await user.hover(validEvaluators);
     expect(
-      await screen.findByText("Evaluators without any variables"),
+      await screen.findByText("Evaluators whose variables all have a trace value chosen"),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
@@ -283,7 +284,7 @@ describe("SettingsTabContent", () => {
       await screen.findAllByRole("button", { name: "Evaluators tab" })
     ).find((el) =>
       el.parentElement?.textContent?.includes(
-        "Every evaluator added to this agent uses variables",
+        "Every evaluator added to this agent has a variable with no trace value chosen",
       ),
     );
     expect(inTooltip).toBeDefined();

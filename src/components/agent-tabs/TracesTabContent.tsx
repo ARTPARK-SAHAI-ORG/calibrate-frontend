@@ -10,6 +10,8 @@ import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToT
 import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
 import { NothingCanScoreMessage } from "@/components/traces/NothingCanScoreMessage";
+import { useConfigureTraceValues } from "@/components/traces/useConfigureTraceValues";
+import { EVERY_EVALUATOR_NEEDS_VALUES } from "@/lib/traceScoring";
 import { TraceScoringChip } from "@/components/traces/TraceScoringChip";
 import {
   AddRunToLabellingTaskDialog,
@@ -479,6 +481,15 @@ export function TracesTabContent({
   const eligibility = traceScoring.eligibility;
   const nothingCanScore =
     eligibility !== null && eligibility.eligible.length === 0;
+  const needValuesCount = ineligible.filter(
+    (item) => item.reason === "declares_variables",
+  ).length;
+  const configureTraceValues = useConfigureTraceValues({
+    agentUuid,
+    agentNature,
+    accessToken,
+    onRefresh: traceScoring.refreshEligibility,
+  });
   // One column per evaluator that can score now, plus any that scored a trace
   // on this page, so taking an evaluator off the agent does not hide the
   // scores it already gave.
@@ -722,7 +733,8 @@ export function TracesTabContent({
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
 
-  const hasWarning = nothingCanScore || overLimit;
+  const scoringBlocked = traceScoring.enabled && nothingCanScore;
+  const hasWarning = scoringBlocked || overLimit;
 
   const integrationGuideButton = (
     <Button
@@ -736,16 +748,28 @@ export function TracesTabContent({
   );
 
   const emptyState = (
-    <TracesEmptyState
-      agentUuid={agentUuid}
-      agentNature={agentNature}
-      onCheckForTraces={async () => {
-        // The first trace is also the first chance to have labels.
-        refetchLabels();
-        refetchConversationIds();
-        return refetch();
-      }}
-    />
+    <>
+      {traceScoring.enabled && needValuesCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            {needValuesCount === 1
+              ? "1 evaluator needs values before it can score your traces"
+              : `${needValuesCount} evaluators need values before they can score your traces`}
+          </p>
+          {configureTraceValues.button}
+        </div>
+      )}
+      <TracesEmptyState
+        agentUuid={agentUuid}
+        agentNature={agentNature}
+        onCheckForTraces={async () => {
+          // The first trace is also the first chance to have labels.
+          refetchLabels();
+          refetchConversationIds();
+          return refetch();
+        }}
+      />
+    </>
   );
 
   // A list that failed to load has nothing behind it, so the failure is all
@@ -786,6 +810,7 @@ export function TracesTabContent({
           </button>
         </ErrorNote>
         {showEmptyState && emptyState}
+        {configureTraceValues.dialog}
       </div>
     );
   }
@@ -847,14 +872,19 @@ export function TracesTabContent({
           and its detail. Only a real problem takes a row of its own. */}
       {hasLoaded && !showEmptyState && hasWarning && (
         <div className="space-y-3">
-          {nothingCanScore && (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+          {scoringBlocked && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
               <p className="text-sm text-amber-700 dark:text-amber-300">
-                <NothingCanScoreMessage
-                  ineligible={ineligible}
-                  onGoToEvaluators={onGoToEvaluators}
-                />
+                {needValuesCount > 0 && needValuesCount === ineligible.length ? (
+                  EVERY_EVALUATOR_NEEDS_VALUES
+                ) : (
+                  <NothingCanScoreMessage
+                    ineligible={ineligible}
+                    onGoToEvaluators={onGoToEvaluators}
+                  />
+                )}
               </p>
+              {needValuesCount > 0 && configureTraceValues.button}
             </div>
           )}
           {overLimit && (
@@ -1252,6 +1282,10 @@ export function TracesTabContent({
           onConfirm={agentDefaults.confirm}
         />
       )}
+
+      {/* Here, not beside its button: the first save can end the warning the
+          button sits in while other evaluators are still waiting. */}
+      {configureTraceValues.dialog}
 
       <DeleteConfirmationDialog
         isOpen={deletion.deleteDialogOpen}

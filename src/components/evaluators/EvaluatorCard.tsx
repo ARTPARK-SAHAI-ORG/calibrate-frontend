@@ -11,6 +11,8 @@ type Props = {
   evaluator: EvaluatorData;
   /** Drawn after View: Duplicate, then Remove on an agent or Delete in the library. */
   actions?: ReactNode;
+  /** One line under the description, for something the reader needs to fix. */
+  warning?: string;
 } & HTMLAttributes<HTMLDivElement>;
 
 /**
@@ -20,7 +22,7 @@ type Props = {
  * the evaluator's own page. Shared by the evaluator library pages and the
  * agent Evaluators tab, so the two read and behave the same.
  */
-export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
+export function EvaluatorCard({ evaluator, actions, warning, ...rest }: Props) {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
@@ -49,6 +51,11 @@ export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
           {evaluator.description && (
             <p className="text-sm text-muted-foreground mt-0.5">
               {evaluator.description}
+            </p>
+          )}
+          {warning && (
+            <p className="text-xs text-yellow-700 dark:text-yellow-500 mt-1">
+              {warning}
             </p>
           )}
         </div>

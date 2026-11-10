@@ -2,6 +2,8 @@
 
 import { nothingCanScoreCopy } from "@/lib/traceScoring";
 
+const TAB_NAME = "Evaluators tab";
+
 /**
  * Why this agent's traces are not being scored, and where to fix it. The same
  * words wherever it is said: the banner above the table and the switch in
@@ -14,18 +16,25 @@ export function NothingCanScoreMessage({
   ineligible: { reason: string }[];
   onGoToEvaluators: () => void;
 }) {
+  // One reason already says what to do in the tab; the others still need it said.
+  const copy = nothingCanScoreCopy(ineligible);
+  const [before, after] = (
+    copy.includes(TAB_NAME)
+      ? copy
+      : `${copy} Choose evaluators that can score traces in the ${TAB_NAME}.`
+  ).split(TAB_NAME);
+
   return (
     <>
-      {nothingCanScoreCopy(ineligible)} Choose evaluators without variables in
-      the{" "}
+      {before}
       <button
         type="button"
         onClick={onGoToEvaluators}
         className="font-semibold cursor-pointer hover:opacity-80"
       >
-        Evaluators tab
+        {TAB_NAME}
       </button>
-      .
+      {after}
     </>
   );
 }
