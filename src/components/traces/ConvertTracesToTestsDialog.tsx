@@ -12,7 +12,7 @@ import {
   convertTracesErrorMessage,
   ConvertTestType,
   ConvertTracesToTestsResult,
-  type TraceFilters,
+  type TraceSelectAll,
 } from "@/lib/tracesApi";
 
 type ConvertTracesToTestsDialogProps = {
@@ -23,7 +23,7 @@ type ConvertTracesToTestsDialogProps = {
   traceUuids: string[];
   /** Set when the reader asked for every trace the list matches: the backend
    *  re-reads them from these filters instead of the ticked ids. */
-  selectAll?: TraceFilters | null;
+  selectAll?: TraceSelectAll | null;
   /** How many traces this will convert. The ticked count, or the whole list
    *  when every matching trace was asked for. */
   traceCount?: number;

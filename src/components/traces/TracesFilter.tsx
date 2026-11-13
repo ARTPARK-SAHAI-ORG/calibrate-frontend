@@ -12,7 +12,11 @@ import {
   XIcon,
 } from "@/components/icons";
 import { defaultBinaryLabel } from "@/lib/binaryLabels";
-import type { TraceOutputFilter, TraceScoreFilters } from "@/lib/tracesApi";
+import {
+  NO_TRACE_FACETS,
+  type TraceFacets,
+  type TraceOutputFilter,
+} from "@/lib/tracesApi";
 
 /** What a trace's output can be filtered down to. A trace that both replied
  *  and called tools counts as a reply, which is also how "Add to tests"
@@ -91,19 +95,13 @@ const TONE_CLASS: Record<ScoreConditionTone, string> = {
   neutral: "bg-muted text-foreground",
 };
 
-export type TracesFilterValue = {
-  outputType: TraceOutputFilter;
-  labels: string[];
-  /** One condition per evaluator, all of which have to hold. */
-  scores: TraceScoreFilters;
-  /** Keep only the turns of this conversation. */
-  conversationId?: string | null;
-};
+export type TracesFilterValue = Omit<TraceFacets, "conversationId"> &
+  Partial<Pick<TraceFacets, "conversationId">>;
 
 /** How many choices are on, so the button can say so without being opened.
  *  Each picked label counts, since that is what the reader ticked, and so does
  *  each evaluator the reader has set a condition on. */
-function traceFilterCount(value: TracesFilterValue): number {
+export function traceFilterCount(value: TracesFilterValue): number {
   return (
     (value.outputType === "all" ? 0 : 1) +
     value.labels.length +
@@ -451,14 +449,7 @@ export function TracesFilter({
           <div className="flex items-center justify-between border-t border-border mt-5 pt-4">
             <button
               type="button"
-              onClick={() =>
-                setDraft({
-                  outputType: "all",
-                  labels: [],
-                  scores: {},
-                  conversationId: null,
-                })
-              }
+              onClick={() => setDraft(NO_TRACE_FACETS)}
               disabled={draftCount === 0}
               className="text-sm font-medium text-foreground hover:opacity-70 transition-opacity cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
             >
