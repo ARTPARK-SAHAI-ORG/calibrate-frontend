@@ -226,6 +226,10 @@ Where it lives today, and what counts as one unit of work:
 - Mobile-first. Primary breakpoint is `md:` (768px). Tables convert to card layouts on mobile (`hidden md:block` for the table, `md:hidden` for the card version).
 - Page titles are set via `document.title` in a `useEffect` in the page component AND via `metadata` export in the route's `layout.tsx` — keep them in sync when renaming.
 
+### Fonts live in the repo
+
+The four fonts are files in `src/app/fonts/`, loaded with `next/font/local` in `src/app/layout.tsx`. Never go back to `next/font/google`: it asks Google for each font during the build, Google sometimes answers with an address of the form `fonts.gstatic.com/l/font?kit=...&skey=...`, and the build then stops with `next/font/google queries have exactly one entry`. Each file holds the Latin letters only, so a character outside them shows in the fallback font. To update one, request `https://fonts.googleapis.com/css2?family=<name>:wght@100..900` with a browser's user agent (DM Sans uses `wght@100..1000`), download the `.woff2` under the `/* latin */` comment, and keep that font's `*-OFL.txt` licence beside it.
+
 ### A new page must be filed for search, in the same change
 
 Adding a folder under `src/app` that answers an address means putting it in one
