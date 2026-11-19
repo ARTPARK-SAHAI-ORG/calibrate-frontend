@@ -23,6 +23,14 @@ export type TicketMessage = {
   placeholder: boolean;
   tags: string[];
   emergencyTag: boolean;
+  /** An image, audio clip, video or document sent with the message, when there is one. */
+  media: TicketMedia | null;
+};
+
+/** What kind of file a message carried. The link is kept with the item for later but never drawn. */
+export type TicketMedia = {
+  kind: "audio" | "image" | "video" | "document" | "other";
+  mime: string;
 };
 
 export type TicketNote = {
@@ -164,7 +172,20 @@ function readTurn(turn: unknown): TicketEvent | null {
       ? t.tags.filter((x): x is string => typeof x === "string")
       : [],
     emergencyTag: t.emergency_tag === true,
+    media: readMedia(t.media),
   };
+}
+
+const MEDIA_KINDS = ["audio", "image", "video", "document"] as const;
+
+function readMedia(v: unknown): TicketMedia | null {
+  const m = asRecord(v);
+  if (!m) return null;
+  const type = str(m.type).toLowerCase();
+  const kind = (MEDIA_KINDS as readonly string[]).includes(type)
+    ? (type as TicketMedia["kind"])
+    : "other";
+  return { kind, mime: str(m.mime) };
 }
 
 /** Whether this item holds a ticket, so the usual conversation pane is not used. */
@@ -215,8 +236,10 @@ export function parseTicket(payload: unknown, metadata: Meta): Ticket | null {
   const later = events.filter((e) => sec(e.ts) > hi);
   const during = events.filter((e) => !(sec(e.ts) < lo) && !(sec(e.ts) > hi));
 
-  const firstReply = events.find(
-    (e): e is TicketMessage => e.kind === "message" && e.who !== "caregiver",
+  // The first reply is the first MSE message while the ticket was open. The
+  // chat's older history is full of automated broadcasts, which are not replies.
+  const firstReply = during.find(
+    (e): e is TicketMessage => e.kind === "message" && e.who === "mse",
   );
   const steps: TicketStep[] = [];
   if (openedAt) steps.push({ key: "opened", label: "Opened", at: openedAt });

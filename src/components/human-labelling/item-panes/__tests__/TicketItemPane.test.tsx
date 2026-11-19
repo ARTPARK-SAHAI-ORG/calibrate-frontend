@@ -178,6 +178,53 @@ describe("TicketItemPane", () => {
     expect(screen.getByText("Escalated (internal) · 19:46")).toBeInTheDocument();
   });
 
+  it("marks a file with no words as one that cannot be played, in place of its placeholder", () => {
+    render(
+      <TicketItemPane
+        payload={{
+          transcript: [
+            {
+              role: "user",
+              kind: "message",
+              content: "[Audio message]",
+              placeholder: true,
+              media: { type: "audio", mime: "audio/ogg", uri: "https://x/a.ogg" },
+              ...at("2026-11-16 19:01:00"),
+            },
+          ],
+        }}
+        metadata={[]}
+      />,
+    );
+    expect(screen.getByTestId("ticket-media")).toHaveTextContent(
+      "Audio message · cannot be played here",
+    );
+    expect(screen.queryByText("[Audio message]")).not.toBeInTheDocument();
+  });
+
+  it("keeps the words of a picture that has a caption, and marks the picture", () => {
+    render(
+      <TicketItemPane
+        payload={{
+          transcript: [
+            {
+              role: "user",
+              kind: "message",
+              content: "This is the powder",
+              media: { type: "image", mime: "image/jpeg", uri: "https://x/i.jpg" },
+              ...at("2026-11-16 19:01:00"),
+            },
+          ],
+        }}
+        metadata={[]}
+      />,
+    );
+    expect(screen.getByText("This is the powder")).toBeInTheDocument();
+    expect(screen.getByTestId("ticket-media")).toHaveTextContent(
+      "Image · cannot be played here",
+    );
+  });
+
   it("draws nothing for an item that is not a ticket", () => {
     const { container } = render(
       <TicketItemPane payload={{ transcript: [] }} metadata={null} />,

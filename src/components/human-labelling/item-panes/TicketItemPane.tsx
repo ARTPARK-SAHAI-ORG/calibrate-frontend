@@ -18,6 +18,14 @@ const PILL_BLUE =
 const PILL_GREEN =
   "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-300";
 
+const MEDIA_LABEL = {
+  audio: "Audio message",
+  image: "Image",
+  video: "Video",
+  document: "Document",
+  other: "Attachment",
+} as const;
+
 /** A support ticket: who it is about, how it went, and the messages and staff notes in order. */
 export function TicketItemPane({
   payload,
@@ -265,13 +273,24 @@ function Message({
           <span className="font-medium text-foreground">{m.label}</span>
           {m.atIst ? ` · ${hourMinute(m.atIst)}` : ""}
         </p>
-        <p
-          className={`mt-1 text-sm whitespace-pre-wrap break-words ${
-            m.placeholder ? "italic text-muted-foreground" : "text-foreground"
-          }`}
-        >
-          {main}
-        </p>
+        {/* A file with no words of its own is drawn as the note below, not as "[Audio message]". */}
+        {!(m.media && m.placeholder) && (
+          <p
+            className={`mt-1 text-sm whitespace-pre-wrap break-words ${
+              m.placeholder ? "italic text-muted-foreground" : "text-foreground"
+            }`}
+          >
+            {main}
+          </p>
+        )}
+        {m.media && (
+          <p
+            data-testid="ticket-media"
+            className="mt-1 inline-block rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground"
+          >
+            {MEDIA_LABEL[m.media.kind]} · cannot be played here
+          </p>
+        )}
         {original && (
           <p className="mt-2 border-t border-border pt-2 text-sm whitespace-pre-wrap break-words text-muted-foreground">
             {original}

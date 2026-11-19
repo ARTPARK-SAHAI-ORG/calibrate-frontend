@@ -182,6 +182,37 @@ describe("parseTicket", () => {
     ]);
   });
 
+  it("counts only an MSE message inside the ticket as the first reply", () => {
+    const turn = (role: string, label: string, at: string) => ({
+      kind: "message",
+      role,
+      label,
+      content: "x",
+      at_ist: at,
+      ts: T(at),
+    });
+    const t = parseTicket(
+      {
+        transcript: [
+          // Months earlier: an automated broadcast and an old MSE reply.
+          turn("assistant", "Automated", "2026-06-28 09:31:00"),
+          turn("assistant", "MSE", "2026-06-28 09:40:00"),
+          turn("user", "Caregiver", "2026-11-16 19:01:00"),
+          // Inside the ticket: an automated acknowledgement, then the MSE.
+          turn("assistant", "Automated", "2026-11-16 19:02:00"),
+          turn("assistant", "MSE", "2026-11-16 19:30:00"),
+        ],
+      },
+      [
+        { key: "Opened", value: "2026-11-16 19:01:00" },
+        { key: "Closed", value: "2026-11-16 20:00:00" },
+      ],
+    )!;
+    expect(t.steps.find((s) => s.key === "first-reply")?.at).toBe(
+      "2026-11-16 19:30:00",
+    );
+  });
+
   it("keeps only the case details the strip shows, in its own order", () => {
     const t = parseTicket(ticketPayload(), META)!;
     expect(t.facts).toEqual([
@@ -272,5 +303,38 @@ describe("parseTicket", () => {
     expect(t.during.map((e) => e.kind)).toEqual(["note", "message"]);
     expect(t.during[0]).toMatchObject({ label: "Note", text: "kept" });
     expect(t.during[1]).toMatchObject({ tags: ["x"] });
+  });
+
+  it("reads the kind of file a message carried, and never its link", () => {
+    const turn = (media: unknown) => ({
+      kind: "message",
+      role: "user",
+      content: "[Audio message]",
+      at_ist: "2026-11-16 19:01:00",
+      ts: T("2026-11-16 19:01:00"),
+      media,
+    });
+    const t = parseTicket(
+      {
+        transcript: [
+          turn({ type: "audio", mime: "audio/ogg; codecs=opus", uri: "https://x/1.ogg" }),
+          turn({ type: "Image", mime: "image/jpeg", uri: "https://x/2.jpg" }),
+          turn({ type: "sticker", mime: "image/webp" }),
+          turn({ mime: "x" }),
+          turn("not an object"),
+          turn(undefined),
+        ],
+      },
+      [],
+    )!;
+    const media = t.during.map((e) => (e as { media: unknown }).media);
+    expect(media).toEqual([
+      { kind: "audio", mime: "audio/ogg; codecs=opus" },
+      { kind: "image", mime: "image/jpeg" },
+      { kind: "other", mime: "image/webp" },
+      { kind: "other", mime: "x" },
+      null,
+      null,
+    ]);
   });
 });
