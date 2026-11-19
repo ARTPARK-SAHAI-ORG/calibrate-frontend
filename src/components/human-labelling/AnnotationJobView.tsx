@@ -1270,7 +1270,7 @@ function AnnotateView({
               </>
             )}
             <h1
-              className={`text-lg md:text-xl font-semibold truncate noora:text-lg noora:md:text-xl ${NOORA_DISPLAY}`}
+              className={`text-lg md:text-xl font-semibold truncate noora:text-xl noora:md:text-2xl noora:leading-8 ${NOORA_DISPLAY}`}
             >
               {data.task.name}
             </h1>
