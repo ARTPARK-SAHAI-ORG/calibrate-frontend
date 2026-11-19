@@ -255,6 +255,29 @@ describe("TicketItemPane", () => {
     expect(timeline).toHaveTextContent("2 questions");
   });
 
+  it("is comfortable by default and tightens its spacing when compact", () => {
+    const { rerender } = render(
+      <TicketItemPane payload={payload} metadata={metadata} />,
+    );
+    const pane = screen.getByTestId("ticket-pane");
+    expect(pane).toHaveAttribute("data-density", "comfortable");
+    expect(pane.className).toContain("space-y-4");
+    const spacious = screen.getByText("QUERY-I had my checkup today").parentElement!;
+    expect(spacious.className).toContain("px-4 py-3");
+
+    rerender(
+      <TicketItemPane payload={payload} metadata={metadata} density="compact" />,
+    );
+    const compact = screen.getByTestId("ticket-pane");
+    expect(compact).toHaveAttribute("data-density", "compact");
+    expect(compact.className).toContain("space-y-2");
+    expect(compact.className).not.toContain("space-y-4");
+    const tight = screen.getByText("QUERY-I had my checkup today").parentElement!;
+    expect(tight.className).toContain("px-3 py-1.5");
+    // The same words are on screen either way.
+    expect(screen.getByText("So is everything normal?")).toBeInTheDocument();
+  });
+
   it("draws nothing for an item that is not a ticket", () => {
     const { container } = render(
       <TicketItemPane payload={{ transcript: [] }} metadata={null} />,

@@ -30,6 +30,8 @@ import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { TicketItemPane } from "./item-panes/TicketItemPane";
 import { isTicketPayload } from "@/lib/ticketView";
+import { useTicketDensity, type TicketDensity } from "@/hooks/useTicketDensity";
+import { JobSettingsMenu } from "./JobSettingsMenu";
 import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
@@ -705,6 +707,10 @@ function AnnotateView({
 }: ViewProps) {
   const total = items.length;
   const isCompleted = data.job.status === "completed";
+  // How much room a ticket takes. The Settings menu sets it and the ticket reads
+  // it, so it is held here, above both. Only jobs of tickets have the choice.
+  const [ticketDensity, setTicketDensity] = useTicketDensity();
+  const hasTickets = data.items.some((it) => isTicketPayload(it.payload));
   // Frozen on the job. Absent keeps the comments box offered.
   const commentsEnabled = data.job.comments_enabled !== false;
   const filterActive =
@@ -1250,6 +1256,12 @@ function AnnotateView({
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {hasTickets && (
+              <JobSettingsMenu
+                density={ticketDensity}
+                onDensityChange={setTicketDensity}
+              />
+            )}
             <button
               type="button"
               onClick={() => setIntroOpen(true)}
@@ -1510,7 +1522,13 @@ function AnnotateView({
                 canResize={!isAdmin}
                 leftHasOwnPadding={itemPaneHasOwnPadding(data.task.type)}
                 rightRef={evaluatorsPaneRef}
-                left={<ItemPane item={currentItem} taskType={data.task.type} />}
+                left={
+                  <ItemPane
+                    item={currentItem}
+                    taskType={data.task.type}
+                    ticketDensity={ticketDensity}
+                  />
+                }
                 right={
                   <EvaluatorsPane
                     evaluators={evaluators}
@@ -1626,15 +1644,23 @@ export function itemPaneHasOwnPadding(taskType: Task["type"]): boolean {
 export function ItemPane({
   item,
   taskType,
+  ticketDensity,
 }: {
   item: Item;
   taskType: Task["type"];
+  ticketDensity?: TicketDensity;
 }) {
   const payload = (item.payload ?? {}) as Record<string, unknown>;
   // A support ticket draws its own case details and timeline, so the usual
   // conversation pane (and the details box on the right) are not used for it.
   if (taskType === "conversation" && isTicketPayload(payload))
-    return <TicketItemPane payload={payload} metadata={item.metadata} />;
+    return (
+      <TicketItemPane
+        payload={payload}
+        metadata={item.metadata}
+        density={ticketDensity}
+      />
+    );
   if (taskType === "stt") return <SttItemPane payload={payload} />;
   if (taskType === "tts") return <TtsItemPane payload={payload} />;
   // A basic agent item is input and output, never a conversation,

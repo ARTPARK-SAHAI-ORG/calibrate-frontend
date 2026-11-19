@@ -2987,3 +2987,97 @@ describe("AnnotationJobView intro and walkthrough", () => {
     expect(screen.getByText("Item One")).toBeInTheDocument();
   });
 });
+
+describe("AnnotationJobView support tickets", () => {
+  const DENSITY_KEY = "calibrate:ticket-density";
+  const ticketItem = {
+    id: 1,
+    uuid: "ticket-1",
+    task_id: "task-1",
+    payload: {
+      name: "t-1",
+      transcript: [
+        {
+          role: "user",
+          label: "User",
+          kind: "message",
+          content: "Is my baby ok",
+          at_ist: "2026-11-16 19:01:00",
+          ts: Date.UTC(2026, 10, 16, 13, 31, 0),
+        },
+      ],
+    },
+    metadata: [
+      { key: "Language", value: "hindi" },
+      { key: "Opened", value: "2026-11-16 19:00:00" },
+      { key: "Closed", value: "2026-11-16 20:00:00" },
+    ],
+    created_at: "2024-01-01",
+    deleted_at: null,
+  };
+  const ticketJob = () =>
+    jobResponse({
+      task: { uuid: "task-1", name: "Tickets", type: "conversation" },
+      items: [ticketItem],
+    });
+
+  let fetchMock: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    window.localStorage.removeItem(DENSITY_KEY);
+    fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  it("offers Settings, and a ticket follows the density picked there", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ticket-pane")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("ticket-pane")).toHaveAttribute(
+      "data-density",
+      "comfortable",
+    );
+
+    await user.click(screen.getByRole("button", { name: /Settings/ }));
+    await user.click(screen.getByRole("radio", { name: /Compact/ }));
+    expect(screen.getByTestId("ticket-pane")).toHaveAttribute(
+      "data-density",
+      "compact",
+    );
+    expect(window.localStorage.getItem(DENSITY_KEY)).toBe("compact");
+  });
+
+  it("opens a ticket in the density saved on this browser", async () => {
+    window.localStorage.setItem(DENSITY_KEY, "compact");
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ticket-pane")).toHaveAttribute(
+        "data-density",
+        "compact",
+      ),
+    );
+  });
+
+  it("has no Settings for a job that holds no tickets", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "How this works" })).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("button", { name: /Settings/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps the case numbers on a phone to one scrolling row", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    const strip = await screen.findByTestId("mobile-case-strip");
+    expect(strip.className).toContain("overflow-x-auto");
+    expect(strip.className).toContain("overflow-y-hidden");
+    expect(within(strip).getAllByRole("button")).toHaveLength(2);
+  });
+});

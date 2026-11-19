@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { TicketDensity } from "@/hooks/useTicketDensity";
 import {
   dayAndTime,
   dayHeading,
@@ -26,17 +27,44 @@ const MEDIA_LABEL = {
   other: "Attachment",
 } as const;
 
+/** The room each part of a ticket takes. Comfortable is the everyday look;
+ *  compact fits more of the ticket on the screen. The one place both are written. */
+const SPACING = {
+  comfortable: {
+    root: "space-y-4 pt-4 md:pt-6",
+    stack: "space-y-3",
+    box: "px-4 py-3",
+    bubble: "px-4 py-3",
+    fold: "px-3 py-2",
+    pill: "px-3 py-1",
+    body: "text-sm",
+  },
+  compact: {
+    root: "space-y-2 pt-2 md:pt-3",
+    stack: "space-y-1.5",
+    box: "px-3 py-2",
+    bubble: "px-3 py-1.5",
+    fold: "px-3 py-1",
+    pill: "px-2.5 py-0.5",
+    body: "text-[13px] leading-5",
+  },
+} as const;
+type Spacing = (typeof SPACING)[TicketDensity];
+
 /** A support ticket: who it is about, how it went, and the messages and staff notes in order. */
 export function TicketItemPane({
   payload,
   metadata,
+  density = "comfortable",
 }: {
   payload: unknown;
   metadata?: { key: string; value: string }[] | null;
+  density?: TicketDensity;
 }) {
   const ticket = parseTicket(payload, metadata);
   const [showEnglish, setShowEnglish] = useState(true);
   if (!ticket) return null;
+  const s = SPACING[density];
 
   const hasTranslation = [
     ...ticket.earlier,
@@ -45,9 +73,13 @@ export function TicketItemPane({
   ].some((e) => e.kind === "message" && e.english !== null);
 
   return (
-    <div className="space-y-4 pt-4 md:pt-6" data-testid="ticket-pane">
-      <TicketFacts ticket={ticket} />
-      <TicketSteps ticket={ticket} />
+    <div
+      className={s.root}
+      data-testid="ticket-pane"
+      data-density={density}
+    >
+      <TicketFacts ticket={ticket} s={s} />
+      <TicketSteps ticket={ticket} s={s} />
       {hasTranslation && (
         <div className="flex justify-end">
           <button
@@ -64,18 +96,19 @@ export function TicketItemPane({
           </button>
         </div>
       )}
-      <div className="space-y-3">
+      <div className={s.stack}>
         <FoldedEvents
           events={ticket.earlier}
           word="earlier"
           showEnglish={showEnglish}
+          s={s}
         />
-        <Pill className={PILL_BLUE}>
+        <Pill className={PILL_BLUE} s={s}>
           Ticket opened
           {ticket.openedAt ? ` · ${dayAndTime(ticket.openedAt)} IST` : ""}
         </Pill>
-        <Events events={ticket.during} showEnglish={showEnglish} />
-        <Pill className={PILL_GREEN}>
+        <Events events={ticket.during} showEnglish={showEnglish} s={s} />
+        <Pill className={PILL_GREEN} s={s}>
           Ticket closed
           {ticket.closedAt ? ` · ${dayAndTime(ticket.closedAt)} IST` : ""}
         </Pill>
@@ -83,19 +116,20 @@ export function TicketItemPane({
           events={ticket.later}
           word="later"
           showEnglish={showEnglish}
+          s={s}
         />
       </div>
     </div>
   );
 }
 
-function TicketFacts({ ticket }: { ticket: Ticket }) {
+function TicketFacts({ ticket, s }: { ticket: Ticket; s: Spacing }) {
   if (ticket.facts.length === 0) return null;
   return (
     <section
       aria-label="Case details"
       data-tutorial="item-details"
-      className="rounded-xl border border-border bg-muted/20 px-4 py-3"
+      className={`rounded-xl border border-border bg-muted/20 ${s.box}`}
     >
       <h3 className="text-sm font-semibold text-foreground">Case details</h3>
       <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
@@ -116,27 +150,27 @@ function TicketFacts({ ticket }: { ticket: Ticket }) {
   );
 }
 
-function TicketSteps({ ticket }: { ticket: Ticket }) {
+function TicketSteps({ ticket, s }: { ticket: Ticket; s: Spacing }) {
   if (ticket.steps.length === 0) return null;
   return (
     <section
       aria-label="Ticket timeline"
-      className="rounded-xl border border-border bg-muted/20 px-4 py-3"
+      className={`rounded-xl border border-border bg-muted/20 ${s.box}`}
     >
       <h3 className="text-sm font-semibold text-foreground">Ticket timeline</h3>
       <ol className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-3">
-        {ticket.steps.map((s, i) => (
-          <li key={s.key} className="flex items-center gap-2">
+        {ticket.steps.map((step, i) => (
+          <li key={step.key} className="flex items-center gap-2">
             <span>
               <span className="block text-xs text-muted-foreground">
-                {s.label}
+                {step.label}
               </span>
               <span className="block text-sm font-medium text-foreground">
-                {dayAndTime(s.at)}
+                {dayAndTime(step.at)}
               </span>
-              {s.note && (
+              {step.note && (
                 <span className="block text-xs text-muted-foreground">
-                  {s.note}
+                  {step.note}
                 </span>
               )}
             </span>
@@ -155,15 +189,17 @@ function TicketSteps({ ticket }: { ticket: Ticket }) {
 
 function Pill({
   className,
+  s,
   children,
 }: {
   className: string;
+  s: Spacing;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex justify-center">
       <span
-        className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${className}`}
+        className={`inline-flex items-center rounded-full border text-xs font-medium ${s.pill} ${className}`}
       >
         {children}
       </span>
@@ -176,25 +212,27 @@ function FoldedEvents({
   events,
   word,
   showEnglish,
+  s,
 }: {
   events: TicketEvent[];
   word: "earlier" | "later";
   showEnglish: boolean;
+  s: Spacing;
 }) {
   const [open, setOpen] = useState(false);
   if (events.length === 0) return null;
   const n = events.length;
   return (
-    <div className="space-y-3">
+    <div className={s.stack}>
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="w-full rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+        className={`w-full rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${s.fold}`}
       >
         {open ? "Hide" : "Show"} {n} {word} message{n === 1 ? "" : "s"}
       </button>
-      {open && <Events events={events} showEnglish={showEnglish} />}
+      {open && <Events events={events} showEnglish={showEnglish} s={s} />}
     </div>
   );
 }
@@ -202,9 +240,11 @@ function FoldedEvents({
 function Events({
   events,
   showEnglish,
+  s,
 }: {
   events: TicketEvent[];
   showEnglish: boolean;
+  s: Spacing;
 }) {
   // A date heading goes above the first event of each day.
   const startsDay = events.map((e, i) => {
@@ -212,7 +252,7 @@ function Events({
     return d !== "" && (i === 0 || d !== events[i - 1].atIst.slice(0, 10));
   });
   return (
-    <div className="space-y-3">
+    <div className={s.stack}>
       {events.map((e, i) => {
         const heading = startsDay[i] ? (
           <p className="text-center text-xs text-muted-foreground">
@@ -220,10 +260,10 @@ function Events({
           </p>
         ) : null;
         return (
-          <div key={`${e.kind}-${e.ts}-${i}`} className="space-y-3">
+          <div key={`${e.kind}-${e.ts}-${i}`} className={s.stack}>
             {heading}
             {e.kind === "escalation" ? (
-              <Pill className={PILL_AMBER}>
+              <Pill className={PILL_AMBER} s={s}>
                 {e.toMedicalOfficer
                   ? "Escalated to a Medical Officer (internal)"
                   : "Escalated (internal)"}
@@ -231,17 +271,17 @@ function Events({
               </Pill>
             ) : e.kind === "note" ? (
               <div
-                className={`rounded-xl border px-4 py-3 ${PILL_AMBER} bg-amber-50 dark:bg-amber-500/10`}
+                className={`rounded-xl border ${s.bubble} ${PILL_AMBER} bg-amber-50 dark:bg-amber-500/10`}
               >
-                <p className="text-sm font-semibold">
+                <p className={`${s.body} font-semibold`}>
                   {e.label} · {hourMinute(e.atIst)}
                 </p>
-                <p className="mt-1 text-sm whitespace-pre-wrap break-words">
+                <p className={`mt-1 ${s.body} whitespace-pre-wrap break-words`}>
                   {e.text}
                 </p>
               </div>
             ) : (
-              <Message m={e} showEnglish={showEnglish} />
+              <Message m={e} showEnglish={showEnglish} s={s} />
             )}
           </div>
         );
@@ -253,9 +293,11 @@ function Events({
 function Message({
   m,
   showEnglish,
+  s,
 }: {
   m: TicketMessage;
   showEnglish: boolean;
+  s: Spacing;
 }) {
   // With the translation on it reads first and the original sits underneath;
   // with it off only the original shows. A placeholder has no translation.
@@ -273,7 +315,7 @@ function Message({
         : "bg-muted/20";
   return (
     <div className={`max-w-full md:max-w-[88%] ${align}`}>
-      <div className={`rounded-xl border border-border px-4 py-3 ${surface}`}>
+      <div className={`rounded-xl border border-border ${s.bubble} ${surface}`}>
         <p className="text-xs text-muted-foreground">
           <span className="font-medium text-foreground">{m.label}</span>
           {m.atIst ? ` · ${hourMinute(m.atIst)}` : ""}
@@ -281,7 +323,7 @@ function Message({
         {/* A file with no words of its own is drawn as the note below, not as "[Audio message]". */}
         {!(m.media && m.placeholder) && (
           <p
-            className={`mt-1 text-sm whitespace-pre-wrap break-words ${
+            className={`mt-1 ${s.body} whitespace-pre-wrap break-words ${
               m.placeholder ? "italic text-muted-foreground" : "text-foreground"
             }`}
           >
@@ -297,7 +339,9 @@ function Message({
           </p>
         )}
         {original && (
-          <p className="mt-2 border-t border-border pt-2 text-sm whitespace-pre-wrap break-words text-muted-foreground">
+          <p
+            className={`mt-2 border-t border-border pt-2 ${s.body} whitespace-pre-wrap break-words text-muted-foreground`}
+          >
             {original}
           </p>
         )}
