@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { NOORA_CARD, NOORA_DISPLAY } from "../noora";
+import { NOORA_CARD } from "../noora";
 import type { TicketDensity } from "@/hooks/useTicketDensity";
 import {
   dayAndTime,
@@ -16,7 +16,7 @@ import {
 const PILL_AMBER =
   "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-300 noora:border-transparent noora:bg-warning-container noora:text-on-warning-container";
 const PILL_BLUE =
-  "border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300 noora:border-transparent noora:bg-secondary-container noora:text-on-secondary-container";
+  "border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300 noora:border-transparent noora:bg-primary-container noora:text-secondary";
 const PILL_GREEN =
   "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-300 noora:border-transparent noora:bg-tertiary-container noora:text-on-tertiary-container";
 
@@ -88,7 +88,7 @@ export function TicketItemPane({
             role="switch"
             aria-checked={showEnglish}
             onClick={() => setShowEnglish((v) => !v)}
-            className={`inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:border-outline noora:focus-visible:ring-primary/40 ${
+            className={`inline-flex items-center gap-2 rounded-full noora:rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:border-outline-variant noora:focus-visible:ring-secondary ${
               showEnglish
                 ? "noora:border-transparent noora:bg-primary-container noora:text-on-primary-container"
                 : "noora:bg-surface-lowest"
@@ -136,7 +136,7 @@ function TicketFacts({ ticket, s }: { ticket: Ticket; s: Spacing }) {
       data-tutorial="item-details"
       className={`rounded-xl border border-border bg-muted/20 ${s.box} ${NOORA_CARD} noora:bg-surface-low`}
     >
-      <h3 className={`text-sm font-semibold text-foreground noora:text-base ${NOORA_DISPLAY}`}>
+      <h3 className={`text-sm font-semibold text-foreground noora:text-[15px]`}>
         Case details
       </h3>
       <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
@@ -164,7 +164,7 @@ function TicketSteps({ ticket, s }: { ticket: Ticket; s: Spacing }) {
       aria-label="Ticket timeline"
       className={`rounded-xl border border-border bg-muted/20 ${s.box} ${NOORA_CARD} noora:bg-surface-low`}
     >
-      <h3 className={`text-sm font-semibold text-foreground noora:text-base ${NOORA_DISPLAY}`}>
+      <h3 className={`text-sm font-semibold text-foreground noora:text-[15px]`}>
         Ticket timeline
       </h3>
       <ol className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-3">
@@ -233,7 +233,7 @@ function FoldedEvents({
   if (events.length === 0) return null;
   const n = events.length;
   const label = `${open ? "Hide" : "Show"} ${n} ${word} message${n === 1 ? "" : "s"}`;
-  const buttonClass = `w-full rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:rounded-full noora:border-outline noora:text-primary noora:hover:bg-primary/8 noora:focus-visible:ring-primary/40 ${s.fold}`;
+  const buttonClass = `w-full rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:rounded-lg noora:border-outline-variant noora:text-secondary noora:hover:bg-primary-container noora:focus-visible:ring-secondary ${s.fold}`;
   return (
     <div className={s.stack}>
       <button
@@ -303,7 +303,7 @@ function Events({
               </Pill>
             ) : e.kind === "note" ? (
               <div
-                className={`rounded-xl border ${s.bubble} ${PILL_AMBER} bg-amber-50 dark:bg-amber-500/10 noora:rounded-2xl`}
+                className={`rounded-xl border ${s.bubble} ${PILL_AMBER} bg-amber-50 dark:bg-amber-500/10 noora:rounded-xl`}
               >
                 <p className={`${s.body} font-semibold`}>
                   {e.label} · {hourMinute(e.atIst)}
@@ -345,12 +345,12 @@ function Message({
     m.who === "user"
       ? "bg-background noora:bg-surface-lowest"
       : m.who === "mse"
-        ? "bg-muted/40 noora:border-transparent noora:bg-secondary-container/60"
-        : "bg-muted/20 noora:border-transparent noora:bg-surface-container";
+        ? "bg-muted/40 noora:border-transparent noora:bg-secondary-container"
+        : "bg-muted/20 noora:bg-surface-lowest";
   return (
     <div className={`max-w-full md:max-w-[88%] ${align}`}>
       <div
-        className={`rounded-xl border border-border ${s.bubble} ${surface} noora:rounded-2xl noora:border-outline-variant`}
+        className={`rounded-xl border border-border ${s.bubble} ${surface} noora:rounded-xl noora:border-outline-variant`}
       >
         <p className="text-xs text-muted-foreground">
           <span className="font-medium text-foreground">{m.label}</span>
@@ -394,7 +394,7 @@ function Message({
           ))}
           {m.emergencyTag && (
             <span
-              className={`rounded-full border px-2 py-0.5 text-xs ${PILL_AMBER}`}
+              className={`rounded-full border px-2 py-0.5 text-xs ${PILL_AMBER} noora:bg-[#FDE8F0] noora:font-medium noora:text-[#B3125A]`}
             >
               Marked as emergency
             </span>

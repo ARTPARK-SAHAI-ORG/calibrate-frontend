@@ -58,6 +58,7 @@
   --color-primary-container: var(--m3-primary-container);
   --color-on-primary-container: var(--m3-on-primary-container);
   --color-secondary: var(--m3-secondary);
+  --color-success: var(--m3-success);
   --color-secondary-container: var(--m3-secondary-container);
   --color-on-secondary-container: var(--m3-on-secondary-container);
   --color-tertiary-container: var(--m3-tertiary-container);
@@ -88,47 +89,56 @@
   --chart-2: #60a5fa;
 }
 
-/* The Noora Health look for the labelling job of support tickets, on Material 3
-   roles. Colours are the brand page's (noorahealth.org/brand): soft black text on
-   warm white, pink / blue / green / orange as the brand colours. Brand pink on
-   its own reaches only 4.2:1 against white text, so filled buttons use a deeper
-   pink of the same hue (5.3:1), as Material 3 does for its primary role. The
-   page is always light, whatever the device or the signed-in app saved.
-   Outside this class nothing changes. */
+/* The Noora Health look for the labelling job of support tickets. It follows the
+   Noora safety viewer: Material 3 roles, the brand page's colours (noorahealth.org
+   /brand), clean white cards on a warm white page, and tan only for input fills.
+   Blue is the colour of the interface itself (the main action, selection, links,
+   the nurse's replies); pink, green and amber are kept for outcomes. A picked
+   answer takes the colour of its own rubric row. The page is always light,
+   whatever the device or the signed-in app saved. Outside this class nothing
+   changes. */
 .skin-noora {
-  --m3-primary: #cc2460;
-  --m3-on-primary: #ffffff;
-  --m3-primary-hover: #ad1f52;
-  --m3-primary-container: #fcd9e6;
-  --m3-on-primary-container: #520420;
-  --m3-secondary: #13769a;
-  --m3-secondary-container: #d0f0fb;
-  --m3-on-secondary-container: #043d52;
-  --m3-tertiary-container: #d3f1e4;
-  --m3-on-tertiary-container: #044433;
-  --m3-warning-container: #fbebd0;
-  --m3-on-warning-container: #492f04;
+  --m3-primary: #37b7e6;
+  --m3-on-primary: #0b2530;
+  --m3-primary-hover: #2ba5d3;
+  --m3-primary-container: #e3f6fc;
+  --m3-on-primary-container: #0b2530;
+  /* Links, focus rings and small text on white: 7:1 where the brand blue is 2.3:1. */
+  --m3-secondary: #00607f;
+  --m3-secondary-container: #e6f6fc;
+  --m3-on-secondary-container: #0b2530;
+  --m3-tertiary-container: #e3f5ee;
+  --m3-on-tertiary-container: #00704f;
+  --m3-warning-container: #fff6dd;
+  --m3-on-warning-container: #6b4000;
+  --m3-success: #00956e;
   --m3-surface-lowest: #ffffff;
-  --m3-surface-low: #f9f4ef;
-  --m3-surface-container: #f3ede7;
-  --m3-surface-high: #ede6df;
+  --m3-surface-low: #ffffff;
+  --m3-surface-container: #f1ece6;
+  --m3-surface-high: #e6dfd7;
   --m3-outline: #8c837b;
-  --m3-outline-variant: #ddd3ca;
-  --m3-on-surface-variant: #625a54;
+  --m3-outline-variant: #e0d9d1;
+  --m3-on-surface-variant: #5e5a56;
+
+  /* The four brand colours, for the stripe under the top row. */
+  --noora-pink: #dd3e77;
+  --noora-blue: #37b7e6;
+  --noora-green: #00956e;
+  --noora-orange: #faa820;
 
   /* The app's own tokens, so every shared component picks the look up. */
   --background: #fdfaf7;
   --foreground: #383838;
-  --muted: #f3ede7;
-  --muted-foreground: #625a54;
-  --border: #ddd3ca;
-  --accent: #f3ede7;
+  --muted: #f1ece6;
+  --muted-foreground: #5e5a56;
+  --border: #e0d9d1;
+  --accent: #f1ece6;
   --accent-foreground: #383838;
   --popover: #ffffff;
 
-  /* Headlines in Playfair Display and everything else in Poppins. Poppins has
-     no Telugu, Kannada, Odia or Gurmukhi, so those scripts fall back to the
-     system's own fonts. */
+  /* Playfair Display for the page title only; Poppins for everything else.
+     Poppins has no Telugu, Kannada, Odia or Gurmukhi, so those scripts fall back
+     to the system's own fonts. */
   --noora-display: "Playfair Display", Georgia, "Times New Roman", serif;
   font-family:
     "Poppins", "Noto Sans", "Noto Sans Devanagari", "Noto Sans Telugu",
@@ -464,4 +474,20 @@ body {
 
 .reason-box-appear {
   animation: reason-box-appear 1.5s ease-out;
+}
+
+/* In the Noora look the same cue is a calm blue ring, not an amber glow. */
+@keyframes reason-box-appear-noora {
+  0%,
+  40% {
+    box-shadow: 0 0 0 3px rgb(0 96 127 / 0.28);
+    border-color: #00607f;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(0 96 127 / 0);
+  }
+}
+
+.skin-noora .reason-box-appear {
+  animation-name: reason-box-appear-noora;
 }

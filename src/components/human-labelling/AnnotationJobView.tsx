@@ -20,6 +20,7 @@ import { ArrowDownIcon } from "@/components/icons";
 import { useDialogNavKeys } from "@/hooks/useDialogNavKeys";
 import { JobItemColumns } from "./JobItemColumns";
 import {
+  getBinaryColor,
   getBinaryDescription,
   getBinaryLabel,
   toRatingScale,
@@ -33,7 +34,7 @@ import { isTicketPayload } from "@/lib/ticketView";
 import { useTicketDensity, type TicketDensity } from "@/hooks/useTicketDensity";
 import { JobSettingsMenu } from "./JobSettingsMenu";
 import Image from "next/image";
-import { NOORA_DISPLAY, NOORA_FILLED, NOORA_OUTLINED } from "./noora";
+import { NOORA_DISPLAY, NOORA_FILLED, NOORA_TONAL } from "./noora";
 import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
@@ -203,6 +204,18 @@ function hasFieldValue(f?: FieldValue): boolean {
   return !!f && f.value !== undefined && f.value !== null && f.value !== "";
 }
 
+/** The four Noora Health colours, in a thin bar under the top row. */
+function BrandStripe() {
+  return (
+    <div aria-hidden className="mb-4 md:mb-6 flex h-1 shrink-0">
+      <span className="flex-1 bg-[var(--noora-pink)]" />
+      <span className="flex-1 bg-[var(--noora-blue)]" />
+      <span className="flex-1 bg-[var(--noora-green)]" />
+      <span className="flex-1 bg-[var(--noora-orange)]" />
+    </div>
+  );
+}
+
 function GreenBar({
   label,
   done,
@@ -224,7 +237,7 @@ function GreenBar({
       className={`bg-muted ${className}`}
     >
       <div
-        className="h-full bg-green-500 noora:bg-primary transition-[width] duration-300"
+        className="h-full bg-green-500 noora:bg-success transition-[width] duration-300"
         style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }}
       />
     </div>
@@ -1257,7 +1270,7 @@ function AnnotateView({
               </>
             )}
             <h1
-              className={`text-lg md:text-xl font-semibold truncate noora:text-xl noora:md:text-2xl noora:tracking-tight ${NOORA_DISPLAY}`}
+              className={`text-lg md:text-xl font-semibold truncate noora:text-lg noora:md:text-xl ${NOORA_DISPLAY}`}
             >
               {data.task.name}
             </h1>
@@ -1290,7 +1303,7 @@ function AnnotateView({
             <button
               type="button"
               onClick={() => setIntroOpen(true)}
-              className={`h-9 px-3 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${NOORA_OUTLINED}`}
+              className={`h-9 px-3 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${NOORA_TONAL}`}
             >
               How this works
             </button>
@@ -1302,11 +1315,12 @@ function AnnotateView({
           </div>
         </div>
       )}
+      {skin && <BrandStripe />}
       <div
         className={
           isAdmin
             ? "contents"
-            : `flex-1 min-h-0 flex flex-col overflow-hidden border border-border rounded-xl mx-4 md:mx-6 mb-4 md:mb-6 noora:rounded-3xl noora:border-outline-variant noora:bg-surface-lowest noora:shadow-sm`
+            : `flex-1 min-h-0 flex flex-col overflow-hidden border border-border rounded-xl mx-4 md:mx-6 mb-4 md:mb-6 noora:rounded-xl noora:border-outline-variant noora:bg-surface-lowest`
         }
       >
         {!isAdmin && (
@@ -1320,7 +1334,7 @@ function AnnotateView({
         <header className="border-b border-border px-4 md:px-6 py-3 flex flex-col gap-3 md:grid md:grid-cols-3 md:items-center md:gap-4">
           <div className="min-w-0 flex items-center gap-3">
             {currentItem && (
-              <h2 className="text-sm font-semibold truncate noora:font-medium noora:text-on-surface-variant">
+              <h2 className="text-sm font-semibold truncate noora:text-xs noora:font-medium noora:text-on-surface-variant">
                 {currentItemName || "Case"}
               </h2>
             )}
@@ -1329,7 +1343,7 @@ function AnnotateView({
             <button
               onClick={() => navigateTo(Math.max(0, currentIndex - 1))}
               disabled={currentIndex === 0}
-              className={`h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${NOORA_OUTLINED}`}
+              className={`h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${NOORA_TONAL}`}
             >
               Previous
             </button>
@@ -1339,7 +1353,7 @@ function AnnotateView({
             <button
               onClick={() => navigateTo(Math.min(total - 1, currentIndex + 1))}
               disabled={currentIndex >= total - 1}
-              className={`h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${NOORA_OUTLINED}`}
+              className={`h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${NOORA_TONAL}`}
             >
               Next
             </button>
@@ -1484,9 +1498,9 @@ function AnnotateView({
                       }
                       onClick={() => navigateTo(i)}
                       aria-label={`Case ${position}${status ? ` (${status})` : ""}`}
-                      className={`h-10 w-10 shrink-0 rounded-md noora:rounded-xl border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                      className={`h-10 w-10 shrink-0 rounded-md noora:rounded-lg border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                         isCurrent
-                          ? "border-foreground bg-foreground text-background noora:border-primary noora:bg-primary noora:text-on-primary noora:shadow-sm"
+                          ? "border-foreground bg-foreground text-background noora:border-primary noora:bg-primary noora:text-on-primary noora:font-semibold"
                           : status
                             ? ITEM_LIST_STATUS_CLASS[status]
                             : "border-border bg-background text-foreground hover:bg-muted/50 noora:bg-surface-lowest noora:hover:bg-primary/8"
@@ -1517,9 +1531,9 @@ function AnnotateView({
                       <button
                         onClick={() => navigateTo(i)}
                         aria-label={`Case ${position}${status ? ` (${status})` : ""}`}
-                        className={`h-10 w-full rounded-md noora:rounded-xl border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                        className={`h-10 w-full rounded-md noora:rounded-lg border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                           isCurrent
-                            ? "border-foreground bg-foreground text-background noora:border-primary noora:bg-primary noora:text-on-primary noora:shadow-sm"
+                            ? "border-foreground bg-foreground text-background noora:border-primary noora:bg-primary noora:text-on-primary noora:font-semibold"
                             : status
                               ? ITEM_LIST_STATUS_CLASS[status]
                               : "border-border bg-background text-foreground hover:bg-muted/50 noora:bg-surface-lowest noora:hover:bg-primary/8"
@@ -1868,7 +1882,7 @@ function EvaluatorsPane({
                             block: "start",
                           })
                       }
-                      className={`shrink-0 w-7 h-7 rounded-md noora:rounded-full border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:focus-visible:ring-primary/40 ${
+                      className={`shrink-0 w-7 h-7 rounded-md noora:rounded-full border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:focus-visible:ring-secondary ${
                         missingAnswerKeys.has(k)
                           ? "border-red-500 text-red-600 dark:text-red-400"
                           : !looksAnswered(ev)
@@ -1900,7 +1914,7 @@ function EvaluatorsPane({
                 All questions answered
               </span>
             ) : answeredCount === 0 ? (
-              <span className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-300 noora:border-transparent noora:bg-warning-container noora:text-on-warning-container">
+              <span className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-300 noora:border-transparent noora:bg-primary-container noora:text-secondary">
                 Answer the questions below
                 <ArrowDownIcon className="w-4 h-4 motion-safe:animate-bounce" />
               </span>
@@ -1957,6 +1971,10 @@ function EvaluatorsPane({
           outputType === "binary" ? getBinaryDescription(scale, true) : null;
         const falseDescription =
           outputType === "binary" ? getBinaryDescription(scale, false) : null;
+        const trueColor =
+          outputType === "binary" ? getBinaryColor(scale, true) : null;
+        const falseColor =
+          outputType === "binary" ? getBinaryColor(scale, false) : null;
         const ratingScale =
           outputType === "rating" ? toRatingScale(scale) : null;
 
@@ -2026,6 +2044,8 @@ function EvaluatorsPane({
               falseLabel={falseLabel}
               trueDescription={trueDescription}
               falseDescription={falseDescription}
+              trueColor={trueColor}
+              falseColor={falseColor}
               ratingScale={ratingScale}
             />
           </div>
