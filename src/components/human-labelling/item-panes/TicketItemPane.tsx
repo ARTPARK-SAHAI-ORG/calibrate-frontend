@@ -134,6 +134,11 @@ function TicketSteps({ ticket }: { ticket: Ticket }) {
               <span className="block text-sm font-medium text-foreground">
                 {dayAndTime(s.at)}
               </span>
+              {s.note && (
+                <span className="block text-xs text-muted-foreground">
+                  {s.note}
+                </span>
+              )}
             </span>
             {/* The arrow belongs to the step before it, so a wrapped line never starts with one. */}
             {i < ticket.steps.length - 1 && (
@@ -257,11 +262,11 @@ function Message({
   const translated = showEnglish && !m.placeholder && m.english !== null;
   const main = translated ? m.english : m.text;
   const original = translated ? m.text : null;
-  // Staff replies sit to the right and the caregiver to the left, but only
+  // Staff replies sit to the right and the user to the left, but only
   // where there is room: on a phone every bubble takes nearly the full width.
   const align = m.who === "mse" ? "md:ml-auto" : "md:mr-auto";
   const surface =
-    m.who === "caregiver"
+    m.who === "user"
       ? "bg-background"
       : m.who === "mse"
         ? "bg-muted/40"

@@ -1411,8 +1411,11 @@ function AnnotateView({
 
         <div className="flex-1 flex flex-col md:flex-row min-h-0">
           {/* Mobile: horizontal scrolling strip */}
-          <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
-            <div className="p-2 grid grid-cols-8 gap-2">
+          <div
+            data-testid="mobile-case-strip"
+            className="md:hidden w-full border-b border-border bg-muted/20 overflow-x-auto overflow-y-hidden"
+          >
+            <div className="p-2 flex w-max gap-2">
               {items.map((it, i) => {
                 const status = statusByItem.get(it.uuid) ?? null;
                 const isCurrent = i === currentIndex;
@@ -1425,9 +1428,26 @@ function AnnotateView({
                     position="top"
                   >
                     <button
+                      // Keep the case being read in view as the reader steps along
+                      // the row. This moves only the row itself, never the page.
+                      ref={
+                        isCurrent
+                          ? (el) => {
+                              const strip = el?.closest<HTMLElement>(
+                                '[data-testid="mobile-case-strip"]',
+                              );
+                              if (el && strip)
+                                strip.scrollLeft +=
+                                  el.getBoundingClientRect().left -
+                                  strip.getBoundingClientRect().left -
+                                  strip.clientWidth / 2 +
+                                  el.offsetWidth / 2;
+                            }
+                          : undefined
+                      }
                       onClick={() => navigateTo(i)}
                       aria-label={`Case ${position}${status ? ` (${status})` : ""}`}
-                      className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                      className={`h-10 w-10 shrink-0 rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                         isCurrent
                           ? "border-foreground bg-foreground text-background"
                           : status

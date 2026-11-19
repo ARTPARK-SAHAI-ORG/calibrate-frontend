@@ -14,7 +14,7 @@ export type TicketMessage = {
   kind: "message";
   ts: number;
   atIst: string;
-  who: "caregiver" | "mse" | "automated";
+  who: "user" | "mse" | "automated";
   label: string;
   /** What was written, in the language it was written in. */
   text: string;
@@ -52,7 +52,13 @@ export type TicketEvent = TicketMessage | TicketNote | TicketEscalation;
 
 export type TicketFact = { label: string; value: string };
 
-export type TicketStep = { key: string; label: string; at: string };
+export type TicketStep = {
+  key: string;
+  label: string;
+  at: string;
+  /** A short line under the time, such as how many questions were asked. */
+  note?: string;
+};
 
 export type Ticket = {
   language: string;
@@ -155,7 +161,7 @@ function readTurn(turn: unknown): TicketEvent | null {
   const label = str(t.label);
   const who =
     t.role === "user"
-      ? "caregiver"
+      ? "user"
       : label.toLowerCase() === "mse"
         ? "mse"
         : "automated";
@@ -164,7 +170,8 @@ function readTurn(turn: unknown): TicketEvent | null {
     ts,
     atIst,
     who,
-    label: label || (who === "caregiver" ? "Caregiver" : "Automated"),
+    // The person writing in is always "User", whatever the data calls them.
+    label: who === "user" ? "User" : label || "Automated",
     text,
     english: english && english !== text ? english : null,
     placeholder: t.placeholder === true,
@@ -176,7 +183,14 @@ function readTurn(turn: unknown): TicketEvent | null {
   };
 }
 
-const MEDIA_KINDS = ["audio", "image", "video", "document"] as const;
+/** Ends with a question mark, ignoring trailing spaces, emoji and WhatsApp's *bold* or _italic_ marks. */
+export function endsWithQuestion(text: string): boolean {
+  return /[?？][\s\p{Extended_Pictographic}️‍*_~"'”’)\]]*$/u.test(
+    text.trim(),
+  );
+}
+
+const MEDIA_KINDS =["audio", "image", "video", "document"] as const;
 
 function readMedia(v: unknown): TicketMedia | null {
   const m = asRecord(v);
@@ -241,13 +255,37 @@ export function parseTicket(payload: unknown, metadata: Meta): Ticket | null {
   const firstReply = during.find(
     (e): e is TicketMessage => e.kind === "message" && e.who === "mse",
   );
-  const steps: TicketStep[] = [];
-  if (openedAt) steps.push({ key: "opened", label: "Opened", at: openedAt });
-  if (escalatedAt)
-    steps.push({ key: "escalated", label: "Escalated", at: escalatedAt });
+  // A probe is an MSE message, while the ticket was open, that ends with a
+  // question mark: the nurse asking the user for more. The user's own questions
+  // and automated messages do not count.
+  const probes = during.filter(
+    (e): e is TicketMessage =>
+      e.kind === "message" &&
+      e.who === "mse" &&
+      !e.placeholder &&
+      (endsWithQuestion(e.text) ||
+        (e.english !== null && endsWithQuestion(e.english))),
+  );
+
+  // In the order they happened, so a probe sits before or after the first
+  // reply or the escalation as it really did.
+  const timed: { ts: number; step: TicketStep }[] = [];
+  const add = (step: TicketStep) => timed.push({ ts: istToMs(step.at), step });
+  if (openedAt) add({ key: "opened", label: "Opened", at: openedAt });
+  if (escalatedAt) add({ key: "escalated", label: "Escalated", at: escalatedAt });
   if (firstReply)
-    steps.push({ key: "first-reply", label: "First reply", at: firstReply.atIst });
-  if (closedAt) steps.push({ key: "closed", label: "Closed", at: closedAt });
+    add({ key: "first-reply", label: "First reply", at: firstReply.atIst });
+  if (probes.length > 0)
+    add({
+      key: "probed",
+      label: "Probed",
+      at: probes[0].atIst,
+      note: probes.length > 1 ? `${probes.length} questions` : undefined,
+    });
+  if (closedAt) add({ key: "closed", label: "Closed", at: closedAt });
+  // Stable, so steps at the same second keep the order they were added in.
+  timed.sort((a, b) => a.ts - b.ts || 0);
+  const steps = timed.map((t) => t.step);
 
   const facts: TicketFact[] = [];
   for (const label of FACT_KEYS) {

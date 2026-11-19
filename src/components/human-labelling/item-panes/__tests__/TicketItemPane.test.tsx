@@ -12,7 +12,7 @@ const payload = {
   transcript: [
     {
       role: "user",
-      label: "Caregiver",
+      label: "User",
       kind: "message",
       content: "Kya phir sab normal hay",
       versions: { "English translation": "So is everything normal?" },
@@ -37,14 +37,14 @@ const payload = {
     },
     {
       role: "user",
-      label: "Caregiver",
+      label: "User",
       kind: "message",
       content: "An earlier question",
       ...at("2026-11-15 10:00:00"),
     },
     {
       role: "user",
-      label: "Caregiver",
+      label: "User",
       kind: "message",
       content: "A later thanks",
       ...at("2026-11-17 09:00:00"),
@@ -223,6 +223,36 @@ describe("TicketItemPane", () => {
     expect(screen.getByTestId("ticket-media")).toHaveTextContent(
       "Image · cannot be played here",
     );
+  });
+
+  it("puts the first probe on the timeline with how many questions were asked", () => {
+    render(
+      <TicketItemPane
+        payload={{
+          transcript: [
+            {
+              role: "assistant",
+              label: "MSE",
+              kind: "message",
+              content: "How old is your baby?",
+              ...at("2026-11-16 19:10:00"),
+            },
+            {
+              role: "assistant",
+              label: "MSE",
+              kind: "message",
+              content: "Is the baby feeding well?",
+              ...at("2026-11-16 19:12:00"),
+            },
+          ],
+        }}
+        metadata={metadata}
+      />,
+    );
+    const timeline = screen.getByRole("region", { name: "Ticket timeline" });
+    expect(timeline).toHaveTextContent("Probed");
+    expect(timeline).toHaveTextContent("16 Nov, 19:10");
+    expect(timeline).toHaveTextContent("2 questions");
   });
 
   it("draws nothing for an item that is not a ticket", () => {

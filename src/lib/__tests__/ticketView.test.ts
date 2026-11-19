@@ -1,6 +1,7 @@
 import {
   dayAndTime,
   dayHeading,
+  endsWithQuestion,
   hourMinute,
   isTicketPayload,
   istToMs,
@@ -15,7 +16,7 @@ function ticketPayload() {
     transcript: [
       {
         role: "user",
-        label: "Caregiver",
+        label: "User",
         kind: "message",
         content: "Kya phir sab normal hay",
         versions: { "English translation": "So is everything normal?" },
@@ -44,7 +45,7 @@ function ticketPayload() {
       },
       {
         role: "user",
-        label: "Caregiver",
+        label: "User",
         kind: "message",
         content: "Earlier question",
         at_ist: "2026-11-15 10:00:00",
@@ -127,11 +128,11 @@ describe("parseTicket", () => {
 
   it("reads a message: who wrote it, the translation, tags and flags", () => {
     const t = parseTicket(ticketPayload(), META)!;
-    const caregiver = t.during[0];
-    expect(caregiver).toMatchObject({
+    const user = t.during[0];
+    expect(user).toMatchObject({
       kind: "message",
-      who: "caregiver",
-      label: "Caregiver",
+      who: "user",
+      label: "User",
       text: "Kya phir sab normal hay",
       english: "So is everything normal?",
       tags: ["ai-Medical"],
@@ -284,7 +285,7 @@ describe("parseTicket", () => {
       undefined,
     )!;
     expect(t.during[0].ts).toBe(T("2026-11-16 19:01:00"));
-    expect(t.during[0]).toMatchObject({ label: "Caregiver", tags: [] });
+    expect(t.during[0]).toMatchObject({ label: "User", tags: [] });
   });
 
   it("drops notes with no text and turns that are not ticket turns", () => {
@@ -336,5 +337,138 @@ describe("parseTicket", () => {
       null,
       null,
     ]);
+  });
+
+  it("always calls the person writing in the User, whatever the data labelled them", () => {
+    const t = parseTicket(
+      {
+        transcript: [
+          {
+            kind: "message",
+            role: "user",
+            label: "Caregiver",
+            content: "hello",
+            at_ist: "2026-11-16 19:01:00",
+            ts: T("2026-11-16 19:01:00"),
+          },
+          {
+            kind: "message",
+            role: "user",
+            content: "no label at all",
+            at_ist: "2026-11-16 19:02:00",
+            ts: T("2026-11-16 19:02:00"),
+          },
+        ],
+      },
+      [],
+    )!;
+    expect(t.during.map((e) => (e as { label: string }).label)).toEqual([
+      "User",
+      "User",
+    ]);
+  });
+});
+
+describe("endsWithQuestion", () => {
+  it.each([
+    ["Are you pregnant?", true],
+    ["Are you pregnant?  ", true],
+    ["*Are you pregnant?*", true],
+    ["Is the baby feeding well? 🙂", true],
+    ["क्या आप गर्भवती हैं？", true],
+    ["Did you take the tablet?_", true],
+    ["Please go to the hospital.", false],
+    ["Is it ok? Go to the hospital", false],
+    ["", false],
+  ])("%j -> %s", (text, expected) => {
+    expect(endsWithQuestion(text)).toBe(expected);
+  });
+});
+
+describe("probes on the timeline", () => {
+  const turn = (role: string, label: string, at: string, content: string, extra = {}) => ({
+    kind: "message",
+    role,
+    label,
+    content,
+    at_ist: at,
+    ts: T(at),
+    ...extra,
+  });
+  const META_WINDOW = [
+    { key: "Opened", value: "2026-11-16 19:00:00" },
+    { key: "Closed", value: "2026-11-16 21:00:00" },
+  ];
+  const stepOf = (t: ReturnType<typeof parseTicket>, key: string) =>
+    t!.steps.find((s) => s.key === key);
+
+  it("counts an MSE question inside the ticket, in order with the other steps", () => {
+    const t = parseTicket(
+      {
+        transcript: [
+          turn("user", "x", "2026-11-16 19:00:00", "Is my baby ok?"),
+          turn("assistant", "MSE", "2026-11-16 19:10:00", "Hello, thank you."),
+          turn("assistant", "MSE", "2026-11-16 19:20:00", "How old is your baby?"),
+        ],
+      },
+      META_WINDOW,
+    )!;
+    expect(stepOf(t, "probed")).toMatchObject({ at: "2026-11-16 19:20:00", label: "Probed" });
+    expect(stepOf(t, "probed")?.note).toBeUndefined();
+    expect(t.steps.map((s) => s.key)).toEqual(["opened", "first-reply", "probed", "closed"]);
+  });
+
+  it("puts a probe before the first reply when it is the first reply", () => {
+    const t = parseTicket(
+      { transcript: [turn("assistant", "MSE", "2026-11-16 19:05:00", "How old is your baby?")] },
+      META_WINDOW,
+    )!;
+    expect(t.steps.map((s) => s.key)).toEqual(["opened", "first-reply", "probed", "closed"]);
+    expect(stepOf(t, "probed")?.at).toBe(stepOf(t, "first-reply")?.at);
+  });
+
+  it("notes how many questions were asked when there are several", () => {
+    const t = parseTicket(
+      {
+        transcript: [
+          turn("assistant", "MSE", "2026-11-16 19:05:00", "How old is your baby?"),
+          turn("assistant", "MSE", "2026-11-16 19:06:00", "Is the baby feeding?"),
+          turn("assistant", "MSE", "2026-11-16 19:07:00", "Thank you."),
+        ],
+      },
+      META_WINDOW,
+    )!;
+    expect(stepOf(t, "probed")).toMatchObject({ at: "2026-11-16 19:05:00", note: "2 questions" });
+  });
+
+  it("ignores the user's questions, automated questions, and MSE questions outside the ticket", () => {
+    const t = parseTicket(
+      {
+        transcript: [
+          turn("user", "x", "2026-11-16 19:01:00", "Is this normal?"),
+          turn("assistant", "Automated", "2026-11-16 19:02:00", "Are you pregnant?"),
+          turn("assistant", "MSE", "2026-11-15 10:00:00", "An old question?"),
+          turn("assistant", "MSE", "2026-11-17 10:00:00", "A later question?"),
+          turn("assistant", "MSE", "2026-11-16 19:03:00", "A statement."),
+          turn("assistant", "MSE", "2026-11-16 19:04:00", "[Audio message]?", { placeholder: true }),
+        ],
+      },
+      META_WINDOW,
+    )!;
+    expect(stepOf(t, "probed")).toBeUndefined();
+  });
+
+  it("reads a question mark in the English translation too", () => {
+    const t = parseTicket(
+      {
+        transcript: [
+          turn("assistant", "MSE", "2026-11-16 19:05:00", "Baby ki age entha", {
+            versions: { "English translation": "How old is the baby?" },
+          }),
+        ],
+      },
+      META_WINDOW,
+    )!;
+    expect(stepOf(t, "probed")?.at).toBe("2026-11-16 19:05:00");
   });
 });
