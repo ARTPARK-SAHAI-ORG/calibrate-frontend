@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useDismissOnOutside } from "@/hooks/useDismissOnOutside";
 import type { TicketDensity } from "@/hooks/useTicketDensity";
+import { NOORA_OUTLINED } from "./noora";
 
 const DENSITY_OPTIONS: { value: TicketDensity; label: string; hint: string }[] =
   [
@@ -31,7 +32,7 @@ export function JobSettingsMenu({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="h-9 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+        className={`h-9 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${NOORA_OUTLINED}`}
       >
         Settings
         <svg
@@ -49,9 +50,9 @@ export function JobSettingsMenu({
         <div
           role="dialog"
           aria-label="Settings"
-          className="absolute right-0 top-full z-40 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-background text-foreground shadow-lg overflow-hidden"
+          className={`absolute right-0 top-full z-40 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-background text-foreground shadow-lg overflow-hidden noora:rounded-3xl noora:border-outline-variant noora:bg-surface-lowest noora:shadow-xl`}
         >
-          <h2 className="px-4 py-3 text-base font-semibold bg-muted border-b border-border">
+          <h2 className="px-4 py-3 text-base font-semibold bg-muted border-b border-border noora:bg-surface-low noora:[font-family:var(--noora-display)] noora:text-lg">
             Settings
           </h2>
           <div className="px-4 py-3">
@@ -69,10 +70,10 @@ export function JobSettingsMenu({
                     role="radio"
                     aria-checked={selected}
                     onClick={() => onDensityChange(o.value)}
-                    className={`w-full text-left rounded-lg border px-3 py-2 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
+                    className={`w-full text-left rounded-lg noora:rounded-2xl border px-3 py-2 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
                       selected
-                        ? "border-foreground bg-muted/50"
-                        : "border-border hover:bg-muted/40"
+                        ? "border-foreground bg-muted/50 noora:border-primary noora:bg-primary-container noora:text-on-primary-container"
+                        : "border-border hover:bg-muted/40 noora:hover:bg-primary/8"
                     }`}
                   >
                     <span className="block text-sm font-medium">{o.label}</span>

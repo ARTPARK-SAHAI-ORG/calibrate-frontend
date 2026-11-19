@@ -3072,6 +3072,36 @@ describe("AnnotationJobView support tickets", () => {
     expect(screen.queryByRole("button", { name: /Settings/ })).not.toBeInTheDocument();
   });
 
+  it("wears the Noora Health look, with the logo, on a job of tickets", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const { container } = render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ticket-pane")).toBeInTheDocument(),
+    );
+    expect(container.querySelector(".skin-noora")).not.toBeNull();
+    expect(screen.getByAltText("Noora Health")).toBeInTheDocument();
+  });
+
+  it("keeps every other job looking as it did, with no logo", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    const { container } = render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "How this works" })).toBeInTheDocument(),
+    );
+    expect(container.querySelector(".skin-noora")).toBeNull();
+    expect(screen.queryByAltText("Noora Health")).not.toBeInTheDocument();
+  });
+
+  it("does not dress the reviewer's own view of a ticket job", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const { container } = render(<AnnotationJobView token="tok" mode="admin" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ticket-pane")).toBeInTheDocument(),
+    );
+    expect(container.querySelector(".skin-noora")).toBeNull();
+    expect(screen.queryByAltText("Noora Health")).not.toBeInTheDocument();
+  });
+
   it("keeps the case numbers on a phone to one scrolling row", async () => {
     fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
     render(<AnnotationJobView token="tok" mode="public" />);

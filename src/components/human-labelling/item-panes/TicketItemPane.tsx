@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { NOORA_CARD, NOORA_DISPLAY } from "../noora";
 import type { TicketDensity } from "@/hooks/useTicketDensity";
 import {
   dayAndTime,
@@ -13,11 +14,11 @@ import {
 } from "@/lib/ticketView";
 
 const PILL_AMBER =
-  "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-300";
+  "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-300 noora:border-transparent noora:bg-warning-container noora:text-on-warning-container";
 const PILL_BLUE =
-  "border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300";
+  "border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300 noora:border-transparent noora:bg-secondary-container noora:text-on-secondary-container";
 const PILL_GREEN =
-  "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-300";
+  "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-300 noora:border-transparent noora:bg-tertiary-container noora:text-on-tertiary-container";
 
 const MEDIA_LABEL = {
   audio: "Audio message",
@@ -87,10 +88,14 @@ export function TicketItemPane({
             role="switch"
             aria-checked={showEnglish}
             onClick={() => setShowEnglish((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+            className={`inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:border-outline noora:focus-visible:ring-primary/40 ${
+              showEnglish
+                ? "noora:border-transparent noora:bg-primary-container noora:text-on-primary-container"
+                : "noora:bg-surface-lowest"
+            }`}
           >
             English translation
-            <span className="font-medium text-muted-foreground">
+            <span className="font-medium text-muted-foreground noora:text-current">
               {showEnglish ? "On" : "Off"}
             </span>
           </button>
@@ -129,9 +134,11 @@ function TicketFacts({ ticket, s }: { ticket: Ticket; s: Spacing }) {
     <section
       aria-label="Case details"
       data-tutorial="item-details"
-      className={`rounded-xl border border-border bg-muted/20 ${s.box}`}
+      className={`rounded-xl border border-border bg-muted/20 ${s.box} ${NOORA_CARD} noora:bg-surface-low`}
     >
-      <h3 className="text-sm font-semibold text-foreground">Case details</h3>
+      <h3 className={`text-sm font-semibold text-foreground noora:text-base ${NOORA_DISPLAY}`}>
+        Case details
+      </h3>
       <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
         {ticket.facts.map((f) => (
           <div key={f.label}>
@@ -155,9 +162,11 @@ function TicketSteps({ ticket, s }: { ticket: Ticket; s: Spacing }) {
   return (
     <section
       aria-label="Ticket timeline"
-      className={`rounded-xl border border-border bg-muted/20 ${s.box}`}
+      className={`rounded-xl border border-border bg-muted/20 ${s.box} ${NOORA_CARD} noora:bg-surface-low`}
     >
-      <h3 className="text-sm font-semibold text-foreground">Ticket timeline</h3>
+      <h3 className={`text-sm font-semibold text-foreground noora:text-base ${NOORA_DISPLAY}`}>
+        Ticket timeline
+      </h3>
       <ol className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-3">
         {ticket.steps.map((step, i) => (
           <li key={step.key} className="flex items-center gap-2">
@@ -224,7 +233,7 @@ function FoldedEvents({
   if (events.length === 0) return null;
   const n = events.length;
   const label = `${open ? "Hide" : "Show"} ${n} ${word} message${n === 1 ? "" : "s"}`;
-  const buttonClass = `w-full rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${s.fold}`;
+  const buttonClass = `w-full rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:rounded-full noora:border-outline noora:text-primary noora:hover:bg-primary/8 noora:focus-visible:ring-primary/40 ${s.fold}`;
   return (
     <div className={s.stack}>
       <button
@@ -294,7 +303,7 @@ function Events({
               </Pill>
             ) : e.kind === "note" ? (
               <div
-                className={`rounded-xl border ${s.bubble} ${PILL_AMBER} bg-amber-50 dark:bg-amber-500/10`}
+                className={`rounded-xl border ${s.bubble} ${PILL_AMBER} bg-amber-50 dark:bg-amber-500/10 noora:rounded-2xl`}
               >
                 <p className={`${s.body} font-semibold`}>
                   {e.label} · {hourMinute(e.atIst)}
@@ -330,15 +339,19 @@ function Message({
   // Staff replies sit to the right and the user to the left, but only
   // where there is room: on a phone every bubble takes nearly the full width.
   const align = m.who === "mse" ? "md:ml-auto" : "md:mr-auto";
+  // Material 3 chat roles: what the user wrote on a clean surface, the nurse's
+  // reply on a brand-blue container, and automated messages on a neutral one.
   const surface =
     m.who === "user"
-      ? "bg-background"
+      ? "bg-background noora:bg-surface-lowest"
       : m.who === "mse"
-        ? "bg-muted/40"
-        : "bg-muted/20";
+        ? "bg-muted/40 noora:border-transparent noora:bg-secondary-container/60"
+        : "bg-muted/20 noora:border-transparent noora:bg-surface-container";
   return (
     <div className={`max-w-full md:max-w-[88%] ${align}`}>
-      <div className={`rounded-xl border border-border ${s.bubble} ${surface}`}>
+      <div
+        className={`rounded-xl border border-border ${s.bubble} ${surface} noora:rounded-2xl noora:border-outline-variant`}
+      >
         <p className="text-xs text-muted-foreground">
           <span className="font-medium text-foreground">{m.label}</span>
           {m.atIst ? ` · ${hourMinute(m.atIst)}` : ""}

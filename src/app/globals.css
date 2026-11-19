@@ -1,7 +1,24 @@
 @import "tailwindcss";
 
+/* The Noora Health brand fonts, from local packages so a build never reaches out
+   to Google for them. Only the weights and scripts the labelling skin uses.
+   A font file is fetched only when a page actually uses its family. */
+@import "@fontsource/poppins/latin-400.css";
+@import "@fontsource/poppins/latin-500.css";
+@import "@fontsource/poppins/latin-600.css";
+@import "@fontsource/poppins/devanagari-400.css";
+@import "@fontsource/poppins/devanagari-500.css";
+@import "@fontsource/poppins/devanagari-600.css";
+@import "@fontsource/playfair-display/latin-600.css";
+@import "@fontsource/playfair-display/latin-700.css";
+
 /* Enable Tailwind dark: variant with class strategy */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* The Noora Health look: write `noora:` before a class to apply it only inside
+   an element wearing `.skin-noora`, the way `dark:` works for dark mode. Used by
+   the labelling job of support tickets; every other page is untouched. */
+@custom-variant noora (&:where(.skin-noora, .skin-noora *));
 
 :root {
   --background: #ffffff;
@@ -32,6 +49,28 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-inter: var(--font-inter);
+
+  /* Material 3 colour roles for the Noora look. They have a value only inside
+     `.skin-noora`, so use them with the `noora:` variant. */
+  --color-primary: var(--m3-primary);
+  --color-on-primary: var(--m3-on-primary);
+  --color-primary-hover: var(--m3-primary-hover);
+  --color-primary-container: var(--m3-primary-container);
+  --color-on-primary-container: var(--m3-on-primary-container);
+  --color-secondary: var(--m3-secondary);
+  --color-secondary-container: var(--m3-secondary-container);
+  --color-on-secondary-container: var(--m3-on-secondary-container);
+  --color-tertiary-container: var(--m3-tertiary-container);
+  --color-on-tertiary-container: var(--m3-on-tertiary-container);
+  --color-warning-container: var(--m3-warning-container);
+  --color-on-warning-container: var(--m3-on-warning-container);
+  --color-surface-lowest: var(--m3-surface-lowest);
+  --color-surface-low: var(--m3-surface-low);
+  --color-surface-container: var(--m3-surface-container);
+  --color-surface-high: var(--m3-surface-high);
+  --color-outline: var(--m3-outline);
+  --color-outline-variant: var(--m3-outline-variant);
+  --color-on-surface-variant: var(--m3-on-surface-variant);
 }
 
 /* Dark theme via class - works with Tailwind dark: variant */
@@ -47,6 +86,56 @@
   --tour-link: #a5b4fc;
   --chart-1: #c084fc;
   --chart-2: #60a5fa;
+}
+
+/* The Noora Health look for the labelling job of support tickets, on Material 3
+   roles. Colours are the brand page's (noorahealth.org/brand): soft black text on
+   warm white, pink / blue / green / orange as the brand colours. Brand pink on
+   its own reaches only 4.2:1 against white text, so filled buttons use a deeper
+   pink of the same hue (5.3:1), as Material 3 does for its primary role. The
+   page is always light, whatever the device or the signed-in app saved.
+   Outside this class nothing changes. */
+.skin-noora {
+  --m3-primary: #cc2460;
+  --m3-on-primary: #ffffff;
+  --m3-primary-hover: #ad1f52;
+  --m3-primary-container: #fcd9e6;
+  --m3-on-primary-container: #520420;
+  --m3-secondary: #13769a;
+  --m3-secondary-container: #d0f0fb;
+  --m3-on-secondary-container: #043d52;
+  --m3-tertiary-container: #d3f1e4;
+  --m3-on-tertiary-container: #044433;
+  --m3-warning-container: #fbebd0;
+  --m3-on-warning-container: #492f04;
+  --m3-surface-lowest: #ffffff;
+  --m3-surface-low: #f9f4ef;
+  --m3-surface-container: #f3ede7;
+  --m3-surface-high: #ede6df;
+  --m3-outline: #8c837b;
+  --m3-outline-variant: #ddd3ca;
+  --m3-on-surface-variant: #625a54;
+
+  /* The app's own tokens, so every shared component picks the look up. */
+  --background: #fdfaf7;
+  --foreground: #383838;
+  --muted: #f3ede7;
+  --muted-foreground: #625a54;
+  --border: #ddd3ca;
+  --accent: #f3ede7;
+  --accent-foreground: #383838;
+  --popover: #ffffff;
+
+  /* Headlines in Playfair Display and everything else in Poppins. Poppins has
+     no Telugu, Kannada, Odia or Gurmukhi, so those scripts fall back to the
+     system's own fonts. */
+  --noora-display: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-family:
+    "Poppins", "Noto Sans", "Noto Sans Devanagari", "Noto Sans Telugu",
+    "Noto Sans Kannada", "Noto Sans Oriya", "Noto Sans Gurmukhi", system-ui,
+    -apple-system, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
 }
 
 * {

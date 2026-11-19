@@ -142,7 +142,8 @@ export function readVerdictTone(p: {
 }
 
 export function evaluatorCardSurfaceClass(tone: Tone): string {
-  const base = "rounded-lg border shadow-md dark:shadow-lg transition-colors";
+  const base =
+    "rounded-lg border shadow-md dark:shadow-lg transition-colors noora:rounded-3xl noora:shadow-none";
   switch (tone) {
     case "green":
       return `${base} border-green-500/40 bg-green-500/[0.14] dark:border-green-500/45 dark:bg-green-500/[0.16] dark:shadow-green-950/35`;
@@ -151,15 +152,15 @@ export function evaluatorCardSurfaceClass(tone: Tone): string {
     case "amber":
       return `${base} border-amber-500/40 bg-amber-500/[0.12] dark:border-amber-500/45 dark:bg-amber-500/[0.13] dark:shadow-amber-950/30`;
     default:
-      return `${base} border-border bg-muted/30 dark:bg-muted/40 dark:border-border dark:shadow-black/25`;
+      return `${base} border-border bg-muted/30 dark:bg-muted/40 dark:border-border dark:shadow-black/25 noora:border-outline-variant noora:bg-surface-low`;
   }
 }
 
 const RATING_ACTIVE_CLASS: Record<Tone, string> = {
-  green: "border-green-600 bg-green-600 text-white",
-  red: "border-red-600 bg-red-600 text-white",
-  amber: "border-amber-600 bg-amber-600 text-white",
-  neutral: "border-foreground bg-foreground text-background",
+  green: "border-green-600 bg-green-600 text-white noora:border-primary noora:bg-primary-container noora:text-on-primary-container noora:ring-1 noora:ring-primary",
+  red: "border-red-600 bg-red-600 text-white noora:border-primary noora:bg-primary-container noora:text-on-primary-container noora:ring-1 noora:ring-primary",
+  amber: "border-amber-600 bg-amber-600 text-white noora:border-primary noora:bg-primary-container noora:text-on-primary-container noora:ring-1 noora:ring-primary",
+  neutral: "border-foreground bg-foreground text-background noora:border-primary noora:bg-primary-container noora:text-on-primary-container noora:ring-1 noora:ring-primary",
 };
 
 export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
@@ -216,11 +217,11 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
 
   return (
     <div
-      className={`${surface} p-3 space-y-3 ${
+      className={`${surface} p-3 noora:p-5 space-y-3 ${
         props.answerMissing
           ? "ring-2 ring-red-500"
           : props.isNextQuestion
-            ? "ring-2 ring-foreground/60"
+            ? "ring-2 ring-foreground/60 noora:ring-primary/70"
             : ""
       }`}
     >
@@ -233,8 +234,8 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
               aria-label={`Question ${props.question.number} of ${props.question.total}`}
               className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
                 props.question.answered
-                  ? "bg-foreground text-background"
-                  : "border border-foreground/30 bg-background text-foreground"
+                  ? "bg-foreground text-background noora:bg-primary noora:text-on-primary"
+                  : "border border-foreground/30 bg-background text-foreground noora:bg-surface-lowest"
               }`}
             >
               {props.question.number}
@@ -476,7 +477,7 @@ function ReadVerdictPill({
 // Left-aligned so the description has room to wrap, and full width of its grid
 // cell so every option is the same size, even one alone on the last row.
 const DESCRIBED_OPTION_BTN =
-  "w-full text-left rounded-md border px-3 py-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-foreground/30";
+  "w-full text-left rounded-md border px-3 py-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:rounded-2xl noora:px-4 noora:py-3 noora:focus-visible:ring-primary/40";
 // Two equal columns, or one when the column is too narrow for two. Answer
 // buttons never pick up the browser's own blue outline when clicked.
 const DESCRIBED_OPTIONS_GRID = "grid grid-cols-1 @xs:grid-cols-2 gap-2";
@@ -560,7 +561,7 @@ function WriteControls({
     const described = !!(trueText || falseText);
     const baseBtn = described
       ? `${DESCRIBED_OPTION_BTN} text-sm font-medium`
-      : "h-9 px-4 rounded-md text-sm font-medium border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-foreground/30";
+      : "h-9 px-4 rounded-md noora:rounded-full text-sm font-medium border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:focus-visible:ring-primary/40";
     // The tooltip wrapper is the grid item now, so it carries the stretch.
     const wrapClass = "flex";
     return (
@@ -581,8 +582,8 @@ function WriteControls({
               onClick={() => onChange(value === true ? null : true)}
               className={`${baseBtn} ${
                 value === true
-                  ? "border-green-600 bg-green-600 text-white"
-                  : "border-border bg-background text-foreground hover:bg-muted/50"
+                  ? "border-green-600 bg-green-600 text-white noora:border-primary noora:bg-primary-container noora:text-on-primary-container noora:ring-1 noora:ring-primary"
+                  : "border-border bg-background text-foreground hover:bg-muted/50 noora:bg-surface-lowest noora:hover:bg-primary/8"
               }`}
             >
               {trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL}
@@ -590,7 +591,7 @@ function WriteControls({
                 <OptionDescription
                   text={trueText}
                   active={value === true}
-                  activeClass="text-white/80"
+                  activeClass="text-white/80 noora:text-on-primary-container/80"
                 />
               )}
             </button>
@@ -606,8 +607,8 @@ function WriteControls({
               onClick={() => onChange(value === false ? null : false)}
               className={`${baseBtn} ${
                 value === false
-                  ? "border-red-600 bg-red-600 text-white"
-                  : "border-border bg-background text-foreground hover:bg-muted/50"
+                  ? "border-red-600 bg-red-600 text-white noora:border-primary noora:bg-primary-container noora:text-on-primary-container noora:ring-1 noora:ring-primary"
+                  : "border-border bg-background text-foreground hover:bg-muted/50 noora:bg-surface-lowest noora:hover:bg-primary/8"
               }`}
             >
               {falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL}
@@ -615,7 +616,7 @@ function WriteControls({
                 <OptionDescription
                   text={falseText}
                   active={value === false}
-                  activeClass="text-white/80"
+                  activeClass="text-white/80 noora:text-on-primary-container/80"
                 />
               )}
             </button>
@@ -686,12 +687,12 @@ function WriteControls({
                   described
                     ? DESCRIBED_OPTION_BTN
                     : hasLabels
-                      ? "outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 min-w-[3.25rem] px-2.5 h-auto py-1.5 flex flex-col items-center gap-0.5 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                      : "outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 w-9 h-9 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      ? "outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 min-w-[3.25rem] px-2.5 h-auto py-1.5 flex flex-col items-center gap-0.5 rounded-md noora:rounded-xl border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      : "outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 w-9 h-9 rounded-md noora:rounded-full border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 } text-sm font-medium ${
                   active
                     ? activeClass
-                    : "border-border bg-background hover:bg-muted/50"
+                    : "border-border bg-background hover:bg-muted/50 noora:bg-surface-lowest noora:hover:bg-primary/8"
                 }`}
               >
                 {described ? (
@@ -704,13 +705,13 @@ function WriteControls({
                       <OptionDescription
                         text={text}
                         active={active}
-                        activeClass="text-white/80"
+                        activeClass="text-white/80 noora:text-on-primary-container/80"
                       />
                     )
                   : hasLabels && (
                       <span
                         className={`text-[10px] font-normal leading-tight ${
-                          active ? "text-white/80" : "text-muted-foreground"
+                          active ? "text-white/80 noora:text-on-primary-container/80" : "text-muted-foreground"
                         }`}
                       >
                         {label ?? ""}
@@ -777,7 +778,7 @@ function WriteReasoning({
         disabled={disabled}
         placeholder={disabled ? "" : "Add your reasoning"}
         rows={2}
-        className={`w-full text-sm rounded-md border bg-background px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20 disabled:opacity-60 ${
+        className={`w-full text-sm rounded-md noora:rounded-2xl border bg-background noora:bg-surface-lowest px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20 noora:focus:ring-primary/30 disabled:opacity-60 ${
           hasBeenHidden ? "reason-box-appear " : ""
         }${missing ? "border-red-500" : "border-border"}`}
       />
