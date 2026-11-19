@@ -116,14 +116,9 @@ function TicketSteps({ ticket }: { ticket: Ticket }) {
       className="rounded-xl border border-border bg-muted/20 px-4 py-3"
     >
       <h3 className="text-sm font-semibold text-foreground">Ticket timeline</h3>
-      <ol className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-2">
+      <ol className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-3">
         {ticket.steps.map((s, i) => (
           <li key={s.key} className="flex items-center gap-2">
-            {i > 0 && (
-              <span aria-hidden className="text-muted-foreground">
-                ›
-              </span>
-            )}
             <span>
               <span className="block text-xs text-muted-foreground">
                 {s.label}
@@ -132,6 +127,12 @@ function TicketSteps({ ticket }: { ticket: Ticket }) {
                 {dayAndTime(s.at)}
               </span>
             </span>
+            {/* The arrow belongs to the step before it, so a wrapped line never starts with one. */}
+            {i < ticket.steps.length - 1 && (
+              <span aria-hidden className="text-muted-foreground">
+                ›
+              </span>
+            )}
           </li>
         ))}
       </ol>
@@ -248,7 +249,9 @@ function Message({
   const translated = showEnglish && !m.placeholder && m.english !== null;
   const main = translated ? m.english : m.text;
   const original = translated ? m.text : null;
-  const align = m.who === "mse" ? "ml-auto" : "mr-auto";
+  // Staff replies sit to the right and the caregiver to the left, but only
+  // where there is room: on a phone every bubble takes nearly the full width.
+  const align = m.who === "mse" ? "md:ml-auto" : "md:mr-auto";
   const surface =
     m.who === "caregiver"
       ? "bg-background"
@@ -256,7 +259,7 @@ function Message({
         ? "bg-muted/40"
         : "bg-muted/20";
   return (
-    <div className={`max-w-[88%] ${align}`}>
+    <div className={`max-w-full md:max-w-[88%] ${align}`}>
       <div className={`rounded-xl border border-border px-4 py-3 ${surface}`}>
         <p className="text-xs text-muted-foreground">
           <span className="font-medium text-foreground">{m.label}</span>
