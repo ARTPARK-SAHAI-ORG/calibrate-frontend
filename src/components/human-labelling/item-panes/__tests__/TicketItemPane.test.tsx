@@ -132,6 +132,31 @@ describe("TicketItemPane", () => {
     expect(screen.getByText("A later thanks")).toBeInTheDocument();
   });
 
+  it("puts the same hide button at both ends of an opened run of messages", async () => {
+    const user = setupUser();
+    const scroll = jest.fn();
+    Element.prototype.scrollIntoView = scroll;
+    render(<TicketItemPane payload={payload} metadata={metadata} />);
+
+    await user.click(screen.getByRole("button", { name: "Show 1 earlier message" }));
+    const hides = screen.getAllByRole("button", { name: "Hide 1 earlier message" });
+    expect(hides).toHaveLength(2);
+    // One above the messages and one below them.
+    const message = screen.getByText("An earlier question");
+    expect(hides[0].compareDocumentPosition(message) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(hides[1].compareDocumentPosition(message) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+
+    // The one at the far end puts the run away and brings the top button back into view.
+    await user.click(hides[1]);
+    expect(screen.queryByText("An earlier question")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show 1 earlier message" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Hide/ })).not.toBeInTheDocument();
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll.mock.contexts[0]).toBe(
+      screen.getByRole("button", { name: "Show 1 earlier message" }),
+    );
+  });
+
   it("puts a date heading above each new day", async () => {
     const user = setupUser();
     render(<TicketItemPane payload={payload} metadata={metadata} />);

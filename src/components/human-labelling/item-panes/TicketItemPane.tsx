@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { TicketDensity } from "@/hooks/useTicketDensity";
 import {
   dayAndTime,
@@ -220,19 +220,42 @@ function FoldedEvents({
   s: Spacing;
 }) {
   const [open, setOpen] = useState(false);
+  const topButton = useRef<HTMLButtonElement>(null);
   if (events.length === 0) return null;
   const n = events.length;
+  const label = `${open ? "Hide" : "Show"} ${n} ${word} message${n === 1 ? "" : "s"}`;
+  const buttonClass = `w-full rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${s.fold}`;
   return (
     <div className={s.stack}>
       <button
+        ref={topButton}
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={`w-full rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${s.fold}`}
+        className={buttonClass}
       >
-        {open ? "Hide" : "Show"} {n} {word} message{n === 1 ? "" : "s"}
+        {label}
       </button>
-      {open && <Events events={events} showEnglish={showEnglish} s={s} />}
+      {open && (
+        <>
+          <Events events={events} showEnglish={showEnglish} s={s} />
+          {/* The same button at the far end, so a long run can be put away
+              without scrolling back up to its start. */}
+          <button
+            type="button"
+            aria-expanded
+            onClick={() => {
+              setOpen(false);
+              // Bring the top button back into view, so the reader is not left
+              // somewhere further down the ticket than where they were.
+              topButton.current?.scrollIntoView?.({ block: "nearest" });
+            }}
+            className={buttonClass}
+          >
+            {label}
+          </button>
+        </>
+      )}
     </div>
   );
 }
