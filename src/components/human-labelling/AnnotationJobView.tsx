@@ -28,6 +28,8 @@ import { LlmItemPane } from "./item-panes/LlmItemPane";
 import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
+import { TicketItemPane } from "./item-panes/TicketItemPane";
+import { isTicketPayload } from "@/lib/ticketView";
 import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
@@ -1164,7 +1166,7 @@ function AnnotateView({
         kind: currentItem.is_tool_call === true ? "tool-call" : introKind(data),
         hasItemDetails: hasItemDetails(
           currentItem.payload,
-          currentItem.metadata,
+          rightColumnMetadata(currentItem),
         ),
         commentsEnabled,
         questions: evaluatorsFor(currentItem.uuid).flatMap((ev) => {
@@ -1588,6 +1590,15 @@ function AnnotateView({
  * flush against its container and needs padding above and below, or its
  * first card sits against the top edge.
  */
+/**
+ * The metadata the details box on the right shows. A support ticket shows its
+ * case details on the left, inside the ticket, so the right keeps only the
+ * questions.
+ */
+export function rightColumnMetadata(item: Item): Item["metadata"] {
+  return isTicketPayload(item.payload) ? null : item.metadata;
+}
+
 export function itemPaneHasOwnPadding(taskType: Task["type"]): boolean {
   return taskType === "llm" || taskType === "conversation";
 }
@@ -1600,6 +1611,10 @@ export function ItemPane({
   taskType: Task["type"];
 }) {
   const payload = (item.payload ?? {}) as Record<string, unknown>;
+  // A support ticket draws its own case details and timeline, so the usual
+  // conversation pane (and the details box on the right) are not used for it.
+  if (taskType === "conversation" && isTicketPayload(payload))
+    return <TicketItemPane payload={payload} metadata={item.metadata} />;
   if (taskType === "stt") return <SttItemPane payload={payload} />;
   if (taskType === "tts") return <TtsItemPane payload={payload} />;
   // A basic agent item is input and output, never a conversation,
@@ -1702,7 +1717,7 @@ function EvaluatorsPane({
         <ItemDetailsBlock
           heading="Case details"
           payload={item.payload}
-          metadata={item.metadata}
+          metadata={rightColumnMetadata(item)}
         />
         {commentBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
@@ -1832,7 +1847,7 @@ function EvaluatorsPane({
       <ItemDetailsBlock
         heading="Case details"
         payload={item.payload}
-        metadata={item.metadata}
+        metadata={rightColumnMetadata(item)}
       />
       {readOnly && commentBlock}
       {forItem.map((ev) => {
