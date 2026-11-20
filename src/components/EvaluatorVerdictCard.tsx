@@ -26,7 +26,7 @@ import { ErrorNote } from "@/components/ui";
 // other callers (tool-call verdicts in test-results/shared.tsx) reuse the
 // exact same toggle visual without duplicating it.
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import {
   DEFAULT_BINARY_FALSE_LABEL,
   DEFAULT_BINARY_TRUE_LABEL,
@@ -200,6 +200,8 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
       : null;
 
   const [open, setOpen] = useState(false);
+  // Names a question for a screen reader, so its answers are heard as one group.
+  const nameId = useId();
 
   // The evaluator whose prompt is on show, opened from the name in the
   // header. Null until the name is clicked. Only relevant when the card
@@ -216,7 +218,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
   // text.
   const { ref: nameRef, clipped: nameClipped } = useIsNameClipped(props.name);
   const nameBlock = (
-    <span ref={nameRef} className="min-w-0 truncate block">
+    <span id={nameId} ref={nameRef} className="min-w-0 truncate block">
       <NameLabel
         name={props.name}
         uuid={props.evaluatorUuid}
@@ -229,6 +231,8 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
 
   return (
     <div
+      role={props.question ? "group" : undefined}
+      aria-labelledby={props.question ? nameId : undefined}
       className={`${surface} p-3 noora:p-4 space-y-3 ${
         props.answerMissing
           ? "ring-2 ring-red-500"

@@ -1387,3 +1387,23 @@ describe("the evaluator name on hover", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("EvaluatorVerdictCard question grouping", () => {
+  it("names a question as a group, so a screen reader hears its answers under it", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Urgency"
+        outputType="binary"
+        question={{ number: 1, total: 2, answered: false }}
+        onValueChange={jest.fn()}
+      />,
+    );
+    expect(screen.getByRole("group", { name: "Urgency" })).toBeInTheDocument();
+  });
+
+  it("adds no group when the card is not one of a list of questions", () => {
+    render(<EvaluatorVerdictCard mode="write" name="Urgency" outputType="binary" onValueChange={jest.fn()} />);
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
+  });
+});

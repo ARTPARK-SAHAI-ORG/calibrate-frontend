@@ -1937,7 +1937,7 @@ function EvaluatorsPane({
               className="h-2 rounded-full overflow-hidden"
             />
           )}
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
             <div className="flex gap-1.5 min-w-0 overflow-x-auto">
               {questions.length > 1 &&
                 questions.map((ev, i) => {
