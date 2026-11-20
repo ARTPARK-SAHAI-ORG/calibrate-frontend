@@ -24,14 +24,13 @@ describe("ticketHelpFor", () => {
     for (const name of ["Urgency", "Probing", "Accuracy", "Patient safety"]) {
       const help = ticketHelpFor(name);
       expect(help?.definition.length).toBeGreaterThan(20);
-      expect(help?.choices?.length).toBeGreaterThanOrEqual(2);
+      expect(help?.example?.length).toBeGreaterThan(20);
     }
   });
 
   it("writes no full stop after a one-line label and no dash that reads as an em-dash", () => {
     for (const help of Object.values(TICKET_HELP)) {
       const lines = [
-        ...(help.choices ?? []).map((c) => c.text),
         ...(help.counts ?? []),
         ...(help.notCounts ?? []),
       ];
