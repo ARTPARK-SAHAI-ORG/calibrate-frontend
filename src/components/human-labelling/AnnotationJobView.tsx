@@ -1464,9 +1464,9 @@ function AnnotateView({
           {/* Mobile: horizontal scrolling strip */}
           <div
             data-testid="mobile-case-strip"
-            className="md:hidden w-full border-b border-border bg-muted/20 overflow-x-auto overflow-y-hidden"
+            className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto noora:max-h-none noora:overflow-x-auto noora:overflow-y-hidden"
           >
-            <div className="p-2 flex w-max gap-2">
+            <div className="p-2 grid grid-cols-8 gap-2 noora:flex noora:w-max">
               {items.map((it, i) => {
                 const status = statusByItem.get(it.uuid) ?? null;
                 const isCurrent = i === currentIndex;
@@ -1487,7 +1487,7 @@ function AnnotateView({
                               const strip = el?.closest<HTMLElement>(
                                 '[data-testid="mobile-case-strip"]',
                               );
-                              if (el && strip)
+                              if (el && strip && strip.scrollWidth > strip.clientWidth)
                                 strip.scrollLeft +=
                                   el.getBoundingClientRect().left -
                                   strip.getBoundingClientRect().left -
@@ -1498,7 +1498,7 @@ function AnnotateView({
                       }
                       onClick={() => navigateTo(i)}
                       aria-label={`Case ${position}${status ? ` (${status})` : ""}`}
-                      className={`h-10 w-10 shrink-0 rounded-md noora:rounded-lg border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                      className={`h-10 w-full noora:w-10 noora:shrink-0 rounded-md noora:rounded-lg border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                         isCurrent
                           ? "border-foreground bg-foreground text-background noora:border-primary noora:bg-primary noora:text-on-primary noora:font-semibold"
                           : status

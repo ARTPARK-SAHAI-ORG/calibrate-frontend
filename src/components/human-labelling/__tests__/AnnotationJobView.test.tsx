@@ -3102,12 +3102,24 @@ describe("AnnotationJobView support tickets", () => {
     expect(screen.queryByAltText("Noora Health")).not.toBeInTheDocument();
   });
 
-  it("keeps the case numbers on a phone to one scrolling row", async () => {
+  it("keeps the phone case numbers a wrapping grid on an ordinary job, and one row only in the Noora look", async () => {
+    // The one-row layout is written as `noora:` classes, so it applies only inside
+    // `.skin-noora`: an ordinary job keeps the grid it always had.
     fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
-    render(<AnnotationJobView token="tok" mode="public" />);
+    const { container, unmount } = render(<AnnotationJobView token="tok" mode="public" />);
     const strip = await screen.findByTestId("mobile-case-strip");
-    expect(strip.className).toContain("overflow-x-auto");
-    expect(strip.className).toContain("overflow-y-hidden");
+    const plain = strip.className.split(/\s+/);
+    expect(plain).toContain("overflow-y-auto");
+    expect(plain).not.toContain("overflow-x-auto");
+    expect(plain).toContain("noora:overflow-x-auto");
+    expect(strip.firstElementChild?.className).toContain("grid-cols-8");
+    expect(container.querySelector(".skin-noora")).toBeNull();
     expect(within(strip).getAllByRole("button")).toHaveLength(2);
+    unmount();
+
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const second = render(<AnnotationJobView token="tok" mode="public" />);
+    const ticketStrip = await screen.findByTestId("mobile-case-strip");
+    expect(second.container.querySelector(".skin-noora")?.contains(ticketStrip)).toBe(true);
   });
 });
