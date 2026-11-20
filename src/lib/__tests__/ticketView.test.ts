@@ -6,6 +6,7 @@ import {
   isTicketPayload,
   istToMs,
   parseTicket,
+  ticketWasProbed,
 } from "../ticketView";
 
 const T = (at: string) => istToMs(at);
@@ -470,5 +471,44 @@ describe("probes on the timeline", () => {
       META_WINDOW,
     )!;
     expect(stepOf(t, "probed")?.at).toBe("2026-11-16 19:05:00");
+  });
+});
+
+describe("ticketWasProbed", () => {
+  const mseAsks = (text: string) => ({
+    transcript: [
+      {
+        role: "user",
+        label: "User",
+        kind: "message",
+        content: "Help",
+        at_ist: "2026-11-16 19:01:00",
+        ts: T("2026-11-16 19:01:00"),
+      },
+      {
+        role: "assistant",
+        label: "MSE",
+        kind: "message",
+        content: text,
+        at_ist: "2026-11-16 19:05:00",
+        ts: T("2026-11-16 19:05:00"),
+      },
+    ],
+  });
+  const meta = [
+    { key: "Opened", value: "2026-11-16 19:00:00" },
+    { key: "Closed", value: "2026-11-16 20:00:00" },
+  ];
+
+  it("is true when the nurse asked a question while the ticket was open", () => {
+    expect(ticketWasProbed(mseAsks("How old is the baby?"), meta)).toBe(true);
+  });
+
+  it("is false when the nurse only made statements", () => {
+    expect(ticketWasProbed(mseAsks("Please rest."), meta)).toBe(false);
+  });
+
+  it("is false for something that is not a ticket", () => {
+    expect(ticketWasProbed({ chat_history: [] }, meta)).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ import {
 import { ITEM_PARAM, readUrlParam } from "../valueFilterUrl";
 import { isTourActive, runTour } from "../../../lib/onboarding/engine";
 import { act } from "@/test-utils";
+import { TICKET_HELP } from "@/lib/ticketHelp";
 
 function setSearch(search: string) {
   window.history.replaceState(null, "", `/annotate-job/tok${search}`);
@@ -3121,5 +3122,92 @@ describe("AnnotationJobView support tickets", () => {
     const second = render(<AnnotationJobView token="tok" mode="public" />);
     const ticketStrip = await screen.findByTestId("mobile-case-strip");
     expect(second.container.querySelector(".skin-noora")?.contains(ticketStrip)).toBe(true);
+  });
+
+  const probedTicket = {
+    ...ticketItem,
+    id: 2,
+    uuid: "ticket-2",
+    payload: {
+      name: "t-2",
+      transcript: [
+        ...ticketItem.payload.transcript,
+        {
+          role: "assistant",
+          label: "MSE",
+          kind: "message",
+          content: "How old is the baby?",
+          at_ist: "2026-11-16 19:05:00",
+          ts: Date.UTC(2026, 10, 16, 13, 35, 0),
+        },
+      ],
+    },
+  };
+  const twoTickets = () =>
+    jobResponse({
+      task: { uuid: "task-1", name: "Tickets", type: "conversation" },
+      items: [ticketItem, probedTicket],
+    });
+
+  it("says where the case being read stands, and follows the case as it is answered", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const user = setupUser();
+    render(<AnnotationJobView token="tok" mode="public" />);
+    const chip = await screen.findByTestId("case-status");
+    expect(chip).toHaveTextContent("Not answered");
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    expect(screen.getByTestId("case-status")).toHaveTextContent("In progress");
+  });
+
+  it("shows no status chip on an ordinary job or in the reviewer's own view", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    const first = render(<AnnotationJobView token="tok" mode="public" />);
+    await screen.findByTestId("mobile-case-strip");
+    expect(screen.queryByTestId("case-status")).not.toBeInTheDocument();
+    first.unmount();
+
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    render(<AnnotationJobView token="tok" mode="admin" />);
+    await screen.findByTestId("ticket-pane");
+    expect(screen.queryByTestId("case-status")).not.toBeInTheDocument();
+  });
+
+  it("marks only the probed cases in the list, in words as well as a symbol", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(twoTickets()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    const strip = await screen.findByTestId("mobile-case-strip");
+    const buttons = within(strip).getAllByRole("button");
+    expect(buttons[0]).toHaveAttribute("aria-label", "Case 1");
+    expect(buttons[1]).toHaveAttribute("aria-label", "Case 2, probed");
+    expect(within(buttons[1]).getByTestId("probed-mark")).toBeInTheDocument();
+    expect(within(buttons[0]).queryByTestId("probed-mark")).not.toBeInTheDocument();
+  });
+
+  it("draws no marks on an ordinary job", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await screen.findByTestId("mobile-case-strip");
+    expect(screen.queryByTestId("probed-mark")).not.toBeInTheDocument();
+  });
+
+  it("offers an explanation under a question the team has written one for, on a ticket only", async () => {
+    TICKET_HELP["Correctness"] = { definition: "Is what the nurse said right" };
+    try {
+      const user = setupUser();
+      fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+      const first = render(<AnnotationJobView token="tok" mode="public" />);
+      const links = await screen.findAllByRole("button", { name: "What does this mean?" });
+      expect(links).toHaveLength(1);
+      await user.click(links[0]);
+      expect(screen.getByText("Is what the nurse said right")).toBeInTheDocument();
+      first.unmount();
+
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await screen.findByText("Correctness");
+      expect(screen.queryByRole("button", { name: "What does this mean?" })).not.toBeInTheDocument();
+    } finally {
+      delete TICKET_HELP["Correctness"];
+    }
   });
 });

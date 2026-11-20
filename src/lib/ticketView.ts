@@ -304,3 +304,15 @@ export function parseTicket(payload: unknown, metadata: Meta): Ticket | null {
     closedAt,
   };
 }
+
+/**
+ * Whether the nurse asked the user a question while the ticket was open: the
+ * same rule that puts "Probed" on the timeline, so the case list and the
+ * timeline can never disagree.
+ */
+export function ticketWasProbed(payload: unknown, metadata: Meta): boolean {
+  return (
+    parseTicket(payload, metadata)?.steps.some((s) => s.key === "probed") ??
+    false
+  );
+}

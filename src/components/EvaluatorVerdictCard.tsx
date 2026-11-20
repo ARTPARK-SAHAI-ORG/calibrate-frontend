@@ -41,6 +41,9 @@ type CommonProps = {
   name: string;
   /** Short evaluator description, shown under the name. */
   description?: string | null;
+  /** Anything to draw straight under the description, such as an explanation
+   * that opens in place. Only drawn while someone is answering. */
+  help?: ReactNode;
   /** This card's place in a list of questions someone is answering. Makes the
    * name a heading above a quieter description, and draws the number in a
    * circle that fills in once answered, whichever answer was picked. A list of one draws no circle. */
@@ -313,6 +316,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             {props.description}
           </p>
         )}
+        {props.mode === "write" && props.help}
       </div>
 
       {props.mode === "write" && (
