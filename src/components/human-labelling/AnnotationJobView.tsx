@@ -1363,8 +1363,7 @@ function AnnotateView({
         </header>
       )}
       {skin && <BrandStripe />}
-      <section
-        aria-label="Cases to review"
+      <main
         className={
           isAdmin
             ? "contents"
@@ -1622,7 +1621,7 @@ function AnnotateView({
             </>
           )}
 
-          <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden scroll-pt-28 noora:max-md:pb-24">
+          <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden scroll-pt-28 noora:max-md:pb-24">
             {!currentItem ? (
               <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground w-full">
                 {filterActive
@@ -1673,9 +1672,9 @@ function AnnotateView({
                 }
               />
             )}
-          </main>
+          </div>
         </div>
-      </section>
+      </main>
       {introOpen && (
         <LabellingJobIntro
           kind={introKind(data)}
@@ -1956,7 +1955,7 @@ function EvaluatorsPane({
                             block: "start",
                           })
                       }
-                      className={`shrink-0 w-7 h-7 noora:max-md:w-10 noora:max-md:h-10 rounded-md noora:rounded-full border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:focus-visible:ring-secondary ${
+                      className={`shrink-0 w-7 h-7 noora:max-md:w-11 noora:max-md:h-11 rounded-md noora:rounded-full border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:focus-visible:ring-secondary ${
                         missingAnswerKeys.has(k)
                           ? "border-red-500 text-red-600 dark:text-red-400"
                           : !looksAnswered(ev)

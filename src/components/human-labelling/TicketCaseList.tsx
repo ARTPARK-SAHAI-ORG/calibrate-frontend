@@ -121,7 +121,8 @@ export function TicketCaseList({
   // Written out in full so Tailwind can see every class.
   const panelClass = `${phoneOpen ? "flex" : "hidden"} ${folded ? "md:hidden" : "md:flex"}`;
   return (
-    <aside
+    <nav
+      aria-label="List of cases"
       data-testid="ticket-case-list"
       className={`shrink-0 border-b md:border-b-0 md:border-r border-border bg-surface-low md:flex md:flex-col md:min-h-0 ${
         folded ? "md:w-12" : "md:w-72 lg:w-80"
@@ -241,6 +242,6 @@ export function TicketCaseList({
           </ul>
         )}
       </div>
-    </aside>
+    </nav>
   );
 }

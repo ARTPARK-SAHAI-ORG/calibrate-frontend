@@ -3149,13 +3149,15 @@ describe("AnnotationJobView support tickets", () => {
   it("keeps the whole page inside landmarks, so a screen reader can jump between its parts", async () => {
     fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
     const { container } = render(<AnnotationJobView token="tok" mode="public" />);
-    const cases = await screen.findByRole("region", { name: "Cases to review" });
-    // The logo and title sit in a banner of their own, and the cases, the
-    // progress bar and the questions in one named region.
+    const main = await screen.findByRole("main");
+    // The logo and title sit in a banner of their own; the progress bar, the
+    // list of cases and the questions are in the one main area, with the list a
+    // navigation landmark inside it.
     const banner = container.querySelector("header");
     expect(banner?.contains(screen.getByAltText("Noora Health"))).toBe(true);
-    expect(cases.contains(screen.getByRole("progressbar", { name: "Cases done" }))).toBe(true);
-    expect(cases.querySelector("main")).not.toBeNull();
+    expect(main.contains(screen.getByRole("progressbar", { name: "Cases done" }))).toBe(true);
+    expect(main.contains(screen.getByRole("navigation", { name: "List of cases" }))).toBe(true);
+    expect(container.querySelectorAll("main")).toHaveLength(1);
   });
 
   it("lists each ticket with what the user wrote, and opens the one picked", async () => {
