@@ -315,3 +315,65 @@ export function ticketTitle(name: string): string {
   const id = name.trim();
   return /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id) ? `Ticket ${id.slice(0, 8)}` : id;
 }
+
+/** What a ticket looks like as one row of the list of cases. */
+export type TicketRowSummary = {
+  /** The user's first message, in English when there is a translation. */
+  preview: string;
+  /** When the ticket opened, as "19:01", or "" when that is not known. */
+  opened: string;
+  /** How long it stayed open, as "9.9 h", or "" when either time is missing. */
+  hoursOpen: string;
+  /** Everything a search should look through, in lower case. */
+  searchText: string;
+};
+
+const MEDIA_NAME = {
+  audio: "Audio message",
+  image: "Image",
+  video: "Video",
+  document: "Document",
+  other: "Attachment",
+} as const;
+
+/**
+ * Reads the line a ticket gets in the list of cases: what the user first wrote,
+ * when it opened and for how long, plus the text a search looks through.
+ */
+export function ticketRowSummary(
+  payload: unknown,
+  metadata: Meta,
+): TicketRowSummary {
+  const ticket = parseTicket(payload, metadata);
+  const events = ticket ? [...ticket.earlier, ...ticket.during, ...ticket.later] : [];
+  const messages = events.filter((e): e is TicketMessage => e.kind === "message");
+  const readable = (m: TicketMessage) => (m.english ?? m.text).trim();
+  // The first thing the user wrote while the ticket was open; the chat's older
+  // history is a fallback, then anything at all.
+  const first =
+    ticket?.during.find(
+      (e): e is TicketMessage =>
+        e.kind === "message" && e.who === "user" && (!!readable(e) || !!e.media),
+    ) ??
+    messages.find((m) => m.who === "user" && (!!readable(m) || !!m.media)) ??
+    null;
+  const preview = first
+    ? readable(first) || (first.media ? MEDIA_NAME[first.media.kind] : "")
+    : "";
+
+  const openedAt = ticket?.openedAt ?? "";
+  const closedAt = ticket?.closedAt ?? "";
+  const hours =
+    openedAt && closedAt
+      ? (istToMs(closedAt) - istToMs(openedAt)) / 3_600_000
+      : NaN;
+  const id = ticketTitle(str(asRecord(payload)?.name));
+  return {
+    preview,
+    opened: openedAt ? hourMinute(openedAt) : "",
+    hoursOpen: Number.isFinite(hours) && hours >= 0 ? `${hours.toFixed(1)} h` : "",
+    searchText: [id, ...messages.flatMap((m) => [m.text, m.english ?? ""])]
+      .join(" ")
+      .toLowerCase(),
+  };
+}

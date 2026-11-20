@@ -6,6 +6,7 @@ import {
   isTicketPayload,
   istToMs,
   parseTicket,
+  ticketRowSummary,
   ticketTitle,
 } from "../ticketView";
 
@@ -482,5 +483,87 @@ describe("ticketTitle", () => {
   it("keeps any other name as it is", () => {
     expect(ticketTitle("  Fever case ")).toBe("Fever case");
     expect(ticketTitle("")).toBe("");
+  });
+});
+
+describe("ticketRowSummary", () => {
+  const meta = [
+    { key: "Opened", value: "2026-11-16 19:00:00" },
+    { key: "Closed", value: "2026-11-16 22:30:00" },
+  ];
+  const turn = (role: string, content: string, at: string, extra = {}) => ({
+    role,
+    label: role === "user" ? "User" : "MSE",
+    kind: "message",
+    content,
+    at_ist: at,
+    ts: T(at),
+    ...extra,
+  });
+
+  it("previews the first thing the user wrote, in English, with when it opened and for how long", () => {
+    const sum = ticketRowSummary(
+      {
+        name: "77286594-f7cd-4880-4d30-40705fd6c6e8",
+        transcript: [
+          turn("user", "Older chat", "2026-11-15 10:00:00"),
+          turn("user", "Kya bukhar hai", "2026-11-16 19:01:00", {
+            versions: { "English translation": "Does the baby have a fever" },
+          }),
+          turn("assistant", "How old is the baby?", "2026-11-16 19:05:00"),
+        ],
+      },
+      meta,
+    );
+    expect(sum.preview).toBe("Does the baby have a fever");
+    expect(sum.opened).toBe("19:00");
+    expect(sum.hoursOpen).toBe("3.5 h");
+    expect(sum.searchText).toContain("ticket 77286594");
+    expect(sum.searchText).toContain("kya bukhar hai");
+    expect(sum.searchText).toContain("does the baby have a fever");
+    expect(sum.searchText).toContain("how old is the baby?");
+  });
+
+  it("names an audio message when the user wrote nothing", () => {
+    const sum = ticketRowSummary(
+      {
+        name: "t",
+        transcript: [
+          turn("user", "", "2026-11-16 19:01:00", {
+            media: { type: "audio", mime: "audio/ogg", uri: "https://example.com/a" },
+          }),
+        ],
+      },
+      meta,
+    );
+    expect(sum.preview).toBe("Audio message");
+  });
+
+  it("falls back to the chat's older history, then to nothing", () => {
+    const older = ticketRowSummary(
+      { name: "t", transcript: [turn("user", "Before it opened", "2026-11-15 10:00:00")] },
+      meta,
+    );
+    expect(older.preview).toBe("Before it opened");
+    const none = ticketRowSummary(
+      { name: "t", transcript: [turn("assistant", "Hello", "2026-11-16 19:05:00")] },
+      meta,
+    );
+    expect(none.preview).toBe("");
+  });
+
+  it("leaves the times out when they are not known, and copes with a non-ticket", () => {
+    const sum = ticketRowSummary(
+      { name: "t", transcript: [turn("user", "Hi", "2026-11-16 19:01:00")] },
+      [],
+    );
+    expect(sum.opened).toBe("");
+    expect(sum.hoursOpen).toBe("");
+    expect(ticketRowSummary({ chat_history: [] }, meta)).toEqual({
+      preview: "",
+      opened: "",
+      hoursOpen: "",
+      searchText: "",
+    });
   });
 });

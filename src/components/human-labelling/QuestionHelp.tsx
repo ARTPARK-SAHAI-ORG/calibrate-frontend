@@ -41,6 +41,19 @@ export function QuestionHelp({
               Example: {help.example}
             </p>
           )}
+          {help.choices?.length ? (
+            <div>
+              <p className="font-medium">How to choose</p>
+              <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                {help.choices.map((c) => (
+                  <li key={c.name}>
+                    <span className="font-medium text-foreground">{c.name}</span>
+                    {`: ${c.text}`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <HelpList title="Counts when" items={help.counts} />
           <HelpList title="Does not count" items={help.notCounts} />
         </div>

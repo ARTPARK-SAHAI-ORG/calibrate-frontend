@@ -3118,10 +3118,57 @@ describe("AnnotationJobView support tickets", () => {
     expect(within(strip).getAllByRole("button")).toHaveLength(2);
     unmount();
 
+    // A ticket job swaps the numbers for the list of cases, so it has no strip.
     fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
     const second = render(<AnnotationJobView token="tok" mode="public" />);
-    const ticketStrip = await screen.findByTestId("mobile-case-strip");
-    expect(second.container.querySelector(".skin-noora")?.contains(ticketStrip)).toBe(true);
+    const list = await screen.findByTestId("ticket-case-list");
+    expect(second.container.querySelector(".skin-noora")?.contains(list)).toBe(true);
+    expect(screen.queryByTestId("mobile-case-strip")).not.toBeInTheDocument();
+  });
+
+  it("lists each ticket with what the user wrote, and opens the one picked", async () => {
+    const second = {
+      ...ticketItem,
+      id: 2,
+      uuid: "ticket-2",
+      payload: {
+        name: "t-2",
+        transcript: [
+          {
+            role: "user",
+            label: "User",
+            kind: "message",
+            content: "My baby will not feed",
+            at_ist: "2026-11-16 19:30:00",
+            ts: Date.UTC(2026, 10, 16, 14, 0, 0),
+          },
+        ],
+      },
+    };
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        jobResponse({
+          task: { uuid: "task-1", name: "Tickets", type: "conversation" },
+          items: [ticketItem, second],
+        }),
+      ),
+    );
+    const user = setupUser();
+    render(<AnnotationJobView token="tok" mode="public" />);
+    const list = await screen.findByTestId("ticket-case-list");
+    expect(within(list).getByText("Is my baby ok")).toBeInTheDocument();
+    expect(within(list).getByText("1 · 19:00 · 1.0 h")).toBeInTheDocument();
+    expect(screen.getByText(/Case 1 of 2/)).toBeInTheDocument();
+    await user.click(within(list).getByRole("button", { name: "Case 2, not answered" }));
+    expect(screen.getByText(/Case 2 of 2/)).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "Case 2, not answered" })).toHaveAttribute("aria-current", "true");
+  });
+
+  it("keeps the ticket list out of the reviewer's own view of a ticket job", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    render(<AnnotationJobView token="tok" mode="admin" />);
+    await screen.findByTestId("ticket-pane");
+    expect(screen.queryByTestId("ticket-case-list")).not.toBeInTheDocument();
   });
 
   it("says where the case being read stands, and follows the case as it is answered", async () => {

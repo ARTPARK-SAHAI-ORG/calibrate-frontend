@@ -19,4 +19,24 @@ describe("ticketHelpFor", () => {
     expect(ticketHelpFor("No such question")).toBeNull();
     expect(typeof TICKET_HELP).toBe("object");
   });
+
+  it("has help for each of the four questions of the safety review", () => {
+    for (const name of ["Urgency", "Probing", "Accuracy", "Patient safety"]) {
+      const help = ticketHelpFor(name);
+      expect(help?.definition.length).toBeGreaterThan(20);
+      expect(help?.choices?.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("writes no full stop after a one-line label and no dash that reads as an em-dash", () => {
+    for (const help of Object.values(TICKET_HELP)) {
+      const lines = [
+        ...(help.choices ?? []).map((c) => c.text),
+        ...(help.counts ?? []),
+        ...(help.notCounts ?? []),
+      ];
+      for (const line of lines) expect(line.endsWith(".")).toBe(false);
+      expect(JSON.stringify(help)).not.toContain("\u2014");
+    }
+  });
 });

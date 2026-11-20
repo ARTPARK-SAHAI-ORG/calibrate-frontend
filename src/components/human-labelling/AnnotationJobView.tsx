@@ -30,7 +30,8 @@ import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { TicketItemPane } from "./item-panes/TicketItemPane";
-import { isTicketPayload, ticketTitle } from "@/lib/ticketView";
+import { isTicketPayload, ticketRowSummary, ticketTitle } from "@/lib/ticketView";
+import { TicketCaseList, type CaseRow } from "./TicketCaseList";
 import { ticketHelpFor } from "@/lib/ticketHelp";
 import { QuestionHelp } from "./QuestionHelp";
 import { useTicketDensity, type TicketDensity } from "@/hooks/useTicketDensity";
@@ -854,6 +855,31 @@ function AnnotateView({
     items.map((it) => [it.uuid, itemListStatus(it.uuid)]),
   );
 
+  // What each case reads as in the ticket list: worked out from the items once,
+  // then joined to the live status so answering a case updates its row.
+  const caseSummaries = useMemo(
+    () =>
+      hasTickets
+        ? new Map(
+            items.map((it) => [it.uuid, ticketRowSummary(it.payload, it.metadata)]),
+          )
+        : null,
+    [hasTickets, items],
+  );
+  const caseRows: CaseRow[] = (caseSummaries ? items : []).map((it) => {
+    const sum = caseSummaries?.get(it.uuid);
+    const payload = (it.payload ?? {}) as Record<string, unknown>;
+    return {
+      uuid: it.uuid,
+      position: originalIndexByUuid.get(it.uuid) ?? 0,
+      title: ticketTitle(typeof payload.name === "string" ? payload.name : ""),
+      status: statusByItem.get(it.uuid) ?? null,
+      preview: sum?.preview ?? "",
+      meta: [sum?.opened, sum?.hoursOpen].filter(Boolean).join(" · "),
+      searchText: sum?.searchText ?? "",
+    };
+  });
+
   const itemsDone = items.filter(
     (it) => statusByItem.get(it.uuid) === "completed",
   ).length;
@@ -1487,6 +1513,16 @@ function AnnotateView({
         )}
 
         <div className="flex-1 flex flex-col md:flex-row min-h-0">
+          {skin ? (
+            <TicketCaseList
+              rows={caseRows}
+              currentUuid={currentItem?.uuid ?? null}
+              onSelect={(uuid) =>
+                navigateTo(items.findIndex((it) => it.uuid === uuid))
+              }
+            />
+          ) : (
+            <>
           {/* Mobile: horizontal scrolling strip */}
           <div
             data-testid="mobile-case-strip"
@@ -1573,6 +1609,8 @@ function AnnotateView({
               </div>
             </div>
           </div>
+            </>
+          )}
 
           <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden scroll-pt-28">
             {!currentItem ? (
