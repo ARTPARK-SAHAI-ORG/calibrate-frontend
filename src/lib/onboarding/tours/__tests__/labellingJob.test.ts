@@ -151,6 +151,7 @@ describe("buildLabellingJobTour", () => {
 
   it.each([
     ["conversation", "Read the conversation"],
+    ["ticket", "Read the ticket"],
     ["llm-general", "Read the input and output"],
     ["stt", "Compare the transcripts"],
     ["tts", "Listen to the audio"],

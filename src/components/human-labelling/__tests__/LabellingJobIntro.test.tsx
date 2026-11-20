@@ -5,6 +5,7 @@ describe("LabellingJobIntro", () => {
   it.each([
     ["llm", "Read each conversation and answer the questions about it", "Is the reply correct?"],
     ["conversation", "Read each conversation and answer the questions about it", "Was the agent polite?"],
+    ["ticket", "Read each support ticket and answer the questions about how it was handled", "Did the nurse ask enough questions?"],
     ["llm-general", "Read each input and output and answer the questions about them", "Is the output correct?"],
     ["stt", "Compare each pair of transcripts and answer the questions about them", "Do they match?"],
     ["tts", "Listen to each audio clip and answer the questions about it", "Does the audio match?"],

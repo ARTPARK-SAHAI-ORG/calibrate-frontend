@@ -3124,31 +3124,6 @@ describe("AnnotationJobView support tickets", () => {
     expect(second.container.querySelector(".skin-noora")?.contains(ticketStrip)).toBe(true);
   });
 
-  const probedTicket = {
-    ...ticketItem,
-    id: 2,
-    uuid: "ticket-2",
-    payload: {
-      name: "t-2",
-      transcript: [
-        ...ticketItem.payload.transcript,
-        {
-          role: "assistant",
-          label: "MSE",
-          kind: "message",
-          content: "How old is the baby?",
-          at_ist: "2026-11-16 19:05:00",
-          ts: Date.UTC(2026, 10, 16, 13, 35, 0),
-        },
-      ],
-    },
-  };
-  const twoTickets = () =>
-    jobResponse({
-      task: { uuid: "task-1", name: "Tickets", type: "conversation" },
-      items: [ticketItem, probedTicket],
-    });
-
   it("says where the case being read stands, and follows the case as it is answered", async () => {
     fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
     const user = setupUser();
@@ -3172,22 +3147,27 @@ describe("AnnotationJobView support tickets", () => {
     expect(screen.queryByTestId("case-status")).not.toBeInTheDocument();
   });
 
-  it("marks only the probed cases in the list, in words as well as a symbol", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(twoTickets()));
+  it("names a ticket by its short id in the top row, not its long one", async () => {
+    const longId = "77286594-f7cd-4880-4d30-40705fd6c6e8";
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        jobResponse({
+          task: { uuid: "task-1", name: "Tickets", type: "conversation" },
+          items: [{ ...ticketItem, payload: { ...ticketItem.payload, name: longId } }],
+        }),
+      ),
+    );
     render(<AnnotationJobView token="tok" mode="public" />);
-    const strip = await screen.findByTestId("mobile-case-strip");
-    const buttons = within(strip).getAllByRole("button");
-    expect(buttons[0]).toHaveAttribute("aria-label", "Case 1");
-    expect(buttons[1]).toHaveAttribute("aria-label", "Case 2, probed");
-    expect(within(buttons[1]).getByTestId("probed-mark")).toBeInTheDocument();
-    expect(within(buttons[0]).queryByTestId("probed-mark")).not.toBeInTheDocument();
+    expect(await screen.findByText("Ticket 77286594")).toBeInTheDocument();
+    expect(screen.queryByText(longId)).not.toBeInTheDocument();
   });
 
-  it("draws no marks on an ordinary job", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+  it("opens a ticket job on its own welcome, not the generic conversation one", async () => {
+    window.localStorage.removeItem(TOUR_SEEN_KEY);
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
     render(<AnnotationJobView token="tok" mode="public" />);
-    await screen.findByTestId("mobile-case-strip");
-    expect(screen.queryByTestId("probed-mark")).not.toBeInTheDocument();
+    expect(await screen.findByText("Did the nurse ask enough questions?")).toBeInTheDocument();
+    expect(screen.queryByText("Was the agent polite?")).not.toBeInTheDocument();
   });
 
   it("offers an explanation under a question the team has written one for, on a ticket only", async () => {

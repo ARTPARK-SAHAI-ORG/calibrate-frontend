@@ -20,7 +20,7 @@ export const labellingJobTourId = (jobUuid: string) =>
   `labelling-job:${jobUuid}`;
 
 export type LabellingJobKind =
-  "llm" | "conversation" | "llm-general" | "stt" | "tts" | "tool-call";
+  "llm" | "conversation" | "ticket" | "llm-general" | "stt" | "tts" | "tool-call";
 
 export type LabellingTourQuestion = {
   uuid: string;
@@ -44,6 +44,11 @@ const READ_STEP: Record<
   conversation: {
     title: "Read the conversation",
     description: "You are checking the whole conversation",
+  },
+  ticket: {
+    title: "Read the ticket",
+    description:
+      "The case details and timeline are at the top, and the messages are below them. You are checking how the whole ticket was handled",
   },
   "llm-general": {
     title: "Read the input and output",

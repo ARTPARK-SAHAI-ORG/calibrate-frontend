@@ -306,13 +306,12 @@ export function parseTicket(payload: unknown, metadata: Meta): Ticket | null {
 }
 
 /**
- * Whether the nurse asked the user a question while the ticket was open: the
- * same rule that puts "Probed" on the timeline, so the case list and the
- * timeline can never disagree.
+ * What a ticket is called in the page's top row. Tickets are stored under their
+ * long id, which means nothing to a rater, so an id shows as "Ticket" and its
+ * first eight characters, as the standalone safety viewer does. Any other name
+ * is kept as it is.
  */
-export function ticketWasProbed(payload: unknown, metadata: Meta): boolean {
-  return (
-    parseTicket(payload, metadata)?.steps.some((s) => s.key === "probed") ??
-    false
-  );
+export function ticketTitle(name: string): string {
+  const id = name.trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id) ? `Ticket ${id.slice(0, 8)}` : id;
 }

@@ -30,7 +30,7 @@ import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
 import { TicketItemPane } from "./item-panes/TicketItemPane";
-import { isTicketPayload, ticketWasProbed } from "@/lib/ticketView";
+import { isTicketPayload, ticketTitle } from "@/lib/ticketView";
 import { ticketHelpFor } from "@/lib/ticketHelp";
 import { QuestionHelp } from "./QuestionHelp";
 import { useTicketDensity, type TicketDensity } from "@/hooks/useTicketDensity";
@@ -255,6 +255,8 @@ function introKind(data: JobResponse): LabellingJobKind {
   )
     return "tool-call";
   const type = data.task.type;
+  if (type === "conversation" && data.items.some((it) => isTicketPayload(it.payload)))
+    return "ticket";
   return type === "conversation" ||
     type === "llm-general" ||
     type === "stt" ||
@@ -367,39 +369,6 @@ const ITEM_LIST_STATUS_CLASS: Record<ItemListStatus, string> = {
   "in progress":
     "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400 noora:border-transparent noora:bg-warning-container noora:text-on-warning-container",
 };
-
-/** What the hover text of a case in the list says: its state, then anything noted about it. */
-function caseListTitle(
-  status: ItemListStatus | null,
-  probed: boolean,
-): string | null {
-  const parts = [
-    status ? ITEM_LIST_STATUS_TEXT[status] : null,
-    probed ? "Probed" : null,
-  ].filter(Boolean);
-  return parts.length ? parts.join(" · ") : null;
-}
-
-/** A small question mark on a case the nurse asked the user a question in. */
-function ProbedMark() {
-  return (
-    <svg
-      data-testid="probed-mark"
-      aria-hidden="true"
-      viewBox="0 0 16 16"
-      className="absolute right-0.5 top-0.5 h-3.5 w-3.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <circle cx="8" cy="8" r="6.25" />
-      <path
-        d="M6.3 6.2a1.8 1.8 0 1 1 2.6 1.6c-.6.3-.9.7-.9 1.3M8 11.3v.2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 /** Where the case being read stands, beside "Case 3 of 50". */
 function CaseStatusChip({ status }: { status: ItemListStatus | null }) {
@@ -777,19 +746,6 @@ function AnnotateView({
   // it, so it is held here, above both. Only jobs of tickets have the choice.
   const [ticketDensity, setTicketDensity] = useTicketDensity();
   const hasTickets = data.items.some((it) => isTicketPayload(it.payload));
-  // The cases where the nurse asked the user a question, marked in the list so a
-  // rater can see which ones to look at for the Probing question.
-  const probedItems = useMemo(
-    () =>
-      hasTickets
-        ? new Set(
-            items
-              .filter((it) => ticketWasProbed(it.payload, it.metadata))
-              .map((it) => it.uuid),
-          )
-        : new Set<string>(),
-    [hasTickets, items],
-  );
   // Frozen on the job. Absent keeps the comments box offered.
   const commentsEnabled = data.job.comments_enabled !== false;
   const filterActive =
@@ -1309,7 +1265,8 @@ function AnnotateView({
       currentItem.payload && typeof currentItem.payload === "object"
         ? (currentItem.payload as Record<string, unknown>)
         : null;
-    return p && typeof p.name === "string" ? p.name.trim() : "";
+    const name = p && typeof p.name === "string" ? p.name.trim() : "";
+    return isTicketPayload(p) ? ticketTitle(name) : name;
   })();
 
   return (
@@ -1398,7 +1355,7 @@ function AnnotateView({
         <header className="border-b border-border px-4 md:px-6 py-3 flex flex-col gap-3 md:grid md:grid-cols-3 md:items-center md:gap-4">
           <div className="min-w-0 flex items-center gap-3">
             {currentItem && (
-              <h2 className="text-sm font-semibold truncate noora:text-xs noora:font-medium noora:text-on-surface-variant">
+              <h2 className="text-sm font-semibold truncate noora:text-sm noora:font-semibold noora:text-foreground">
                 {currentItemName || "Case"}
               </h2>
             )}
@@ -1543,12 +1500,8 @@ function AnnotateView({
                 return (
                   <Tooltip
                     key={it.uuid}
-                    content={caseListTitle(status, probedItems.has(it.uuid))}
-                    contentStyle={
-                      caseListTitle(status, probedItems.has(it.uuid))
-                        ? undefined
-                        : { display: "none" }
-                    }
+                    content={status ? ITEM_LIST_STATUS_TEXT[status] : null}
+                    contentStyle={status ? undefined : { display: "none" }}
                     position="top"
                   >
                     <button
@@ -1570,8 +1523,8 @@ function AnnotateView({
                           : undefined
                       }
                       onClick={() => navigateTo(i)}
-                      aria-label={`Case ${position}${status ? ` (${status})` : ""}${probedItems.has(it.uuid) ? ", probed" : ""}`}
-                      className={`h-10 w-full noora:w-10 noora:shrink-0 rounded-md noora:rounded-lg border text-sm font-medium transition-colors cursor-pointer relative flex items-center justify-center ${
+                      aria-label={`Case ${position}${status ? ` (${status})` : ""}`}
+                      className={`h-10 w-full noora:w-10 noora:shrink-0 rounded-md noora:rounded-lg border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                         isCurrent
                           ? "border-foreground bg-foreground text-background noora:border-primary noora:bg-primary noora:text-on-primary noora:font-semibold"
                           : status
@@ -1580,7 +1533,6 @@ function AnnotateView({
                       }`}
                     >
                       {position}
-                      {probedItems.has(it.uuid) && <ProbedMark />}
                     </button>
                   </Tooltip>
                 );
@@ -1598,18 +1550,14 @@ function AnnotateView({
                   return (
                     <Tooltip
                       key={it.uuid}
-                      content={caseListTitle(status, probedItems.has(it.uuid))}
-                      contentStyle={
-                        caseListTitle(status, probedItems.has(it.uuid))
-                          ? undefined
-                          : { display: "none" }
-                      }
+                      content={status ? ITEM_LIST_STATUS_TEXT[status] : null}
+                      contentStyle={status ? undefined : { display: "none" }}
                       position="right"
                     >
                       <button
                         onClick={() => navigateTo(i)}
-                        aria-label={`Case ${position}${status ? ` (${status})` : ""}${probedItems.has(it.uuid) ? ", probed" : ""}`}
-                        className={`h-10 w-full rounded-md noora:rounded-lg border text-sm font-medium transition-colors cursor-pointer relative flex items-center justify-center ${
+                        aria-label={`Case ${position}${status ? ` (${status})` : ""}`}
+                        className={`h-10 w-full rounded-md noora:rounded-lg border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                           isCurrent
                             ? "border-foreground bg-foreground text-background noora:border-primary noora:bg-primary noora:text-on-primary noora:font-semibold"
                             : status
@@ -1618,7 +1566,6 @@ function AnnotateView({
                         }`}
                       >
                         {position}
-                        {probedItems.has(it.uuid) && <ProbedMark />}
                       </button>
                     </Tooltip>
                   );
