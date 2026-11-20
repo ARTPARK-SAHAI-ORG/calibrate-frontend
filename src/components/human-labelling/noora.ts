@@ -11,15 +11,15 @@
 
 /** Material 3 tonal button: a quiet fill and no outline, for the everyday actions. */
 export const NOORA_TONAL =
-  "noora:h-10 noora:rounded-lg noora:border-transparent noora:bg-surface-container noora:px-4 noora:text-foreground noora:hover:bg-surface-high noora:focus-visible:ring-secondary";
+  "noora:h-11 noora:md:h-10 noora:rounded-lg noora:border-transparent noora:bg-surface-container noora:px-4 noora:text-foreground noora:hover:bg-surface-high noora:focus-visible:ring-secondary";
 
 /** The same for a square icon button. */
 export const NOORA_ICON_TONAL =
-  "noora:h-10 noora:w-10 noora:rounded-lg noora:border-transparent noora:bg-surface-container noora:text-foreground noora:hover:bg-surface-high noora:focus-visible:ring-secondary";
+  "noora:h-11 noora:w-11 noora:md:h-10 noora:md:w-10 noora:rounded-lg noora:border-transparent noora:bg-surface-container noora:text-foreground noora:hover:bg-surface-high noora:focus-visible:ring-secondary";
 
 /** Material 3 filled button: the one main action on the page. */
 export const NOORA_FILLED =
-  "noora:h-10 noora:rounded-lg noora:bg-primary noora:px-5 noora:font-semibold noora:text-on-primary noora:hover:bg-primary-hover noora:hover:opacity-100 noora:focus-visible:ring-secondary";
+  "noora:h-11 noora:md:h-10 noora:rounded-lg noora:bg-primary noora:px-5 noora:font-semibold noora:text-on-primary noora:hover:bg-primary-hover noora:hover:opacity-100 noora:focus-visible:ring-secondary";
 
 /** A card: a 12px corner and a hairline; the fill is set where it is used. */
 export const NOORA_CARD = "noora:rounded-xl noora:border-outline-variant";

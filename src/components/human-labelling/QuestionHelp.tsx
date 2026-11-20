@@ -24,7 +24,7 @@ export function QuestionHelp({
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((o) => !o)}
-        className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 rounded noora:text-secondary noora:hover:text-foreground noora:focus-visible:ring-secondary"
+        className="inline-flex min-h-6 items-center noora:max-md:min-h-11 text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 rounded noora:text-secondary noora:hover:text-foreground noora:focus-visible:ring-secondary"
       >
         {open ? "Hide the explanation" : "What does this mean?"}
       </button>

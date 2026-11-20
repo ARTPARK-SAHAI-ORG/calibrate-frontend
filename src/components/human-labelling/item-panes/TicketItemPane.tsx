@@ -88,7 +88,7 @@ export function TicketItemPane({
             role="switch"
             aria-checked={showEnglish}
             onClick={() => setShowEnglish((v) => !v)}
-            className={`inline-flex items-center gap-2 rounded-full noora:rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:border-outline-variant noora:focus-visible:ring-secondary ${
+            className={`inline-flex items-center gap-2 rounded-full noora:rounded-lg noora:min-h-11 noora:md:min-h-0 border border-border bg-background px-3 py-1.5 text-sm text-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:border-outline-variant noora:focus-visible:ring-secondary ${
               showEnglish
                 ? "noora:border-transparent noora:bg-primary-container noora:text-on-primary-container"
                 : "noora:bg-surface-lowest"
@@ -233,7 +233,7 @@ function FoldedEvents({
   if (events.length === 0) return null;
   const n = events.length;
   const label = `${open ? "Hide" : "Show"} ${n} ${word} message${n === 1 ? "" : "s"}`;
-  const buttonClass = `w-full rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:rounded-lg noora:border-outline-variant noora:text-secondary noora:hover:bg-primary-container noora:focus-visible:ring-secondary ${s.fold}`;
+  const buttonClass = `w-full noora:min-h-11 noora:md:min-h-0 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:rounded-lg noora:border-outline-variant noora:text-secondary noora:hover:bg-primary-container noora:focus-visible:ring-secondary ${s.fold}`;
   return (
     <div className={s.stack}>
       <button
@@ -395,7 +395,7 @@ function Message({
             type="button"
             aria-expanded={open}
             onClick={() => setOpen((o) => !o)}
-            className="mt-1 cursor-pointer text-sm text-secondary underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-secondary rounded"
+            className="mt-1 inline-flex min-h-6 items-center noora:max-md:min-h-11 cursor-pointer text-sm text-secondary underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-secondary rounded"
           >
             {open ? "Show less" : "Read more"}
           </button>

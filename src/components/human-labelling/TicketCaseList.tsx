@@ -172,7 +172,7 @@ export function TicketCaseList({
               }}
               aria-label="Search cases"
               placeholder="Search cases ( / )"
-              className="h-10 min-w-0 flex-1 rounded-lg border border-transparent bg-surface-container px-3 text-sm text-foreground outline-none placeholder:text-on-surface-variant focus-visible:ring-2 focus-visible:ring-secondary"
+              className="h-11 md:h-10 min-w-0 flex-1 rounded-lg border border-transparent bg-surface-container px-3 text-sm text-foreground outline-none placeholder:text-on-surface-variant focus-visible:ring-2 focus-visible:ring-secondary"
             />
             <Tooltip content="Fold away the list" position="bottom" className="hidden md:block">
               <button
@@ -185,12 +185,12 @@ export function TicketCaseList({
               </button>
             </Tooltip>
           </div>
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+          <label className="flex min-h-11 md:min-h-8 cursor-pointer items-center gap-2 text-sm text-foreground">
             <input
               type="checkbox"
               checked={unfinishedOnly}
               onChange={(e) => setUnfinishedOnly(e.target.checked)}
-              className="h-4 w-4 cursor-pointer accent-secondary"
+              className="h-5 w-5 cursor-pointer accent-secondary"
             />
             Show unfinished only
           </label>

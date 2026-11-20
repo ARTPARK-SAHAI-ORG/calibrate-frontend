@@ -3146,6 +3146,18 @@ describe("AnnotationJobView support tickets", () => {
     expect(await screen.findByText("Welcome to your labelling task")).toBeInTheDocument();
   });
 
+  it("keeps the whole page inside landmarks, so a screen reader can jump between its parts", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const { container } = render(<AnnotationJobView token="tok" mode="public" />);
+    const cases = await screen.findByRole("region", { name: "Cases to review" });
+    // The logo and title sit in a banner of their own, and the cases, the
+    // progress bar and the questions in one named region.
+    const banner = container.querySelector("header");
+    expect(banner?.contains(screen.getByAltText("Noora Health"))).toBe(true);
+    expect(cases.contains(screen.getByRole("progressbar", { name: "Cases done" }))).toBe(true);
+    expect(cases.querySelector("main")).not.toBeNull();
+  });
+
   it("lists each ticket with what the user wrote, and opens the one picked", async () => {
     const second = {
       ...ticketItem,
