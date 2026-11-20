@@ -17,9 +17,13 @@ const DENSITY_OPTIONS: { value: TicketDensity; label: string; hint: string }[] =
 export function JobSettingsMenu({
   density,
   onDensityChange,
+  onShowIntro,
 }: {
   density: TicketDensity;
   onDensityChange: (next: TicketDensity) => void;
+  /** Opens the welcome again. On a phone this is where it lives, to save a
+   *  button in the crowded top row; a wider screen keeps its own button. */
+  onShowIntro?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -103,6 +107,20 @@ export function JobSettingsMenu({
               })}
             </div>
           </div>
+          {onShowIntro && (
+            <div className="border-t border-border px-4 py-3 md:hidden noora:border-outline-variant">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onShowIntro();
+                }}
+                className="cursor-pointer text-sm font-medium text-secondary underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-secondary rounded"
+              >
+                How this works
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

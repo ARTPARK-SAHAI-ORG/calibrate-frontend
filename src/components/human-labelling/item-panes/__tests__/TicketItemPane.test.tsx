@@ -334,4 +334,59 @@ describe("ticket items in the job view", () => {
       { key: "Language", value: "hindi" },
     ]);
   });
+
+  describe("long automated messages", () => {
+    const long = "Stay healthy and keep your appointments. ".repeat(10);
+    const withAutomated = (content: string, who = "Automated") => ({
+      transcript: [
+        {
+          role: "assistant",
+          label: who,
+          kind: "message",
+          content,
+          versions: { "English translation": content + " (english)" },
+          ...at("2026-11-16 19:01:00"),
+        },
+      ],
+    });
+
+    it("folds to a few lines with the original tucked away, and opens on Read more", async () => {
+      const user = setupUser();
+      render(<TicketItemPane payload={withAutomated(long)} metadata={[]} />);
+      const button = screen.getByRole("button", { name: "Read more" });
+      expect(button).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByText(/\(english\)$/).className).toContain("line-clamp-3");
+      // Only the folded English shows; the original is hidden until opened.
+      expect(screen.getAllByText(/Stay healthy/)).toHaveLength(1);
+
+      await user.click(button);
+      expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getAllByText(/Stay healthy/)).toHaveLength(2);
+      expect(screen.getAllByText(/Stay healthy/)[0].className).not.toContain("line-clamp-3");
+
+      await user.click(screen.getByRole("button", { name: "Show less" }));
+      expect(screen.getAllByText(/Stay healthy/)).toHaveLength(1);
+    });
+
+    it("leaves a short automated message and any nurse's reply as they are", () => {
+      render(
+        <TicketItemPane
+          payload={{
+            transcript: [
+              ...withAutomated("Thanks, goodbye").transcript,
+              {
+                role: "assistant",
+                label: "MSE",
+                kind: "message",
+                content: long,
+                ...at("2026-11-16 19:05:00"),
+              },
+            ],
+          }}
+          metadata={[]}
+        />,
+      );
+      expect(screen.queryByRole("button", { name: "Read more" })).not.toBeInTheDocument();
+    });
+  });
 });

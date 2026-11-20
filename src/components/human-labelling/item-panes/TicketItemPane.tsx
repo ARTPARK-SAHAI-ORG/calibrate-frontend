@@ -322,6 +322,9 @@ function Events({
   );
 }
 
+/** An automated message longer than this folds to a few lines until opened. */
+const LONG_AUTOMATED_CHARS = 280;
+
 function Message({
   m,
   showEnglish,
@@ -336,6 +339,12 @@ function Message({
   const translated = showEnglish && !m.placeholder && m.english !== null;
   const main = translated ? m.english : m.text;
   const original = translated ? m.text : null;
+  // Broadcasts and other automated messages can run to a whole page. They fold
+  // to three lines (with the original language tucked away too) until opened.
+  const [open, setOpen] = useState(false);
+  const foldable =
+    m.who === "automated" && (main ?? "").length > LONG_AUTOMATED_CHARS;
+  const folded = foldable && !open;
   // Staff replies sit to the right and the user to the left, but only
   // where there is room: on a phone every bubble takes nearly the full width.
   const align = m.who === "mse" ? "md:ml-auto" : "md:mr-auto";
@@ -361,7 +370,7 @@ function Message({
           <p
             className={`mt-1 ${s.body} whitespace-pre-wrap break-words ${
               m.placeholder ? "italic text-muted-foreground" : "text-foreground"
-            }`}
+            } ${folded ? "line-clamp-3" : ""}`}
           >
             {main}
           </p>
@@ -374,12 +383,22 @@ function Message({
             {MEDIA_LABEL[m.media.kind]} · cannot be played here
           </p>
         )}
-        {original && (
+        {original && !folded && (
           <p
             className={`mt-2 border-t border-border pt-2 ${s.body} whitespace-pre-wrap break-words text-muted-foreground`}
           >
             {original}
           </p>
+        )}
+        {foldable && (
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+            className="mt-1 cursor-pointer text-sm text-secondary underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-secondary rounded"
+          >
+            {open ? "Show less" : "Read more"}
+          </button>
         )}
       </div>
       {(m.tags.length > 0 || m.emergencyTag) && (

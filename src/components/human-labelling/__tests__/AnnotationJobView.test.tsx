@@ -3126,6 +3126,26 @@ describe("AnnotationJobView support tickets", () => {
     expect(screen.queryByTestId("mobile-case-strip")).not.toBeInTheDocument();
   });
 
+  it("puts the main button in a bar fixed to the bottom of a phone, in a ticket job only", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const first = render(<AnnotationJobView token="tok" mode="public" />);
+    const bar = await screen.findByTestId("submit-bar");
+    expect(bar.className).toContain("noora:max-md:fixed");
+    expect(within(bar).getByRole("button", { name: "Mark as complete" })).toBeInTheDocument();
+    // The numbers stand in for the words on a phone.
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
+    first.unmount();
+  });
+
+  it("opens the welcome again from the Settings menu", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const user = setupUser();
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await user.click(await screen.findByRole("button", { name: /Settings/ }));
+    await user.click(within(screen.getByRole("dialog", { name: "Settings" })).getByRole("button", { name: "How this works" }));
+    expect(await screen.findByText("Welcome to your labelling task")).toBeInTheDocument();
+  });
+
   it("lists each ticket with what the user wrote, and opens the one picked", async () => {
     const second = {
       ...ticketItem,

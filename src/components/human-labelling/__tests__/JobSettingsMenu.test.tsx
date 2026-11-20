@@ -64,4 +64,19 @@ describe("JobSettingsMenu", () => {
     await user.click(screen.getByRole("radio", { name: /Compact/ }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
+
+  it("offers How this works only when given a way to open it, and closes once it is pressed", async () => {
+    const user = setupUser();
+    const onShowIntro = jest.fn();
+    const { unmount } = render(<JobSettingsMenu density="comfortable" onDensityChange={jest.fn()} />);
+    await user.click(screen.getByRole("button", { name: /Settings/ }));
+    expect(screen.queryByRole("button", { name: "How this works" })).not.toBeInTheDocument();
+    unmount();
+
+    render(<JobSettingsMenu density="comfortable" onDensityChange={jest.fn()} onShowIntro={onShowIntro} />);
+    await user.click(screen.getByRole("button", { name: /Settings/ }));
+    await user.click(screen.getByRole("button", { name: "How this works" }));
+    expect(onShowIntro).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
 });

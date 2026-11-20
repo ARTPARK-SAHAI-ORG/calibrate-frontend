@@ -1344,12 +1344,13 @@ function AnnotateView({
               <JobSettingsMenu
                 density={ticketDensity}
                 onDensityChange={setTicketDensity}
+                onShowIntro={() => setIntroOpen(true)}
               />
             )}
             <button
               type="button"
               onClick={() => setIntroOpen(true)}
-              className={`h-9 px-3 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${NOORA_TONAL}`}
+              className={`h-9 px-3 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:max-md:hidden ${NOORA_TONAL}`}
             >
               How this works
             </button>
@@ -1385,7 +1386,7 @@ function AnnotateView({
               </h2>
             )}
           </div>
-          <div className="flex items-center justify-center gap-2 flex-wrap">
+          <div className="flex items-center justify-center gap-2 flex-wrap noora:max-md:flex-nowrap noora:max-md:justify-between noora:max-md:gap-1">
             <button
               onClick={() => navigateTo(Math.max(0, currentIndex - 1))}
               disabled={currentIndex === 0}
@@ -1393,8 +1394,12 @@ function AnnotateView({
             >
               Previous
             </button>
-            <span className="text-sm text-muted-foreground tabular-nums px-2">
+            <span className="text-sm text-muted-foreground tabular-nums px-2 noora:max-md:hidden">
               Case {Math.min(currentIndex + 1, total)} of {total}
+            </span>
+            {/* A phone has no room for the words, only the numbers. */}
+            <span className="hidden text-sm text-muted-foreground tabular-nums noora:max-md:inline">
+              {Math.min(currentIndex + 1, total)} / {total}
             </span>
             {hasTickets && !isAdmin && currentItem && (
               <CaseStatusChip
@@ -1409,7 +1414,12 @@ function AnnotateView({
               Next
             </button>
           </div>
-          <div className="flex justify-stretch md:justify-end [&>button]:w-full md:[&>button]:w-auto">
+          {/* On a phone the main button is a bar fixed to the bottom of the screen,
+              so it is always in reach however far the ticket is scrolled. */}
+          <div
+            data-testid="submit-bar"
+            className="flex justify-stretch md:justify-end [&>button]:w-full md:[&>button]:w-auto noora:max-md:fixed noora:max-md:inset-x-0 noora:max-md:bottom-0 noora:max-md:z-30 noora:max-md:border-t noora:max-md:border-outline-variant noora:max-md:bg-surface-lowest noora:max-md:px-4 noora:max-md:pt-3 noora:max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          >
             {!isAdmin &&
               (() => {
                 const currentItemSaved = currentItem
@@ -1611,7 +1621,7 @@ function AnnotateView({
             </>
           )}
 
-          <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden scroll-pt-28">
+          <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden scroll-pt-28 noora:max-md:pb-24">
             {!currentItem ? (
               <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground w-full">
                 {filterActive
