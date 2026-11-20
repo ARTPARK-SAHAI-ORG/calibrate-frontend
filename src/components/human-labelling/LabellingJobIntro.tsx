@@ -67,6 +67,20 @@ const INTRO: Record<
       </>
     ),
   },
+  ticket: {
+    line: "Read each support ticket and answer the questions about how it was handled",
+    question: "Was the reply accurate?",
+    answers: ["Accurate", "Not accurate"],
+    item: (
+      <>
+        <p className={CAPTION}>User</p>
+        <Asked>My baby has a fever</Asked>
+        <p className={CAPTION}>MSE</p>
+        <Replied>How many days has the fever lasted?</Replied>
+        <Asked>Two days</Asked>
+      </>
+    ),
+  },
   "llm-general": {
     line: "Read each input and output and answer the questions about them",
     question: "Is the output correct?",

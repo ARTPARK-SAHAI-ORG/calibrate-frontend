@@ -8,6 +8,7 @@ import {
 import { ITEM_PARAM, readUrlParam } from "../valueFilterUrl";
 import { isTourActive, runTour } from "../../../lib/onboarding/engine";
 import { act } from "@/test-utils";
+import { TICKET_HELP } from "@/lib/ticketHelp";
 
 function setSearch(search: string) {
   window.history.replaceState(null, "", `/annotate-job/tok${search}`);
@@ -2985,5 +2986,288 @@ describe("AnnotationJobView intro and walkthrough", () => {
     isTourActiveMock.mockReturnValueOnce(true);
     await user.keyboard("{ArrowDown}");
     expect(screen.getByText("Item One")).toBeInTheDocument();
+  });
+});
+
+describe("AnnotationJobView support tickets", () => {
+  const DENSITY_KEY = "calibrate:ticket-density";
+  const ticketItem = {
+    id: 1,
+    uuid: "ticket-1",
+    task_id: "task-1",
+    payload: {
+      name: "t-1",
+      transcript: [
+        {
+          role: "user",
+          label: "User",
+          kind: "message",
+          content: "Is my baby ok",
+          at_ist: "2026-11-16 19:01:00",
+          ts: Date.UTC(2026, 10, 16, 13, 31, 0),
+        },
+      ],
+    },
+    metadata: [
+      { key: "Language", value: "hindi" },
+      { key: "Opened", value: "2026-11-16 19:00:00" },
+      { key: "Closed", value: "2026-11-16 20:00:00" },
+    ],
+    created_at: "2024-01-01",
+    deleted_at: null,
+  };
+  const ticketJob = () =>
+    jobResponse({
+      task: { uuid: "task-1", name: "Tickets", type: "conversation" },
+      items: [ticketItem],
+    });
+
+  let fetchMock: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    window.localStorage.removeItem(DENSITY_KEY);
+    fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  it("offers Settings, and a ticket follows the density picked there", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ticket-pane")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("ticket-pane")).toHaveAttribute(
+      "data-density",
+      "comfortable",
+    );
+
+    await user.click(screen.getByRole("button", { name: /Settings/ }));
+    await user.click(screen.getByRole("radio", { name: /Compact/ }));
+    expect(screen.getByTestId("ticket-pane")).toHaveAttribute(
+      "data-density",
+      "compact",
+    );
+    expect(window.localStorage.getItem(DENSITY_KEY)).toBe("compact");
+  });
+
+  it("opens a ticket in the density saved on this browser", async () => {
+    window.localStorage.setItem(DENSITY_KEY, "compact");
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ticket-pane")).toHaveAttribute(
+        "data-density",
+        "compact",
+      ),
+    );
+  });
+
+  it("has no Settings for a job that holds no tickets", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "How this works" })).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("button", { name: /Settings/ })).not.toBeInTheDocument();
+  });
+
+  it("wears the Noora Health look, with the logo, on a job of tickets", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const { container } = render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ticket-pane")).toBeInTheDocument(),
+    );
+    expect(container.querySelector(".skin-noora")).not.toBeNull();
+    expect(screen.getByAltText("Noora Health")).toBeInTheDocument();
+  });
+
+  it("keeps every other job looking as it did, with no logo", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    const { container } = render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "How this works" })).toBeInTheDocument(),
+    );
+    expect(container.querySelector(".skin-noora")).toBeNull();
+    expect(screen.queryByAltText("Noora Health")).not.toBeInTheDocument();
+  });
+
+  it("does not dress the reviewer's own view of a ticket job", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const { container } = render(<AnnotationJobView token="tok" mode="admin" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ticket-pane")).toBeInTheDocument(),
+    );
+    expect(container.querySelector(".skin-noora")).toBeNull();
+    expect(screen.queryByAltText("Noora Health")).not.toBeInTheDocument();
+  });
+
+  it("keeps the phone case numbers a wrapping grid on an ordinary job, and one row only in the Noora look", async () => {
+    // The one-row layout is written as `noora:` classes, so it applies only inside
+    // `.skin-noora`: an ordinary job keeps the grid it always had.
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    const { container, unmount } = render(<AnnotationJobView token="tok" mode="public" />);
+    const strip = await screen.findByTestId("mobile-case-strip");
+    const plain = strip.className.split(/\s+/);
+    expect(plain).toContain("overflow-y-auto");
+    expect(plain).not.toContain("overflow-x-auto");
+    expect(plain).toContain("noora:overflow-x-auto");
+    expect(strip.firstElementChild?.className).toContain("grid-cols-8");
+    expect(container.querySelector(".skin-noora")).toBeNull();
+    expect(within(strip).getAllByRole("button")).toHaveLength(2);
+    unmount();
+
+    // A ticket job swaps the numbers for the list of cases, so it has no strip.
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const second = render(<AnnotationJobView token="tok" mode="public" />);
+    const list = await screen.findByTestId("ticket-case-list");
+    expect(second.container.querySelector(".skin-noora")?.contains(list)).toBe(true);
+    expect(screen.queryByTestId("mobile-case-strip")).not.toBeInTheDocument();
+  });
+
+  it("puts the main button in a bar fixed to the bottom of a phone, in a ticket job only", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const first = render(<AnnotationJobView token="tok" mode="public" />);
+    const bar = await screen.findByTestId("submit-bar");
+    expect(bar.className).toContain("noora:max-md:fixed");
+    expect(within(bar).getByRole("button", { name: "Mark as complete" })).toBeInTheDocument();
+    // The numbers stand in for the words on a phone.
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
+    first.unmount();
+  });
+
+  it("opens the welcome again from the Settings menu", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const user = setupUser();
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await user.click(await screen.findByRole("button", { name: /Settings/ }));
+    await user.click(within(screen.getByRole("dialog", { name: "Settings" })).getByRole("button", { name: "How this works" }));
+    expect(await screen.findByText("Welcome to your labelling task")).toBeInTheDocument();
+  });
+
+  it("keeps the whole page inside landmarks, so a screen reader can jump between its parts", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const { container } = render(<AnnotationJobView token="tok" mode="public" />);
+    const main = await screen.findByRole("main");
+    // The logo and title sit in a banner of their own; the progress bar, the
+    // list of cases and the questions are in the one main area, with the list a
+    // navigation landmark inside it.
+    const banner = container.querySelector("header");
+    expect(banner?.contains(screen.getByAltText("Noora Health"))).toBe(true);
+    expect(main.contains(screen.getByRole("progressbar", { name: "Cases done" }))).toBe(true);
+    expect(main.contains(screen.getByRole("navigation", { name: "List of cases" }))).toBe(true);
+    expect(container.querySelectorAll("main")).toHaveLength(1);
+  });
+
+  it("lists each ticket with what the user wrote, and opens the one picked", async () => {
+    const second = {
+      ...ticketItem,
+      id: 2,
+      uuid: "ticket-2",
+      payload: {
+        name: "t-2",
+        transcript: [
+          {
+            role: "user",
+            label: "User",
+            kind: "message",
+            content: "My baby will not feed",
+            at_ist: "2026-11-16 19:30:00",
+            ts: Date.UTC(2026, 10, 16, 14, 0, 0),
+          },
+        ],
+      },
+    };
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        jobResponse({
+          task: { uuid: "task-1", name: "Tickets", type: "conversation" },
+          items: [ticketItem, second],
+        }),
+      ),
+    );
+    const user = setupUser();
+    render(<AnnotationJobView token="tok" mode="public" />);
+    const list = await screen.findByTestId("ticket-case-list");
+    expect(within(list).getByText("Is my baby ok")).toBeInTheDocument();
+    expect(screen.getByText(/Case 1 of 2/)).toBeInTheDocument();
+    await user.click(within(list).getByRole("button", { name: "Case 2, not answered" }));
+    expect(screen.getByText(/Case 2 of 2/)).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "Case 2, not answered" })).toHaveAttribute("aria-current", "true");
+  });
+
+  it("keeps the ticket list out of the reviewer's own view of a ticket job", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    render(<AnnotationJobView token="tok" mode="admin" />);
+    await screen.findByTestId("ticket-pane");
+    expect(screen.queryByTestId("ticket-case-list")).not.toBeInTheDocument();
+  });
+
+  it("says where the case being read stands, and follows the case as it is answered", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    const user = setupUser();
+    render(<AnnotationJobView token="tok" mode="public" />);
+    const chip = await screen.findByTestId("case-status");
+    expect(chip).toHaveTextContent("Not answered");
+    await user.click(screen.getByRole("button", { name: "Correct" }));
+    expect(screen.getByTestId("case-status")).toHaveTextContent("In progress");
+  });
+
+  it("shows no status chip on an ordinary job or in the reviewer's own view", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+    const first = render(<AnnotationJobView token="tok" mode="public" />);
+    await screen.findByTestId("mobile-case-strip");
+    expect(screen.queryByTestId("case-status")).not.toBeInTheDocument();
+    first.unmount();
+
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    render(<AnnotationJobView token="tok" mode="admin" />);
+    await screen.findByTestId("ticket-pane");
+    expect(screen.queryByTestId("case-status")).not.toBeInTheDocument();
+  });
+
+  it("names a ticket by its short id in the top row, not its long one", async () => {
+    const longId = "77286594-f7cd-4880-4d30-40705fd6c6e8";
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        jobResponse({
+          task: { uuid: "task-1", name: "Tickets", type: "conversation" },
+          items: [{ ...ticketItem, payload: { ...ticketItem.payload, name: longId } }],
+        }),
+      ),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    expect(await screen.findByText("Ticket 77286594")).toBeInTheDocument();
+    expect(screen.queryByText(longId)).not.toBeInTheDocument();
+  });
+
+  it("opens a ticket job on its own welcome, not the generic conversation one", async () => {
+    window.localStorage.removeItem(TOUR_SEEN_KEY);
+    fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+    render(<AnnotationJobView token="tok" mode="public" />);
+    expect(await screen.findByText("Was the reply accurate?")).toBeInTheDocument();
+    expect(screen.queryByText("Was the agent polite?")).not.toBeInTheDocument();
+  });
+
+  it("offers an explanation under a question the team has written one for, on a ticket only", async () => {
+    TICKET_HELP["Correctness"] = { definition: "Is what the nurse said right" };
+    try {
+      const user = setupUser();
+      fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
+      const first = render(<AnnotationJobView token="tok" mode="public" />);
+      const links = await screen.findAllByRole("button", { name: "What does this mean?" });
+      expect(links).toHaveLength(1);
+      await user.click(links[0]);
+      expect(screen.getByText("Is what the nurse said right")).toBeInTheDocument();
+      first.unmount();
+
+      fetchMock.mockResolvedValue(jsonResponse(jobResponse()));
+      render(<AnnotationJobView token="tok" mode="public" />);
+      await screen.findByText("Correctness");
+      expect(screen.queryByRole("button", { name: "What does this mean?" })).not.toBeInTheDocument();
+    } finally {
+      delete TICKET_HELP["Correctness"];
+    }
   });
 });

@@ -17,6 +17,8 @@ export type BinaryScaleEntryLike = {
   // Per-option rubric authored on the evaluator version. Shown under the
   // option so annotators know what picking it means.
   description?: string | null;
+  // Colour authored on the row, as a hex value. A picked answer can wear it.
+  color?: string | null;
 };
 
 // Coerce a scale entry's `value` to a boolean for matching. Backend
@@ -75,13 +77,27 @@ export function getBinaryDescription(
   return entry?.description?.trim() || null;
 }
 
+// The colour authored on a true/false row, or null when there is none.
+export function getBinaryColor(
+  scale: readonly BinaryScaleEntryLike[] | null | undefined,
+  value: boolean,
+): string | null {
+  const entry = scale?.find((e) => coerceBinaryValue(e.value) === value);
+  return entry?.color?.trim() || null;
+}
+
 // Reshape an `output_config.scale` array into the `ratingScale` prop
 // EvaluatorVerdictCard expects: numeric-valued entries with display
 // names and per-option rubrics. Returns null when there's no scale, so
 // callers can pass the result straight through without extra null checks.
 export function toRatingScale(
   scale: readonly BinaryScaleEntryLike[] | null | undefined,
-): { value: number; name: string | null; description: string | null }[] | null {
+): {
+  value: number;
+  name: string | null;
+  description: string | null;
+  color: string | null;
+}[] | null {
   if (!scale) return null;
   return scale
     .filter((e) => typeof e.value === "number")
@@ -89,5 +105,6 @@ export function toRatingScale(
       value: e.value as number,
       name: e.name ?? null,
       description: e.description?.trim() || null,
+      color: e.color?.trim() || null,
     }));
 }

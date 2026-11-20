@@ -1,0 +1,392 @@
+import React from "react";
+import { render, screen, setupUser } from "@/test-utils";
+import { istToMs } from "@/lib/ticketView";
+import { TicketItemPane } from "../TicketItemPane";
+import { ItemPane, rightColumnMetadata } from "../../AnnotationJobView";
+import type { Item } from "../../AnnotationJobView";
+
+const at = (s: string) => ({ at_ist: s, ts: istToMs(s) });
+
+const payload = {
+  name: "a7c6f5f2",
+  transcript: [
+    {
+      role: "user",
+      label: "User",
+      kind: "message",
+      content: "Kya phir sab normal hay",
+      versions: { "English translation": "So is everything normal?" },
+      tags: ["ai-Medical"],
+      emergency_tag: true,
+      ...at("2026-11-16 19:01:00"),
+    },
+    {
+      role: "note",
+      label: "NOTE: MSE to MO",
+      kind: "note",
+      content: "QUERY-I had my checkup today",
+      ...at("2026-11-16 19:46:00"),
+    },
+    {
+      role: "assistant",
+      label: "MSE",
+      kind: "message",
+      content: "[Audio message]",
+      placeholder: true,
+      ...at("2026-11-16 22:56:00"),
+    },
+    {
+      role: "user",
+      label: "User",
+      kind: "message",
+      content: "An earlier question",
+      ...at("2026-11-15 10:00:00"),
+    },
+    {
+      role: "user",
+      label: "User",
+      kind: "message",
+      content: "A later thanks",
+      ...at("2026-11-17 09:00:00"),
+    },
+  ],
+};
+
+const metadata = [
+  { key: "Condition area", value: "anc_edd" },
+  { key: "Language", value: "hindi" },
+  { key: "Opened", value: "2026-11-16 19:01:00" },
+  { key: "Closed", value: "2026-11-16 22:56:00" },
+  { key: "Escalated", value: "2026-11-16 19:46:00" },
+  { key: "Escalated to", value: "Medical Officer" },
+];
+
+describe("TicketItemPane", () => {
+  it("draws the case details and the timeline", () => {
+    render(<TicketItemPane payload={payload} metadata={metadata} />);
+    expect(screen.getByText("Case details")).toBeInTheDocument();
+    expect(screen.getByText("Area")).toBeInTheDocument();
+    expect(screen.getByText("anc edd")).toBeInTheDocument();
+    expect(screen.getByText("hindi")).toBeInTheDocument();
+    expect(screen.getByText("Ticket timeline")).toBeInTheDocument();
+    expect(screen.getByText("Escalated")).toBeInTheDocument();
+    expect(screen.getByText("First reply")).toBeInTheDocument();
+  });
+
+  it("marks when the ticket opened and closed", () => {
+    render(<TicketItemPane payload={payload} metadata={metadata} />);
+    expect(
+      screen.getByText("Ticket opened · 16 Nov, 19:01 IST"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Ticket closed · 16 Nov, 22:56 IST"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the translation first with the original under it, and can switch it off", async () => {
+    const user = setupUser();
+    render(<TicketItemPane payload={payload} metadata={metadata} />);
+    expect(screen.getByText("So is everything normal?")).toBeInTheDocument();
+    expect(screen.getByText("Kya phir sab normal hay")).toBeInTheDocument();
+
+    const toggle = screen.getByRole("switch", { name: /English translation/ });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(
+      screen.queryByText("So is everything normal?"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Kya phir sab normal hay")).toBeInTheDocument();
+  });
+
+  it("shows the escalation, the staff note and the message flags", () => {
+    render(<TicketItemPane payload={payload} metadata={metadata} />);
+    expect(
+      screen.getByText("Escalated to a Medical Officer (internal) · 19:46"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("NOTE: MSE to MO · 19:46")).toBeInTheDocument();
+    expect(
+      screen.getByText("QUERY-I had my checkup today"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("ai-Medical")).toBeInTheDocument();
+    expect(screen.getByText("Marked as emergency")).toBeInTheDocument();
+    expect(screen.getByText("[Audio message]")).toBeInTheDocument();
+  });
+
+  it("keeps messages from before and after the ticket folded until asked for", async () => {
+    const user = setupUser();
+    render(<TicketItemPane payload={payload} metadata={metadata} />);
+    expect(screen.queryByText("An earlier question")).not.toBeInTheDocument();
+    expect(screen.queryByText("A later thanks")).not.toBeInTheDocument();
+
+    const earlier = screen.getByRole("button", {
+      name: "Show 1 earlier message",
+    });
+    await user.click(earlier);
+    expect(screen.getByText("An earlier question")).toBeInTheDocument();
+    expect(earlier).toHaveTextContent("Hide 1 earlier message");
+    await user.click(earlier);
+    expect(screen.queryByText("An earlier question")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /later message/ }));
+    expect(screen.getByText("A later thanks")).toBeInTheDocument();
+  });
+
+  it("puts the same hide button at both ends of an opened run of messages", async () => {
+    const user = setupUser();
+    const scroll = jest.fn();
+    Element.prototype.scrollIntoView = scroll;
+    render(<TicketItemPane payload={payload} metadata={metadata} />);
+
+    await user.click(screen.getByRole("button", { name: "Show 1 earlier message" }));
+    const hides = screen.getAllByRole("button", { name: "Hide 1 earlier message" });
+    expect(hides).toHaveLength(2);
+    // One above the messages and one below them.
+    const message = screen.getByText("An earlier question");
+    expect(hides[0].compareDocumentPosition(message) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(hides[1].compareDocumentPosition(message) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+
+    // The one at the far end puts the run away and brings the top button back into view.
+    await user.click(hides[1]);
+    expect(screen.queryByText("An earlier question")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show 1 earlier message" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Hide/ })).not.toBeInTheDocument();
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll.mock.contexts[0]).toBe(
+      screen.getByRole("button", { name: "Show 1 earlier message" }),
+    );
+  });
+
+  it("puts a date heading above each new day", async () => {
+    const user = setupUser();
+    render(<TicketItemPane payload={payload} metadata={metadata} />);
+    expect(screen.getByText("Mon, 16 Nov 2026")).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Show 1 earlier message" }),
+    );
+    expect(screen.getByText("Sun, 15 Nov 2026")).toBeInTheDocument();
+  });
+
+  it("offers no translation switch when nothing has a translation", () => {
+    render(
+      <TicketItemPane
+        payload={{
+          transcript: [
+            {
+              role: "user",
+              kind: "message",
+              content: "Hello",
+              ...at("2026-11-16 19:01:00"),
+            },
+          ],
+        }}
+        metadata={[]}
+      />,
+    );
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    expect(screen.getByText("Hello")).toBeInTheDocument();
+    expect(screen.queryByText("Case details")).not.toBeInTheDocument();
+    // No opening, closing or reply time to put on a timeline.
+    expect(screen.queryByText("Ticket timeline")).not.toBeInTheDocument();
+  });
+
+  it("says plainly when the escalation is not to a Medical Officer", () => {
+    render(
+      <TicketItemPane
+        payload={payload}
+        metadata={[
+          ...metadata.filter((m) => m.key !== "Escalated to"),
+          { key: "Escalated to", value: "Doctor" },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Escalated (internal) · 19:46")).toBeInTheDocument();
+  });
+
+  it("marks a file with no words as one that cannot be played, in place of its placeholder", () => {
+    render(
+      <TicketItemPane
+        payload={{
+          transcript: [
+            {
+              role: "user",
+              kind: "message",
+              content: "[Audio message]",
+              placeholder: true,
+              media: { type: "audio", mime: "audio/ogg", uri: "https://x/a.ogg" },
+              ...at("2026-11-16 19:01:00"),
+            },
+          ],
+        }}
+        metadata={[]}
+      />,
+    );
+    expect(screen.getByTestId("ticket-media")).toHaveTextContent(
+      "Audio message · cannot be played here",
+    );
+    expect(screen.queryByText("[Audio message]")).not.toBeInTheDocument();
+  });
+
+  it("keeps the words of a picture that has a caption, and marks the picture", () => {
+    render(
+      <TicketItemPane
+        payload={{
+          transcript: [
+            {
+              role: "user",
+              kind: "message",
+              content: "This is the powder",
+              media: { type: "image", mime: "image/jpeg", uri: "https://x/i.jpg" },
+              ...at("2026-11-16 19:01:00"),
+            },
+          ],
+        }}
+        metadata={[]}
+      />,
+    );
+    expect(screen.getByText("This is the powder")).toBeInTheDocument();
+    expect(screen.getByTestId("ticket-media")).toHaveTextContent(
+      "Image · cannot be played here",
+    );
+  });
+
+  it("puts the first probe on the timeline with how many questions were asked", () => {
+    render(
+      <TicketItemPane
+        payload={{
+          transcript: [
+            {
+              role: "assistant",
+              label: "MSE",
+              kind: "message",
+              content: "How old is your baby?",
+              ...at("2026-11-16 19:10:00"),
+            },
+            {
+              role: "assistant",
+              label: "MSE",
+              kind: "message",
+              content: "Is the baby feeding well?",
+              ...at("2026-11-16 19:12:00"),
+            },
+          ],
+        }}
+        metadata={metadata}
+      />,
+    );
+    const timeline = screen.getByRole("region", { name: "Ticket timeline" });
+    expect(timeline).toHaveTextContent("Probed");
+    expect(timeline).toHaveTextContent("16 Nov, 19:10");
+    expect(timeline).toHaveTextContent("2 questions");
+  });
+
+  it("is comfortable by default and tightens its spacing when compact", () => {
+    const { rerender } = render(
+      <TicketItemPane payload={payload} metadata={metadata} />,
+    );
+    const pane = screen.getByTestId("ticket-pane");
+    expect(pane).toHaveAttribute("data-density", "comfortable");
+    expect(pane.className).toContain("space-y-4");
+    const spacious = screen.getByText("QUERY-I had my checkup today").parentElement!;
+    expect(spacious.className).toContain("px-4 py-3");
+
+    rerender(
+      <TicketItemPane payload={payload} metadata={metadata} density="compact" />,
+    );
+    const compact = screen.getByTestId("ticket-pane");
+    expect(compact).toHaveAttribute("data-density", "compact");
+    expect(compact.className).toContain("space-y-2");
+    expect(compact.className).not.toContain("space-y-4");
+    const tight = screen.getByText("QUERY-I had my checkup today").parentElement!;
+    expect(tight.className).toContain("px-3 py-1.5");
+    // The same words are on screen either way.
+    expect(screen.getByText("So is everything normal?")).toBeInTheDocument();
+  });
+
+  it("draws nothing for an item that is not a ticket", () => {
+    const { container } = render(
+      <TicketItemPane payload={{ transcript: [] }} metadata={null} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("ticket items in the job view", () => {
+  const ticketItem = {
+    uuid: "i1",
+    payload,
+    metadata,
+  } as unknown as Item;
+
+  it("is drawn by the ticket pane for a conversation task", () => {
+    render(<ItemPane item={ticketItem} taskType="conversation" />);
+    expect(screen.getByTestId("ticket-pane")).toBeInTheDocument();
+  });
+
+  it("hides the case details on the right for a ticket, and only for a ticket", () => {
+    expect(rightColumnMetadata(ticketItem)).toBeNull();
+    const plain = {
+      uuid: "i2",
+      payload: { transcript: [{ role: "user", content: "hi" }] },
+      metadata: [{ key: "Language", value: "hindi" }],
+    } as unknown as Item;
+    expect(rightColumnMetadata(plain)).toEqual([
+      { key: "Language", value: "hindi" },
+    ]);
+  });
+
+  describe("long automated messages", () => {
+    const long = "Stay healthy and keep your appointments. ".repeat(10);
+    const withAutomated = (content: string, who = "Automated") => ({
+      transcript: [
+        {
+          role: "assistant",
+          label: who,
+          kind: "message",
+          content,
+          versions: { "English translation": content + " (english)" },
+          ...at("2026-11-16 19:01:00"),
+        },
+      ],
+    });
+
+    it("folds to a few lines with the original tucked away, and opens on Read more", async () => {
+      const user = setupUser();
+      render(<TicketItemPane payload={withAutomated(long)} metadata={[]} />);
+      const button = screen.getByRole("button", { name: "Read more" });
+      expect(button).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByText(/\(english\)$/).className).toContain("line-clamp-3");
+      // Only the folded English shows; the original is hidden until opened.
+      expect(screen.getAllByText(/Stay healthy/)).toHaveLength(1);
+
+      await user.click(button);
+      expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getAllByText(/Stay healthy/)).toHaveLength(2);
+      expect(screen.getAllByText(/Stay healthy/)[0].className).not.toContain("line-clamp-3");
+
+      await user.click(screen.getByRole("button", { name: "Show less" }));
+      expect(screen.getAllByText(/Stay healthy/)).toHaveLength(1);
+    });
+
+    it("leaves a short automated message and any nurse's reply as they are", () => {
+      render(
+        <TicketItemPane
+          payload={{
+            transcript: [
+              ...withAutomated("Thanks, goodbye").transcript,
+              {
+                role: "assistant",
+                label: "MSE",
+                kind: "message",
+                content: long,
+                ...at("2026-11-16 19:05:00"),
+              },
+            ],
+          }}
+          metadata={[]}
+        />,
+      );
+      expect(screen.queryByRole("button", { name: "Read more" })).not.toBeInTheDocument();
+    });
+  });
+});

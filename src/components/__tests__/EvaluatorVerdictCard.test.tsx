@@ -322,6 +322,68 @@ describe("EvaluatorVerdictCard - header extras", () => {
     expect(screen.queryByText("Optional")?.tagName).toBe("SPAN");
   });
 
+  it("gives a picked answer the colour of its own row, and leaves an unpicked one alone", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Safety"
+        outputType="binary"
+        trueLabel="Safe"
+        falseLabel="Unsafe"
+        trueColor="#00805f"
+        falseColor="#C7235E"
+        value={true}
+        comment=""
+        onValueChange={() => {}}
+        onCommentChange={() => {}}
+      />,
+    );
+    const safe = screen.getByRole("button", { name: "Safe" });
+    expect(safe.style.getPropertyValue("--pick")).toBe("#00805F");
+    expect(safe.style.getPropertyValue("--pick-ink")).toBe("#FFFFFF");
+    expect(screen.getByRole("button", { name: "Unsafe" })).not.toHaveAttribute("style");
+  });
+
+  it("colours the picked level of a rating from its own row", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Urgency"
+        outputType="rating"
+        scaleMin={0}
+        scaleMax={2}
+        ratingScale={[
+          { value: 0, name: "Emergency", color: "#C7235E" },
+          { value: 1, name: "Urgent", color: "#FAA820" },
+          { value: 2, name: "Routine" },
+        ]}
+        value={1}
+        comment=""
+        onValueChange={() => {}}
+        onCommentChange={() => {}}
+      />,
+    );
+    const urgent = screen.getByRole("button", { name: /Urgent/ });
+    expect(urgent.style.getPropertyValue("--pick")).toBe("#FAA820");
+    expect(urgent.style.getPropertyValue("--pick-ink")).toBe("#383838");
+    expect(screen.getByRole("button", { name: /Emergency/ })).not.toHaveAttribute("style");
+  });
+
+  it("sets no colour on a picked answer whose row has none", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Quality"
+        outputType="binary"
+        value={true}
+        comment=""
+        onValueChange={() => {}}
+        onCommentChange={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Correct" })).not.toHaveAttribute("style");
+  });
+
   it("hides the Optional pill when the evaluator is required", () => {
     render(
       <EvaluatorVerdictCard
@@ -859,7 +921,10 @@ describe("EvaluatorVerdictCard - per-option descriptions", () => {
     );
     // A level with a rubric but no name keeps just the number.
     expect(screen.getByText("1")).toBeInTheDocument();
-    expect(screen.getByText("2 · Good")).toBeInTheDocument();
+    // The number is in its own element so the Noora look can hide it.
+    expect(screen.getByRole("button", { name: /Answers it fully/ })).toHaveTextContent(
+      "2 · Good",
+    );
     expect(screen.getByText("Ignores the question.")).toBeInTheDocument();
     expect(screen.getByText("Answers it fully.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Answers it fully/ }));
@@ -1320,5 +1385,25 @@ describe("the evaluator name on hover", () => {
     expect(
       await screen.findByRole("heading", { name: "Linked Eval" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("EvaluatorVerdictCard question grouping", () => {
+  it("names a question as a group, so a screen reader hears its answers under it", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="write"
+        name="Urgency"
+        outputType="binary"
+        question={{ number: 1, total: 2, answered: false }}
+        onValueChange={jest.fn()}
+      />,
+    );
+    expect(screen.getByRole("group", { name: "Urgency" })).toBeInTheDocument();
+  });
+
+  it("adds no group when the card is not one of a list of questions", () => {
+    render(<EvaluatorVerdictCard mode="write" name="Urgency" outputType="binary" onValueChange={jest.fn()} />);
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
   });
 });

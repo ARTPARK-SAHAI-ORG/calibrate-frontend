@@ -4,6 +4,7 @@ import {
   defaultBinaryLabel,
   coerceBinaryValue,
   binaryScaleFor,
+  getBinaryColor,
   getBinaryDescription,
   getBinaryLabel,
   toRatingScale,
@@ -92,8 +93,8 @@ describe("toRatingScale", () => {
       { value: 2, name: null },
     ]);
     expect(result).toEqual([
-      { value: 1, name: "One", description: null },
-      { value: 2, name: null, description: null },
+      { value: 1, name: "One", description: null, color: null },
+      { value: 2, name: null, description: null, color: null },
     ]);
   });
 
@@ -108,9 +109,45 @@ describe("toRatingScale", () => {
         { value: 2, name: "Two", description: "   " },
       ]),
     ).toEqual([
-      { value: 1, name: "One", description: "Ignores the question." },
-      { value: 2, name: "Two", description: null },
+      { value: 1, name: "One", description: "Ignores the question.", color: null },
+      { value: 2, name: "Two", description: null, color: null },
     ]);
+  });
+
+  it("carries the colour of each level through, trimming blanks to null", () => {
+    expect(
+      toRatingScale([
+        { value: 1, name: "Bad", color: " #C7235E " },
+        { value: 2, name: "Fine", color: "   " },
+        { value: 3, name: "Good" },
+      ]),
+    ).toEqual([
+      { value: 1, name: "Bad", description: null, color: "#C7235E" },
+      { value: 2, name: "Fine", description: null, color: null },
+      { value: 3, name: "Good", description: null, color: null },
+    ]);
+  });
+});
+
+describe("getBinaryColor", () => {
+  const scale = [
+    { value: true, name: "Safe", color: "#00805F" },
+    { value: false, name: "Unsafe", color: "  " },
+  ];
+
+  it("reads the colour of the true or the false row", () => {
+    expect(getBinaryColor(scale, true)).toBe("#00805F");
+  });
+
+  it("is null for a blank colour, a missing row or no scale", () => {
+    expect(getBinaryColor(scale, false)).toBeNull();
+    expect(getBinaryColor([{ value: true, name: "Yes" }], false)).toBeNull();
+    expect(getBinaryColor(null, true)).toBeNull();
+    expect(getBinaryColor(undefined, false)).toBeNull();
+  });
+
+  it("matches rows encoded as 1 and 0 as well", () => {
+    expect(getBinaryColor([{ value: 1, color: "#C7235E" }], true)).toBe("#C7235E");
   });
 });
 

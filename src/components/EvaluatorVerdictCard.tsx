@@ -2,6 +2,7 @@
 
 import { ratingRank } from "@/lib/ratingRank";
 import type { ReasoningMode } from "@/components/human-labelling/AssignAnnotatorsDialog";
+import { pickColourVars } from "@/lib/colour";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote } from "@/components/ui";
 
@@ -25,7 +26,7 @@ import { ErrorNote } from "@/components/ui";
 // other callers (tool-call verdicts in test-results/shared.tsx) reuse the
 // exact same toggle visual without duplicating it.
 
-import { useState, type ReactNode } from "react";
+import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import {
   DEFAULT_BINARY_FALSE_LABEL,
   DEFAULT_BINARY_TRUE_LABEL,
@@ -40,6 +41,9 @@ type CommonProps = {
   name: string;
   /** Short evaluator description, shown under the name. */
   description?: string | null;
+  /** Anything to draw straight under the description, such as an explanation
+   * that opens in place. Only drawn while someone is answering. */
+  help?: ReactNode;
   /** This card's place in a list of questions someone is answering. Makes the
    * name a heading above a quieter description, and draws the number in a
    * circle that fills in once answered, whichever answer was picked. A list of one draws no circle. */
@@ -76,7 +80,12 @@ type CommonProps = {
    * next to each rating button and beside the score / max pill so
    * annotators see what each number means. */
   ratingScale?:
-    | { value: number; name?: string | null; description?: string | null }[]
+    | {
+        value: number;
+        name?: string | null;
+        description?: string | null;
+        color?: string | null;
+      }[]
     | null;
   /** Pre-resolved label for the rating verdict pill. Wins over the
    * `ratingScale` lookup so callers can surface a backend-resolved
@@ -102,6 +111,9 @@ type WriteProps = CommonProps & {
    * A result card never shows it, which is why it is not a read prop. */
   trueDescription?: string | null;
   falseDescription?: string | null;
+  /** Colours authored on the two rows of a binary verdict, as hex values. */
+  trueColor?: string | null;
+  falseColor?: string | null;
   /** Current value the annotator picked. Boolean for binary, number for rating. */
   value?: boolean | number | null;
   /** Current free-text reasoning the annotator entered. */
@@ -142,7 +154,8 @@ export function readVerdictTone(p: {
 }
 
 export function evaluatorCardSurfaceClass(tone: Tone): string {
-  const base = "rounded-lg border shadow-md dark:shadow-lg transition-colors";
+  const base =
+    "rounded-lg border shadow-md dark:shadow-lg transition-colors noora:rounded-xl noora:shadow-none";
   switch (tone) {
     case "green":
       return `${base} border-green-500/40 bg-green-500/[0.14] dark:border-green-500/45 dark:bg-green-500/[0.16] dark:shadow-green-950/35`;
@@ -151,15 +164,15 @@ export function evaluatorCardSurfaceClass(tone: Tone): string {
     case "amber":
       return `${base} border-amber-500/40 bg-amber-500/[0.12] dark:border-amber-500/45 dark:bg-amber-500/[0.13] dark:shadow-amber-950/30`;
     default:
-      return `${base} border-border bg-muted/30 dark:bg-muted/40 dark:border-border dark:shadow-black/25`;
+      return `${base} border-border bg-muted/30 dark:bg-muted/40 dark:border-border dark:shadow-black/25 noora:border-outline-variant noora:bg-surface-low`;
   }
 }
 
 const RATING_ACTIVE_CLASS: Record<Tone, string> = {
-  green: "border-green-600 bg-green-600 text-white",
-  red: "border-red-600 bg-red-600 text-white",
-  amber: "border-amber-600 bg-amber-600 text-white",
-  neutral: "border-foreground bg-foreground text-background",
+  green: "border-green-600 bg-green-600 text-white noora:border-[var(--pick,var(--m3-secondary))] noora:bg-[var(--pick,var(--m3-primary-container))] noora:text-[var(--pick-ink,var(--m3-on-primary-container))] noora:ring-1 noora:ring-[var(--pick,var(--m3-secondary))]",
+  red: "border-red-600 bg-red-600 text-white noora:border-[var(--pick,var(--m3-secondary))] noora:bg-[var(--pick,var(--m3-primary-container))] noora:text-[var(--pick-ink,var(--m3-on-primary-container))] noora:ring-1 noora:ring-[var(--pick,var(--m3-secondary))]",
+  amber: "border-amber-600 bg-amber-600 text-white noora:border-[var(--pick,var(--m3-secondary))] noora:bg-[var(--pick,var(--m3-primary-container))] noora:text-[var(--pick-ink,var(--m3-on-primary-container))] noora:ring-1 noora:ring-[var(--pick,var(--m3-secondary))]",
+  neutral: "border-foreground bg-foreground text-background noora:border-[var(--pick,var(--m3-secondary))] noora:bg-[var(--pick,var(--m3-primary-container))] noora:text-[var(--pick-ink,var(--m3-on-primary-container))] noora:ring-1 noora:ring-[var(--pick,var(--m3-secondary))]",
 };
 
 export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
@@ -187,6 +200,8 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
       : null;
 
   const [open, setOpen] = useState(false);
+  // Names a question for a screen reader, so its answers are heard as one group.
+  const nameId = useId();
 
   // The evaluator whose prompt is on show, opened from the name in the
   // header. Null until the name is clicked. Only relevant when the card
@@ -203,7 +218,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
   // text.
   const { ref: nameRef, clipped: nameClipped } = useIsNameClipped(props.name);
   const nameBlock = (
-    <span ref={nameRef} className="min-w-0 truncate block">
+    <span id={nameId} ref={nameRef} className="min-w-0 truncate block">
       <NameLabel
         name={props.name}
         uuid={props.evaluatorUuid}
@@ -216,11 +231,13 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
 
   return (
     <div
-      className={`${surface} p-3 space-y-3 ${
+      role={props.question ? "group" : undefined}
+      aria-labelledby={props.question ? nameId : undefined}
+      className={`${surface} p-3 noora:p-4 space-y-3 ${
         props.answerMissing
           ? "ring-2 ring-red-500"
           : props.isNextQuestion
-            ? "ring-2 ring-foreground/60"
+            ? "ring-2 ring-foreground/60 noora:ring-secondary"
             : ""
       }`}
     >
@@ -233,8 +250,8 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
               aria-label={`Question ${props.question.number} of ${props.question.total}`}
               className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
                 props.question.answered
-                  ? "bg-foreground text-background"
-                  : "border border-foreground/30 bg-background text-foreground"
+                  ? "bg-foreground text-background noora:bg-primary noora:text-on-primary"
+                  : "border border-foreground/30 bg-background text-foreground noora:bg-surface-lowest"
               }`}
             >
               {props.question.number}
@@ -303,6 +320,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             {props.description}
           </p>
         )}
+        {props.mode === "write" && props.help}
       </div>
 
       {props.mode === "write" && (
@@ -318,6 +336,8 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             falseLabel={props.falseLabel}
             trueDescription={props.trueDescription}
             falseDescription={props.falseDescription}
+            trueColor={props.trueColor}
+            falseColor={props.falseColor}
             ratingScale={props.ratingScale}
           />
           {hasVariables && (
@@ -337,7 +357,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
       )}
 
       {props.answerMissing && (
-        <p className="text-xs font-medium text-red-600 dark:text-red-400">
+        <p className="text-xs font-medium text-red-600 dark:text-red-400 noora:text-[13px] noora:text-[#B3261E]">
           This question needs an answer
         </p>
       )}
@@ -476,7 +496,7 @@ function ReadVerdictPill({
 // Left-aligned so the description has room to wrap, and full width of its grid
 // cell so every option is the same size, even one alone on the last row.
 const DESCRIBED_OPTION_BTN =
-  "w-full text-left rounded-md border px-3 py-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-foreground/30";
+  "w-full text-left rounded-md border px-3 py-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:relative noora:rounded-lg noora:px-3.5 noora:py-2.5 noora:focus-visible:ring-secondary";
 // Two equal columns, or one when the column is too narrow for two. Answer
 // buttons never pick up the browser's own blue outline when clicked.
 const DESCRIBED_OPTIONS_GRID = "grid grid-cols-1 @xs:grid-cols-2 gap-2";
@@ -504,6 +524,17 @@ function OptionDescription({
 // Every option sits inside a Tooltip at all times, so picking one does not
 // rebuild the button and drop keyboard focus. Only the picked option has hover
 // text; on the others the popup is hidden.
+/** A check mark in the corner of the picked tile, so the choice never relies on
+ *  colour alone. Drawn only in the Noora look. */
+function PickedMark({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <span aria-hidden className="hidden noora:block absolute right-2.5 top-2.5">
+      <CheckIcon className="w-4 h-4" />
+    </span>
+  );
+}
+
 function PickedOptionTooltip({
   picked,
   className,
@@ -525,6 +556,11 @@ function PickedOptionTooltip({
   );
 }
 
+/** The picked answer's own colour, as the two variables the page's look reads. */
+function pickStyle(color: string | null | undefined): CSSProperties | undefined {
+  return pickColourVars(color) as CSSProperties | undefined;
+}
+
 function WriteControls({
   outputType,
   scaleMin,
@@ -536,6 +572,8 @@ function WriteControls({
   falseLabel,
   trueDescription,
   falseDescription,
+  trueColor,
+  falseColor,
   ratingScale,
 }: {
   outputType: EvaluatorOutputType;
@@ -548,8 +586,15 @@ function WriteControls({
   falseLabel?: string | null;
   trueDescription?: string | null;
   falseDescription?: string | null;
+  trueColor?: string | null;
+  falseColor?: string | null;
   ratingScale?:
-    | { value: number; name?: string | null; description?: string | null }[]
+    | {
+        value: number;
+        name?: string | null;
+        description?: string | null;
+        color?: string | null;
+      }[]
     | null;
 }) {
   if (outputType === "binary") {
@@ -560,9 +605,10 @@ function WriteControls({
     const described = !!(trueText || falseText);
     const baseBtn = described
       ? `${DESCRIBED_OPTION_BTN} text-sm font-medium`
-      : "h-9 px-4 rounded-md text-sm font-medium border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-foreground/30";
+      : "h-9 px-4 rounded-md noora:rounded-full text-sm font-medium border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:focus-visible:ring-secondary";
     // The tooltip wrapper is the grid item now, so it carries the stretch.
-    const wrapClass = "flex";
+    const wrapClass =
+      "flex noora:@xs:[&:last-child:nth-child(odd)]:col-span-2";
     return (
       <div className="@container">
         <div
@@ -578,19 +624,21 @@ function WriteControls({
               type="button"
               disabled={disabled}
               aria-pressed={value === true}
+              style={value === true ? pickStyle(trueColor) : undefined}
               onClick={() => onChange(value === true ? null : true)}
               className={`${baseBtn} ${
                 value === true
-                  ? "border-green-600 bg-green-600 text-white"
-                  : "border-border bg-background text-foreground hover:bg-muted/50"
+                  ? "border-green-600 bg-green-600 text-white noora:border-[var(--pick,var(--m3-secondary))] noora:bg-[var(--pick,var(--m3-primary-container))] noora:text-[var(--pick-ink,var(--m3-on-primary-container))] noora:ring-1 noora:ring-[var(--pick,var(--m3-secondary))]"
+                  : "border-border bg-background text-foreground hover:bg-muted/50 noora:bg-surface-lowest noora:hover:bg-primary/8"
               }`}
             >
+              {described && <PickedMark show={value === true} />}
               {trueLabel?.trim() || DEFAULT_BINARY_TRUE_LABEL}
               {trueText && (
                 <OptionDescription
                   text={trueText}
                   active={value === true}
-                  activeClass="text-white/80"
+                  activeClass="text-white/80 noora:text-[var(--pick-ink,var(--m3-on-primary-container))]"
                 />
               )}
             </button>
@@ -603,19 +651,21 @@ function WriteControls({
               type="button"
               disabled={disabled}
               aria-pressed={value === false}
+              style={value === false ? pickStyle(falseColor) : undefined}
               onClick={() => onChange(value === false ? null : false)}
               className={`${baseBtn} ${
                 value === false
-                  ? "border-red-600 bg-red-600 text-white"
-                  : "border-border bg-background text-foreground hover:bg-muted/50"
+                  ? "border-red-600 bg-red-600 text-white noora:border-[var(--pick,var(--m3-secondary))] noora:bg-[var(--pick,var(--m3-primary-container))] noora:text-[var(--pick-ink,var(--m3-on-primary-container))] noora:ring-1 noora:ring-[var(--pick,var(--m3-secondary))]"
+                  : "border-border bg-background text-foreground hover:bg-muted/50 noora:bg-surface-lowest noora:hover:bg-primary/8"
               }`}
             >
+              {described && <PickedMark show={value === false} />}
               {falseLabel?.trim() || DEFAULT_BINARY_FALSE_LABEL}
               {falseText && (
                 <OptionDescription
                   text={falseText}
                   active={value === false}
-                  activeClass="text-white/80"
+                  activeClass="text-white/80 noora:text-[var(--pick-ink,var(--m3-on-primary-container))]"
                 />
               )}
             </button>
@@ -675,27 +725,39 @@ function WriteControls({
             <PickedOptionTooltip
               key={n}
               picked={active && !disabled}
-              className="flex"
+              className="flex noora:@xs:[&:last-child:nth-child(odd)]:col-span-2"
             >
               <button
                 type="button"
                 disabled={disabled}
                 aria-pressed={active}
+                style={active ? pickStyle(entry?.color) : undefined}
                 onClick={() => onChange(active ? null : n)}
                 className={`${
                   described
                     ? DESCRIBED_OPTION_BTN
                     : hasLabels
-                      ? "outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 min-w-[3.25rem] px-2.5 h-auto py-1.5 flex flex-col items-center gap-0.5 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                      : "outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 w-9 h-9 rounded-md border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      ? "outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 min-w-[3.25rem] px-2.5 h-auto py-1.5 flex flex-col items-center gap-0.5 rounded-md noora:rounded-lg border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                      : "outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 w-9 h-9 rounded-md noora:rounded-full border transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 } text-sm font-medium ${
                   active
                     ? activeClass
-                    : "border-border bg-background hover:bg-muted/50"
+                    : "border-border bg-background hover:bg-muted/50 noora:bg-surface-lowest noora:hover:bg-primary/8"
                 }`}
               >
+                {described && <PickedMark show={active} />}
                 {described ? (
-                  <span>{label ? `${n} · ${label}` : n}</span>
+                  <span>
+                    {label ? (
+                      <>
+                        {/* The number is a code; the name is the meaning. */}
+                        <span className="noora:hidden">{n} · </span>
+                        {label}
+                      </>
+                    ) : (
+                      n
+                    )}
+                  </span>
                 ) : (
                   <span>{n}</span>
                 )}
@@ -704,13 +766,13 @@ function WriteControls({
                       <OptionDescription
                         text={text}
                         active={active}
-                        activeClass="text-white/80"
+                        activeClass="text-white/80 noora:text-[var(--pick-ink,var(--m3-on-primary-container))]"
                       />
                     )
                   : hasLabels && (
                       <span
                         className={`text-[10px] font-normal leading-tight ${
-                          active ? "text-white/80" : "text-muted-foreground"
+                          active ? "text-white/80 noora:text-[var(--pick-ink,var(--m3-on-primary-container))]" : "text-muted-foreground"
                         }`}
                       >
                         {label ?? ""}
@@ -777,12 +839,12 @@ function WriteReasoning({
         disabled={disabled}
         placeholder={disabled ? "" : "Add your reasoning"}
         rows={2}
-        className={`w-full text-sm rounded-md border bg-background px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20 disabled:opacity-60 ${
+        className={`w-full text-sm rounded-md noora:rounded-lg border bg-background noora:bg-surface-container px-3 py-2 resize-y focus:outline-none focus:ring-2 focus:ring-foreground/20 noora:focus:ring-secondary disabled:opacity-60 ${
           hasBeenHidden ? "reason-box-appear " : ""
-        }${missing ? "border-red-500" : "border-border"}`}
+        }${missing ? "border-red-500" : "border-border noora:border-outline"}`}
       />
       {missing && (
-        <p className="text-xs text-red-500">
+        <p className="text-xs text-red-500 noora:text-[13px] noora:text-[#B3261E]">
           Add your reasoning for this score
         </p>
       )}

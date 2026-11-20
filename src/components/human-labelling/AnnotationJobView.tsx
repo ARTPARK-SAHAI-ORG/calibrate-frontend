@@ -20,6 +20,7 @@ import { ArrowDownIcon } from "@/components/icons";
 import { useDialogNavKeys } from "@/hooks/useDialogNavKeys";
 import { JobItemColumns } from "./JobItemColumns";
 import {
+  getBinaryColor,
   getBinaryDescription,
   getBinaryLabel,
   toRatingScale,
@@ -28,6 +29,15 @@ import { LlmItemPane } from "./item-panes/LlmItemPane";
 import { LlmGeneralItemPane } from "./item-panes/LlmGeneralItemPane";
 import { Section } from "./item-panes/shared";
 import { ConversationItemPane } from "./item-panes/ConversationItemPane";
+import { TicketItemPane } from "./item-panes/TicketItemPane";
+import { isTicketPayload, ticketRowSummary, ticketTitle } from "@/lib/ticketView";
+import { TicketCaseList, type CaseRow } from "./TicketCaseList";
+import { ticketHelpFor } from "@/lib/ticketHelp";
+import { QuestionHelp } from "./QuestionHelp";
+import { useTicketDensity, type TicketDensity } from "@/hooks/useTicketDensity";
+import { JobSettingsMenu } from "./JobSettingsMenu";
+import Image from "next/image";
+import { NOORA_DISPLAY, NOORA_FILLED, NOORA_TONAL } from "./noora";
 import { ToolCallItemPane } from "./item-panes/ToolCallItemPane";
 import { SttItemPane } from "./item-panes/SttItemPane";
 import { TtsItemPane } from "./item-panes/TtsItemPane";
@@ -197,6 +207,18 @@ function hasFieldValue(f?: FieldValue): boolean {
   return !!f && f.value !== undefined && f.value !== null && f.value !== "";
 }
 
+/** The four Noora Health colours, in a thin bar under the top row. */
+function BrandStripe() {
+  return (
+    <div aria-hidden className="mb-4 md:mb-6 flex h-1 shrink-0">
+      <span className="flex-1 bg-[var(--noora-pink)]" />
+      <span className="flex-1 bg-[var(--noora-blue)]" />
+      <span className="flex-1 bg-[var(--noora-green)]" />
+      <span className="flex-1 bg-[var(--noora-orange)]" />
+    </div>
+  );
+}
+
 function GreenBar({
   label,
   done,
@@ -218,7 +240,7 @@ function GreenBar({
       className={`bg-muted ${className}`}
     >
       <div
-        className="h-full bg-green-500 transition-[width] duration-300"
+        className="h-full bg-green-500 noora:bg-success transition-[width] duration-300"
         style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }}
       />
     </div>
@@ -234,6 +256,8 @@ function introKind(data: JobResponse): LabellingJobKind {
   )
     return "tool-call";
   const type = data.task.type;
+  if (type === "conversation" && data.items.some((it) => isTicketPayload(it.payload)))
+    return "ticket";
   return type === "conversation" ||
     type === "llm-general" ||
     type === "stt" ||
@@ -342,10 +366,26 @@ const ITEM_LIST_STATUS_TEXT: Record<ItemListStatus, string> = {
 };
 const ITEM_LIST_STATUS_CLASS: Record<ItemListStatus, string> = {
   completed:
-    "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400",
+    "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-400 noora:border-transparent noora:bg-tertiary-container noora:text-on-tertiary-container",
   "in progress":
-    "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400",
+    "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-400 noora:border-transparent noora:bg-warning-container noora:text-on-warning-container",
 };
+
+/** Where the case being read stands, beside "Case 3 of 50". */
+function CaseStatusChip({ status }: { status: ItemListStatus | null }) {
+  return (
+    <span
+      data-testid="case-status"
+      className={`rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${
+        status
+          ? ITEM_LIST_STATUS_CLASS[status]
+          : "border-border bg-background text-muted-foreground noora:border-outline-variant noora:bg-surface-lowest"
+      }`}
+    >
+      {status ? ITEM_LIST_STATUS_TEXT[status] : "Not answered"}
+    </span>
+  );
+}
 
 export function AnnotationJobView({
   token,
@@ -703,6 +743,10 @@ function AnnotateView({
 }: ViewProps) {
   const total = items.length;
   const isCompleted = data.job.status === "completed";
+  // How much room a ticket takes. The Settings menu sets it and the ticket reads
+  // it, so it is held here, above both. Only jobs of tickets have the choice.
+  const [ticketDensity, setTicketDensity] = useTicketDensity();
+  const hasTickets = data.items.some((it) => isTicketPayload(it.payload));
   // Frozen on the job. Absent keeps the comments box offered.
   const commentsEnabled = data.job.comments_enabled !== false;
   const filterActive =
@@ -810,6 +854,30 @@ function AnnotateView({
   const statusByItem = new Map(
     items.map((it) => [it.uuid, itemListStatus(it.uuid)]),
   );
+
+  // What each case reads as in the ticket list: worked out from the items once,
+  // then joined to the live status so answering a case updates its row.
+  const caseSummaries = useMemo(
+    () =>
+      hasTickets
+        ? new Map(
+            items.map((it) => [it.uuid, ticketRowSummary(it.payload, it.metadata)]),
+          )
+        : null,
+    [hasTickets, items],
+  );
+  const caseRows: CaseRow[] = (caseSummaries ? items : []).map((it) => {
+    const sum = caseSummaries?.get(it.uuid);
+    const payload = (it.payload ?? {}) as Record<string, unknown>;
+    return {
+      uuid: it.uuid,
+      position: originalIndexByUuid.get(it.uuid) ?? 0,
+      title: ticketTitle(typeof payload.name === "string" ? payload.name : ""),
+      status: statusByItem.get(it.uuid) ?? null,
+      preview: sum?.preview ?? "",
+      searchText: sum?.searchText ?? "",
+    };
+  });
 
   const itemsDone = items.filter(
     (it) => statusByItem.get(it.uuid) === "completed",
@@ -1164,7 +1232,7 @@ function AnnotateView({
         kind: currentItem.is_tool_call === true ? "tool-call" : introKind(data),
         hasItemDetails: hasItemDetails(
           currentItem.payload,
-          currentItem.metadata,
+          rightColumnMetadata(currentItem),
         ),
         commentsEnabled,
         questions: evaluatorsFor(currentItem.uuid).flatMap((ev) => {
@@ -1207,9 +1275,14 @@ function AnnotateView({
     },
   });
 
-  const wrapperClass = fillViewport
-    ? "h-screen bg-background text-foreground flex flex-col overflow-hidden"
-    : "flex flex-col flex-1 min-h-0";
+  // A job of support tickets wears the Noora Health look; any other job, and the
+  // reviewer's own view inside the app, look as they always did.
+  const skin = hasTickets && !isAdmin;
+  const wrapperClass = `${
+    fillViewport
+      ? "h-screen bg-background text-foreground flex flex-col overflow-hidden"
+      : "flex flex-col flex-1 min-h-0"
+  }${skin ? " skin-noora" : ""}`;
 
   const currentItemName = (() => {
     if (!currentItem) return "";
@@ -1217,15 +1290,34 @@ function AnnotateView({
       currentItem.payload && typeof currentItem.payload === "object"
         ? (currentItem.payload as Record<string, unknown>)
         : null;
-    return p && typeof p.name === "string" ? p.name.trim() : "";
+    const name = p && typeof p.name === "string" ? p.name.trim() : "";
+    return isTicketPayload(p) ? ticketTitle(name) : name;
   })();
 
   return (
     <div className={wrapperClass}>
       {!isAdmin && (
-        <div className="px-4 md:px-6 pt-4 md:pt-6 pb-3 shrink-0 flex items-center justify-between gap-4">
+        <header className="px-4 md:px-6 pt-4 md:pt-6 pb-3 shrink-0 flex items-center justify-between gap-4 noora:flex-wrap noora:md:flex-nowrap noora:gap-y-3">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            <h1 className="text-lg md:text-xl font-semibold truncate">
+            {skin && (
+              <>
+                <Image
+                  src="/brand/noora-health-logo.png"
+                  alt="Noora Health"
+                  width={716}
+                  height={203}
+                  priority
+                  className="h-8 md:h-9 w-auto max-w-none shrink-0"
+                />
+                <span
+                  aria-hidden
+                  className="hidden sm:block h-7 w-px bg-outline-variant mx-1"
+                />
+              </>
+            )}
+            <h1
+              className={`text-lg md:text-xl font-semibold truncate noora:text-xl noora:md:text-2xl noora:leading-8 ${NOORA_DISPLAY}`}
+            >
               {data.task.name}
             </h1>
             {isCompleted && (
@@ -1248,10 +1340,17 @@ function AnnotateView({
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {hasTickets && (
+              <JobSettingsMenu
+                density={ticketDensity}
+                onDensityChange={setTicketDensity}
+                onShowIntro={() => setIntroOpen(true)}
+              />
+            )}
             <button
               type="button"
               onClick={() => setIntroOpen(true)}
-              className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+              className={`h-9 px-3 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted/50 transition-colors cursor-pointer whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:max-md:hidden ${NOORA_TONAL}`}
             >
               How this works
             </button>
@@ -1261,13 +1360,14 @@ function AnnotateView({
               createdAt={data.job.created_at}
             />
           </div>
-        </div>
+        </header>
       )}
-      <div
+      {skin && <BrandStripe />}
+      <main
         className={
           isAdmin
             ? "contents"
-            : "flex-1 min-h-0 flex flex-col overflow-hidden border border-border rounded-xl mx-4 md:mx-6 mb-4 md:mb-6"
+            : `flex-1 min-h-0 flex flex-col overflow-hidden border border-border rounded-xl mx-4 md:mx-6 mb-4 md:mb-6 noora:rounded-xl noora:border-outline-variant noora:bg-surface-lowest`
         }
       >
         {!isAdmin && (
@@ -1281,31 +1381,45 @@ function AnnotateView({
         <header className="border-b border-border px-4 md:px-6 py-3 flex flex-col gap-3 md:grid md:grid-cols-3 md:items-center md:gap-4">
           <div className="min-w-0 flex items-center gap-3">
             {currentItem && (
-              <h2 className="text-sm font-semibold truncate">
+              <h2 className="text-sm font-semibold truncate noora:text-sm noora:font-semibold noora:text-foreground">
                 {currentItemName || "Case"}
               </h2>
             )}
           </div>
-          <div className="flex items-center justify-center gap-2 flex-wrap">
+          <div className="flex items-center justify-center gap-2 flex-wrap noora:max-md:flex-nowrap noora:max-md:justify-between noora:max-md:gap-1">
             <button
               onClick={() => navigateTo(Math.max(0, currentIndex - 1))}
               disabled={currentIndex === 0}
-              className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${NOORA_TONAL}`}
             >
               Previous
             </button>
-            <span className="text-sm text-muted-foreground tabular-nums px-2">
+            <span className="text-sm text-muted-foreground tabular-nums px-2 noora:max-md:hidden">
               Case {Math.min(currentIndex + 1, total)} of {total}
             </span>
+            {/* A phone has no room for the words, only the numbers. */}
+            <span className="hidden text-sm text-muted-foreground tabular-nums noora:max-md:inline">
+              {Math.min(currentIndex + 1, total)} / {total}
+            </span>
+            {hasTickets && !isAdmin && currentItem && (
+              <CaseStatusChip
+                status={statusByItem.get(currentItem.uuid) ?? null}
+              />
+            )}
             <button
               onClick={() => navigateTo(Math.min(total - 1, currentIndex + 1))}
               disabled={currentIndex >= total - 1}
-              className="h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`h-9 px-3 rounded-md text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${NOORA_TONAL}`}
             >
               Next
             </button>
           </div>
-          <div className="flex justify-stretch md:justify-end [&>button]:w-full md:[&>button]:w-auto">
+          {/* On a phone the main button is a bar fixed to the bottom of the screen,
+              so it is always in reach however far the ticket is scrolled. */}
+          <div
+            data-testid="submit-bar"
+            className="flex justify-stretch md:justify-end [&>button]:w-full md:[&>button]:w-auto noora:max-md:fixed noora:max-md:inset-x-0 noora:max-md:bottom-0 noora:max-md:z-30 noora:max-md:border-t noora:max-md:border-outline-variant noora:max-md:bg-surface-lowest noora:max-md:px-4 noora:max-md:pt-3 noora:max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          >
             {!isAdmin &&
               (() => {
                 const currentItemSaved = currentItem
@@ -1384,7 +1498,7 @@ function AnnotateView({
                       scrollToQuestion(next, "smooth");
                     }}
                     disabled={disabled}
-                    className="h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`h-9 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${NOORA_FILLED}`}
                   >
                     {label}
                   </button>
@@ -1408,9 +1522,22 @@ function AnnotateView({
         )}
 
         <div className="flex-1 flex flex-col md:flex-row min-h-0">
+          {skin ? (
+            <TicketCaseList
+              rows={caseRows}
+              currentUuid={currentItem?.uuid ?? null}
+              onSelect={(uuid) =>
+                navigateTo(items.findIndex((it) => it.uuid === uuid))
+              }
+            />
+          ) : (
+            <>
           {/* Mobile: horizontal scrolling strip */}
-          <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
-            <div className="p-2 grid grid-cols-8 gap-2">
+          <div
+            data-testid="mobile-case-strip"
+            className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto noora:max-h-none noora:overflow-x-auto noora:overflow-y-hidden"
+          >
+            <div className="p-2 grid grid-cols-8 gap-2 noora:flex noora:w-max">
               {items.map((it, i) => {
                 const status = statusByItem.get(it.uuid) ?? null;
                 const isCurrent = i === currentIndex;
@@ -1423,14 +1550,31 @@ function AnnotateView({
                     position="top"
                   >
                     <button
+                      // Keep the case being read in view as the reader steps along
+                      // the row. This moves only the row itself, never the page.
+                      ref={
+                        isCurrent
+                          ? (el) => {
+                              const strip = el?.closest<HTMLElement>(
+                                '[data-testid="mobile-case-strip"]',
+                              );
+                              if (el && strip && strip.scrollWidth > strip.clientWidth)
+                                strip.scrollLeft +=
+                                  el.getBoundingClientRect().left -
+                                  strip.getBoundingClientRect().left -
+                                  strip.clientWidth / 2 +
+                                  el.offsetWidth / 2;
+                            }
+                          : undefined
+                      }
                       onClick={() => navigateTo(i)}
                       aria-label={`Case ${position}${status ? ` (${status})` : ""}`}
-                      className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                      className={`h-10 w-full noora:w-10 noora:shrink-0 rounded-md noora:rounded-lg border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                         isCurrent
-                          ? "border-foreground bg-foreground text-background"
+                          ? "border-foreground bg-foreground text-background noora:border-primary noora:bg-primary noora:text-on-primary noora:font-semibold"
                           : status
                             ? ITEM_LIST_STATUS_CLASS[status]
-                            : "border-border bg-background text-foreground hover:bg-muted/50"
+                            : "border-border bg-background text-foreground hover:bg-muted/50 noora:bg-surface-lowest noora:hover:bg-primary/8"
                       }`}
                     >
                       {position}
@@ -1458,12 +1602,12 @@ function AnnotateView({
                       <button
                         onClick={() => navigateTo(i)}
                         aria-label={`Case ${position}${status ? ` (${status})` : ""}`}
-                        className={`h-10 w-full rounded-md border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
+                        className={`h-10 w-full rounded-md noora:rounded-lg border text-sm font-medium transition-colors cursor-pointer flex items-center justify-center ${
                           isCurrent
-                            ? "border-foreground bg-foreground text-background"
+                            ? "border-foreground bg-foreground text-background noora:border-primary noora:bg-primary noora:text-on-primary noora:font-semibold"
                             : status
                               ? ITEM_LIST_STATUS_CLASS[status]
-                              : "border-border bg-background text-foreground hover:bg-muted/50"
+                              : "border-border bg-background text-foreground hover:bg-muted/50 noora:bg-surface-lowest noora:hover:bg-primary/8"
                         }`}
                       >
                         {position}
@@ -1474,8 +1618,10 @@ function AnnotateView({
               </div>
             </div>
           </div>
+            </>
+          )}
 
-          <main className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden scroll-pt-28">
+          <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-y-auto md:overflow-hidden scroll-pt-28 noora:max-md:pb-24">
             {!currentItem ? (
               <div className="flex items-center justify-center h-full p-8 text-sm text-muted-foreground w-full">
                 {filterActive
@@ -1488,7 +1634,13 @@ function AnnotateView({
                 canResize={!isAdmin}
                 leftHasOwnPadding={itemPaneHasOwnPadding(data.task.type)}
                 rightRef={evaluatorsPaneRef}
-                left={<ItemPane item={currentItem} taskType={data.task.type} />}
+                left={
+                  <ItemPane
+                    item={currentItem}
+                    taskType={data.task.type}
+                    ticketDensity={ticketDensity}
+                  />
+                }
                 right={
                   <EvaluatorsPane
                     evaluators={evaluators}
@@ -1520,9 +1672,9 @@ function AnnotateView({
                 }
               />
             )}
-          </main>
+          </div>
         </div>
-      </div>
+      </main>
       {introOpen && (
         <LabellingJobIntro
           kind={introKind(data)}
@@ -1588,6 +1740,15 @@ function AnnotateView({
  * flush against its container and needs padding above and below, or its
  * first card sits against the top edge.
  */
+/**
+ * The metadata the details box on the right shows. A support ticket shows its
+ * case details on the left, inside the ticket, so the right keeps only the
+ * questions.
+ */
+export function rightColumnMetadata(item: Item): Item["metadata"] {
+  return isTicketPayload(item.payload) ? null : item.metadata;
+}
+
 export function itemPaneHasOwnPadding(taskType: Task["type"]): boolean {
   return taskType === "llm" || taskType === "conversation";
 }
@@ -1595,11 +1756,23 @@ export function itemPaneHasOwnPadding(taskType: Task["type"]): boolean {
 export function ItemPane({
   item,
   taskType,
+  ticketDensity,
 }: {
   item: Item;
   taskType: Task["type"];
+  ticketDensity?: TicketDensity;
 }) {
   const payload = (item.payload ?? {}) as Record<string, unknown>;
+  // A support ticket draws its own case details and timeline, so the usual
+  // conversation pane (and the details box on the right) are not used for it.
+  if (taskType === "conversation" && isTicketPayload(payload))
+    return (
+      <TicketItemPane
+        payload={payload}
+        metadata={item.metadata}
+        density={ticketDensity}
+      />
+    );
   if (taskType === "stt") return <SttItemPane payload={payload} />;
   if (taskType === "tts") return <TtsItemPane payload={payload} />;
   // A basic agent item is input and output, never a conversation,
@@ -1702,7 +1875,7 @@ function EvaluatorsPane({
         <ItemDetailsBlock
           heading="Case details"
           payload={item.payload}
-          metadata={item.metadata}
+          metadata={rightColumnMetadata(item)}
         />
         {commentBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
@@ -1764,7 +1937,7 @@ function EvaluatorsPane({
               className="h-2 rounded-full overflow-hidden"
             />
           )}
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
             <div className="flex gap-1.5 min-w-0 overflow-x-auto">
               {questions.length > 1 &&
                 questions.map((ev, i) => {
@@ -1782,12 +1955,12 @@ function EvaluatorsPane({
                             block: "start",
                           })
                       }
-                      className={`shrink-0 w-7 h-7 rounded-md border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
+                      className={`shrink-0 w-7 h-7 noora:max-md:w-11 noora:max-md:h-11 rounded-md noora:rounded-full border text-xs font-medium cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 noora:focus-visible:ring-secondary ${
                         missingAnswerKeys.has(k)
                           ? "border-red-500 text-red-600 dark:text-red-400"
                           : !looksAnswered(ev)
-                            ? "border-border bg-background text-foreground hover:bg-muted/50"
-                            : "border-foreground bg-foreground text-background"
+                            ? "border-border bg-background text-foreground hover:bg-muted/50 noora:bg-surface-lowest noora:hover:bg-primary/8"
+                            : "border-foreground bg-foreground text-background noora:border-transparent noora:bg-primary-container noora:text-on-primary-container"
                       }`}
                     >
                       {i + 1}
@@ -1796,7 +1969,7 @@ function EvaluatorsPane({
                 })}
             </div>
             {answeredCount === questions.length ? (
-              <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400">
+              <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400 noora:text-on-tertiary-container">
                 <svg
                   className="w-4 h-4"
                   fill="none"
@@ -1814,7 +1987,7 @@ function EvaluatorsPane({
                 All questions answered
               </span>
             ) : answeredCount === 0 ? (
-              <span className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-300">
+              <span className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-300 noora:border-transparent noora:bg-primary-container noora:text-secondary">
                 Answer the questions below
                 <ArrowDownIcon className="w-4 h-4 motion-safe:animate-bounce" />
               </span>
@@ -1832,7 +2005,7 @@ function EvaluatorsPane({
       <ItemDetailsBlock
         heading="Case details"
         payload={item.payload}
-        metadata={item.metadata}
+        metadata={rightColumnMetadata(item)}
       />
       {readOnly && commentBlock}
       {forItem.map((ev) => {
@@ -1871,6 +2044,10 @@ function EvaluatorsPane({
           outputType === "binary" ? getBinaryDescription(scale, true) : null;
         const falseDescription =
           outputType === "binary" ? getBinaryDescription(scale, false) : null;
+        const trueColor =
+          outputType === "binary" ? getBinaryColor(scale, true) : null;
+        const falseColor =
+          outputType === "binary" ? getBinaryColor(scale, false) : null;
         const ratingScale =
           outputType === "rating" ? toRatingScale(scale) : null;
 
@@ -1914,6 +2091,14 @@ function EvaluatorsPane({
               name={ev.name}
               isOptional={ev.is_optional === true}
               description={ev.description}
+              help={
+                isTicketPayload(item.payload) && ticketHelpFor(ev.name) ? (
+                  <QuestionHelp
+                    help={ticketHelpFor(ev.name)!}
+                    questionName={ev.name}
+                  />
+                ) : undefined
+              }
               question={{
                 number: questions.indexOf(ev) + 1,
                 total: questions.length,
@@ -1940,6 +2125,8 @@ function EvaluatorsPane({
               falseLabel={falseLabel}
               trueDescription={trueDescription}
               falseDescription={falseDescription}
+              trueColor={trueColor}
+              falseColor={falseColor}
               ratingScale={ratingScale}
             />
           </div>
