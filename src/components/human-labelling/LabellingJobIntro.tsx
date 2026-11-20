@@ -69,8 +69,8 @@ const INTRO: Record<
   },
   ticket: {
     line: "Read each support ticket and answer the questions about how it was handled",
-    question: "Did the nurse ask enough questions?",
-    answers: ["Probed sufficiently", "Not probed sufficiently"],
+    question: "Was the reply accurate?",
+    answers: ["Accurate", "Not accurate"],
     item: (
       <>
         <p className={CAPTION}>User</p>

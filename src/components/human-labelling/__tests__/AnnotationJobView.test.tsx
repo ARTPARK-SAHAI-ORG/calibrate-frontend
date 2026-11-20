@@ -3166,7 +3166,7 @@ describe("AnnotationJobView support tickets", () => {
     window.localStorage.removeItem(TOUR_SEEN_KEY);
     fetchMock.mockResolvedValue(jsonResponse(ticketJob()));
     render(<AnnotationJobView token="tok" mode="public" />);
-    expect(await screen.findByText("Did the nurse ask enough questions?")).toBeInTheDocument();
+    expect(await screen.findByText("Was the reply accurate?")).toBeInTheDocument();
     expect(screen.queryByText("Was the agent polite?")).not.toBeInTheDocument();
   });
 
