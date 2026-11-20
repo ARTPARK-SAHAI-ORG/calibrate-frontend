@@ -12,8 +12,6 @@ export type CaseRow = {
   title: string;
   status: CaseStatus;
   preview: string;
-  /** "19:01 · 9.9 h", or "" when neither is known. */
-  meta: string;
   /** Lower case, everything a search looks through. */
   searchText: string;
 };
@@ -232,12 +230,8 @@ export function TicketCaseList({
                       <StatusIcon status={r.status} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-foreground">
+                      <span className="line-clamp-2 text-sm font-medium text-foreground">
                         {r.preview || r.title}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-on-surface-variant">
-                        {r.position}
-                        {r.meta ? ` · ${r.meta}` : ""}
                       </span>
                     </span>
                   </button>

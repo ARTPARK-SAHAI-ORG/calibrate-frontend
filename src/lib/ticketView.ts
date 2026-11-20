@@ -320,10 +320,6 @@ export function ticketTitle(name: string): string {
 export type TicketRowSummary = {
   /** The user's first message, in English when there is a translation. */
   preview: string;
-  /** When the ticket opened, as "19:01", or "" when that is not known. */
-  opened: string;
-  /** How long it stayed open, as "9.9 h", or "" when either time is missing. */
-  hoursOpen: string;
   /** Everything a search should look through, in lower case. */
   searchText: string;
 };
@@ -338,7 +334,7 @@ const MEDIA_NAME = {
 
 /**
  * Reads the line a ticket gets in the list of cases: what the user first wrote,
- * when it opened and for how long, plus the text a search looks through.
+ * plus the text a search looks through.
  */
 export function ticketRowSummary(
   payload: unknown,
@@ -361,17 +357,9 @@ export function ticketRowSummary(
     ? readable(first) || (first.media ? MEDIA_NAME[first.media.kind] : "")
     : "";
 
-  const openedAt = ticket?.openedAt ?? "";
-  const closedAt = ticket?.closedAt ?? "";
-  const hours =
-    openedAt && closedAt
-      ? (istToMs(closedAt) - istToMs(openedAt)) / 3_600_000
-      : NaN;
   const id = ticketTitle(str(asRecord(payload)?.name));
   return {
     preview,
-    opened: openedAt ? hourMinute(openedAt) : "",
-    hoursOpen: Number.isFinite(hours) && hours >= 0 ? `${hours.toFixed(1)} h` : "",
     searchText: [id, ...messages.flatMap((m) => [m.text, m.english ?? ""])]
       .join(" ")
       .toLowerCase(),

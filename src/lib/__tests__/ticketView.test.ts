@@ -501,7 +501,7 @@ describe("ticketRowSummary", () => {
     ...extra,
   });
 
-  it("previews the first thing the user wrote, in English, with when it opened and for how long", () => {
+  it("previews the first thing the user wrote, in English", () => {
     const sum = ticketRowSummary(
       {
         name: "77286594-f7cd-4880-4d30-40705fd6c6e8",
@@ -516,8 +516,6 @@ describe("ticketRowSummary", () => {
       meta,
     );
     expect(sum.preview).toBe("Does the baby have a fever");
-    expect(sum.opened).toBe("19:00");
-    expect(sum.hoursOpen).toBe("3.5 h");
     expect(sum.searchText).toContain("ticket 77286594");
     expect(sum.searchText).toContain("kya bukhar hai");
     expect(sum.searchText).toContain("does the baby have a fever");
@@ -552,17 +550,9 @@ describe("ticketRowSummary", () => {
     expect(none.preview).toBe("");
   });
 
-  it("leaves the times out when they are not known, and copes with a non-ticket", () => {
-    const sum = ticketRowSummary(
-      { name: "t", transcript: [turn("user", "Hi", "2026-11-16 19:01:00")] },
-      [],
-    );
-    expect(sum.opened).toBe("");
-    expect(sum.hoursOpen).toBe("");
+  it("copes with something that is not a ticket", () => {
     expect(ticketRowSummary({ chat_history: [] }, meta)).toEqual({
       preview: "",
-      opened: "",
-      hoursOpen: "",
       searchText: "",
     });
   });

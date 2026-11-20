@@ -3,9 +3,9 @@ import { fireEvent } from "@testing-library/react";
 import { TicketCaseList, type CaseRow } from "../TicketCaseList";
 
 const rows: CaseRow[] = [
-  { uuid: "a", position: 1, title: "Ticket aaaa", status: null, preview: "Fever since yesterday", meta: "19:00 · 3.5 h", searchText: "ticket aaaa fever since yesterday" },
-  { uuid: "b", position: 2, title: "Ticket bbbb", status: "in progress", preview: "Baby will not feed", meta: "", searchText: "ticket bbbb baby will not feed" },
-  { uuid: "c", position: 3, title: "Ticket cccc", status: "completed", preview: "", meta: "20:10", searchText: "ticket cccc" },
+  { uuid: "a", position: 1, title: "Ticket aaaa", status: null, preview: "Fever since yesterday", searchText: "ticket aaaa fever since yesterday" },
+  { uuid: "b", position: 2, title: "Ticket bbbb", status: "in progress", preview: "Baby will not feed", searchText: "ticket bbbb baby will not feed" },
+  { uuid: "c", position: 3, title: "Ticket cccc", status: "completed", preview: "", searchText: "ticket cccc" },
 ];
 
 function setup(currentUuid: string | null = "a") {
@@ -19,10 +19,10 @@ describe("TicketCaseList", () => {
   it("shows each case with what the user wrote, its timing and its state", () => {
     setup();
     expect(screen.getByText("Fever since yesterday")).toBeInTheDocument();
-    expect(screen.getByText("1 · 19:00 · 3.5 h")).toBeInTheDocument();
-    // A case with no preview falls back to its title, and no timing shows just its place.
+    // A case with no preview falls back to its title.
     expect(screen.getByText("Ticket cccc")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
+    // Nothing else sits under the preview.
+    expect(screen.queryByText(/\d+ · /)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Case 1, not answered" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Case 2, in progress" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Case 3, completed" })).toBeInTheDocument();

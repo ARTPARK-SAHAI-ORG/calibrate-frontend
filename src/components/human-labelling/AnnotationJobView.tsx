@@ -875,7 +875,6 @@ function AnnotateView({
       title: ticketTitle(typeof payload.name === "string" ? payload.name : ""),
       status: statusByItem.get(it.uuid) ?? null,
       preview: sum?.preview ?? "",
-      meta: [sum?.opened, sum?.hoursOpen].filter(Boolean).join(" · "),
       searchText: sum?.searchText ?? "",
     };
   });

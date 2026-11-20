@@ -3157,7 +3157,6 @@ describe("AnnotationJobView support tickets", () => {
     render(<AnnotationJobView token="tok" mode="public" />);
     const list = await screen.findByTestId("ticket-case-list");
     expect(within(list).getByText("Is my baby ok")).toBeInTheDocument();
-    expect(within(list).getByText("1 · 19:00 · 1.0 h")).toBeInTheDocument();
     expect(screen.getByText(/Case 1 of 2/)).toBeInTheDocument();
     await user.click(within(list).getByRole("button", { name: "Case 2, not answered" }));
     expect(screen.getByText(/Case 2 of 2/)).toBeInTheDocument();
