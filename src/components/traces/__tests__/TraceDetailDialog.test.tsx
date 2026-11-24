@@ -1157,3 +1157,45 @@ describe("showing a whole conversation", () => {
     ).toBeInTheDocument();
   });
 });
+
+it("says where the trace came from and shows its feedback", async () => {
+  mockFetchTrace.mockResolvedValue({
+    ...detail,
+    source: "chat",
+    feedback: { rating: "up", comment: "Clear answer", at: "2026-07-20" },
+  });
+  render(
+    <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+  );
+
+  expect(await screen.findByText("Source")).toBeInTheDocument();
+  expect(screen.getByText("Chat link")).toBeInTheDocument();
+  expect(screen.getByText("Feedback")).toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "Thumbs up" })).toBeInTheDocument();
+  expect(screen.getByText("Clear answer")).toBeInTheDocument();
+});
+
+it("shows an API trace with no feedback without a feedback block", async () => {
+  mockFetchTrace.mockResolvedValue({ ...detail, source: "api", feedback: null });
+  render(
+    <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+  );
+
+  expect(await screen.findByText("API")).toBeInTheDocument();
+  expect(screen.queryByText("Feedback")).not.toBeInTheDocument();
+});
+
+it("shows a thumb with no comment on its own", async () => {
+  mockFetchTrace.mockResolvedValue({
+    ...detail,
+    feedback: { rating: "down", comment: null, at: "2026-07-20" },
+  });
+  render(
+    <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+  );
+
+  expect(
+    await screen.findByRole("img", { name: "Thumbs down" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Source")).not.toBeInTheDocument();
+});

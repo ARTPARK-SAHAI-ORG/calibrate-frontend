@@ -29,13 +29,15 @@ import {
   TraceDetail,
   TraceOutput,
   TraceConversation,
+  TraceFeedback,
   TraceScoringRun,
+  TraceSource,
   TraceTurn,
 } from "@/lib/tracesApi";
 import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
-import { formatTraceDate } from "./TracesTable";
+import { formatTraceDate, TraceFeedbackThumb } from "./TracesTable";
 import { TraceScorePanel } from "./TraceScorePanel";
 
 type TraceDetailDialogProps = {
@@ -246,12 +248,16 @@ function TraceMetaPanel({
   createdAt,
   labels,
   metadata,
+  source,
+  feedback,
 }: {
   messageId: string | null;
   conversationId: string | null;
   createdAt: string;
   labels: string[] | null;
   metadata: MetadataEntry[] | null;
+  source?: TraceSource;
+  feedback?: TraceFeedback | null;
 }) {
   const tags = labels ?? [];
 
@@ -262,6 +268,27 @@ function TraceMetaPanel({
         <MetaBlock label="Conversation" value={conversationId} />
       )}
       <MetaBlock label="Created" value={formatTraceDate(createdAt)} />
+      {source && (
+        <MetaBlock
+          label="Source"
+          value={source === "chat" ? "Chat link" : "API"}
+        />
+      )}
+      {feedback && (
+        <div>
+          <span className="block text-sm font-semibold text-foreground">
+            Feedback
+          </span>
+          <div className="flex items-start gap-2 mt-0.5">
+            <TraceFeedbackThumb feedback={feedback} />
+            {feedback.comment && (
+              <span className="text-xs text-foreground break-words">
+                {feedback.comment}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
       {tags.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-foreground">Labels</h3>
@@ -510,6 +537,8 @@ export function TraceDetailDialog({
                   createdAt={trace.created_at}
                   labels={trace.labels ?? null}
                   metadata={trace.metadata}
+                  source={trace.source}
+                  feedback={trace.feedback}
                 />
               )}
             </div>
