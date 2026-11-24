@@ -67,6 +67,46 @@ describe("the conversation filter on the traces list", () => {
   });
 });
 
+describe("the source and feedback filters", () => {
+  const facets = { source: "chat", feedback: "down" } as const;
+
+  it("reach the list, the conversations list and a select-all body", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
+
+    await fetchTraces("tok", { limit: 10, offset: 0, agentId: "a", ...facets });
+    await fetchTraceConversations("tok", {
+      limit: 10,
+      offset: 0,
+      agentId: "a",
+      ...facets,
+    });
+
+    for (const [url] of mockApiGet.mock.calls) {
+      const query = new URLSearchParams(url.split("?")[1]);
+      expect(query.get("source")).toBe("chat");
+      expect(query.get("feedback")).toBe("down");
+    }
+    expect(selectAllBody({ agentId: "a", ...facets })).toEqual({
+      select_all: true,
+      agent_id: "a",
+      source: "chat",
+      feedback: "down",
+    });
+  });
+
+  it("are left off when set to every trace", () => {
+    expect(
+      selectAllBody({ agentId: "a", source: "all", feedback: "all" }),
+    ).toEqual({ select_all: true, agent_id: "a" });
+  });
+
+  it("change the filter key", () => {
+    const plain = traceFilterKey({ agentId: "a" });
+    expect(traceFilterKey({ agentId: "a", source: "chat" })).not.toBe(plain);
+    expect(traceFilterKey({ agentId: "a", feedback: "none" })).not.toBe(plain);
+  });
+});
+
 describe("fetchTraceConversationIds", () => {
   it("asks for the agent's conversation IDs", async () => {
     mockApiGet.mockResolvedValueOnce({ conversation_ids: ["conv a/1"] });
@@ -349,13 +389,16 @@ describe("fetchTraceUsage", () => {
       max_scored_traces: 100,
     });
 
-    await expect(fetchTraceUsage("tok")).resolves.toEqual({
+    await expect(fetchTraceUsage("tok", "ag 1")).resolves.toEqual({
       traces_stored: 412,
       max_traces: 50000,
       traces_scored: 100,
       max_scored_traces: 100,
     });
-    expect(mockApiGet).toHaveBeenCalledWith("/traces/usage", "tok");
+    expect(mockApiGet).toHaveBeenCalledWith(
+      "/traces/usage?agent_id=ag%201",
+      "tok",
+    );
   });
 });
 

@@ -253,7 +253,7 @@ describe("TracesTable", () => {
       .getByText("Input")
       .closest("div[style]") as HTMLElement;
     expect(header.style.gridTemplateColumns).toBe(
-      "40px 400px 400px 10ch 11ch 160px auto",
+      "40px 400px 400px 10ch 11ch 90px 160px auto",
     );
   });
 
@@ -299,7 +299,7 @@ describe("TracesTable", () => {
       traces: [trace({})],
     });
     // The name plus the arrow that orders the column.
-    const expected = `40px 400px 400px 10ch ${longName.length + 3}ch 160px auto`;
+    const expected = `40px 400px 400px 10ch ${longName.length + 3}ch 90px 160px auto`;
     const header = screen
       .getByText("Input")
       .closest("div[style]") as HTMLElement;
@@ -497,5 +497,59 @@ describe("TracesTable", () => {
       screen.queryByRole("button", { name: /^Sort traces by/ }),
     ).not.toBeInTheDocument();
     expect(screen.getAllByText("Tone").length).toBeGreaterThan(0);
+  });
+});
+
+describe("chat link traces and feedback", () => {
+  it("marks a trace from the chat link, and says so on hover", async () => {
+    const user = setupUser();
+    renderTable({ traces: [trace({ source: "chat" })] });
+
+    const marks = screen.getAllByRole("img", {
+      name: "Sent from the chat link",
+    });
+    // One on the desktop row and one on the phone card.
+    expect(marks).toHaveLength(2);
+    await user.hover(marks[0]);
+    expect(
+      (await screen.findAllByText("Sent from the chat link")).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("leaves a trace from the app unmarked", () => {
+    renderTable({ traces: [trace({ source: "api" })] });
+
+    expect(
+      screen.queryByRole("img", { name: "Sent from the chat link" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the thumb under Feedback, with the comment on hover", async () => {
+    const user = setupUser();
+    renderTable({
+      traces: [
+        trace({
+          uuid: "t1",
+          feedback: { rating: "down", comment: "Wrong dose", at: "2026-07-20" },
+        }),
+        trace({
+          uuid: "t2",
+          feedback: { rating: "up", comment: null, at: "2026-07-20" },
+        }),
+        trace({ uuid: "t3", feedback: null }),
+      ],
+    });
+
+    expect(screen.getByText("Feedback")).toBeInTheDocument();
+    const down = screen.getAllByRole("img", { name: "Thumbs down" });
+    expect(down).toHaveLength(2);
+    expect(down[0]).toHaveClass("text-red-600");
+    expect(screen.getAllByRole("img", { name: "Thumbs up" })[0]).toHaveClass(
+      "text-green-600",
+    );
+    await user.hover(down[0]);
+    expect((await screen.findAllByText("Wrong dose")).length).toBeGreaterThan(
+      0,
+    );
   });
 });

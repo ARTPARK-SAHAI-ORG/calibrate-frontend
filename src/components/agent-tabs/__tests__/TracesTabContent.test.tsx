@@ -343,6 +343,8 @@ const loaded = (over: Record<string, unknown> = {}) => ({
   labels: [],
   scores: {},
   conversationId: null,
+  source: "all",
+  feedback: "all",
   ...over,
 });
 
@@ -441,7 +443,13 @@ async function applyTraceFilter(
   },
 ) {
   await openTraceFilter(user);
-  if (output) await user.click(screen.getByRole("button", { name: output }));
+  if (output) {
+    await user.click(
+      within(
+        screen.getByRole("group", { name: "Filter traces by output" }),
+      ).getByRole("button", { name: output }),
+    );
+  }
   for (const label of labels) {
     await user.click(screen.getByRole("checkbox", { name: label }));
   }
@@ -753,7 +761,56 @@ describe("TracesTabContent", () => {
       // logs. Waiting for something here to go wrong would mean never saying
       // it at all.
       render(<TracesTabContent {...tabProps} />);
-      expect(fetchTraceUsage).toHaveBeenCalled();
+      expect(fetchTraceUsage).toHaveBeenCalledWith("test-token", "agent-1");
+    });
+
+    it("says the chat link reached its daily limit, with a way to ask for more", async () => {
+      fetchTraceUsage.mockResolvedValue({
+        traces_stored: 3,
+        max_traces: 50000,
+        traces_scored: 1,
+        max_scored_traces: 100,
+        chat_replies_today: 1200,
+        max_chat_replies_per_day: 1200,
+      });
+      render(<TracesTabContent {...tabProps} />);
+      const line = await screen.findByText(
+        /The chat link reached its limit of 1,200 replies today\./,
+      );
+      expect(line).toHaveTextContent("Click here to contact us");
+    });
+
+    it("says one reply, not one replies, when the daily limit is one", async () => {
+      fetchTraceUsage.mockResolvedValue({
+        traces_stored: 3,
+        max_traces: 50000,
+        traces_scored: 1,
+        max_scored_traces: 100,
+        chat_replies_today: 1,
+        max_chat_replies_per_day: 1,
+      });
+      render(<TracesTabContent {...tabProps} />);
+      expect(
+        await screen.findByText(/reached its limit of 1 reply today/),
+      ).toBeInTheDocument();
+    });
+
+    it.each([
+      ["below the limit", 199, 200],
+      ["with no limit", 5000, null],
+    ])("says nothing about the chat link %s", async (_, today, cap) => {
+      fetchTraceUsage.mockResolvedValue({
+        traces_stored: 3,
+        max_traces: 50000,
+        traces_scored: 1,
+        max_scored_traces: 100,
+        chat_replies_today: today,
+        max_chat_replies_per_day: cap,
+      });
+      render(<TracesTabContent {...tabProps} />);
+      await waitFor(() => expect(fetchTraceUsage).toHaveBeenCalled());
+      await act(async () => {});
+      expect(screen.queryByText(/The chat link reached/)).not.toBeInTheDocument();
     });
 
     it("says nothing about a limit when no trace was refused for one", () => {
@@ -1404,6 +1461,8 @@ describe("TracesTabContent", () => {
     const props = screen.getByTestId("conversations-view").dataset.props;
     expect(props).not.toContain("scores");
     expect(props).not.toContain("conversationId");
+    expect(props).toContain("source");
+    expect(props).toContain("feedback");
     const address = new URLSearchParams(window.location.search);
     expect(address.get("score")).toBe("ev-1:failed");
     expect(address.get("conversation")).toBe("conv-9");

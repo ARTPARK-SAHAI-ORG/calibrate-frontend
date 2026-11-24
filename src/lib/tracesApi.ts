@@ -55,6 +55,19 @@ export type TraceSummary = {
   /** One entry per evaluator on the latest completed run, the same shape a
    *  scoring run carries. Empty until the run finishes. */
   results?: TraceScoreResult[] | null;
+  /** "chat" when the trace came from the agent's chat link, else "api". */
+  source?: TraceSource;
+  /** The thumb and comment left on the reply in the chat link, if any. */
+  feedback?: TraceFeedback | null;
+};
+
+/** Where a trace came from: the customer's app, or the agent's chat link. */
+export type TraceSource = "api" | "chat";
+
+export type TraceFeedback = {
+  rating: "up" | "down";
+  comment: string | null;
+  at: string;
 };
 
 /** Status of one durable trace-scoring run. */
@@ -114,6 +127,8 @@ export type TraceDetail = {
   labels?: string[] | null;
   created_at: string;
   updated_at: string;
+  source?: TraceSource;
+  feedback?: TraceFeedback | null;
 };
 
 /** What a trace adds to a labelling item's metadata: its own entries, then its
@@ -193,6 +208,12 @@ export function traceScoreParams(scores?: TraceScoreFilters): string[] {
     .map(([uuid, condition]) => `${uuid}:${condition}`);
 }
 
+/** The source filter, where "all" means no filter at all. */
+export type TraceSourceFilter = "all" | TraceSource;
+
+/** The feedback filter: a thumb up, a thumb down, either, or none. */
+export type TraceFeedbackFilter = "all" | "up" | "down" | "any" | "none";
+
 /** Which way a sorted column runs. */
 export type TraceSortOrder = "asc" | "desc";
 
@@ -212,6 +233,10 @@ export type TraceFacets = {
   scores: TraceScoreFilters;
   /** Keep only the turns of this conversation. */
   conversationId: string | null;
+  /** Keep only the traces from the customer's app or from the chat link. */
+  source: TraceSourceFilter;
+  /** Keep only the traces with this feedback from the chat link. */
+  feedback: TraceFeedbackFilter;
 };
 
 export const NO_TRACE_FACETS: TraceFacets = {
@@ -219,6 +244,8 @@ export const NO_TRACE_FACETS: TraceFacets = {
   labels: [],
   scores: {},
   conversationId: null,
+  source: "all",
+  feedback: "all",
 };
 
 /** Which traces a list shows. */
@@ -257,6 +284,8 @@ function traceFilterFields(f: TraceFilters): Record<string, string | string[]> {
   if (f.outputType && f.outputType !== "all") fields.output_type = f.outputType;
   if (f.labels?.length) fields.labels = f.labels;
   if (f.conversationId) fields.conversation_id = f.conversationId;
+  if (f.source && f.source !== "all") fields.source = f.source;
+  if (f.feedback && f.feedback !== "all") fields.feedback = f.feedback;
   const score = traceScoreParams(f.scores);
   if (score.length) fields.score = score;
   return fields;
@@ -430,12 +459,21 @@ export type TraceUsage = {
   traces_scored: number;
   /** Null means the workspace has no scoring limit. */
   max_scored_traces: number | null;
+  /** Replies the agent's chat link gave today. */
+  chat_replies_today?: number;
+  /** Null means the chat link has no daily limit. */
+  max_chat_replies_per_day?: number | null;
 };
 
+/** Usage for the workspace; the chat link's counts are for `agentId`. */
 export async function fetchTraceUsage(
   accessToken: string,
+  agentId: string,
 ): Promise<TraceUsage> {
-  return apiGet<TraceUsage>("/traces/usage", accessToken);
+  return apiGet<TraceUsage>(
+    `/traces/usage?agent_id=${encodeURIComponent(agentId)}`,
+    accessToken,
+  );
 }
 
 /** Every conversation ID on this agent's traces, newest activity first. */

@@ -15,7 +15,9 @@ import { defaultBinaryLabel } from "@/lib/binaryLabels";
 import {
   NO_TRACE_FACETS,
   type TraceFacets,
+  type TraceFeedbackFilter,
   type TraceOutputFilter,
+  type TraceSourceFilter,
 } from "@/lib/tracesApi";
 
 /** What a trace's output can be filtered down to. A trace that both replied
@@ -26,6 +28,23 @@ const OUTPUT_FILTER_OPTIONS: { value: TraceOutputFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "response", label: "Response" },
   { value: "tool_call", label: "Tool call" },
+];
+
+const SOURCE_FILTER_OPTIONS: { value: TraceSourceFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "api", label: "API" },
+  { value: "chat", label: "Chat link" },
+];
+
+const FEEDBACK_FILTER_OPTIONS: {
+  value: TraceFeedbackFilter;
+  label: string;
+}[] = [
+  { value: "all", label: "All" },
+  { value: "up", label: "Thumbs up" },
+  { value: "down", label: "Thumbs down" },
+  { value: "any", label: "Any feedback" },
+  { value: "none", label: "No feedback" },
 ];
 
 /** Past this many labels the list is worth searching rather than scrolling. */
@@ -106,7 +125,9 @@ export function traceFilterCount(value: TracesFilterValue): number {
     (value.outputType === "all" ? 0 : 1) +
     value.labels.length +
     Object.keys(value.scores).length +
-    (value.conversationId ? 1 : 0)
+    (value.conversationId ? 1 : 0) +
+    (value.source === "all" ? 0 : 1) +
+    (value.feedback === "all" ? 0 : 1)
   );
 }
 
@@ -269,6 +290,32 @@ export function TracesFilter({
                 : "Filter traces by output"
             }
           />
+
+          <div className="mt-4 pt-4 border-t border-border">
+            <p className="text-sm font-medium text-foreground mb-2">
+              Filter by where the trace came from
+            </p>
+            <SegmentedFilter
+              value={draft.source}
+              onChange={(source) => setDraft((d) => ({ ...d, source }))}
+              options={SOURCE_FILTER_OPTIONS}
+              className="w-fit"
+              ariaLabel="Filter by where the trace came from"
+            />
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-border">
+            <p className="text-sm font-medium text-foreground mb-2">
+              Filter by feedback
+            </p>
+            <SegmentedFilter
+              value={draft.feedback}
+              onChange={(feedback) => setDraft((d) => ({ ...d, feedback }))}
+              options={FEEDBACK_FILTER_OPTIONS}
+              className="w-fit max-w-full overflow-x-auto"
+              ariaLabel="Filter by feedback"
+            />
+          </div>
 
           {!forConversations && allConversationIds.length > 0 && (
             <div className="mt-4 pt-4 border-t border-border">

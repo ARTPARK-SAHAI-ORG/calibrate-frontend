@@ -1,7 +1,12 @@
 "use client";
 
 import React from "react";
-import { ToolIcon } from "@/components/icons";
+import {
+  ChatIcon,
+  ThumbsDownIcon,
+  ThumbsUpIcon,
+  ToolIcon,
+} from "@/components/icons";
 import { Tooltip } from "@/components/Tooltip";
 import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { SelectCheckbox } from "@/components/ui/SelectCheckbox";
@@ -9,6 +14,7 @@ import { DeleteIconButton } from "@/components/ui";
 import { Link } from "@/lib/nav";
 import { openInPlace } from "@/lib/openInPlace";
 import type {
+  TraceFeedback,
   TraceSortOrder,
   TraceSummary,
   TraceToolCall,
@@ -99,6 +105,55 @@ function ScoreColumnHeading({
         <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
       </svg>
     </button>
+  );
+}
+
+/** A chat bubble on a trace sent from the agent's chat link. API traces carry
+ *  nothing, since that is where most traces come from. */
+function ChatSourceMark({ trace }: { trace: TraceSummary }) {
+  if (trace.source !== "chat") return null;
+  return (
+    <Tooltip content="Sent from the chat link" position="top">
+      <span
+        role="img"
+        aria-label="Sent from the chat link"
+        className="flex-shrink-0 text-muted-foreground"
+      >
+        <ChatIcon className="w-4 h-4" />
+      </span>
+    </Tooltip>
+  );
+}
+
+/** The thumb left on a reply in the chat link, green up or red down. */
+export function TraceFeedbackThumb({ feedback }: { feedback: TraceFeedback }) {
+  const up = feedback.rating === "up";
+  const Icon = up ? ThumbsUpIcon : ThumbsDownIcon;
+  return (
+    <span
+      role="img"
+      aria-label={up ? "Thumbs up" : "Thumbs down"}
+      className={`inline-flex flex-shrink-0 ${
+        up
+          ? "text-green-600 dark:text-green-500"
+          : "text-red-600 dark:text-red-500"
+      }`}
+    >
+      <Icon className="w-4 h-4" />
+    </span>
+  );
+}
+
+/** The thumb, with the comment on hover when one was left. */
+function FeedbackCell({ trace }: { trace: TraceSummary }) {
+  if (!trace.feedback) return null;
+  const thumb = <TraceFeedbackThumb feedback={trace.feedback} />;
+  return trace.feedback.comment ? (
+    <Tooltip content={trace.feedback.comment} position="top">
+      {thumb}
+    </Tooltip>
+  ) : (
+    thumb
   );
 }
 
@@ -238,7 +293,7 @@ export function TracesTable({
     // columns would not line up. The table scrolls sideways instead.
     gridTemplateColumns: `40px 400px 400px${
       evaluatorTracks ? ` ${evaluatorTracks}` : ""
-    } 160px auto`,
+    } 90px 160px auto`,
   };
   // Each row's text is a link, so a right-click, middle-click or Cmd-click opens
   // the trace in a new tab, while a plain click opens the window in place. The
@@ -281,6 +336,9 @@ export function TracesTable({
             />
           ))}
           <div className="text-sm font-medium text-muted-foreground">
+            Feedback
+          </div>
+          <div className="text-sm font-medium text-muted-foreground">
             Created
           </div>
           <div className="w-8" />
@@ -301,6 +359,7 @@ export function TracesTable({
                 className="min-w-0 self-stretch py-2.5 flex items-center gap-2"
               >
                 <TraceScoreMark trace={trace} />
+                <ChatSourceMark trace={trace} />
                 {trace.input_preview && (
                   <div className="text-sm font-medium text-foreground truncate">
                     {trace.input_preview}
@@ -318,6 +377,9 @@ export function TracesTable({
                 columns={scoreColumns}
                 layout="row"
               />
+              <div className="flex items-center">
+                <FeedbackCell trace={trace} />
+              </div>
               <Link
                 {...linkProps(trace.uuid)}
                 className="self-stretch py-2.5 flex items-center text-sm text-muted-foreground whitespace-nowrap"
@@ -350,6 +412,7 @@ export function TracesTable({
                   className="min-w-0 flex items-start gap-2"
                 >
                   <TraceScoreMark trace={trace} />
+                  <ChatSourceMark trace={trace} />
                   {trace.input_preview && (
                     <p className="text-sm font-medium text-foreground line-clamp-2">
                       {trace.input_preview}
@@ -373,6 +436,7 @@ export function TracesTable({
                 >
                   {formatTraceDate(trace.created_at)}
                 </Link>
+                <FeedbackCell trace={trace} />
                 <div className="ml-auto">
                   <DeleteIconButton
                     onClick={() => onDelete(trace)}
