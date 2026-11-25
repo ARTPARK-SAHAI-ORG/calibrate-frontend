@@ -56,7 +56,9 @@ Use the Artifact tool's Design type (`action: "quickstart"`, `intent:
   updates every screen.
 - Use real-looking example content from the product's domain, never lorem
   ipsum.
-- Add a short sticky note listing the questions the team should answer.
+- No questions on the canvas: no sticky notes of open questions, no notes
+  asking for decisions. The mockup shows screens only. Decide anything with
+  an obvious answer yourself, and ask the few real questions in chat.
 
 ## 3. Share it and iterate
 
