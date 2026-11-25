@@ -315,6 +315,7 @@ export function AddLlmGeneralItemsDialog({
       const seeded = toolCallsToSelectedTools(
         s?.expectedToolCalls,
         availableTools,
+        true,
       );
       expected.reset(seeded);
       setExpectedBaseline(JSON.stringify(selectedToolsToCalls(seeded)));
@@ -377,7 +378,11 @@ export function AddLlmGeneralItemsDialog({
     if (availableTools.length === 0) return;
     const calls = selectedToolsToCalls(expected.selectedTools);
     if (JSON.stringify(calls) !== expectedBaseline) return;
-    const rebuilt = toolCallsToSelectedTools(calls, availableTools);
+    const rebuilt = toolCallsToSelectedTools(
+      seed?.expectedToolCalls,
+      availableTools,
+      true,
+    );
     expected.setSelectedTools(rebuilt);
     setExpectedBaseline(JSON.stringify(selectedToolsToCalls(rebuilt)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -535,7 +540,7 @@ export function AddLlmGeneralItemsDialog({
     (!!output.trim() || toolCalls.length > 0 || storesEmptyToolCallList) &&
     varsComplete &&
     versionsComplete(inputExtras) &&
-    (toolCalls.length > 0 || versionsComplete(outputExtras)) &&
+    (!output.trim() || versionsComplete(outputExtras)) &&
     Object.keys(metadataRowErrors(metadataRows)).length === 0;
 
   const handleSubmit = async () => {
@@ -570,7 +575,8 @@ export function AddLlmGeneralItemsDialog({
           input: input.trim(),
           output: output.trim(),
           inputExtras,
-          outputExtras: toolCalls.length > 0 ? {} : outputExtras,
+          // Versions beside an empty output would be refused on save.
+          outputExtras: output.trim() ? outputExtras : {},
           toolCalls: restoreToolCalls(
             toolCalls.map((tc) => ({
               tool: tc.tool,
@@ -794,23 +800,21 @@ export function AddLlmGeneralItemsDialog({
                 </div>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto space-y-3 flex flex-col">
-                {toolCalls.length === 0 && (
-                  <TextVersionsEditor
-                    field="output"
-                    extras={outputExtras}
-                    onChange={setOutputExtras}
-                    onPendingChange={setOutputPending}
+                <TextVersionsEditor
+                  field="output"
+                  extras={outputExtras}
+                  onChange={setOutputExtras}
+                  onPendingChange={setOutputPending}
+                  disabled={submitting}
+                >
+                  <textarea
+                    value={output}
+                    onChange={(e) => setOutput(e.target.value)}
+                    placeholder="The output the LLM produced"
                     disabled={submitting}
-                  >
-                    <textarea
-                      value={output}
-                      onChange={(e) => setOutput(e.target.value)}
-                      placeholder="The output the LLM produced"
-                      disabled={submitting}
-                      className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-                    />
-                  </TextVersionsEditor>
-                )}
+                    className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                  />
+                </TextVersionsEditor>
                 {toolCalls.map((tc) => (
                   // Same card the test dialog draws a tool call with, in the
                   // conversation tab: header row with the wrench and the tool

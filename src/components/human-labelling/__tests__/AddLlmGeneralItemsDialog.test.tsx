@@ -223,7 +223,7 @@ function renderDialog(
 }
 
 describe("AddLlmGeneralItemsDialog tool-call output", () => {
-  it("shows the tool call under Output instead of an empty box", () => {
+  it("shows the tool call under Output beside the output box", () => {
     renderDialog({
       mode: "edit",
       initialRows: [
@@ -239,8 +239,8 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     expect(screen.getByText("dummy")).toBeInTheDocument();
     expect(screen.getByText("success")).toBeInTheDocument();
     expect(
-      screen.queryByPlaceholderText("The output the LLM produced"),
-    ).not.toBeInTheDocument();
+      screen.getByPlaceholderText("The output the LLM produced"),
+    ).toBeInTheDocument();
   });
 
   it("saves an edited argument value, with true kept as a yes/no", async () => {
@@ -641,6 +641,32 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
       ),
     ).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("saves an expected call that leaves out a required input as it was", async () => {
+    withTools();
+    const user = setupUser();
+    const stored = [
+      { tool: "book_flight", arguments: {}, accept_any_arguments: false },
+    ];
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: stored,
+        },
+      ],
+    });
+    await screen.findByText("Accept any values for the parameters");
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].expectedToolCalls).toEqual(stored);
     accessTokenMock.mockReturnValue(null);
   });
 
@@ -1690,7 +1716,7 @@ describe("AddLlmGeneralItemsDialog headings and versions", () => {
     expect(save).toBeDisabled();
   });
 
-  it("sends no output versions when the answer is a tool call", async () => {
+  it("sends no output versions when the output is empty", async () => {
     const user = setupUser();
     const onSubmit = jest.fn().mockResolvedValue(undefined);
     renderDialog({
@@ -1704,10 +1730,30 @@ describe("AddLlmGeneralItemsDialog headings and versions", () => {
       ],
       onSubmit,
     });
-    expect(screen.queryByLabelText("Heading for the output")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save item" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0][0].outputExtras).toEqual({});
+  });
+
+  it("keeps the output's versions when the item also has a tool call", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn().mockResolvedValue(undefined);
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          ...versioned,
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+      onSubmit,
+    });
+    expect(screen.getByDisplayValue("A summary")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].outputExtras).toEqual(
+      versioned.outputExtras,
+    );
   });
 
   it("does not step to another item while the remove question is up", async () => {

@@ -45,6 +45,7 @@ import {
   DEFAULT_WEBHOOK_RESPONSE,
   actualToolCallsStart,
   argumentText,
+  hasArgumentGroups,
 } from "@/components/human-labelling/itemConversation";
 import {
   ToolCallExpectationsEditor,
@@ -581,7 +582,7 @@ export function AddTestDialog({
                 group?: string;
               }> = [];
 
-              if (isWebhook) {
+              if (isWebhook && hasArgumentGroups(parsedArgs)) {
                 // Extract params from body, query with their group (headers are not shown in UI)
                 const webhookKeys = ["body", "query"];
                 webhookKeys.forEach((groupKey) => {
@@ -718,12 +719,19 @@ export function AddTestDialog({
             toolCallsToSelectedTools(
               initialConfig.evaluation.tool_calls,
               availableTools,
+              isLabelItem,
             ),
           );
         }
       }
     }
-  }, [initialConfig, toolsFetched, showsExpectedToolCalls, setSelectedTools]);
+  }, [
+    initialConfig,
+    toolsFetched,
+    showsExpectedToolCalls,
+    isLabelItem,
+    setSelectedTools,
+  ]);
 
 
   // Evaluators attached to this test (next-reply tab only).
@@ -2229,7 +2237,7 @@ export function AddTestDialog({
   // Where the graded answer starts: the agent's last message, or the run of
   // tool calls (with their responses) it ended on, together with the message
   // just before them when that is the agent's. -1 when there is neither.
-  const evalTargetStartIndex = () => {
+  const evalTargetStart = (() => {
     const start = trailingToolCallsStart();
     if (start >= 0) {
       return chatMessages[start - 1]?.role === "agent" ? start - 1 : start;
@@ -2237,7 +2245,7 @@ export function AddTestDialog({
     return chatMessages[chatMessages.length - 1]?.role === "agent"
       ? chatMessages.length - 1
       : -1;
-  };
+  })();
 
   const evalTargetPill = (
     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -3381,11 +3389,10 @@ export function AddTestDialog({
                 ) : (
                   <div className="space-y-4">
                     {chatMessages.map((message, index) => {
-                      const evalTargetStart = requireAssistantLastMessage
-                        ? evalTargetStartIndex()
-                        : -1;
                       const isEvalTarget =
-                        evalTargetStart >= 0 && index >= evalTargetStart;
+                        requireAssistantLastMessage &&
+                        evalTargetStart >= 0 &&
+                        index >= evalTargetStart;
                       const lastNonToolResponseIndex =
                         chatMessages.length -
                         1 -
@@ -3625,7 +3632,9 @@ export function AddTestDialog({
                                     message.toolParams.length > 0 && (
                                       <div className="space-y-3 mt-3">
                                         {/* Group parameters by type for webhook tools */}
-                                        {message.isWebhook ? (
+                                        {message.toolParams.some(
+                                          (p) => p.group,
+                                        ) ? (
                                           <>
                                             {/* Query Parameters */}
                                             {message.toolParams.filter(
@@ -4260,7 +4269,7 @@ export function AddTestDialog({
                   // An item storing an empty tool call list records an agent
                   // that did nothing, so it has no answer to end on.
                   isLastMessageInvalid =
-                    evalTargetStartIndex() < 0 && !storesEmptyToolCallList;
+                    evalTargetStart < 0 && !storesEmptyToolCallList;
                 } else if (allowAgentLastMessage) {
                   isLastMessageInvalid = isEmpty;
                 } else {

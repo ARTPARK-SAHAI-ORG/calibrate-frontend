@@ -10,7 +10,10 @@ import { TracesEmptyState } from "@/components/traces/TracesEmptyState";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
 import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
-import { NothingCanScoreMessage } from "@/components/traces/NothingCanScoreMessage";
+import {
+  EvaluatorsTabLink,
+  NothingCanScoreMessage,
+} from "@/components/traces/NothingCanScoreMessage";
 import { AddToolCallEvaluatorButton } from "@/components/traces/AddToolCallEvaluatorButton";
 import { TraceScoringChip } from "@/components/traces/TraceScoringChip";
 import {
@@ -608,6 +611,15 @@ export function TracesTabContent({
     (hasStoredToolCallTrace ||
       items.some((trace) => isToolCallOutput(traceRowOutputFacts(trace)))) &&
     !Object.values(evaluatorTypes).includes("tool-call");
+  const [hasStoredReplyTrace, setHasStoredReplyTrace] = useState(false);
+  const linkedTypes = Object.values(evaluatorTypes);
+  const onlyToolCallEvaluators =
+    !evaluatorTypesLoading &&
+    !evaluatorTypesFailed &&
+    linkedTypes.length > 0 &&
+    linkedTypes.every((type) => type === "tool-call") &&
+    (hasStoredReplyTrace ||
+      items.some((trace) => !isToolCallOutput(traceRowOutputFacts(trace))));
   const addToolCallEvaluatorButton = (
     <AddToolCallEvaluatorButton
       agentUuid={agentUuid}
@@ -682,6 +694,11 @@ export function TracesTabContent({
         if (!cancelled) setHasStoredToolCallTrace(has);
       })
       .catch((err) => reportError("Error checking for tool call traces:", err));
+    fetchHasTrace(accessToken, agentUuid, { outputType: "response" })
+      .then((has) => {
+        if (!cancelled) setHasStoredReplyTrace(has);
+      })
+      .catch((err) => reportError("Error checking for reply traces:", err));
     return () => {
       cancelled = true;
     };
@@ -785,7 +802,11 @@ export function TracesTabContent({
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
 
-  const hasWarning = nothingCanScore || overLimit || missingToolCallEvaluator;
+  const hasWarning =
+    nothingCanScore ||
+    overLimit ||
+    missingToolCallEvaluator ||
+    onlyToolCallEvaluators;
 
   const integrationGuideButton = (
     <Button
@@ -951,6 +972,15 @@ export function TracesTabContent({
                 <p className="text-sm text-amber-700 dark:text-amber-300">
                   This agent has no tool call evaluator, so its tool calls are not
                   checked. {addToolCallEvaluatorButton}
+                </p>
+              </div>
+            )}
+            {onlyToolCallEvaluators && !nothingCanScore && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  This agent has only tool call evaluators, so its replies are
+                  not checked. Add an evaluator that checks replies in the{" "}
+                  <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
                 </p>
               </div>
             )}

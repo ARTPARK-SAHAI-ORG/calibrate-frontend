@@ -174,4 +174,19 @@ describe("ToolCallItemPane", () => {
     );
     expect(screen.getByText("Expected answer")).toBeInTheDocument();
   });
+
+  it("marks only the agent's calls as judged when an earlier agent turn sits right before them", () => {
+    render(
+      <ToolCallItemPane
+        payload={{
+          chat_history: [
+            { role: "user", content: "Book a flight" },
+            { role: "assistant", content: "Looking it up" },
+          ],
+          actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
+        }}
+      />,
+    );
+    expect(screen.getAllByText("Evaluation target")).toHaveLength(1);
+  });
 });

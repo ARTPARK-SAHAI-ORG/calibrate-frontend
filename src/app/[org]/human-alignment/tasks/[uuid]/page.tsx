@@ -53,6 +53,10 @@ import {
 } from "@/components/human-labelling/itemConversation";
 import { agentToolCalls } from "@/components/human-labelling/item-panes/shared";
 import { textOf } from "@/lib/messageVersions";
+import {
+  actualToolCallsCell,
+  toolCallsCell,
+} from "@/components/human-labelling/toolCallCells";
 import { BulkUploadSttItemsDialog } from "@/components/human-labelling/BulkUploadSttItemsDialog";
 import { BulkUploadTtsItemsDialog } from "@/components/human-labelling/BulkUploadTtsItemsDialog";
 import { BulkUploadConversationItemsDialog } from "@/components/human-labelling/BulkUploadConversationItemsDialog";
@@ -451,6 +455,10 @@ function buildItemsCsv(
     columns.push({ key: "input", header: "input" });
     columns.push({ key: "output", header: "output" });
   }
+  if (taskType === "llm" || taskType === "llm-general") {
+    columns.push({ key: "actual_tool_calls", header: "actual_tool_calls" });
+    columns.push({ key: "expected_tool_calls", header: "expected_tool_calls" });
+  }
 
   for (const ev of evaluators) {
     const evName = sanitizeCsvName(ev.name);
@@ -528,6 +536,10 @@ function buildItemsCsv(
     } else if (taskType === "llm-general") {
       out.input = textOf(p.input);
       out.output = textOf(p.output);
+    }
+    if (taskType === "llm" || taskType === "llm-general") {
+      out.actual_tool_calls = actualToolCallsCell(p);
+      out.expected_tool_calls = toolCallsCell(p.expected_tool_calls);
     }
 
     for (const ev of evaluators) {

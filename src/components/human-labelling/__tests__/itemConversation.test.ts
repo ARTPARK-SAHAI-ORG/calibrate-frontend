@@ -564,8 +564,6 @@ describe("actualToolCallsStart", () => {
 
 describe("restoreToolCalls", () => {
   it("puts back stored values whose text is unchanged, for the same tool only", () => {
-    const text = (v: unknown) =>
-      typeof v === "string" ? v : v == null ? "" : JSON.stringify(v);
     const stored = [
       { tool: "a", arguments: { n: 3, ok: true } },
       { tool: "b", arguments: { n: 3 } },
@@ -578,7 +576,6 @@ describe("restoreToolCalls", () => {
           { tool: "d", arguments: {} },
         ],
         stored,
-        text,
       ),
     ).toEqual([
       { tool: "a", arguments: { n: 3, ok: true } },
@@ -608,6 +605,24 @@ describe("restoreToolCalls with webhook arguments", () => {
     expect(
       restoreToolCalls([{ tool: "w", arguments: { body: { id: 7 } } }], stored),
     ).toEqual([{ tool: "w", arguments: { body: { id: 7 }, headers: { k: "v" } } }]);
+  });
+
+  it("drops a body the reader emptied", () => {
+    const stored = [
+      { tool: "w", arguments: { body: { id: 7 }, headers: { k: "v" } } },
+    ];
+    expect(restoreToolCalls([{ tool: "w", arguments: {} }], stored)).toEqual([
+      { tool: "w", arguments: { headers: { k: "v" } } },
+    ]);
+  });
+
+  it("treats a call with no body or query object as plain arguments", () => {
+    expect(
+      restoreToolCalls(
+        [{ tool: "w", arguments: { city: "Pune" } }],
+        [{ tool: "w", arguments: { city: "Pune", body: "raw" } }],
+      ),
+    ).toEqual([{ tool: "w", arguments: { city: "Pune" } }]);
   });
 
   it("keeps the headers when the query is edited", () => {

@@ -302,7 +302,7 @@ it("says the agent has no tool call evaluator and offers the button to add one",
     />,
   );
   expect(document.body).toHaveTextContent(
-    "This agent had no tool call evaluator when this trace was scored. Add a tool call evaluator",
+    "This trace was not scored because the agent had no tool call evaluator. Add a tool call evaluator",
   );
   expect(
     screen.getByRole("button", { name: "Add a tool call evaluator" }),
@@ -322,7 +322,7 @@ it("says the trace was skipped before a tool call evaluator was added, with no b
     />,
   );
   expect(document.body).toHaveTextContent(
-    /^Scores\s*This agent had no tool call evaluator when this trace was scored$/,
+    /^Scores\s*This trace was not scored because the agent had no tool call evaluator$/,
   );
   expect(
     screen.queryByRole("button", { name: "Add a tool call evaluator" }),

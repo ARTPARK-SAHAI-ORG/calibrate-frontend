@@ -1981,6 +1981,102 @@ describe("AddTestDialog", () => {
       expect(onSubmit).not.toHaveBeenCalled();
     });
 
+    it("saves an expected call that leaves out a required input as it was", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      const stored = [
+        { tool: "get_weather", arguments: {}, accept_any_arguments: false },
+      ];
+      render(
+        <ControlledDialog
+          {...labelProps({
+            onSubmit,
+            isEditing: true,
+            initialConfig: {
+              history: [
+                { role: "user", content: "Weather?" },
+                { role: "assistant", content: "Sunny" },
+              ],
+              evaluation: { type: "response", tool_calls: stored },
+            },
+            initialEvaluators: [
+              {
+                evaluator_uuid: "ev-tone",
+                name: "Tone",
+                slug: null,
+                evaluator_type: "llm",
+                variables: [],
+                variable_values: {},
+              },
+            ],
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("get_weather")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit.mock.calls[0][0].evaluation.tool_calls).toEqual(stored);
+    });
+
+    it("shows a webhook call's arguments that are not under body or query", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      global.fetch = mockFetchImpl([
+        {
+          uuid: "tool-hook",
+          name: "lookup",
+          config: {
+            type: "webhook",
+            webhook: { body: { parameters: [{ id: "city" }] } },
+          },
+        },
+      ]);
+      render(
+        <ControlledDialog
+          {...labelProps({
+            onSubmit,
+            isEditing: true,
+            initialConfig: {
+              history: [
+                { role: "user", content: "Weather in Pune?" },
+                {
+                  role: "assistant",
+                  tool_calls: [
+                    {
+                      id: "actual-call-0",
+                      type: "function",
+                      function: { name: "lookup", arguments: '{"city":"Pune"}' },
+                    },
+                  ],
+                },
+                { role: "tool", content: "{}", tool_call_id: "actual-call-0" },
+              ],
+              evaluation: { type: "response" },
+            },
+            initialEvaluators: [
+              {
+                evaluator_uuid: "ev-tool",
+                name: "Tool call correctness",
+                slug: null,
+                evaluator_type: "tool-call",
+                variables: [],
+                variable_values: {},
+              },
+            ],
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Pune")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const call = onSubmit.mock.calls[0][0].history[1].tool_calls[0];
+      expect(JSON.parse(call.function.arguments)).toEqual({ city: "Pune" });
+    });
+
     it("loads saved expected tool calls back into the section", async () => {
       render(
         <ControlledDialog

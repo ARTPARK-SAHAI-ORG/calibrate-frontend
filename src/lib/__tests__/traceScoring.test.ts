@@ -48,7 +48,7 @@ describe("copy", () => {
       "No evaluator on this agent fits this trace",
     );
     expect(scoringRunErrorCopy("no_tool_call_evaluator")).toBe(
-      "This agent had no tool call evaluator when this trace was scored",
+      "This trace was not scored because the agent had no tool call evaluator",
     );
     expect(scoringRunErrorCopy("unsupported_interaction_type")).toMatch(
       /cannot be scored yet/,

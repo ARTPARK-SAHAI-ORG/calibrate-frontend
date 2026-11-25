@@ -54,6 +54,15 @@ jest.mock("../../../../../../components/human-labelling/AddLlmGeneralItemsDialog
   },
 }));
 
+const mockExportProps: { getRows: () => Promise<any> }[] = [];
+jest.mock("../../../../../../components/ExportResultsButton", () => ({
+  ...jest.requireActual("../../../../../../components/ExportResultsButton"),
+  ExportResultsButton: (props: { getRows: () => Promise<any> }) => {
+    mockExportProps.push(props);
+    return null;
+  },
+}));
+
 // The bulk upload dialogs build sample PDFs; nothing here downloads one.
 jest.mock("jspdf", () => ({ jsPDF: class {} }));
 
@@ -503,4 +512,26 @@ it("counts select all as holding tool-call items when assigning labelling", asyn
   expect(props.hasToolCallItems).toBe(true);
   expect(props.hasNonToolCallItems).toBe(true);
   expect(props.itemKindsPresent).toEqual({ toolCall: false, other: true });
+});
+
+it.each([
+  ["llm", { agent_response: "" }],
+  ["llm-general", { input: "Book it", output: "" }],
+])("puts a %s item's tool calls in the items CSV", async (type, fields) => {
+  const calls = [{ tool: "book_flight", arguments: { to: "BLR" } }];
+  itemsTabWith(type, {
+    name: "Books a flight",
+    ...fields,
+    actual_tool_calls: calls,
+    expected_tool_calls: calls,
+  });
+  mockExportProps.length = 0;
+  render(<LabellingTaskPage />);
+  await screen.findByText("Books a flight");
+  const { columns, rows } = await mockExportProps.at(-1)!.getRows();
+  expect(columns.map((c: { key: string }) => c.key)).toEqual(
+    expect.arrayContaining(["actual_tool_calls", "expected_tool_calls"]),
+  );
+  expect(rows[0].actual_tool_calls).toBe(JSON.stringify(calls));
+  expect(rows[0].expected_tool_calls).toBe(JSON.stringify(calls));
 });

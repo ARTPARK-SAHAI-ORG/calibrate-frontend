@@ -10,6 +10,7 @@ import {
 import { ErrorNote, NestedContainer, ViewMoreToggle } from "@/components/ui";
 import { readToolParameters, NormalizedToolParam } from "@/lib/toolParams";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
+import { isPlainObject } from "@/components/human-labelling/itemConversation";
 
 /** One expected tool call as it is saved: on a tool-call test's evaluation,
  * and as `expected_tool_calls` on a labelling item. */
@@ -325,12 +326,13 @@ const argsToCustomParams = (args: Record<string, any>): ExpectedParam[] =>
   Object.entries(args).map(([name, v]) => customParamFromArg(name, v));
 
 // Overlay saved tool-call argument values onto a schema-derived param tree
-// (edit mode). Required params are always kept; optional ones the saved test
-// didn't assert are dropped; saved keys with no matching schema param surface
-// as custom rows.
+// (edit mode). Required params are kept unless `savedOnly`; optional ones the
+// saved test didn't assert are dropped; saved keys with no matching schema
+// param surface as custom rows.
 const overlayArgsOntoParams = (
   schemaParams: ExpectedParam[],
   args: Record<string, any>,
+  savedOnly = false,
 ): ExpectedParam[] => {
   const schemaNames = new Set(schemaParams.map((p) => p.name));
   const merged: ExpectedParam[] = [];
@@ -338,7 +340,7 @@ const overlayArgsOntoParams = (
   for (const p of schemaParams) {
     const present = Object.prototype.hasOwnProperty.call(args, p.name);
     if (!present) {
-      if (p.required) merged.push(p);
+      if (p.required && !savedOnly) merged.push(p);
       continue;
     }
     const rawVal = args[p.name];
@@ -354,7 +356,11 @@ const overlayArgsOntoParams = (
           : {};
       merged.push({
         ...p,
-        properties: overlayArgsOntoParams(p.properties || [], childArgs),
+        properties: overlayArgsOntoParams(
+          p.properties || [],
+          childArgs,
+          savedOnly,
+        ),
       });
     } else {
       const { matchType, value, criteria, judgeModel } = parseArgMatch(rawVal);
@@ -567,9 +573,13 @@ function AddBackChips({
 }
 
 /** Saved expected tool calls back into the editor's rows. */
+/** The editor's rows for saved tool calls. `savedOnly` leaves out required
+ * inputs a call does not carry, so a labelling item, which records what was
+ * expected rather than what the tool needs, still saves as it was. */
 export function toolCallsToSelectedTools(
   toolCalls: ExpectedToolCall[] | undefined,
   availableTools: AvailableTool[],
+  savedOnly = false,
 ): SelectedToolConfig[] {
   if (!toolCalls || toolCalls.length === 0) return [];
   return toolCalls.map((toolCall) => {
@@ -586,12 +596,9 @@ export function toolCallsToSelectedTools(
     const matchedTool = availableTools.find(
       (t) => t.uuid === toolCall.tool || t.name === toolCall.tool,
     );
-    const savedArgs =
-      toolCall.arguments &&
-      typeof toolCall.arguments === "object" &&
-      !Array.isArray(toolCall.arguments)
-        ? toolCall.arguments
-        : {};
+    const savedArgs = isPlainObject(toolCall.arguments)
+      ? toolCall.arguments
+      : {};
 
     // Reconstruct the expected-parameter tree. When the tool's
     // schema is available we overlay saved values onto it so we
@@ -604,7 +611,11 @@ export function toolCallsToSelectedTools(
         const { params, allowCustom } =
           buildExpectedParamsFromToolConfig(matchedTool.config);
         allowCustomParameters = allowCustom;
-        expectedParameters = overlayArgsOntoParams(params, savedArgs);
+        expectedParameters = overlayArgsOntoParams(
+          params,
+          savedArgs,
+          savedOnly,
+        );
       } else {
         expectedParameters = argsToCustomParams(savedArgs);
         allowCustomParameters = !inbuiltTool;

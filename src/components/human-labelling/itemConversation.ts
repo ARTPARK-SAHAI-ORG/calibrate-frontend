@@ -85,14 +85,6 @@ export function payloadToHistory(
   return history;
 }
 
-function parseToolOutput(content: string): unknown {
-  try {
-    return JSON.parse(content);
-  } catch {
-    return content;
-  }
-}
-
 function outputText(output: unknown): string {
   return typeof output === "string" ? output : JSON.stringify(output, null, 2);
 }
@@ -115,12 +107,16 @@ export function isPlainObject(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
 
-// A webhook call's own keys: the dialog shows only these and the values
-// inside them, so any other key missing from what it sends back was hidden.
 const WEBHOOK_GROUPS = ["body", "query"];
 
-// A value that was not text, edited in a text box, keeps its type when the
-// new text still reads as one (`7` edited to `8` is saved as 8, not "8").
+/** True when the arguments hold a webhook's body or query as an object. The
+ * dialogs then show only the values inside those, and other keys stay hidden. */
+export function hasArgumentGroups(args: Record<string, unknown>): boolean {
+  return WEBHOOK_GROUPS.some((k) => isPlainObject(args[k]));
+}
+
+// Text read back as the value it spells when it is valid JSON, so `7` edited
+// to `8` is saved as 8, not "8".
 function parseEdited(text: string): unknown {
   try {
     return JSON.parse(text);
@@ -135,17 +131,21 @@ function parseEdited(text: string): unknown {
 function restoreArguments(
   next: Record<string, unknown>,
   previous: Record<string, unknown>,
-  text: (value: unknown) => string = argumentText,
   nested = false,
 ): Record<string, unknown> {
-  const webhook = !nested && WEBHOOK_GROUPS.some((k) => k in previous);
+  const webhook = !nested && hasArgumentGroups(previous);
+  // A body or query with values was on screen, so its absence is a removal.
+  const shown = (k: string) =>
+    WEBHOOK_GROUPS.includes(k) &&
+    isPlainObject(previous[k]) &&
+    Object.keys(previous[k]).length > 0;
   let changed =
     Object.keys(next).some((k) => !(k in previous)) ||
-    (!webhook && Object.keys(previous).some((k) => !(k in next)));
+    Object.keys(previous).some((k) => !(k in next) && (!webhook || shown(k)));
   const out: Record<string, unknown> = {};
   if (webhook) {
     for (const [k, v] of Object.entries(previous)) {
-      if (!WEBHOOK_GROUPS.includes(k)) out[k] = v;
+      if (!shown(k)) out[k] = v;
     }
   }
   for (const [k, v] of Object.entries(next)) {
@@ -153,9 +153,9 @@ function restoreArguments(
     if (v === before) {
       out[k] = before;
     } else if (isPlainObject(v) && isPlainObject(before)) {
-      out[k] = restoreArguments(v, before, text, true);
+      out[k] = restoreArguments(v, before, true);
       if (out[k] !== before) changed = true;
-    } else if (typeof v === "string" && v === text(before)) {
+    } else if (typeof v === "string" && v === argumentText(before)) {
       out[k] = before;
     } else {
       out[k] =
@@ -170,11 +170,10 @@ function restoreArguments(
 
 /** Tool calls back from a dialog that edits argument values as text: each
  * call that still names the same tool as the stored call in its place gets
- * the stored values back where its text is unchanged. `text` is how that
- * dialog writes a value into its box. */
+ * the stored values back where its text is unchanged. */
 export function restoreToolCalls<
   T extends { tool: string; arguments: Record<string, unknown> },
->(next: T[], previous: unknown, text?: (value: unknown) => string): T[] {
+>(next: T[], previous: unknown): T[] {
   const before = Array.isArray(previous) ? previous : [];
   return next.map((call, i) => {
     if (before[i] === undefined) return call;
@@ -182,7 +181,7 @@ export function restoreToolCalls<
     if (prior.toolName !== call.tool) return call;
     return {
       ...call,
-      arguments: restoreArguments(call.arguments, prior.args, text),
+      arguments: restoreArguments(call.arguments, prior.args),
     };
   });
 }
@@ -276,7 +275,7 @@ export function historyToPayloadFields(
             (content === DEFAULT_STRUCTURED_RESPONSE ||
               content === DEFAULT_WEBHOOK_RESPONSE)
           )) {
-            output = parseToolOutput(content);
+            output = parseEdited(content);
           }
         }
         return {

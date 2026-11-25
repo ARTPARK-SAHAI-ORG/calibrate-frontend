@@ -26,7 +26,10 @@ import {
 import { summariseValues } from "@/lib/evaluatorResultStat";
 import { payloadHasVersions, textOf } from "@/lib/messageVersions";
 import { evaluatorFitsItem } from "@/lib/labellingItem";
-import { agentToolCalls } from "@/components/human-labelling/item-panes/shared";
+import {
+  actualToolCallsCell,
+  toolCallsCell,
+} from "@/components/human-labelling/toolCallCells";
 import {
   ItemPane,
   itemPaneHasOwnPadding,
@@ -465,19 +468,6 @@ export function serializeMessages(messages: unknown[]): string {
     })
     .filter(Boolean)
     .join("\n");
-}
-
-// An empty list is kept as `[]`, since on re-upload it still marks a
-// tool-call row.
-function toolCallsCell(calls: unknown): string {
-  return Array.isArray(calls) ? JSON.stringify(calls) : "";
-}
-
-function actualToolCallsCell(p: Record<string, unknown>): string {
-  const calls = agentToolCalls(p);
-  return Array.isArray(p.actual_tool_calls) || calls.length > 0
-    ? JSON.stringify(calls)
-    : "";
 }
 
 export function extractPayloadInputValues(
@@ -960,7 +950,6 @@ export function EvaluatorResultsPane({
         }
 
         // The judge did not run on this row, so there is no score to draw.
-        // Say why, rather than leaving an empty card behind.
         if (r.value?.skipped === true) {
           return (
             <div

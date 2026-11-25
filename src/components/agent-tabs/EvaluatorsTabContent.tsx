@@ -14,7 +14,6 @@ import {
 } from "@/components/evaluators/DuplicateEvaluatorButton";
 import { XIcon } from "@/components/icons";
 import { evaluatorTypesForTask, fitsTaskType } from "@/lib/labellingItem";
-import type { EvaluatorType } from "@/components/EvaluatorPills";
 import {
   type EvaluatorData,
   fetchAllEvaluators,
@@ -44,12 +43,6 @@ const CREATE_BUTTON_CLASS =
 // Tool call evaluators fit either kind of agent.
 function agentTaskType(agentNature: "conversation" | "general") {
   return agentNature === "general" ? "llm-general" : "llm";
-}
-
-function agentEvaluatorTypes(
-  agentNature: "conversation" | "general",
-): EvaluatorType[] {
-  return evaluatorTypesForTask(agentTaskType(agentNature));
 }
 
 export function EvaluatorsTabContent({
@@ -393,7 +386,7 @@ export function EvaluatorsTabContent({
         onClose={() => setCreateFlowOpen(false)}
         existingEvaluators={allEvaluators}
         onCreated={handleCreated}
-        useCaseTypes={agentEvaluatorTypes(agentNature)}
+        useCaseTypes={evaluatorTypesForTask(agentTaskType(agentNature))}
       />
 
       {/* Shared detach/delete confirmation */}
