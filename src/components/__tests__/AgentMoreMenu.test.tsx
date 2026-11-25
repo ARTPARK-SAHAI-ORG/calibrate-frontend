@@ -26,3 +26,19 @@ describe("AgentMoreMenu", () => {
     expect(onDuplicate).not.toHaveBeenCalled();
   });
 });
+
+it("shows a plain Duplicate button on a wide screen and the menu below that", async () => {
+  const user = setupUser();
+  const onDuplicate = jest.fn();
+  render(<AgentMoreMenu onDuplicate={onDuplicate} />);
+
+  const plain = screen.getByRole("button", { name: "Duplicate" });
+  expect(plain).toHaveClass("hidden", "xl:flex");
+  expect(
+    screen.getByRole("button", { name: "More actions" }).parentElement
+      ?.parentElement,
+  ).toHaveClass("xl:hidden");
+
+  await user.click(plain);
+  expect(onDuplicate).toHaveBeenCalledTimes(1);
+});
