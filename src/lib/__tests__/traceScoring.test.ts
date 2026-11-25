@@ -1,6 +1,6 @@
 import {
   ineligibleReasonCopy,
-  isToolCallRow,
+  isToolCallTraceRow,
   isTraceScoringInProgress,
   nothingCanScoreCopy,
   scoringRunErrorCopy,
@@ -21,17 +21,17 @@ describe("traceRowOutputFacts", () => {
   });
 });
 
-describe("isToolCallRow", () => {
+describe("isToolCallTraceRow", () => {
   it("is true only for a row with calls and no reply", () => {
-    expect(isToolCallRow({ response_preview: " ", tool_call_count: 1 })).toBe(
-      true,
-    );
-    expect(isToolCallRow({ response_preview: "Hi", tool_call_count: 1 })).toBe(
-      false,
-    );
-    expect(isToolCallRow({ response_preview: null, tool_call_count: 0 })).toBe(
-      false,
-    );
+    expect(
+      isToolCallTraceRow({ response_preview: " ", tool_call_count: 1 }),
+    ).toBe(true);
+    expect(
+      isToolCallTraceRow({ response_preview: "Hi", tool_call_count: 1 }),
+    ).toBe(false);
+    expect(
+      isToolCallTraceRow({ response_preview: null, tool_call_count: 0 }),
+    ).toBe(false);
   });
 });
 

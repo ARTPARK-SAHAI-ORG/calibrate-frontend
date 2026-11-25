@@ -1431,6 +1431,31 @@ describe("TracesTabContent", () => {
         expect(screen.getByText(new RegExp(NOTE))).toBeInTheDocument();
       });
 
+      it("goes once the last tool-call trace is deleted", async () => {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+        const realFetch = global.fetch;
+        process.env.NEXT_PUBLIC_BACKEND_URL = "https://api.test";
+        global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+        fetchHasTraceForToolCalls.mockResolvedValue(true);
+        fetchAgentEvaluators.mockResolvedValue([
+          { uuid: "ev-1", evaluator_type: "llm" },
+        ]);
+        const user = setupUser();
+        render(<TracesTabContent {...tabProps} />);
+        expect(await screen.findByText(new RegExp(NOTE))).toBeInTheDocument();
+
+        fetchHasTraceForToolCalls.mockResolvedValue(false);
+        await user.click(screen.getAllByLabelText("Delete trace")[0]);
+        await user.click(screen.getByRole("button", { name: "Delete" }));
+
+        await waitFor(() =>
+          expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument(),
+        );
+        expect(handleDeleted).toHaveBeenCalled();
+        global.fetch = realFetch;
+        process.env.NEXT_PUBLIC_BACKEND_URL = backendUrl;
+      });
+
       it("shows after Refresh finds a tool-call trace that is not on the page", async () => {
         fetchAgentEvaluators.mockResolvedValue([
           { uuid: "ev-1", evaluator_type: "llm" },

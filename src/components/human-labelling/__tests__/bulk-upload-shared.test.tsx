@@ -1693,4 +1693,15 @@ describe("toolCallColumns", () => {
     expect(parse(actual, { tool: "t", accept_any_arguments: true })).toHaveProperty("error");
     expect(parse(expected, { tool: "t", output: 1 })).toHaveProperty("error");
   });
+
+  it("shows an expected call that accepts any arguments as such", () => {
+    render(
+      <>
+        {expected.renderPreview!([
+          { tool: "save", arguments: {}, accept_any_arguments: true },
+        ])}
+      </>,
+    );
+    expect(screen.getByText("save(any arguments)")).toBeInTheDocument();
+  });
 });

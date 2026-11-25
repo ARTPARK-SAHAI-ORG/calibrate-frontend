@@ -43,7 +43,7 @@ export function actualToolCallsStart<T>(
   return start < turns.length ? start : -1;
 }
 
-export type ToolCallRecord = {
+type ToolCallRecord = {
   tool: string;
   arguments: Record<string, unknown>;
   output?: unknown;
@@ -282,13 +282,17 @@ export function historyToPayloadFields(
       if (content !== undefined) {
         if (priorOutput !== undefined && content === outputText(priorOutput)) {
           output = priorOutput;
-        } else if (!(
+        } else if (
           same &&
-          priorOutput === undefined &&
+          (priorOutput === undefined || priorOutput === "") &&
           (content === DEFAULT_STRUCTURED_RESPONSE ||
             content === DEFAULT_WEBHOOK_RESPONSE)
-        )) {
-          output = parseEdited(content);
+        ) {
+          // The dialog filled in its default because no reply was stored.
+          output = priorOutput;
+        } else {
+          output =
+            typeof priorOutput === "string" ? content : parseEdited(content);
         }
       }
       return {

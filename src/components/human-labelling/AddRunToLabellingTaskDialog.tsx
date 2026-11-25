@@ -578,7 +578,7 @@ export function buildItemsFromSource(
           : source.benchmarkUuid.slice(0, 8);
       // Response and tool-call tests both become items in the task: a
       // response test → a response item scored by the evaluators, a tool-call
-      // test → a tool-call item a person marks correct or wrong.
+      // test → a tool-call item judged by tool-call evaluators.
       // The run names the version each evaluator ran at once, at the top
       // level, not on every verdict, so build the lookup once here.
       const versionByEvaluator: Record<string, number> = {};

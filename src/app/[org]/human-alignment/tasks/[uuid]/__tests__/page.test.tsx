@@ -30,11 +30,18 @@ jest.mock("../../../../../../hooks", () => ({
 
 // The item dialogs have their own tests. Here they only hand back what the
 // page passed them, so a test can call their onSubmit directly.
-const mockDialogProps: { llm: any[]; general: any[]; assign: any[] } = {
+const mockDialogProps: { llm: any[]; general: any[]; assign: any[]; manage: any[] } = {
   llm: [],
   general: [],
   assign: [],
+  manage: [],
 };
+jest.mock("../../../../../../components/human-labelling/ManageEvaluatorsDialog", () => ({
+  ManageEvaluatorsDialog: (props: unknown) => {
+    mockDialogProps.manage.push(props);
+    return null;
+  },
+}));
 jest.mock("../../../../../../components/human-labelling/AssignAnnotatorsDialog", () => ({
   AssignAnnotatorsDialog: (props: unknown) => {
     mockDialogProps.assign.push(props);
@@ -495,13 +502,18 @@ it("gives the llm-general edit dialog each evaluator's type and the empty tool c
   );
 });
 
-it("counts select all as holding tool-call items when assigning labelling", async () => {
+it("reads the item kinds for select all from every item in the task", async () => {
   const user = setupUser();
-  itemsTabWith("llm", {
+  const payload = {
     name: "Plain reply",
     chat_history: [{ role: "user", content: "Hi" }],
     agent_response: "Hello",
-  });
+  };
+  itemsTabWith("llm", payload);
+  mockTask = {
+    ...(mockTask as object),
+    items: [1, 2, 3, 4, 5].map((n) => ({ uuid: `i-${n}`, payload, is_tool_call: false })),
+  };
   mockSummary = { ...(mockSummary as object), pagination: { total: 5, limit: 50, offset: 0 } };
   render(<LabellingTaskPage />);
   await screen.findByRole("button", { name: "Edit" });
@@ -509,9 +521,25 @@ it("counts select all as holding tool-call items when assigning labelling", asyn
   await user.click(screen.getByRole("button", { name: "Select all 5 items" }));
   await user.click(screen.getByRole("button", { name: "Label selected" }));
   const props = mockDialogProps.assign.filter((p) => p.isOpen).at(-1);
-  expect(props.hasToolCallItems).toBe(true);
+  expect(props.hasToolCallItems).toBe(false);
   expect(props.hasNonToolCallItems).toBe(true);
-  expect(props.itemKindsPresent).toEqual({ toolCall: false, other: true });
+});
+
+it("does not take a first tool-call evaluator as the task type in Manage evaluators", async () => {
+  const user = setupUser();
+  mockSearch = "tab=overview";
+  mockTask = {
+    ...TASK,
+    type: undefined,
+    evaluators: [
+      { uuid: "ev-tc", name: "Tool call correctness", evaluator_type: "tool-call", output_type: "binary" },
+      ...TASK.evaluators,
+    ],
+  };
+  render(<LabellingTaskPage />);
+  await user.click(await screen.findByRole("button", { name: "Manage evaluators" }));
+  expect(mockDialogProps.manage.at(-1).taskType).toBeUndefined();
+  mockTask = TASK;
 });
 
 it.each([

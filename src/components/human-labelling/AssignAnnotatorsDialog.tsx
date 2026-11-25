@@ -166,9 +166,6 @@ type AssignAnnotatorsDialogProps = {
    * than by a tool call. Labels that are not tool-call labels are offered only
    * then. */
   hasNonToolCallItems: boolean;
-  /** Which kinds the chosen items are known to hold. Each known kind must keep
-   * a label that fits it. Defaults to the two flags above. */
-  itemKindsPresent?: { toolCall: boolean; other: boolean };
   onClose: () => void;
   /** The evaluators to show in the created labelling jobs. */
   onConfirm: (
@@ -184,7 +181,6 @@ export function AssignAnnotatorsDialog({
   evaluators,
   hasToolCallItems,
   hasNonToolCallItems,
-  itemKindsPresent = { toolCall: hasToolCallItems, other: hasNonToolCallItems },
   onClose,
   onConfirm,
 }: AssignAnnotatorsDialogProps) {
@@ -356,8 +352,8 @@ export function AssignAnnotatorsDialog({
   // task has one to offer.
   const offeredLabels = [...lockedEvaluators, ...choosableEvaluators];
   const evaluatorSelectionValid = [
-    { isToolCall: true, chosen: itemKindsPresent.toolCall },
-    { isToolCall: false, chosen: itemKindsPresent.other },
+    { isToolCall: true, chosen: hasToolCallItems },
+    { isToolCall: false, chosen: hasNonToolCallItems },
   ].every(
     ({ isToolCall, chosen }) =>
       !chosen ||

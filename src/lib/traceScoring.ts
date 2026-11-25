@@ -36,7 +36,7 @@ export function traceRowOutputFacts(
 }
 
 /** True when a list row's output is a tool call and nothing else. */
-export function isToolCallRow(
+export function isToolCallTraceRow(
   trace: Pick<TraceSummary, "response_preview" | "tool_call_count">,
 ): boolean {
   return isToolCallOutput(traceRowOutputFacts(trace));

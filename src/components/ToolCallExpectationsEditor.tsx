@@ -167,6 +167,8 @@ const expectedValueTypeError = (value: string, dataType: string): boolean => {
 
 export type SelectedToolConfig = {
   id: string;
+  // Tells apart two cards for the same tool.
+  cardId: string;
   name: string;
   expectation: "should-call" | "should-not-call";
   acceptAnyParameterValues: boolean;
@@ -180,6 +182,9 @@ export type SelectedToolConfig = {
   // call is saved instead.
   stored?: { call: ExpectedToolCall; readAs: string };
 };
+
+let cardIdCounter = 0;
+const newCardId = () => `card-${++cardIdCounter}`;
 
 let expParamIdCounter = 0;
 const newExpParamId = () =>
@@ -307,7 +312,7 @@ const customParamFromArg = (name: string, raw: any): ExpectedParam => {
       properties: undefined,
     };
   }
-  const isObj = v !== null && typeof v === "object" && !Array.isArray(v);
+  const isObj = isPlainObject(v);
   return {
     id: newExpParamId(),
     name,
@@ -585,7 +590,7 @@ export function toolCallsToSelectedTools(
   savedOnly = false,
 ): SelectedToolConfig[] {
   if (!toolCalls || toolCalls.length === 0) return [];
-  return toolCalls.map((toolCall) => {
+  return toolCalls.map((toolCall, index) => {
     const expectation: "should-call" | "should-not-call" =
       toolCall.is_called === false
         ? "should-not-call"
@@ -627,6 +632,7 @@ export function toolCallsToSelectedTools(
 
     const selected: SelectedToolConfig = {
       id: inbuiltTool ? inbuiltTool.id : toolCall.tool,
+      cardId: `${toolCall.tool}-${index}`,
       name: inbuiltTool ? inbuiltTool.name : toolCall.tool,
       expectation,
       acceptAnyParameterValues: acceptAny,
@@ -722,6 +728,7 @@ export function useToolCallExpectations() {
 
     const newTool: SelectedToolConfig = {
       id: tool.uuid,
+      cardId: newCardId(),
       name: tool.name,
       expectation: "should-call",
       acceptAnyParameterValues: isWebhook,
@@ -756,14 +763,14 @@ export function useToolCallExpectations() {
     // A card open in its JSON view shows text written when the view opened,
     // so rewrite it for the cards that changed or it would show old inputs.
     const changedInJson = nextTools.filter(
-      (t, i) => t !== selectedTools[i] && jsonModeToolIds.has(t.id),
+      (t, i) => t !== selectedTools[i] && jsonModeToolIds.has(t.cardId),
     );
     if (changedInJson.length > 0) {
       setToolJsonText((prev) => ({
         ...prev,
         ...Object.fromEntries(
           changedInJson.map((t) => [
-            t.id,
+            t.cardId,
             JSON.stringify(
               buildArgsFromExpectedParams(t.expectedParameters),
               null,
@@ -857,6 +864,7 @@ export function ToolCallExpectationsEditor({
   const selectInbuiltTool = (toolId: string, toolName: string) => {
     const newTool: SelectedToolConfig = {
       id: toolId,
+      cardId: newCardId(),
       name: toolName,
       expectation: "should-call",
       acceptAnyParameterValues: false,
@@ -869,7 +877,7 @@ export function ToolCallExpectationsEditor({
   };
 
   const removeTool = (toolId: string) => {
-    setSelectedTools(selectedTools.filter((t) => t.id !== toolId));
+    setSelectedTools(selectedTools.filter((t) => t.cardId !== toolId));
   };
 
   // ---- Per-tool JSON editing of expected parameters ----
@@ -879,10 +887,10 @@ export function ToolCallExpectationsEditor({
     const args = buildArgsFromExpectedParams(tool.expectedParameters);
     setToolJsonText((prev) => ({
       ...prev,
-      [tool.id]: JSON.stringify(args, null, 2),
+      [tool.cardId]: JSON.stringify(args, null, 2),
     }));
-    setToolJsonError((prev) => ({ ...prev, [tool.id]: null }));
-    setJsonModeToolIds((prev) => new Set(prev).add(tool.id));
+    setToolJsonError((prev) => ({ ...prev, [tool.cardId]: null }));
+    setJsonModeToolIds((prev) => new Set(prev).add(tool.cardId));
   };
 
   const exitToolJsonMode = (toolId: string) => {
@@ -898,14 +906,14 @@ export function ToolCallExpectationsEditor({
   // of param → value / spec) is overlaid onto the tool's schema; invalid JSON
   // surfaces an error and leaves the last good parameters untouched.
   const handleToolJsonChange = (tool: SelectedToolConfig, text: string) => {
-    setToolJsonText((prev) => ({ ...prev, [tool.id]: text }));
+    setToolJsonText((prev) => ({ ...prev, [tool.cardId]: text }));
     let parsed: any;
     try {
       parsed = JSON.parse(text);
     } catch (e) {
       setToolJsonError((prev) => ({
         ...prev,
-        [tool.id]: `Invalid JSON: ${(e as Error).message}`,
+        [tool.cardId]: `Invalid JSON: ${(e as Error).message}`,
       }));
       return;
     }
@@ -916,16 +924,16 @@ export function ToolCallExpectationsEditor({
     ) {
       setToolJsonError((prev) => ({
         ...prev,
-        [tool.id]: "The top-level value must be a JSON object of parameters.",
+        [tool.cardId]: "The top-level value must be a JSON object of parameters.",
       }));
       return;
     }
-    setToolJsonError((prev) => ({ ...prev, [tool.id]: null }));
+    setToolJsonError((prev) => ({ ...prev, [tool.cardId]: null }));
     const schemaParams = getExpectedParamsForTool(tool.id, tool.name).params;
     const rebuilt = overlayArgsOntoParams(schemaParams, parsed);
     setSelectedTools((prev) =>
       prev.map((t) =>
-        t.id === tool.id ? { ...t, expectedParameters: rebuilt } : t,
+        t.cardId === tool.cardId ? { ...t, expectedParameters: rebuilt } : t,
       ),
     );
   };
@@ -945,7 +953,7 @@ export function ToolCallExpectationsEditor({
   ) => {
     setSelectedTools(
       selectedTools.map((tool) => {
-        if (tool.id !== toolId) return tool;
+        if (tool.cardId !== toolId) return tool;
 
         const updatedTool = { ...tool, ...updates };
 
@@ -983,7 +991,7 @@ export function ToolCallExpectationsEditor({
   ) => {
     setSelectedTools((prev) =>
       prev.map((tool) =>
-        tool.id === toolId
+        tool.cardId === toolId
           ? { ...tool, expectedParameters: fn(tool.expectedParameters) }
           : tool,
       ),
@@ -1645,7 +1653,7 @@ export function ToolCallExpectationsEditor({
             ).params;
             return (
               <div
-                key={tool.id}
+                key={tool.cardId}
                 className="bg-muted rounded-lg p-4 border border-border"
               >
                 {/* Tool header with name and delete button */}
@@ -1669,7 +1677,8 @@ export function ToolCallExpectationsEditor({
                     ) : null;
                   })()}
                   <button
-                    onClick={() => removeTool(tool.id)}
+                    onClick={() => removeTool(tool.cardId)}
+                    aria-label={`Remove ${tool.name}`}
                     className="w-10 h-10 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
                   >
                     <svg
@@ -1709,7 +1718,7 @@ export function ToolCallExpectationsEditor({
                     <div className="mt-4 flex items-center gap-3">
                       <button
                         onClick={() =>
-                          updateToolConfig(tool.id, {
+                          updateToolConfig(tool.cardId, {
                             acceptAnyParameterValues:
                               !tool.acceptAnyParameterValues,
                           })
@@ -1765,10 +1774,10 @@ export function ToolCallExpectationsEditor({
                           <button
                             type="button"
                             onClick={() =>
-                              exitToolJsonMode(tool.id)
+                              exitToolJsonMode(tool.cardId)
                             }
                             className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                              jsonModeToolIds.has(tool.id)
+                              jsonModeToolIds.has(tool.cardId)
                                 ? "text-muted-foreground hover:text-foreground"
                                 : "bg-foreground text-background"
                             }`}
@@ -1781,7 +1790,7 @@ export function ToolCallExpectationsEditor({
                               enterToolJsonMode(tool)
                             }
                             className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                              jsonModeToolIds.has(tool.id)
+                              jsonModeToolIds.has(tool.cardId)
                                 ? "bg-foreground text-background"
                                 : "text-muted-foreground hover:text-foreground"
                             }`}
@@ -1791,17 +1800,17 @@ export function ToolCallExpectationsEditor({
                         </div>
                       </div>
 
-                      {jsonModeToolIds.has(tool.id) ? (
+                      {jsonModeToolIds.has(tool.cardId) ? (
                         <div className="space-y-2">
-                          {toolJsonError[tool.id] && (
+                          {toolJsonError[tool.cardId] && (
                             <ErrorNote>
                               <p className="whitespace-pre-line">
-                                {toolJsonError[tool.id]}
+                                {toolJsonError[tool.cardId]}
                               </p>
                             </ErrorNote>
                           )}
                           <textarea
-                            value={toolJsonText[tool.id] ?? ""}
+                            value={toolJsonText[tool.cardId] ?? ""}
                             onChange={(e) =>
                               handleToolJsonChange(
                                 tool,
@@ -1813,7 +1822,7 @@ export function ToolCallExpectationsEditor({
                               '{\n  "param": { "match_type": "exact", "value": "..." }\n}'
                             }
                             className={`w-full min-h-[240px] px-4 py-3 rounded-lg text-sm font-mono bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent resize-y ${
-                              toolJsonError[tool.id]
+                              toolJsonError[tool.cardId]
                                 ? "border-red-500"
                                 : "border-border"
                             }`}
@@ -1825,7 +1834,7 @@ export function ToolCallExpectationsEditor({
                             0 && (
                             <div className="space-y-3">
                               {renderExpectedParams(
-                                tool.id,
+                                tool.cardId,
                                 tool.expectedParameters,
                                 [],
                                 toolSchemaParams,
@@ -1838,7 +1847,7 @@ export function ToolCallExpectationsEditor({
                               <button
                                 onClick={() =>
                                   addCustomExpectedParam(
-                                    tool.id,
+                                    tool.cardId,
                                     [],
                                   )
                                 }
@@ -1848,7 +1857,7 @@ export function ToolCallExpectationsEditor({
                               </button>
                             )}
                             {renderAddBackChips(
-                              tool.id,
+                              tool.cardId,
                               [],
                               toolSchemaParams,
                               tool.expectedParameters,

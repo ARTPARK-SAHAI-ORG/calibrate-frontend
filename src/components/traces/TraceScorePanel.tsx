@@ -82,14 +82,12 @@ function RunBody({
           {run.error === "over_limit" && usesOwnProviderKeys
             ? "This trace was not scored because the workspace had reached its scoring limit at the time"
             : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`}
-          {run.error === "no_usable_evaluators" &&
-            ineligible.length === 0 &&
-            onGoToEvaluators && (
-              <>
-                . Add one that does in the{" "}
-                <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
-              </>
-            )}
+          {run.error === "no_usable_evaluators" && onGoToEvaluators && (
+            <>
+              . Add one that does in the{" "}
+              <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
+            </>
+          )}
           {run.error === "no_tool_call_evaluator" && addToolCallEvaluator && (
             <>. {addToolCallEvaluator}</>
           )}

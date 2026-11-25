@@ -42,7 +42,13 @@ import {
   type MetadataRow,
 } from "./MetadataFieldsEditor";
 import { parseItemNameConflictFromError } from "./itemNameConflict";
-import { argumentText, restoreToolCalls } from "./itemConversation";
+import {
+  argumentText,
+  hasArgumentGroups,
+  isPlainObject,
+  restoreToolCalls,
+  WEBHOOK_GROUPS,
+} from "./itemConversation";
 import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
@@ -85,25 +91,6 @@ type DraftToolCall = {
   tool: string;
   params: ToolCallParam[];
 };
-
-/** A webhook's inputs are saved split by the part of its request they go in,
- * `{ query: {...}, body: {...} }`, the same way the test editor saves them. */
-const WEBHOOK_GROUPS = ["query", "body"];
-
-/** True when saved arguments have that webhook shape. */
-function isGroupedArgs(args: Record<string, unknown>): boolean {
-  const keys = Object.keys(args);
-  return (
-    keys.length > 0 &&
-    keys.every(
-      (k) =>
-        WEBHOOK_GROUPS.includes(k) &&
-        !!args[k] &&
-        typeof args[k] === "object" &&
-        !Array.isArray(args[k]),
-    )
-  );
-}
 
 /** Inputs read as a webhook's query and body only because of how their saved
  * arguments looked, put back as the two inputs `query` and `body` they are
@@ -158,9 +145,11 @@ function seedToolCalls(raw: unknown): DraftToolCall[] {
       args && typeof args === "object" && !Array.isArray(args)
         ? (args as Record<string, unknown>)
         : {};
-    const params: ToolCallParam[] = isGroupedArgs(record)
+    const params: ToolCallParam[] = hasArgumentGroups(record)
       ? WEBHOOK_GROUPS.flatMap((group) =>
-          Object.entries((record[group] ?? {}) as Record<string, unknown>).map(
+          Object.entries(
+            isPlainObject(record[group]) ? record[group] : {},
+          ).map(
             ([name, value]) => ({ name, value: argumentText(value), group }),
           ),
         )

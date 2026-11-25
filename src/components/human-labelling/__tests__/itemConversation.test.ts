@@ -669,3 +669,36 @@ describe("historyToPayloadFields matching stored calls", () => {
     ]);
   });
 });
+
+describe("historyToPayloadFields with a stored tool reply", () => {
+  const withOutput = (output: unknown) => ({
+    chat_history: [],
+    agent_response: "",
+    actual_tool_calls: [{ tool: "lookup", arguments: {}, output }],
+  });
+  const replyAs = (payload: Record<string, unknown>, content: string) =>
+    payloadToHistory(payload, "llm").map((t) =>
+      t.role === "tool" ? { ...t, content } : t,
+    );
+
+  it("keeps an empty reply the dialog showed as its default", () => {
+    const payload = withOutput("");
+    expect(
+      historyToPayloadFields(
+        replyAs(payload, DEFAULT_STRUCTURED_RESPONSE),
+        "llm",
+        payload,
+      ),
+    ).toEqual(payload);
+  });
+
+  it("keeps a text reply as text when it is edited to look like a number", () => {
+    const payload = withOutput("ok");
+    expect(
+      historyToPayloadFields(replyAs(payload, "43"), "llm", payload),
+    ).toEqual(withOutput("43"));
+    expect(
+      historyToPayloadFields(replyAs(withOutput(1), "43"), "llm", withOutput(1)),
+    ).toEqual(withOutput(43));
+  });
+});

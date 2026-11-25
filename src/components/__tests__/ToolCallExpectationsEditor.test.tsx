@@ -1,4 +1,8 @@
+import { useEffect } from "react";
+import { render, screen, setupUser } from "@/test-utils";
 import {
+  ToolCallExpectationsEditor,
+  useToolCallExpectations,
   selectedToolsHaveInvalidParams,
   selectedToolsToCalls,
   toolCallsToSelectedTools,
@@ -122,5 +126,39 @@ describe("a labelling item's stored expected calls", () => {
         accept_any_arguments: false,
       },
     ]);
+  });
+});
+
+describe("two expected calls to the same tool", () => {
+  it("removes only the card the person removed", async () => {
+    const user = setupUser();
+    const calls = [
+      { tool: "save", arguments: { months: 7 } },
+      { tool: "save", arguments: { months: 9 } },
+    ];
+    let editor!: ReturnType<typeof useToolCallExpectations>;
+    function Harness() {
+      editor = useToolCallExpectations();
+      useEffect(() => {
+        editor.reset(toolCallsToSelectedTools(calls, [], true));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return (
+        <ToolCallExpectationsEditor
+          editor={editor}
+          heading="Expected tool calls"
+          emptyText="No tools"
+          availableTools={[]}
+          availableToolsLoading={false}
+          onToolSaved={() => {}}
+          onCreateTool={() => {}}
+          showErrors={false}
+        />
+      );
+    }
+    render(<Harness />);
+    const removes = await screen.findAllByRole("button", { name: "Remove save" });
+    await user.click(removes[0]);
+    expect(selectedToolsToCalls(editor.selectedTools)).toEqual([calls[1]]);
   });
 });

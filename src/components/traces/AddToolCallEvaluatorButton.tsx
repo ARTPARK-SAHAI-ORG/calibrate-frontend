@@ -88,10 +88,7 @@ export function AddToolCallEvaluatorButton({
             onEvaluatorDeleted={(uuid) =>
               setLibrary((prev) => prev.filter((e) => e.uuid !== uuid))
             }
-            onCreateEvaluator={() => {
-              setPickerOpen(false);
-              setCreateOpen(true);
-            }}
+            onCreateEvaluator={() => setCreateOpen(true)}
             onAdd={add}
           />,
           document.body,

@@ -286,6 +286,33 @@ it("points at the Evaluators tab when no evaluator fits and none is listed", asy
   expect(onGoToEvaluators).toHaveBeenCalled();
 });
 
+it("points at the Evaluators tab beside the evaluators that do not fit", async () => {
+  const onGoToEvaluators = jest.fn();
+  const user = setupUser();
+  render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r12",
+        status: "skipped",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "no_usable_evaluators",
+        results: [],
+      }}
+      ineligible={[
+        {
+          evaluator_uuid: "e1",
+          name: "Tone check",
+          reason: "declares_variables",
+        },
+      ]}
+      onGoToEvaluators={onGoToEvaluators}
+    />,
+  );
+  expect(screen.getByText("Tone check")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
+  expect(onGoToEvaluators).toHaveBeenCalled();
+});
+
 it("says the agent has no tool call evaluator and offers the button to add one", () => {
   render(
     <TraceScorePanel

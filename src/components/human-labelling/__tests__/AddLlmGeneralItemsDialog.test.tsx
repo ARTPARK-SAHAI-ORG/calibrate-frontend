@@ -1036,6 +1036,26 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     ]);
   });
 
+  it("shows only the body of a call that also carries headers, and saves the headers", async () => {
+    const user = setupUser();
+    const stored = [
+      { tool: "dummy", arguments: { body: { note: "hi" }, headers: { k: "v" } } },
+    ];
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "", toolCalls: stored },
+      ],
+    });
+    expect(screen.getByText("Body")).toBeInTheDocument();
+    expect(screen.getByLabelText("note")).toHaveValue("hi");
+    expect(screen.queryByLabelText("headers")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual(stored);
+  });
+
   it("gives a webhook tool call the tool's new inputs when the tool is saved", async () => {
     const user = setupUser();
     const { onSubmit } = renderDialog({

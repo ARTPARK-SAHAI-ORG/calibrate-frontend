@@ -640,6 +640,50 @@ describe("AddTestDialog — additional branch coverage", () => {
     });
   });
 
+  it("shows only the body of a webhook call that also carries headers", async () => {
+    (global as any).fetch = mockFetchImpl([WEBHOOK_TOOL]);
+    const initialConfig: TestConfig = {
+      history: [
+        { role: "user", content: "What's the weather?" },
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [
+            {
+              id: "call-1",
+              type: "function",
+              function: {
+                name: "weather_webhook",
+                arguments: JSON.stringify({
+                  body: { units: "metric" },
+                  headers: { k: "v" },
+                }),
+              },
+            },
+          ],
+        },
+        { role: "tool", tool_call_id: "call-1", content: '{"status":"success"}' },
+      ],
+      evaluation: { type: "response" },
+    };
+    render(
+      <AddTestDialog
+        {...baseProps({
+          isEditing: true,
+          initialTab: "next-reply",
+          initialConfig,
+          testName: "Webhook edit",
+        })}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByDisplayValue("metric")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Body")).toBeInTheDocument();
+    expect(screen.queryByText("headers")).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/"k"/)).not.toBeInTheDocument();
+  });
+
   describe("chat: adding tool-call messages via the in-chat picker", () => {
     it("adds a structured tool call with parameter inputs and a response box", async () => {
       const user = setupUser();

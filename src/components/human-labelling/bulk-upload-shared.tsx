@@ -1556,7 +1556,14 @@ function ToolCallsPreview({ calls }: { calls: BulkToolCall[] }) {
     <div className="max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap">
       {calls
         .map(
-          (c) => `${c.tool}(${c.arguments ? JSON.stringify(c.arguments) : ""})`,
+          (c) =>
+            `${c.tool}(${
+              c.accept_any_arguments
+                ? "any arguments"
+                : c.arguments
+                  ? JSON.stringify(c.arguments)
+                  : ""
+            })`,
         )
         .join("\n")}
     </div>

@@ -60,7 +60,7 @@ import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
 import { CONTACT_LINK } from "@/constants/limits";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
-import { isToolCallRow, traceRowOutputFacts } from "@/lib/traceScoring";
+import { isToolCallTraceRow, traceRowOutputFacts } from "@/lib/traceScoring";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
@@ -81,6 +81,14 @@ import { fetchChatLink, type ChatLink } from "@/lib/chatLinkApi";
  * A number of traces, said the way a person says it: "1 trace", "50,000
  * traces". Both limit lines use it so neither can end up with "1 traces".
  */
+function WarningBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+      <p className="text-sm text-amber-700 dark:text-amber-300">{children}</p>
+    </div>
+  );
+}
+
 function traceCount(n: number): string {
   return `${n.toLocaleString()} trace${n === 1 ? "" : "s"}`;
 }
@@ -216,10 +224,16 @@ export function TracesTabContent({
     createdBefore: everyTraceMatchingSince,
   };
 
+  // Refresh bumps this, since the chat link's count moves during the day. A
+  // delete bumps it too, since it can remove the last trace of a kind.
+  const [usageReads, setUsageReads] = useState(0);
+
   const deletion = useTraceDeletion({
     traces: items,
-    onDeleted: (uuids) =>
-      handleDeleted(everyTraceMatching ? total : uuids.length),
+    onDeleted: (uuids) => {
+      handleDeleted(everyTraceMatching ? total : uuids.length);
+      setUsageReads((n) => n + 1);
+    },
     accessToken,
     selectAll: everyTraceMatching ? selectAllFilters : null,
   });
@@ -246,7 +260,7 @@ export function TracesTabContent({
   // A trace either replied or only called a tool, and the two become different
   // kinds of test. One selection makes one kind, so a mix is refused rather
   // than quietly turned into the wrong thing.
-  const toolCallOnlyCount = selectedTraces.filter(isToolCallRow).length;
+  const toolCallOnlyCount = selectedTraces.filter(isToolCallTraceRow).length;
   const isMixedSelection =
     toolCallOnlyCount > 0 && toolCallOnlyCount < selectedTraces.length;
   const selectedTestType =
@@ -268,8 +282,7 @@ export function TracesTabContent({
   // tool-call row is answered only against the tool-call evaluator, so there
   // is nothing to pick.
   const labellingIsToolCallOnly =
-    labellableTraces.length > 0 &&
-    labellableTraces.every(isToolCallRow);
+    labellableTraces.length > 0 && labellableTraces.every(isToolCallTraceRow);
 
   // Send selected traces for labelling. Step one asks which evaluators the
   // annotators score against; step two needs the full traces, which the list
@@ -591,9 +604,10 @@ export function TracesTabContent({
   // Whether any trace, not only one on this page, is nothing but tool calls.
   const [hasStoredToolCallTrace, setHasStoredToolCallTrace] = useState(false);
   const [hasStoredReplyTrace, setHasStoredReplyTrace] = useState(false);
-  const hasToolCallTrace = hasStoredToolCallTrace || items.some(isToolCallRow);
+  const hasToolCallTrace =
+    hasStoredToolCallTrace || items.some(isToolCallTraceRow);
   const hasReplyTrace =
-    hasStoredReplyTrace || items.some((trace) => !isToolCallRow(trace));
+    hasStoredReplyTrace || items.some((trace) => !isToolCallTraceRow(trace));
   const linkedTypes = evaluatorTypes ? Object.values(evaluatorTypes) : null;
   // Null while any evaluator that can score has no known type yet.
   const scoringTypes =
@@ -608,15 +622,12 @@ export function TracesTabContent({
     hasToolCallTrace &&
     !linkedTypes.includes("tool-call");
   const toolCallEvaluatorCannotScore =
-    linkedTypes !== null &&
     knownScoringTypes !== null &&
-    knownScoringTypes.length > 0 &&
     hasToolCallTrace &&
-    linkedTypes.includes("tool-call") &&
+    !!linkedTypes?.includes("tool-call") &&
     !knownScoringTypes.includes("tool-call");
   const onlyToolCallEvaluators =
     knownScoringTypes !== null &&
-    knownScoringTypes.length > 0 &&
     knownScoringTypes.every((type) => type === "tool-call") &&
     hasReplyTrace;
   const addToolCallEvaluatorButton = (
@@ -668,8 +679,6 @@ export function TracesTabContent({
   // Whether any of the agent's traces carries feedback from the chat link,
   // which is what puts the feedback section in the filter.
   const [hasFeedback, setHasFeedback] = useState(false);
-  // Refresh bumps this, since the chat link's count moves during the day.
-  const [usageReads, setUsageReads] = useState(0);
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
@@ -915,40 +924,36 @@ export function TracesTabContent({
           those steps ask for cannot happen, and the reader would be left
           sending traces that are quietly turned away. */}
         {hasLoaded && storageFull && usage && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-            <p className="text-sm text-amber-700 dark:text-amber-300">
-              New traces are no longer being stored because this workspace has
-              reached its limit of {traceCount(usage.max_traces)}. Delete traces
-              to make room.{" "}
-              <a
-                href={CONTACT_LINK}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold"
-              >
-                Click here
-              </a>{" "}
-              to contact us to extend your limits.
-            </p>
-          </div>
+          <WarningBox>
+            New traces are no longer being stored because this workspace has
+            reached its limit of {traceCount(usage.max_traces)}. Delete traces
+            to make room.{" "}
+            <a
+              href={CONTACT_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold"
+            >
+              Click here
+            </a>{" "}
+            to contact us to extend your limits.
+          </WarningBox>
         )}
 
         {hasLoaded && chatLimitReached && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-            <p className="text-sm text-amber-700 dark:text-amber-300">
-              Talking to this agent reached its limit of{" "}
-              {chatReplyCap.toLocaleString()}{" "}
-              {chatReplyCap === 1 ? "reply" : "replies"} today.{" "}
-              <button
-                type="button"
-                onClick={onGoToSettings}
-                className="font-bold cursor-pointer hover:opacity-80"
-              >
-                Click here
-              </button>{" "}
-              to increase the limit.
-            </p>
-          </div>
+          <WarningBox>
+            Talking to this agent reached its limit of{" "}
+            {chatReplyCap.toLocaleString()}{" "}
+            {chatReplyCap === 1 ? "reply" : "replies"} today.{" "}
+            <button
+              type="button"
+              onClick={onGoToSettings}
+              className="font-bold cursor-pointer hover:opacity-80"
+            >
+              Click here
+            </button>{" "}
+            to increase the limit.
+          </WarningBox>
         )}
 
         {/* Quiet while scoring works: the chip in the toolbar carries the state
@@ -956,61 +961,51 @@ export function TracesTabContent({
         {hasLoaded && !showEmptyState && hasWarning && (
           <div className="space-y-2">
             {nothingCanScore && (
-              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  <NothingCanScoreMessage
-                    ineligible={ineligible}
-                    onGoToEvaluators={onGoToEvaluators}
-                  />
-                </p>
-              </div>
+              <WarningBox>
+                <NothingCanScoreMessage
+                  ineligible={ineligible}
+                  onGoToEvaluators={onGoToEvaluators}
+                />
+              </WarningBox>
             )}
             {/* One warning for one problem: the line above already points
               to the Evaluators tab, where a tool call evaluator can be added. */}
             {missingToolCallEvaluator && !nothingCanScore && (
-              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  This agent has no tool call evaluator, so its tool calls are not
-                  checked. {addToolCallEvaluatorButton}
-                </p>
-              </div>
+              <WarningBox>
+                This agent has no tool call evaluator, so its tool calls are not
+                checked. {addToolCallEvaluatorButton}
+              </WarningBox>
             )}
             {toolCallEvaluatorCannotScore && !nothingCanScore && (
-              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  No tool call evaluator on this agent can score traces, so its
-                  tool calls are not checked. Add one that can in the{" "}
-                  <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
-                </p>
-              </div>
+              <WarningBox>
+                No tool call evaluator on this agent can score traces, so its
+                tool calls are not checked. Add one that can in the{" "}
+                <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
+              </WarningBox>
             )}
             {onlyToolCallEvaluators && !nothingCanScore && (
-              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  Only tool call evaluators can score this agent&apos;s traces,
-                  so its replies are not checked. Add an evaluator that checks
-                  replies in the{" "}
-                  <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
-                </p>
-              </div>
+              <WarningBox>
+                Only tool call evaluators can score this agent&apos;s traces, so
+                its replies are not checked. Add an evaluator that checks
+                replies in the{" "}
+                <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
+              </WarningBox>
             )}
             {overLimit && (
-              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  {usage?.max_scored_traces != null
-                    ? `Some traces were not scored because this workspace has reached its limit of scoring ${traceCount(usage.max_scored_traces)}.`
-                    : "Some traces were not scored because this workspace has reached its limit for scoring traces."}{" "}
-                  <a
-                    href={CONTACT_LINK}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold"
-                  >
-                    Click here
-                  </a>{" "}
-                  to contact us to extend your limits.
-                </p>
-              </div>
+              <WarningBox>
+                {usage?.max_scored_traces != null
+                  ? `Some traces were not scored because this workspace has reached its limit of scoring ${traceCount(usage.max_scored_traces)}.`
+                  : "Some traces were not scored because this workspace has reached its limit for scoring traces."}{" "}
+                <a
+                  href={CONTACT_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold"
+                >
+                  Click here
+                </a>{" "}
+                to contact us to extend your limits.
+              </WarningBox>
             )}
           </div>
         )}
