@@ -280,7 +280,7 @@ export function PublicChatView({ token }: { token: string }) {
             className="mt-6"
             icon={<ChatIcon className="w-6 h-6 text-muted-foreground" />}
             title={`Talk to ${agent.agent_name}`}
-            description="Send a message the way the people using this agent would. Then rate each reply with 👍 or 👎, and add a comment on what was good or wrong"
+            description="Send a message the way the people using this agent would"
             actions={
               <div className="flex flex-col gap-2 w-full max-w-md">
                 {STARTER_MESSAGES.map((message) => (
