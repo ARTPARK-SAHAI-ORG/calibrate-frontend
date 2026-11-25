@@ -5,11 +5,10 @@
 // Pulled out of the page so it can be unit tested directly: the page it was
 // inline in sits outside what the coverage setup measures, and dropping a
 // field silently here is exactly the bug that made the dialog draw every
-// evaluator on a tool-call item instead of just Tool call correctness.
+// evaluator on a tool-call item.
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import type { ExpectedToolCall } from "@/components/ToolCallExpectationsEditor";
 import type { MetadataEntry } from "@/components/ui";
-import { agentToolCalls } from "@/components/human-labelling/item-panes/shared";
 import { readTurnExtras, textOf, type TurnExtras } from "@/lib/messageVersions";
 
 export type ItemDetailSourceItem = {
@@ -152,4 +151,13 @@ export function storesEmptyToolCallList(payload: unknown): boolean {
   return [p.expected_tool_calls, p.actual_tool_calls].some(
     (list) => Array.isArray(list) && list.length === 0,
   );
+}
+
+/** The tool calls the agent made: `actual_tool_calls` whenever it is a list,
+ * even an empty one, else `tool_calls` when the item has no text reply. The
+ * backend reads the same. */
+export function agentToolCalls(payload: Record<string, unknown>): unknown[] {
+  if (Array.isArray(payload.actual_tool_calls)) return payload.actual_tool_calls;
+  if (textOf(payload.agent_response) || textOf(payload.output)) return [];
+  return Array.isArray(payload.tool_calls) ? payload.tool_calls : [];
 }

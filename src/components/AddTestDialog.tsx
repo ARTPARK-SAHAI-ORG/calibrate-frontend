@@ -1973,19 +1973,20 @@ export function AddTestDialog({
     return false;
   };
 
+  // A call the agent really made can carry an empty argument, so an item's
+  // own stored calls are not required to fill every argument.
+  const storedCallIds = new Set(
+    isLabelItem
+      ? (initialConfig?.history ?? []).flatMap((h) =>
+          (h.tool_calls ?? [])
+            .map((c) => c.id)
+            .filter((id) => id?.startsWith(ACTUAL_CALL_ID_PREFIX)),
+        )
+      : [],
+  );
+
   // Helper to check if tool call messages have empty params
   const hasEmptyToolCallParams = () => {
-    // A call the agent really made can carry an empty argument, so an item's
-    // own stored calls are not held to this.
-    const storedCallIds = new Set(
-      isLabelItem
-        ? (initialConfig?.history ?? []).flatMap((h) =>
-            (h.tool_calls ?? [])
-              .map((c) => c.id)
-              .filter((id) => id?.startsWith(ACTUAL_CALL_ID_PREFIX)),
-          )
-        : [],
-    );
     const toolCallMessages = chatMessages.filter(
       (m) => m.role === "tool_call" && !storedCallIds.has(m.id),
     );
@@ -3652,7 +3653,10 @@ export function AddTestDialog({
                                                         !param.value.trim();
                                                       const showError =
                                                         localValidationAttempted &&
-                                                        isEmpty;
+                                                        isEmpty &&
+                                                        !storedCallIds.has(
+                                                          message.id,
+                                                        );
                                                       return (
                                                         <div key={idx}>
                                                           <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -3709,7 +3713,10 @@ export function AddTestDialog({
                                                         !param.value.trim();
                                                       const showError =
                                                         localValidationAttempted &&
-                                                        isEmpty;
+                                                        isEmpty &&
+                                                        !storedCallIds.has(
+                                                          message.id,
+                                                        );
                                                       return (
                                                         <div key={idx}>
                                                           <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -3758,7 +3765,10 @@ export function AddTestDialog({
                                                   !param.value.trim();
                                                 const showError =
                                                   localValidationAttempted &&
-                                                  isEmpty;
+                                                  isEmpty &&
+                                                  !storedCallIds.has(
+                                                    message.id,
+                                                  );
                                                 return (
                                                   <div key={idx}>
                                                     <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -4263,10 +4273,9 @@ export function AddTestDialog({
                   // its own "empty input" validation runs on submit instead.
                   isLastMessageInvalid = false;
                 } else if (requireAssistantLastMessage) {
-                  // An item storing an empty tool call list records an agent
-                  // that did nothing, so it has no answer to end on.
-                  isLastMessageInvalid =
-                    evalTargetStart < 0 && !storesEmptyToolCallList;
+                  // A tool-call item may have no answer to end on: its agent
+                  // can have done nothing, which its expected calls grade.
+                  isLastMessageInvalid = evalTargetStart < 0 && !isToolCallItem;
                 } else if (allowAgentLastMessage) {
                   isLastMessageInvalid = isEmpty;
                 } else {

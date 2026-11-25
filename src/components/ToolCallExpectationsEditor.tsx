@@ -357,12 +357,7 @@ const overlayArgsOntoParams = (
       // Objects are containers; if a saved value arrived wrapped in an explicit
       // exact spec, unwrap it before recursing into the nested properties.
       const unwrapped = parseArgMatch(rawVal).value;
-      const childArgs =
-        unwrapped !== null &&
-        typeof unwrapped === "object" &&
-        !Array.isArray(unwrapped)
-          ? unwrapped
-          : {};
+      const childArgs = isPlainObject(unwrapped) ? unwrapped : {};
       merged.push({
         ...p,
         properties: overlayArgsOntoParams(
@@ -632,7 +627,9 @@ export function toolCallsToSelectedTools(
 
     const selected: SelectedToolConfig = {
       id: inbuiltTool ? inbuiltTool.id : toolCall.tool,
-      cardId: `${toolCall.tool}-${index}`,
+      // Fixed by place, unlike newCardId's, so rows rebuilt once the tool
+      // list arrives keep their cards on screen.
+      cardId: `saved-${index}`,
       name: inbuiltTool ? inbuiltTool.name : toolCall.tool,
       expectation,
       acceptAnyParameterValues: acceptAny,
@@ -696,7 +693,7 @@ export function selectedToolsHaveInvalidParams(
 export function useToolCallExpectations() {
   const [selectedTools, setSelectedTools] = useState<SelectedToolConfig[]>([]);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
-  // Per-tool "edit parameters as raw JSON" mode. Keyed by tool id. While in
+  // Per-card "edit parameters as raw JSON" mode. Keyed by card id. While in
   // JSON mode we keep an editable text buffer and a parse-error message; valid
   // JSON flows live into `expectedParameters` (the single source of truth).
   const [jsonModeToolIds, setJsonModeToolIds] = useState<Set<string>>(

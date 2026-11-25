@@ -236,8 +236,7 @@ export function AssignAnnotatorsDialog({
     };
   }, [isOpen, accessToken]);
 
-  // Tool call correctness is never a choice: a tool-call item has no other
-  // slot for a person's answer, so it is locked on whenever one is chosen.
+  // Tool call correctness is always on when a tool-call item is chosen.
   // Every other label is offered only when an item it fits is chosen.
   const lockedEvaluators = hasToolCallItems
     ? evaluators.filter(isBuiltInToolCallEvaluator)

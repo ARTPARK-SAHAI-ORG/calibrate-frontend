@@ -6,7 +6,8 @@ import {
 } from "@/components/test-results/shared";
 import { readTextField } from "@/lib/messageVersions";
 import { ExpectedToolCalls } from "./ExpectedToolCalls";
-import { Section, agentToolCalls } from "./shared";
+import { agentToolCalls } from "@/lib/labellingItem";
+import { Section } from "./shared";
 
 /**
  * Renders a general (non-conversational) "llm-general" evaluation item.

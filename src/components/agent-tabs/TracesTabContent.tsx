@@ -76,19 +76,12 @@ import {
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 import { fetchChatLink, type ChatLink } from "@/lib/chatLinkApi";
+import { WarningBox } from "@/components/traces/WarningBox";
 
 /**
  * A number of traces, said the way a person says it: "1 trace", "50,000
  * traces". Both limit lines use it so neither can end up with "1 traces".
  */
-function WarningBox({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-      <p className="text-sm text-amber-700 dark:text-amber-300">{children}</p>
-    </div>
-  );
-}
-
 function traceCount(n: number): string {
   return `${n.toLocaleString()} trace${n === 1 ? "" : "s"}`;
 }
@@ -571,11 +564,11 @@ export function TracesTabContent({
   const [evaluatorDescriptions, setEvaluatorDescriptions] = useState<
     Record<string, string>
   >({});
+  const [evaluatorsReloadKey, setEvaluatorsReloadKey] = useState(0);
+  const [toolCallPickerOpen, setToolCallPickerOpen] = useState(false);
   // Read again each time the tab comes back on screen, the same moment the
   // scoring eligibility is read again, so an evaluator linked meanwhile has a
   // type for its column.
-  const [evaluatorsReloadKey, setEvaluatorsReloadKey] = useState(0);
-  const [toolCallPickerOpen, setToolCallPickerOpen] = useState(false);
   useEffect(() => {
     if (!accessToken || !isActive) return;
     let cancelled = false;

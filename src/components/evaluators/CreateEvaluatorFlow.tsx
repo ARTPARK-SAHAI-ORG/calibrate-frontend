@@ -80,7 +80,7 @@ type CreateEvaluatorFlowProps = {
   existingEvaluators: Pick<EvaluatorData, "name">[];
   /** Called with the created evaluator after a successful POST. */
   onCreated: (evaluator: EvaluatorData) => void;
-  /** Further narrow the picker to specific evaluator types (e.g. `llm` on next-reply tests). */
+  /** Limit the picker to these evaluator types (e.g. `llm` on next-reply tests). */
   useCaseTypes?: EvaluatorType[];
   /** Open the form already filled in from this evaluator, as a copy of it. */
   duplicateOf?: EvaluatorDetail | null;

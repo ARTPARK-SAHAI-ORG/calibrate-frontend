@@ -521,12 +521,12 @@ export function AddLlmGeneralItemsDialog({
     .every((e) =>
       e.variables.every((v) => (varValues[e.uuid]?.[v.name] ?? "").trim()),
     );
-  // An item's answer is either text or one or more tool calls, so either
-  // one satisfies Output.
+  // A tool-call item may have no output: its agent can have made no call,
+  // which its expected calls grade.
   const valid =
     !!name.trim() &&
     !!input.trim() &&
-    (!!output.trim() || toolCalls.length > 0 || storesEmptyToolCallList) &&
+    (!!output.trim() || isToolCallItem) &&
     varsComplete &&
     versionsComplete(inputExtras) &&
     (!output.trim() || versionsComplete(outputExtras)) &&

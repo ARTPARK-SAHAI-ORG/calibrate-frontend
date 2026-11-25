@@ -4,7 +4,8 @@ import {
 } from "@/components/test-results/shared";
 import { readTextField } from "@/lib/messageVersions";
 import { ExpectedToolCalls } from "./ExpectedToolCalls";
-import { agentToolCalls, normaliseHistoryItem } from "./shared";
+import { agentToolCalls } from "@/lib/labellingItem";
+import { normaliseHistoryItem } from "./shared";
 
 /**
  * Renders the conversation side of a tool-call labelling item: the
@@ -65,7 +66,7 @@ export function ToolCallItemPane({
     <TestDetailView
       history={history}
       passed={true}
-      highlightEvalTarget={hasReply && hasCalls ? "final-run" : true}
+      highlightEvalTarget={hasReply && hasCalls ? 2 : true}
       toolCallLabel={hasReply ? "Agent's tool calls" : AGENT_ANSWER}
       afterHistory={
         <>

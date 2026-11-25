@@ -48,7 +48,7 @@ import {
   payloadToHistory,
   textFieldsToPayload,
 } from "@/components/human-labelling/itemConversation";
-import { agentToolCalls } from "@/components/human-labelling/item-panes/shared";
+import { agentToolCalls } from "@/lib/labellingItem";
 import { textOf } from "@/lib/messageVersions";
 import {
   buildItemsCsv,

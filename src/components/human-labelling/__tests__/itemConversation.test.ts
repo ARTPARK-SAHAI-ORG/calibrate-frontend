@@ -563,7 +563,7 @@ describe("actualToolCallsStart", () => {
 });
 
 describe("restoreToolCalls", () => {
-  it("puts back stored values whose text is unchanged, for the same tool only", () => {
+  it("puts back stored values for the same tool only, and reads an added call's values as JSON", () => {
     const stored = [
       { tool: "a", arguments: { n: 3, ok: true } },
       { tool: "b", arguments: { n: 3 } },
@@ -573,7 +573,7 @@ describe("restoreToolCalls", () => {
         [
           { tool: "a", arguments: { n: "3", ok: true } },
           { tool: "c", arguments: { n: "3" } },
-          { tool: "d", arguments: {} },
+          { tool: "d", arguments: { n: "7" } },
         ],
         stored,
         [0, 1, undefined],
@@ -581,7 +581,7 @@ describe("restoreToolCalls", () => {
     ).toEqual([
       { tool: "a", arguments: { n: 3, ok: true } },
       { tool: "c", arguments: { n: "3" } },
-      { tool: "d", arguments: {} },
+      { tool: "d", arguments: { n: 7 } },
     ]);
   });
 
@@ -665,7 +665,37 @@ describe("historyToPayloadFields matching stored calls", () => {
     );
     expect("actual_tool_calls" in fields && fields.actual_tool_calls).toEqual([
       { tool: "save", arguments: { n: 7 } },
-      { tool: "save", arguments: { n: "7" } },
+      { tool: "save", arguments: { n: 7 } },
+    ]);
+  });
+
+  it("reads typed values as JSON for an added call or key, and keeps an edited stored text value as text", () => {
+    const previous = {
+      chat_history: [],
+      agent_response: "",
+      actual_tool_calls: [{ tool: "save", arguments: { note: "a" } }],
+    };
+    const call = (id: string, args: Record<string, unknown>) => ({
+      role: "assistant" as const,
+      tool_calls: [
+        {
+          id,
+          type: "function" as const,
+          function: { name: "save", arguments: JSON.stringify(args) },
+        },
+      ],
+    });
+    const fields = historyToPayloadFields(
+      [
+        call("actual-call-0", { note: "7", n: "7" }),
+        call("actual-call-1764000000000", { n: "7", body: { ok: "true", city: "Pune" } }),
+      ],
+      "llm",
+      previous,
+    );
+    expect("actual_tool_calls" in fields && fields.actual_tool_calls).toEqual([
+      { tool: "save", arguments: { note: "7", n: 7 } },
+      { tool: "save", arguments: { n: 7, body: { ok: true, city: "Pune" } } },
     ]);
   });
 });

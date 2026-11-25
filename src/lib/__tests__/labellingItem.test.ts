@@ -1,5 +1,5 @@
 import { textFieldsToPayload } from "@/components/human-labelling/itemConversation";
-import { evaluatorFitsItem, evaluatorTypesForTask, fitsTaskType, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables, storesEmptyToolCallList } from "../labellingItem";
+import { agentToolCalls, evaluatorFitsItem, evaluatorTypesForTask, fitsTaskType, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables, storesEmptyToolCallList } from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
 // field by field, and is_tool_call was left off the list. The dialog then
@@ -186,5 +186,18 @@ describe("storesEmptyToolCallList", () => {
     expect(storesEmptyToolCallList({ actual_tool_calls: [{ tool: "x" }] })).toBe(false);
     expect(storesEmptyToolCallList({ agent_response: "hi" })).toBe(false);
     expect(storesEmptyToolCallList(null)).toBe(false);
+  });
+});
+
+describe("agentToolCalls", () => {
+  const calls = [{ tool: "a", arguments: {} }];
+  it("uses actual_tool_calls whenever it is a list, even an empty one", () => {
+    expect(agentToolCalls({ actual_tool_calls: calls, tool_calls: [] })).toEqual(calls);
+    expect(agentToolCalls({ actual_tool_calls: [], tool_calls: calls })).toEqual([]);
+  });
+  it("falls back to tool_calls, and to nothing", () => {
+    expect(agentToolCalls({ tool_calls: calls })).toEqual(calls);
+    expect(agentToolCalls({ tool_calls: "x" })).toEqual([]);
+    expect(agentToolCalls({})).toEqual([]);
   });
 });

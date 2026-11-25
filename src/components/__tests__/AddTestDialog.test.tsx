@@ -1888,6 +1888,67 @@ describe("AddTestDialog", () => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
     });
 
+    it("does not outline a stored call's empty argument when another field blocks the save", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...labelProps({
+            onSubmit,
+            initialConfig: {
+              history: [
+                { role: "user", content: "" },
+                {
+                  role: "assistant",
+                  tool_calls: [
+                    {
+                      id: "actual-call-0",
+                      type: "function",
+                      function: { name: "get_weather", arguments: '{"city":""}' },
+                    },
+                  ],
+                },
+                { role: "tool", content: "{}", tool_call_id: "actual-call-0" },
+              ],
+              evaluation: { type: "response" },
+            },
+          })}
+        />,
+      );
+      const city = await screen.findByPlaceholderText("Enter city");
+      await user.click(screen.getByRole("button", { name: "Create" }));
+      expect(await screen.findByText("Message cannot be empty")).toBeInTheDocument();
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(city).not.toHaveClass("border-red-500");
+      expect(screen.queryByText(/This field cannot be/)).not.toBeInTheDocument();
+    });
+
+    it("saves an item with only expected tool calls and no answer", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...labelProps({
+            onSubmit,
+            initialConfig: {
+              history: [{ role: "user", content: "Weather?" }],
+              evaluation: {
+                type: "response",
+                tool_calls: [{ tool: "get_weather", arguments: { city: "Pune" } }],
+              },
+            },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Weather?")).toBeInTheDocument(),
+      );
+      const create = screen.getByRole("button", { name: "Create" });
+      expect(create).toBeEnabled();
+      await user.click(create);
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+
     it("saves an item that stores an empty tool call list and has no answer", async () => {
       const user = setupUser();
       const onSubmit = jest.fn();

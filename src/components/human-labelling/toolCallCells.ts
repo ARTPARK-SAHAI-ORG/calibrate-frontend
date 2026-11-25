@@ -1,4 +1,4 @@
-import { agentToolCalls } from "./item-panes/shared";
+import { agentToolCalls } from "@/lib/labellingItem";
 
 // An empty list is kept as `[]`, since on re-upload it still marks a
 // tool-call row.

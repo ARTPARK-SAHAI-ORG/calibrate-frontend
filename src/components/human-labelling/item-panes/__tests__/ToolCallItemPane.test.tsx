@@ -187,4 +187,30 @@ describe("ToolCallItemPane", () => {
     );
     expect(screen.getAllByText("Evaluation target")).toHaveLength(1);
   });
+
+  it("marks only the reply and the calls when an earlier agent tool call has no saved response", () => {
+    render(
+      <ToolCallItemPane
+        payload={{
+          chat_history: [
+            { role: "user", content: "Book a flight" },
+            {
+              role: "assistant",
+              tool_calls: [
+                {
+                  id: "call-0",
+                  type: "function",
+                  function: { name: "search_flights", arguments: "{}" },
+                },
+              ],
+            },
+          ],
+          agent_response: "One moment",
+          actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
+        }}
+      />,
+    );
+    expect(screen.getByText("search_flights")).toBeInTheDocument();
+    expect(screen.getAllByText("Evaluation target")).toHaveLength(2);
+  });
 });

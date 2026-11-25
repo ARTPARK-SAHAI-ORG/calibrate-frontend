@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { render, screen, setupUser } from "@/test-utils";
+import { act, render, screen, setupUser, waitFor } from "@/test-utils";
 import {
   ToolCallExpectationsEditor,
   useToolCallExpectations,
@@ -160,5 +160,29 @@ describe("two expected calls to the same tool", () => {
     const removes = await screen.findAllByRole("button", { name: "Remove save" });
     await user.click(removes[0]);
     expect(selectedToolsToCalls(editor.selectedTools)).toEqual([calls[1]]);
+  });
+});
+
+describe("card ids", () => {
+  it("never repeat between stored cards and added ones, even for a tool named card", async () => {
+    const calls = Array.from({ length: 50 }, () => ({
+      tool: "card",
+      arguments: {},
+    }));
+    let editor!: ReturnType<typeof useToolCallExpectations>;
+    function Harness() {
+      editor = useToolCallExpectations();
+      useEffect(() => {
+        editor.reset(toolCallsToSelectedTools(calls, [], true));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return null;
+    }
+    render(<Harness />);
+    await waitFor(() => expect(editor.selectedTools).toHaveLength(50));
+    act(() => editor.addToolFromSelection(WEATHER));
+    const ids = editor.selectedTools.map((t) => t.cardId);
+    expect(ids).toHaveLength(51);
+    expect(new Set(ids).size).toBe(51);
   });
 });

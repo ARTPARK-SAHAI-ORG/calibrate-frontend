@@ -3,7 +3,7 @@ import {
   PILL_CLASS,
   type TestCaseHistory,
 } from "@/components/test-results/shared";
-import { readTurnExtras, textOf } from "@/lib/messageVersions";
+import { readTurnExtras } from "@/lib/messageVersions";
 
 export function Section({
   title,
@@ -105,11 +105,4 @@ export function normaliseHistoryItem(raw: unknown): TestCaseHistory | null {
   return null;
 }
 
-/** The tool calls the agent made: `actual_tool_calls` whenever it is a list,
- * even an empty one, else `tool_calls` when the item has no text reply. The
- * backend reads the same. */
-export function agentToolCalls(payload: Record<string, unknown>): unknown[] {
-  if (Array.isArray(payload.actual_tool_calls)) return payload.actual_tool_calls;
-  if (textOf(payload.agent_response) || textOf(payload.output)) return [];
-  return Array.isArray(payload.tool_calls) ? payload.tool_calls : [];
-}
+export { agentToolCalls } from "@/lib/labellingItem";

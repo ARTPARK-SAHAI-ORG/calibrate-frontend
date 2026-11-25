@@ -6,6 +6,7 @@ import { SpinnerIcon } from "@/components/icons";
 import { CONTACT_LINK } from "@/constants/limits";
 import { useUsesOwnProviderKeys } from "@/hooks";
 import { EvaluatorsTabLink } from "./NothingCanScoreMessage";
+import { WarningBox } from "./WarningBox";
 import {
   ineligibleReasonCopy,
   isTraceScoringInProgress,
@@ -75,48 +76,50 @@ function RunBody({
   // have somewhere for the reader to go next, so only they carry a link.
   if (run.status === "failed" || run.status === "skipped") {
     return (
-      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-        <p className="text-sm text-amber-700 dark:text-amber-300">
-          {/* A lone reason takes no full stop. One followed by more words or
-              a button takes one. */}
-          {run.error === "over_limit" && usesOwnProviderKeys
-            ? "This trace was not scored because the workspace had reached its scoring limit at the time"
-            : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`}
-          {run.error === "no_usable_evaluators" && onGoToEvaluators && (
-            <>
-              . Add one that does in the{" "}
-              <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
-            </>
-          )}
-          {run.error === "no_tool_call_evaluator" && addToolCallEvaluator && (
-            <>. {addToolCallEvaluator}</>
-          )}
-          {run.error === "over_limit" && !usesOwnProviderKeys && (
-            <>
-              {" "}
-              <a
-                href={CONTACT_LINK}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold"
-              >
-                Click here
-              </a>{" "}
-              to contact us to extend your limits.
-            </>
-          )}
-        </p>
-        {run.error === "no_usable_evaluators" && ineligible.length > 0 && (
-          <ul className="mt-1 list-disc pl-5 text-sm text-amber-700 dark:text-amber-300">
-            {ineligible.map((item) => (
-              <li key={item.evaluator_uuid}>
-                <span className="font-medium">{item.name}</span>:{" "}
-                {ineligibleReasonCopy(item.reason).toLowerCase()}
-              </li>
-            ))}
-          </ul>
+      <WarningBox
+        after={
+          run.error === "no_usable_evaluators" &&
+          ineligible.length > 0 && (
+            <ul className="mt-1 list-disc pl-5 text-sm text-amber-700 dark:text-amber-300">
+              {ineligible.map((item) => (
+                <li key={item.evaluator_uuid}>
+                  <span className="font-medium">{item.name}</span>:{" "}
+                  {ineligibleReasonCopy(item.reason).toLowerCase()}
+                </li>
+              ))}
+            </ul>
+          )
+        }
+      >
+        {/* A lone reason takes no full stop. One followed by more words or
+            a button takes one. */}
+        {run.error === "over_limit" && usesOwnProviderKeys
+          ? "This trace was not scored because the workspace had reached its scoring limit at the time"
+          : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`}
+        {run.error === "no_usable_evaluators" && onGoToEvaluators && (
+          <>
+            . Add one that does in the{" "}
+            <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
+          </>
         )}
-      </div>
+        {run.error === "no_tool_call_evaluator" && addToolCallEvaluator && (
+          <>. {addToolCallEvaluator}</>
+        )}
+        {run.error === "over_limit" && !usesOwnProviderKeys && (
+          <>
+            {" "}
+            <a
+              href={CONTACT_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold"
+            >
+              Click here
+            </a>{" "}
+            to contact us to extend your limits.
+          </>
+        )}
+      </WarningBox>
     );
   }
 

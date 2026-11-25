@@ -988,10 +988,10 @@ export function TestDetailView({
   /** When true, the trailing assistant message (text reply or tool call)
    * in `history` is rendered with a blue left border + "Evaluation
    * target" pill. Used by the LLM labelling pane to indicate which
-   * message annotators are scoring. `"final-run"` marks every assistant
-   * turn in the trailing run instead, for a reply followed by tool calls
-   * that the judge reads together. */
-  highlightEvalTarget?: boolean | "final-run";
+   * message annotators are scoring. A number marks that many turns ending
+   * at the last assistant turn, for a reply followed by tool calls that the
+   * judge reads together. */
+  highlightEvalTarget?: boolean | number;
   /** When false, the agent's final output is still the emphasised last
    * turn (left border) but pass/fail chrome is omitted. Used by traces,
    * which are not scored. */
@@ -1027,10 +1027,8 @@ export function TestDetailView({
     ? (() => {
         let last = history.length - 1;
         while (last >= 0 && history[last].role !== "assistant") last--;
-        let start = last;
-        if (highlightEvalTarget === "final-run")
-          while (start > 0 && history[start - 1].role === "assistant") start--;
-        return { start, last };
+        const count = highlightEvalTarget === true ? 1 : highlightEvalTarget;
+        return { start: Math.max(0, last - count + 1), last };
       })()
     : { start: -1, last: -1 };
 

@@ -431,6 +431,26 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     expect(screen.getByRole("button", { name: "Save item" })).toBeEnabled();
   });
 
+  it("saves an item with only expected tool calls and no answer", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          expectedToolCalls: [{ tool: "book_flight", arguments: { city: "Pune" } }],
+        },
+      ],
+    });
+    const save = screen.getByRole("button", { name: "Save item" });
+    expect(save).toBeEnabled();
+    await user.click(save);
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+  });
+
   it("saves an edited number argument as a number", async () => {
     const user = setupUser();
     const { onSubmit } = renderDialog({

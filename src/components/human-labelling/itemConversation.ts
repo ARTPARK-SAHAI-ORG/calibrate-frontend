@@ -128,6 +128,20 @@ function parseEdited(text: string): unknown {
   }
 }
 
+/** Values typed for a call or key with nothing stored behind it, read the way
+ * parseEdited reads an edited value. */
+function parseTyped(value: unknown): unknown {
+  if (typeof value === "string") return parseEdited(value);
+  if (!isPlainObject(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([k, v]) => [k, parseTyped(v)]),
+  );
+}
+
+function typedArguments(args: Record<string, unknown>) {
+  return parseTyped(args) as Record<string, unknown>;
+}
+
 /** The dialog edits argument values as text, so a value it shows unchanged is
  * put back as the original value. Returns `previous` itself when nothing was
  * changed, which also keeps keys the dialog does not show. */
@@ -162,11 +176,11 @@ function restoreArguments(
       out[k] = before;
     } else {
       out[k] =
-        typeof v === "string" &&
-        before !== undefined &&
-        typeof before !== "string"
-          ? parseEdited(v)
-          : v;
+        before === undefined
+          ? parseTyped(v)
+          : typeof v === "string" && typeof before !== "string"
+            ? parseEdited(v)
+            : v;
       changed = true;
     }
   }
@@ -184,8 +198,11 @@ export function restoreToolCalls<
   const before = Array.isArray(previous) ? previous : [];
   return next.map((call, i) => {
     const at = storedIndex[i];
-    if (at === undefined || before[at] === undefined) return call;
-    const prior = normalizeToolCall(before[at]);
+    const prior =
+      at === undefined || before[at] === undefined
+        ? undefined
+        : normalizeToolCall(before[at]);
+    if (!prior) return { ...call, arguments: typedArguments(call.arguments) };
     if (prior.toolName !== call.tool) return call;
     return {
       ...call,
@@ -270,8 +287,8 @@ export function historyToPayloadFields(
       };
     }),
   );
-  const calls: ToolCallRecord[] = restoreToolCalls(
-    read.map(({ tool, arguments: args, content, storedAt }) => {
+  const calls: ToolCallRecord[] = read.map(
+    ({ tool, arguments: args, content, storedAt }) => {
       const prior =
         storedAt === undefined || before[storedAt] === undefined
           ? undefined
@@ -297,12 +314,14 @@ export function historyToPayloadFields(
       }
       return {
         tool,
-        arguments: args,
+        arguments: !prior
+          ? typedArguments(args)
+          : same
+            ? restoreArguments(args, prior.args)
+            : args,
         ...(output !== undefined ? { output } : {}),
       };
-    }),
-    before,
-    read.map((c) => c.storedAt),
+    },
   );
   return {
     chat_history,
