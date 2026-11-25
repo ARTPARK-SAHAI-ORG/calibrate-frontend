@@ -59,13 +59,13 @@ import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import {
   isToolCallOutput,
-  NO_TOOL_CALL_EVALUATOR_NOTE,
   traceRowOutputFacts,
 } from "@/lib/traceScoring";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
   fetchTrace,
+  fetchHasToolCallTrace,
   fetchHasTraceFeedback,
   fetchTraceUsage,
   fetchTraces,
@@ -597,24 +597,6 @@ export function TracesTabContent({
 
   // Whether any trace, not only one on this page, is nothing but tool calls.
   const [hasStoredToolCallTrace, setHasStoredToolCallTrace] = useState(false);
-  useEffect(() => {
-    if (!accessToken || !isActive) return;
-    let cancelled = false;
-    fetchTraces(accessToken, {
-      agentId: agentUuid,
-      outputType: "tool_call",
-      limit: 1,
-      offset: 0,
-    })
-      .then((page) => {
-        if (!cancelled) setHasStoredToolCallTrace((page?.total ?? 0) > 0);
-      })
-      .catch((err) => reportError("Error checking for tool call traces:", err));
-    return () => {
-      cancelled = true;
-    };
-  }, [agentUuid, accessToken, isActive]);
-  const linkedEvaluatorUuids = Object.keys(evaluatorTypes);
   const missingToolCallEvaluator =
     !evaluatorTypesLoading &&
     !evaluatorTypesFailed &&
@@ -625,7 +607,6 @@ export function TracesTabContent({
     <AddToolCallEvaluatorButton
       agentUuid={agentUuid}
       accessToken={accessToken}
-      linkedEvaluatorUuids={linkedEvaluatorUuids}
       onAdded={() => {
         setEvaluatorsReloadKey((key) => key + 1);
         void traceScoring.refreshEligibility();
@@ -691,6 +672,11 @@ export function TracesTabContent({
         if (!cancelled) setHasFeedback(has);
       })
       .catch((err) => reportError("Error checking for trace feedback:", err));
+    fetchHasToolCallTrace(accessToken, agentUuid)
+      .then((has) => {
+        if (!cancelled) setHasStoredToolCallTrace(has);
+      })
+      .catch((err) => reportError("Error checking for tool call traces:", err));
     return () => {
       cancelled = true;
     };
@@ -956,7 +942,8 @@ export function TracesTabContent({
             {missingToolCallEvaluator && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
                 <p className="text-sm text-amber-700 dark:text-amber-300">
-                  {NO_TOOL_CALL_EVALUATOR_NOTE} {addToolCallEvaluatorButton}
+                  This agent has no tool call evaluator, so its tool calls are not
+                  checked. {addToolCallEvaluatorButton}
                 </p>
               </div>
             )}

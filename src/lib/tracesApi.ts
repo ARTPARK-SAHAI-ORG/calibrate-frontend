@@ -479,6 +479,20 @@ export async function fetchHasTraceFeedback(
   return page.total > 0;
 }
 
+/** Whether any of the agent's traces is nothing but tool calls. */
+export async function fetchHasToolCallTrace(
+  accessToken: string,
+  agentId: string,
+): Promise<boolean> {
+  const page = await fetchTraces(accessToken, {
+    agentId,
+    outputType: "tool_call",
+    limit: 1,
+    offset: 0,
+  });
+  return page.total > 0;
+}
+
 export async function fetchTraceUsage(
   accessToken: string,
 ): Promise<TraceUsage> {

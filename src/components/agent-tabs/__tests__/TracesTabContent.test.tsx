@@ -40,6 +40,7 @@ const fetchTrace = jest.fn();
 const fetchTraces = jest.fn();
 const fetchTraceUsage = jest.fn();
 const fetchHasTraceFeedback = jest.fn();
+const fetchHasToolCallTrace = jest.fn();
 const fetchChatLink = jest.fn();
 const chatLink = (messagesToday: number, limit: number) => ({
   is_public: false,
@@ -58,6 +59,8 @@ jest.mock("../../../lib/tracesApi", () => ({
   fetchTraceUsage: (...args: unknown[]) => fetchTraceUsage(...args),
   fetchHasTraceFeedback: (...args: unknown[]) =>
     fetchHasTraceFeedback(...args),
+  fetchHasToolCallTrace: (...args: unknown[]) =>
+    fetchHasToolCallTrace(...args),
 }));
 
 // The agent's own evaluators decide whether the attach prompt has anything to
@@ -181,11 +184,9 @@ jest.mock("../../traces/TracesEmptyState", () => ({
 const toolCallEvaluatorAdded = jest.fn();
 jest.mock("../../traces/AddToolCallEvaluatorButton", () => ({
   AddToolCallEvaluatorButton: ({
-    linkedEvaluatorUuids,
     onAdded,
     onOpenChange,
   }: {
-    linkedEvaluatorUuids: string[];
     onAdded: () => void;
     onOpenChange?: (open: boolean) => void;
   }) => (
@@ -193,7 +194,7 @@ jest.mock("../../traces/AddToolCallEvaluatorButton", () => ({
       <button
         type="button"
         onClick={() => {
-          toolCallEvaluatorAdded(linkedEvaluatorUuids);
+          toolCallEvaluatorAdded();
           onAdded();
         }}
       >
@@ -466,7 +467,7 @@ beforeEach(() => {
   fetchAgentEvaluators.mockResolvedValue([]);
   fetchHasTraceFeedback.mockResolvedValue(false);
   // The check for any tool-call trace answers "none" unless a test says so.
-  fetchTraces.mockResolvedValue({ items: [], total: 0, limit: 1, offset: 0 });
+  fetchHasToolCallTrace.mockResolvedValue(false);
   // Read on every visit now, so every test needs an answer. Well inside both
   // limits, which is the ordinary case; the limit tests override it.
   fetchTraceUsage.mockResolvedValue({
@@ -1305,12 +1306,7 @@ describe("TracesTabContent", () => {
         "This agent has no tool call evaluator, so its tool calls are not checked.";
 
       it("shows when a stored trace only called a tool and no tool call evaluator is added, and goes once one is", async () => {
-        fetchTraces.mockResolvedValue({
-          items: [],
-          total: 3,
-          limit: 1,
-          offset: 0,
-        });
+        fetchHasToolCallTrace.mockResolvedValue(true);
         fetchAgentEvaluators.mockResolvedValue([
           { uuid: "ev-1", evaluator_type: "llm" },
         ]);
@@ -1324,12 +1320,10 @@ describe("TracesTabContent", () => {
         );
 
         expect(await screen.findByText(new RegExp(NOTE))).toBeInTheDocument();
-        expect(fetchTraces).toHaveBeenCalledWith("test-token", {
-          agentId: "agent-1",
-          outputType: "tool_call",
-          limit: 1,
-          offset: 0,
-        });
+        expect(fetchHasToolCallTrace).toHaveBeenCalledWith(
+          "test-token",
+          "agent-1",
+        );
 
         fetchAgentEvaluators.mockResolvedValue([
           { uuid: "ev-1", evaluator_type: "llm" },
@@ -1339,7 +1333,7 @@ describe("TracesTabContent", () => {
           screen.getByRole("button", { name: "Add a tool call evaluator" }),
         );
 
-        expect(toolCallEvaluatorAdded).toHaveBeenCalledWith(["ev-1"]);
+        expect(toolCallEvaluatorAdded).toHaveBeenCalled();
         await waitFor(() =>
           expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument(),
         );
@@ -1348,12 +1342,7 @@ describe("TracesTabContent", () => {
       });
 
       it("stays while the evaluators are read again on returning to the tab", async () => {
-        fetchTraces.mockResolvedValue({
-          items: [],
-          total: 3,
-          limit: 1,
-          offset: 0,
-        });
+        fetchHasToolCallTrace.mockResolvedValue(true);
         fetchAgentEvaluators.mockResolvedValue([
           { uuid: "ev-1", evaluator_type: "llm" },
         ]);
@@ -1370,8 +1359,23 @@ describe("TracesTabContent", () => {
         expect(screen.getByText(new RegExp(NOTE))).toBeInTheDocument();
       });
 
+      it("shows after Refresh finds a tool-call trace that is not on the page", async () => {
+        fetchAgentEvaluators.mockResolvedValue([
+          { uuid: "ev-1", evaluator_type: "llm" },
+        ]);
+        const user = setupUser();
+        render(<TracesTabContent {...tabProps} />);
+        await waitFor(() => expect(fetchHasToolCallTrace).toHaveBeenCalled());
+        expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument();
+
+        fetchHasToolCallTrace.mockResolvedValue(true);
+        await user.click(screen.getByRole("button", { name: "Refresh" }));
+
+        expect(await screen.findByText(new RegExp(NOTE))).toBeInTheDocument();
+      });
+
       it("shows for a tool-call trace on the page even before the check answers", async () => {
-        fetchTraces.mockReturnValue(new Promise(() => {}));
+        fetchHasToolCallTrace.mockReturnValue(new Promise(() => {}));
         mockUseTraces.mockReturnValue(
           tracesResult([trace({ response_preview: null, tool_call_count: 1 })]),
         );
@@ -1380,18 +1384,13 @@ describe("TracesTabContent", () => {
       });
 
       it("stays away when a tool call evaluator is already added", async () => {
-        fetchTraces.mockResolvedValue({
-          items: [],
-          total: 3,
-          limit: 1,
-          offset: 0,
-        });
+        fetchHasToolCallTrace.mockResolvedValue(true);
         fetchAgentEvaluators.mockResolvedValue([
           { uuid: "ev-tc", evaluator_type: "tool-call" },
         ]);
         render(<TracesTabContent {...tabProps} />);
         await waitFor(() => expect(fetchAgentEvaluators).toHaveBeenCalled());
-        await waitFor(() => expect(fetchTraces).toHaveBeenCalled());
+        await waitFor(() => expect(fetchHasToolCallTrace).toHaveBeenCalled());
         expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument();
       });
 
@@ -1401,7 +1400,7 @@ describe("TracesTabContent", () => {
           tracesResult([trace({ response_preview: null, tool_call_count: 1 })]),
         );
         render(<TracesTabContent {...tabProps} />);
-        await waitFor(() => expect(fetchTraces).toHaveBeenCalled());
+        await waitFor(() => expect(fetchHasToolCallTrace).toHaveBeenCalled());
         expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument();
       });
 
@@ -1416,12 +1415,7 @@ describe("TracesTabContent", () => {
       });
 
       it("turns the trace window's keys off while the picker is open", async () => {
-        fetchTraces.mockResolvedValue({
-          items: [],
-          total: 1,
-          limit: 1,
-          offset: 0,
-        });
+        fetchHasToolCallTrace.mockResolvedValue(true);
         fetchAgentEvaluators.mockResolvedValue([
           { uuid: "ev-1", evaluator_type: "llm" },
         ]);
@@ -1449,18 +1443,13 @@ describe("TracesTabContent", () => {
 
       it("stays away when no trace only called a tool", async () => {
         render(<TracesTabContent {...tabProps} />);
-        await waitFor(() => expect(fetchTraces).toHaveBeenCalled());
+        await waitFor(() => expect(fetchHasToolCallTrace).toHaveBeenCalled());
         await waitFor(() => expect(fetchAgentEvaluators).toHaveBeenCalled());
         expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument();
       });
 
       it("hands the trace window the same button while no tool call evaluator is added", async () => {
-        fetchTraces.mockResolvedValue({
-          items: [],
-          total: 1,
-          limit: 1,
-          offset: 0,
-        });
+        fetchHasToolCallTrace.mockResolvedValue(true);
         fetchAgentEvaluators.mockResolvedValue([
           { uuid: "ev-1", evaluator_type: "llm" },
         ]);
@@ -1479,12 +1468,7 @@ describe("TracesTabContent", () => {
       });
 
       it("hands the trace window no button once a tool call evaluator is added", async () => {
-        fetchTraces.mockResolvedValue({
-          items: [],
-          total: 1,
-          limit: 1,
-          offset: 0,
-        });
+        fetchHasToolCallTrace.mockResolvedValue(true);
         fetchAgentEvaluators.mockResolvedValue([
           { uuid: "ev-tc", evaluator_type: "tool-call" },
         ]);
@@ -2138,10 +2122,6 @@ describe("TracesTabContent", () => {
       tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
     );
     render(<TracesTabContent {...tabProps} agentNature="general" />);
-
-    // The check for any tool-call trace on load is not the counting asked about.
-    await waitFor(() => expect(fetchTraces).toHaveBeenCalledTimes(1));
-    fetchTraces.mockClear();
 
     // The list itself is filtered to replies, so no counting is needed.
     await applyTraceFilter(user, { output: "Response" });
@@ -3605,10 +3585,6 @@ describe("TracesTabContent", () => {
     );
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
-
-    // The check for any tool-call trace on load is not the counting asked about.
-    await waitFor(() => expect(fetchTraces).toHaveBeenCalledTimes(1));
-    fetchTraces.mockClear();
 
     await applyTraceFilter(user, { scores: { Tone: "failed" } });
     await user.click(screen.getByLabelText("Select all traces"));

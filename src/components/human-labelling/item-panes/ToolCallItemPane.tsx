@@ -65,7 +65,7 @@ export function ToolCallItemPane({
     <TestDetailView
       history={history}
       passed={true}
-      highlightEvalTarget
+      highlightEvalTarget="final-run"
       toolCallLabel={hasReply ? "Agent's tool calls" : AGENT_ANSWER}
       afterHistory={
         <>

@@ -458,6 +458,24 @@ describe("saving an item opened in the dialog", () => {
     });
   });
 
+  it("removes calls stored under tool_calls when every call is removed", () => {
+    const stored = {
+      chat_history: [{ role: "user", content: "book it" }],
+      agent_response: "On it",
+      tool_calls: [{ tool: "book_flight", arguments: { seats: 3 } }],
+    };
+    const withoutCalls = payloadToHistory(stored, "llm").filter(
+      (t) => !t.tool_calls && t.role !== "tool",
+    );
+    const saved = {
+      ...stored,
+      ...historyToPayloadFields(withoutCalls, "llm", stored),
+    };
+    expect(
+      payloadToHistory(saved, "llm").some((t) => t.tool_calls),
+    ).toBe(false);
+  });
+
   it("keeps the text reply of an item that also has tool calls", () => {
     const fields = historyToPayloadFields(
       payloadToHistory(payload, "llm"),
@@ -576,6 +594,15 @@ describe("restoreToolCalls with webhook arguments", () => {
     ).toEqual(stored);
     expect(
       restoreToolCalls([{ tool: "w", arguments: { body: { id: 7 } } }], stored),
-    ).toEqual([{ tool: "w", arguments: { body: { id: 7 } } }]);
+    ).toEqual([{ tool: "w", arguments: { body: { id: 7 }, headers: { k: "v" } } }]);
+  });
+
+  it("keeps the headers when the query is edited", () => {
+    const stored = [
+      { tool: "w", arguments: { query: { q: "x" }, headers: { k: "v" } } },
+    ];
+    expect(
+      restoreToolCalls([{ tool: "w", arguments: { query: { q: "y" } } }], stored),
+    ).toEqual([{ tool: "w", arguments: { query: { q: "y" }, headers: { k: "v" } } }]);
   });
 });

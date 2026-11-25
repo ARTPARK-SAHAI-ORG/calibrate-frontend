@@ -1526,7 +1526,7 @@ describe("tool call columns", () => {
   it.each([
     [
       '[{""tool"":""save"",""extra"":1}]',
-      'Row 1: call 1 in "actual_tool_calls" has a field that is not allowed: "extra". A call can only have "tool", "arguments", "output" and "accept_any_arguments".',
+      'Row 1: call 1 in "actual_tool_calls" has a field that is not allowed: "extra". A call in "actual_tool_calls" can only have "tool", "arguments" and "output".',
     ],
     [
       `[{""tool"":""${"x".repeat(256)}""}]`,
@@ -1538,21 +1538,25 @@ describe("tool call columns", () => {
     ],
     [
       '[{""tool"":""save"",""accept_any_arguments"":""yes""}]',
-      'Row 1: call 1 in "actual_tool_calls" has "accept_any_arguments" that is not true or false.',
+      'Row 1: call 1 in "expected_tool_calls" has "accept_any_arguments" that is not true or false.',
+      "expected_tool_calls",
     ],
-  ])("refuses a call the backend would refuse: %s", async (cell, message) => {
+  ])("refuses a call the backend would refuse: %s", async (cell, message, column = "actual_tool_calls") => {
     render(<BulkUploadItemsDialog {...props()} />);
-    await uploadFile(`name,output,actual_tool_calls\n"A","hi","${cell}"`);
+    await uploadFile(`name,output,${column}\n"A","hi","${cell}"`);
     await waitFor(() => expect(screen.getByText(message)).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Upload item" })).toBeDisabled();
   });
 
   it("accepts every field the backend allows on a call", async () => {
     const payload = await uploadAndGetPayload(
-      `name,output,actual_tool_calls\n"A","","[{""tool"":""save"",""arguments"":null,""output"":[1],""accept_any_arguments"":true}]"`,
+      `name,output,actual_tool_calls,expected_tool_calls\n"A","","[{""tool"":""save"",""arguments"":null,""output"":[1]}]","[{""tool"":""save"",""accept_any_arguments"":true}]"`,
     );
     expect(payload.actual_tool_calls).toEqual([
-      { tool: "save", arguments: null, output: [1], accept_any_arguments: true },
+      { tool: "save", arguments: null, output: [1] },
+    ]);
+    expect(payload.expected_tool_calls).toEqual([
+      { tool: "save", accept_any_arguments: true },
     ]);
   });
 

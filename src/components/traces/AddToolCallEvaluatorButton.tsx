@@ -14,20 +14,18 @@ import { reportError } from "@/lib/reportError";
 
 /**
  * "Add a tool call evaluator", and the picker it opens: every tool-call
- * evaluator in the workspace that this agent does not have yet, or a way to
- * create one when there are none. The windows are drawn on the page body so
- * they are not trapped inside a dialog they open from.
+ * evaluator in the workspace, or a way to create one when there are none.
+ * It is shown only while the agent has none linked. The windows are drawn on
+ * the page body so they are not trapped inside a dialog they open from.
  */
 export function AddToolCallEvaluatorButton({
   agentUuid,
   accessToken,
-  linkedEvaluatorUuids,
   onAdded,
   onOpenChange,
 }: {
   agentUuid: string;
   accessToken: string | null;
-  linkedEvaluatorUuids: string[];
   onAdded: () => void;
   /** Told when a window this button opened appears or goes away. */
   onOpenChange?: (open: boolean) => void;
@@ -35,11 +33,7 @@ export function AddToolCallEvaluatorButton({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [library, setLibrary] = useState<EvaluatorData[]>([]);
-  const available = library.filter(
-    (e) =>
-      e.evaluator_type === "tool-call" &&
-      !linkedEvaluatorUuids.includes(e.uuid),
-  );
+  const available = library.filter((e) => e.evaluator_type === "tool-call");
 
   const windowOpen = pickerOpen || createOpen;
   useEffect(() => {

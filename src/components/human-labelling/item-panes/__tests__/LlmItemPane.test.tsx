@@ -34,7 +34,22 @@ describe("LlmItemPane", () => {
     expect(screen.getByText("Hello, how can I help?")).toBeInTheDocument();
   });
 
-  it("renders when only agent_response is present (no chat_history)", () => {
+  it("marks only the last message when the item ends with two agent messages", () => {
+    render(
+      <LlmItemPane
+        payload={{
+          chat_history: [
+            { role: "user", content: "Hi" },
+            { role: "assistant", content: "One moment" },
+          ],
+          agent_response: "Here it is",
+        }}
+      />,
+    );
+    expect(screen.getAllByText("Evaluation target")).toHaveLength(1);
+  });
+
+    it("renders when only agent_response is present (no chat_history)", () => {
     render(<LlmItemPane payload={{ agent_response: "Just a reply" }} />);
     expect(screen.getByText("Just a reply")).toBeInTheDocument();
   });

@@ -10,6 +10,10 @@ import { Select } from "@/components/ui/Select";
 import { apiClient } from "@/lib/api";
 import { evaluatorFitsItem } from "@/lib/labellingItem";
 import {
+  DEFAULT_TOOL_CALL_CORRECTNESS_SLUG,
+  matchesDefaultSlug,
+} from "@/lib/defaultEvaluators";
+import {
   createAnnotator,
   renameAnnotator,
   type NewAnnotator,
@@ -30,7 +34,7 @@ type TaskEvaluator = {
 };
 
 const isBuiltInToolCallEvaluator = (ev: TaskEvaluator) =>
-  ev.source_default_slug === "default-tool-call-correctness";
+  matchesDefaultSlug(ev, DEFAULT_TOOL_CALL_CORRECTNESS_SLUG);
 
 /** Returns a new Set with `id` toggled in or out. */
 function toggleInSet(set: Set<string>, id: string): Set<string> {

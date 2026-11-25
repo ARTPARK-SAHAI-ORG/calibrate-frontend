@@ -44,6 +44,7 @@ import {
   DEFAULT_STRUCTURED_RESPONSE,
   DEFAULT_WEBHOOK_RESPONSE,
   actualToolCallsStart,
+  argumentText,
 } from "@/components/human-labelling/itemConversation";
 import {
   ToolCallExpectationsEditor,
@@ -541,20 +542,6 @@ export function AddTestDialog({
           versions?: Record<string, string>;
         }> = [];
 
-        // Helper to format value - stringify objects/arrays for display
-        const formatValue = (val: any): string => {
-          if (val === null) return "null";
-          if (val === undefined) return "";
-          if (typeof val === "object") {
-            try {
-              return JSON.stringify(val, null, 2);
-            } catch {
-              return String(val);
-            }
-          }
-          return String(val);
-        };
-
         // Track tool call IDs for linking tool responses
         const toolCallIds: string[] = [];
 
@@ -608,7 +595,7 @@ export function AddTestDialog({
                       ([paramName, paramValue]) => {
                         toolParams.push({
                           name: paramName,
-                          value: formatValue(paramValue),
+                          value: argumentText(paramValue),
                           group: groupKey,
                         });
                       },
@@ -620,7 +607,7 @@ export function AddTestDialog({
                 toolParams = Object.entries(parsedArgs).map(
                   ([name, value]) => ({
                     name,
-                    value: formatValue(value),
+                    value: argumentText(value),
                   }),
                 );
               }

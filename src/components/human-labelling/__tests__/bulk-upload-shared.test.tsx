@@ -35,6 +35,7 @@ import {
   roleLabel,
   rolePillClass,
   sampleEvaluatorValue,
+  toolCallColumns,
   turnContentString,
   useAnnotatedItemsCheck,
   useAnnotators,
@@ -1678,5 +1679,18 @@ describe("BulkUploadDialogShell", () => {
     const file = new File(["a"], "a.csv", { type: "text/csv" });
     fireEvent.change(input, { target: { files: [file] } });
     expect(onFile).toHaveBeenCalledWith(file);
+  });
+});
+
+describe("toolCallColumns", () => {
+  const [actual, expected] = toolCallColumns("agent_response");
+  const parse = (column: typeof actual, call: object) =>
+    column.parse!(JSON.stringify([call]), 0);
+
+  it("allows output only on made calls and accept_any_arguments only on expected calls", () => {
+    expect(parse(actual, { tool: "t", output: 1 })).toHaveProperty("value");
+    expect(parse(expected, { tool: "t", accept_any_arguments: true })).toHaveProperty("value");
+    expect(parse(actual, { tool: "t", accept_any_arguments: true })).toHaveProperty("error");
+    expect(parse(expected, { tool: "t", output: 1 })).toHaveProperty("error");
   });
 });

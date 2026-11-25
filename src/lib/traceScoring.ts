@@ -35,10 +35,6 @@ export function traceRowOutputFacts(
   };
 }
 
-/** Said above the traces list, followed by the button that adds one. */
-export const NO_TOOL_CALL_EVALUATOR_NOTE =
-  "This agent has no tool call evaluator, so its tool calls are not checked.";
-
 /** A run that is still open and should be refetched. */
 export function isTraceScoringInProgress(
   status: TraceScoringStatus | null | undefined,

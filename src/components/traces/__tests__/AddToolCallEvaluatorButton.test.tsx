@@ -68,23 +68,17 @@ beforeEach(() => {
       name: "Booking calls",
       evaluator_type: "tool-call",
     }),
-    evaluator({
-      uuid: "ev-tc-linked",
-      name: "Already here",
-      evaluator_type: "tool-call",
-    }),
   ]);
   addEvaluatorsToAgent.mockResolvedValue({ linked: [], already_linked: [] });
 });
 
-it("lists only the tool call evaluators the agent does not have, and adds the ones picked", async () => {
+it("lists only the tool call evaluators, and adds the ones picked", async () => {
   const user = setupUser();
   const onAdded = jest.fn();
   render(
     <AddToolCallEvaluatorButton
       agentUuid="agent-1"
       accessToken="token"
-      linkedEvaluatorUuids={["ev-tc-linked"]}
       onAdded={onAdded}
     />,
   );
@@ -96,7 +90,6 @@ it("lists only the tool call evaluators the agent does not have, and adds the on
   expect(await screen.findByText("Tool call correctness")).toBeInTheDocument();
   expect(screen.getByText("Booking calls")).toBeInTheDocument();
   expect(screen.queryByText("Tone")).not.toBeInTheDocument();
-  expect(screen.queryByText("Already here")).not.toBeInTheDocument();
 
   for (const box of screen.getAllByRole("checkbox")) await user.click(box);
   await user.click(screen.getByRole("button", { name: "Add (2)" }));
@@ -118,7 +111,6 @@ it("says the library could not be read instead of opening an empty picker", asyn
     <AddToolCallEvaluatorButton
       agentUuid="agent-1"
       accessToken="token"
-      linkedEvaluatorUuids={[]}
       onAdded={jest.fn()}
       onOpenChange={onOpenChange}
     />,
@@ -146,7 +138,6 @@ it("offers to create a tool call evaluator when none is left to add, and adds th
     <AddToolCallEvaluatorButton
       agentUuid="agent-1"
       accessToken="token"
-      linkedEvaluatorUuids={[]}
       onAdded={onAdded}
       onOpenChange={onOpenChange}
     />,
@@ -180,7 +171,6 @@ it("tells the parent the picker closed when the button goes away with it open", 
     <AddToolCallEvaluatorButton
       agentUuid="agent-1"
       accessToken="token"
-      linkedEvaluatorUuids={[]}
       onAdded={jest.fn()}
       onOpenChange={onOpenChange}
     />,

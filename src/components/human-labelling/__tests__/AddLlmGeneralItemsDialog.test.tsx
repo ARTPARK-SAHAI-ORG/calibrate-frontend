@@ -369,7 +369,32 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     await user.click(screen.getByRole("button", { name: "Save item" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit.mock.calls[0][0][0].evaluator_variables).toEqual({
-      "ev-reply": { criteria: "Old rule", extra: "" },
+      "ev-reply": { criteria: "Old rule" },
+      "ev-tool": { rule: "Right tool" },
+    });
+  });
+
+  it("saves nothing for an evaluator that skips the item and has no stored values", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn().mockResolvedValue(undefined);
+    renderDialog({
+      mode: "edit",
+      onSubmit,
+      evaluators: [replyEvaluator, toolCallEvaluator],
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+          varValues: { "ev-tool": { rule: "Right tool" } },
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0][0].evaluator_variables).toEqual({
       "ev-tool": { rule: "Right tool" },
     });
   });

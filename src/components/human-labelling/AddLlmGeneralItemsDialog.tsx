@@ -553,6 +553,11 @@ export function AddLlmGeneralItemsDialog({
     }
     const evaluator_variables: VarValues = {};
     for (const e of evaluatorsWithVariables) {
+      if (!evaluatorFits(e)) {
+        const stored = seed?.varValues?.[e.uuid];
+        if (stored) evaluator_variables[e.uuid] = stored;
+        continue;
+      }
       const evVals: Record<string, string> = {};
       for (const v of e.variables) {
         evVals[v.name] = (varValues[e.uuid]?.[v.name] ?? "").trim();

@@ -1491,11 +1491,12 @@ export type BulkToolCall = {
   accept_any_arguments?: boolean;
 };
 
-const TOOL_CALL_KEYS = ["tool", "arguments", "output", "accept_any_arguments"];
+const TOOL_CALL_KEYS: Record<string, string[]> = {
+  actual_tool_calls: ["tool", "arguments", "output"],
+  expected_tool_calls: ["tool", "arguments", "accept_any_arguments"],
+};
 const MAX_TOOL_NAME_CHARS = 255;
 
-// The backend treats an item with either list, even an empty one, as a tool
-// call that only tool-call evaluators score.
 function parseToolCallsCell(
   raw: string,
   rowIndex: number,
@@ -1523,12 +1524,11 @@ function parseToolCallsCell(
   for (let k = 0; k < calls.length; k++) {
     const call = calls[k] as Record<string, unknown>;
     const where = `Row ${rowIndex + 1}: call ${k + 1} in "${column}"`;
-    const unknownKey = Object.keys(call).find(
-      (key) => !TOOL_CALL_KEYS.includes(key),
-    );
+    const allowed = TOOL_CALL_KEYS[column];
+    const unknownKey = Object.keys(call).find((key) => !allowed.includes(key));
     if (unknownKey) {
       return {
-        error: `${where} has a field that is not allowed: "${unknownKey}". A call can only have "tool", "arguments", "output" and "accept_any_arguments".`,
+        error: `${where} has a field that is not allowed: "${unknownKey}". A call in "${column}" can only have ${allowed.slice(0, -1).map((k) => `"${k}"`).join(", ")} and "${allowed[allowed.length - 1]}".`,
       };
     }
     if ((call.tool as string).length > MAX_TOOL_NAME_CHARS) {

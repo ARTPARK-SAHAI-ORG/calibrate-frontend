@@ -103,7 +103,7 @@ export const DEFAULT_WEBHOOK_RESPONSE =
 export const DEFAULT_STRUCTURED_RESPONSE = '{\n  "status": "received"\n}';
 
 // How the item dialog shows a saved argument value in its text box.
-function argumentText(value: unknown): string {
+export function argumentText(value: unknown): string {
   if (value === null) return "null";
   if (value === undefined) return "";
   if (typeof value === "object") return JSON.stringify(value, null, 2);
@@ -132,6 +132,11 @@ function restoreArguments(
     Object.keys(next).some((k) => !(k in previous)) ||
     (!webhook && Object.keys(previous).some((k) => !(k in next)));
   const out: Record<string, unknown> = {};
+  if (webhook) {
+    for (const [k, v] of Object.entries(previous)) {
+      if (!WEBHOOK_GROUPS.includes(k)) out[k] = v;
+    }
+  }
   for (const [k, v] of Object.entries(next)) {
     const before = previous[k];
     if (v === before) {
@@ -191,6 +196,7 @@ export function historyToPayloadFields(
       chat_history: HistoryItem[];
       agent_response: string | TextField;
       actual_tool_calls?: ToolCallRecord[];
+      tool_calls?: undefined;
     } {
   if (taskType === "conversation") return { transcript: history };
   const isCall = (h: HistoryItem) =>
@@ -207,21 +213,11 @@ export function historyToPayloadFields(
     (h) => (isCall(h) ? h.tool_calls?.[0]?.id : undefined),
     (h) => h.role === "tool",
   );
-  const hasCalls = callStart >= 0;
-  const start = hasCalls ? callStart : history.length;
+  const start = callStart >= 0 ? callStart : history.length;
   const trailing = history.slice(start);
-  const replyIndex = hasCalls
-    ? isReply(history[start - 1])
-      ? start - 1
-      : -1
-    : isReply(history[history.length - 1])
-      ? history.length - 1
-      : -1;
+  const replyIndex = isReply(history[start - 1]) ? start - 1 : -1;
   const reply = replyIndex >= 0 ? history[replyIndex] : undefined;
-  const chat_history = history.slice(
-    0,
-    replyIndex >= 0 ? replyIndex : hasCalls ? start : history.length,
-  );
+  const chat_history = history.slice(0, replyIndex >= 0 ? replyIndex : start);
   const agent_response = reply
     ? writeTextField(reply.content as string, {
         label: reply.label,
@@ -229,62 +225,59 @@ export function historyToPayloadFields(
       })
     : "";
   const before = agentToolCalls(previous ?? {});
-  const calls: ToolCallRecord[] = hasCalls
-    ? restoreToolCalls(
-        trailing
-          .filter(isCall)
-          .flatMap((turn) =>
-            (turn.tool_calls ?? []).map((call) => {
-              const { args } = normalizeToolCall(call);
-              const response = trailing.find(
-                (t) => t.role === "tool" && t.tool_call_id === call.id,
-              );
-              return {
-                tool: call.function.name,
-                arguments: args as Record<string, unknown>,
-                content:
-                  typeof response?.content === "string"
-                    ? response.content
-                    : undefined,
-              };
-            }),
-          )
-          .map(({ tool, arguments: args, content }, i) => {
-            const prior =
-              before[i] === undefined
-                ? undefined
-                : normalizeToolCall(before[i]);
-            const same = prior?.toolName === tool;
-            const priorOutput = same ? prior?.output : undefined;
-            let output: unknown;
-            if (content !== undefined) {
-              if (
-                priorOutput !== undefined &&
-                content === outputText(priorOutput)
-              ) {
-                output = priorOutput;
-              } else if (!(
-                same &&
-                priorOutput === undefined &&
-                (content === DEFAULT_STRUCTURED_RESPONSE ||
-                  content === DEFAULT_WEBHOOK_RESPONSE)
-              )) {
-                output = parseToolOutput(content);
-              }
-            }
-            return {
-              tool,
-              arguments: args,
-              ...(output !== undefined ? { output } : {}),
-            };
-          }),
-        before,
+  const calls: ToolCallRecord[] = restoreToolCalls(
+    trailing
+      .filter(isCall)
+      .flatMap((turn) =>
+        (turn.tool_calls ?? []).map((call) => {
+          const { args } = normalizeToolCall(call);
+          const response = trailing.find(
+            (t) => t.role === "tool" && t.tool_call_id === call.id,
+          );
+          return {
+            tool: call.function.name,
+            arguments: args as Record<string, unknown>,
+            content:
+              typeof response?.content === "string"
+                ? response.content
+                : undefined,
+          };
+        }),
       )
-    : [];
+      .map(({ tool, arguments: args, content }, i) => {
+        const prior =
+          before[i] === undefined ? undefined : normalizeToolCall(before[i]);
+        const same = prior?.toolName === tool;
+        const priorOutput = same ? prior?.output : undefined;
+        let output: unknown;
+        if (content !== undefined) {
+          if (
+            priorOutput !== undefined &&
+            content === outputText(priorOutput)
+          ) {
+            output = priorOutput;
+          } else if (!(
+            same &&
+            priorOutput === undefined &&
+            (content === DEFAULT_STRUCTURED_RESPONSE ||
+              content === DEFAULT_WEBHOOK_RESPONSE)
+          )) {
+            output = parseToolOutput(content);
+          }
+        }
+        return {
+          tool,
+          arguments: args,
+          ...(output !== undefined ? { output } : {}),
+        };
+      }),
+    before,
+  );
   return {
     chat_history,
     agent_response,
     actual_tool_calls: keepList(previous?.actual_tool_calls, calls),
+    tool_calls: undefined,
   };
 }
 

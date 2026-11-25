@@ -41,6 +41,7 @@ const CREATE_BUTTON_CLASS =
 
 // Full-conversation evaluators are hidden for now, so a conversation agent
 // lists the next-reply (`llm`) ones and a general agent the output-type ones.
+// Tool call evaluators fit either kind of agent.
 function agentEvaluatorTypes(
   agentNature: "conversation" | "general",
 ): EvaluatorType[] {

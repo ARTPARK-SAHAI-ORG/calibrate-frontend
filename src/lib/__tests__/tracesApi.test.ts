@@ -9,6 +9,7 @@ import {
   setAgentTraceScoring,
   configWithTraceScoring,
   fetchTraceUsage,
+  fetchHasToolCallTrace,
   fetchHasTraceFeedback,
   convertTracesToTests,
   selectAllBody,
@@ -415,6 +416,24 @@ describe("fetchHasTraceFeedback", () => {
     mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 1, offset: 0 });
 
     await expect(fetchHasTraceFeedback("tok", "ag-1")).resolves.toBe(false);
+  });
+});
+
+describe("fetchHasToolCallTrace", () => {
+  it("asks for one trace that only called a tool, and says whether there is one", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 2, limit: 1, offset: 0 });
+
+    await expect(fetchHasToolCallTrace("tok", "ag-1")).resolves.toBe(true);
+    const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
+    expect(query.get("agent_id")).toBe("ag-1");
+    expect(query.get("output_type")).toBe("tool_call");
+    expect(query.get("limit")).toBe("1");
+  });
+
+  it("says no when none of the agent's traces only called a tool", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 1, offset: 0 });
+
+    await expect(fetchHasToolCallTrace("tok", "ag-1")).resolves.toBe(false);
   });
 });
 

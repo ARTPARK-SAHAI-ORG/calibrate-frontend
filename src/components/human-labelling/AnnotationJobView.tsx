@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { publicFetch } from "@/lib/publicFetch";
-import { evaluatorFitsItem, isToolCallContent } from "@/lib/labellingItem";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
@@ -1580,12 +1580,7 @@ export function ItemPane({
   // the tool-call pane, which reads `chat_history` / `agent_response`.
   if (taskType === "llm-general")
     return <LlmGeneralItemPane payload={payload} />;
-  // The flag is stamped by the backend and absent on a run's copy of an item
-  // and on older responses, so the lists it is worked out from count too.
-  if (
-    item.is_tool_call === true ||
-    isToolCallContent(payload)
-  )
+  if (item.is_tool_call === true)
     return <ToolCallItemPane payload={payload} />;
   if (taskType === "llm") return <LlmItemPane payload={payload} />;
   if (taskType === "conversation")
