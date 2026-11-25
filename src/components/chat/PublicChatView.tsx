@@ -12,7 +12,6 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import {
   ChatIcon,
   InfoIcon,
-  SpinnerIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
 } from "@/components/icons";
@@ -353,10 +352,20 @@ export function PublicChatView({ token }: { token: string }) {
           ),
         )}
         {sending && (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <SpinnerIcon className="w-4 h-4 animate-spin" />
-            The agent is replying
-          </p>
+          <div
+            role="status"
+            className={`${TURN_BUBBLE_CLASS} bg-background w-fit flex items-center gap-1.5 py-4`}
+          >
+            <span className="sr-only">The agent is replying</span>
+            {[0, 150, 300].map((delay) => (
+              <span
+                key={delay}
+                aria-hidden
+                className="w-2 h-2 rounded-full bg-muted-foreground motion-safe:animate-bounce"
+                style={{ animationDelay: `${delay}ms` }}
+              />
+            ))}
+          </div>
         )}
         {sendError && (
           <ErrorNote className="flex items-center justify-between gap-3">
