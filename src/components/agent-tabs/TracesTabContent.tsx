@@ -600,6 +600,9 @@ export function TracesTabContent({
   // logs the refusal on its own server, and this tab just looks like a quiet
   // day. The scoring limit's own number comes from the same answer.
   const [usage, setUsage] = useState<TraceUsage | null>(null);
+  // Whether any of the agent's traces carries feedback from the chat link,
+  // which is what puts the feedback section in the filter.
+  const [hasFeedback, setHasFeedback] = useState(false);
   // Refresh bumps this, since the chat link's count moves during the day.
   const [usageReads, setUsageReads] = useState(0);
   useEffect(() => {
@@ -610,16 +613,6 @@ export function TracesTabContent({
         if (!cancelled) setUsage(next);
       })
       .catch((err) => reportError("Error fetching trace usage:", err));
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, agentUuid, usageReads]);
-  // Whether any of the agent's traces carries feedback from the chat link,
-  // which is what puts the feedback section in the filter.
-  const [hasFeedback, setHasFeedback] = useState(false);
-  useEffect(() => {
-    if (!accessToken) return;
-    let cancelled = false;
     fetchHasTraceFeedback(accessToken, agentUuid)
       .then((has) => {
         if (!cancelled) setHasFeedback(has);
