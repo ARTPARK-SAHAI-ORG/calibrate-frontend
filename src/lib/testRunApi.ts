@@ -150,7 +150,12 @@ export async function startTestRun(
 
   if (response.status === 401) throw new UnauthorizedError();
   if (response.status >= 400 && response.status < 500) {
-    throw new RunNotStartedError(await parseBackendErrorResponse(response));
+    const message = await parseBackendErrorResponse(response);
+    // A 422 means this app sent a request the backend could not read.
+    if (response.status === 422) {
+      reportError("Error starting test run:", response.status, message);
+    }
+    throw new RunNotStartedError(message);
   }
   if (!response.ok) throw new Error("Failed to start test run");
 

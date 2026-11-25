@@ -140,6 +140,24 @@ describe("testRunApi", () => {
       expect(reportError).not.toHaveBeenCalled();
     });
 
+    it("reports a request the backend could not read, and still shows its reason", async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse({ detail: "test_uuids: Input should be a valid list" }, false, 422),
+      );
+
+      await expect(
+        startTestRunOrNotify(BACKEND_URL, TOKEN, "agent-1", null),
+      ).resolves.toBeNull();
+      expect(toast.error).toHaveBeenCalledWith(
+        "test_uuids: Input should be a valid list",
+      );
+      expect(reportError).toHaveBeenCalledWith(
+        "Error starting test run:",
+        422,
+        "test_uuids: Input should be a valid list",
+      );
+    });
+
     it("shows an error toast and returns null on any other failure", async () => {
       (global.fetch as jest.Mock).mockResolvedValue(
         jsonResponse({}, false, 500),
