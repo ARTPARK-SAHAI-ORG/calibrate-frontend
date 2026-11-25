@@ -460,9 +460,9 @@ export type TraceUsage = {
   /** Null means the workspace has no scoring limit. */
   max_scored_traces: number | null;
   /** Replies the agent's chat link gave today. */
-  chat_replies_today?: number;
+  chat_replies_today: number;
   /** Null means the chat link has no daily limit. */
-  max_chat_replies_per_day?: number | null;
+  max_chat_replies_per_day: number | null;
 };
 
 /** Usage for the workspace; the chat link's counts are for `agentId`. */
