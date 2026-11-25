@@ -64,6 +64,9 @@ type TraceDetailDialogProps = {
   evaluatorDescriptions?: Record<string, string>;
   /** The agent's evaluators that cannot score traces, and why. */
   ineligibleEvaluators?: TraceScoringIneligibleEvaluator[];
+  /** The button that adds a tool call evaluator, for a trace skipped because
+   *  the agent has none. */
+  addToolCallEvaluator?: React.ReactNode;
   /** Whether this trace is ticked in the list behind the dialog. */
   isSelected?: boolean;
   /** Tick or untick this trace without closing the dialog and going back to
@@ -368,6 +371,7 @@ export function TraceDetailDialog({
   hasNext = false,
   position,
   evaluatorDescriptions,
+  addToolCallEvaluator,
   isSelected = false,
   onToggleSelected,
   selectedCount = 0,
@@ -668,6 +672,7 @@ export function TraceDetailDialog({
                   error={scoresError}
                   descriptions={evaluatorDescriptions}
                   ineligible={ineligibleEvaluators}
+                  addToolCallEvaluator={addToolCallEvaluator}
                 />
               </div>
             )}
@@ -692,6 +697,7 @@ export function TraceDetailDialog({
                     error={scoresError}
                     descriptions={evaluatorDescriptions}
                     ineligible={ineligibleEvaluators}
+                    addToolCallEvaluator={addToolCallEvaluator}
                   />
                 </div>
               </div>

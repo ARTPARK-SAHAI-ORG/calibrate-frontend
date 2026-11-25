@@ -11,6 +11,7 @@ import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToT
 import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
 import { NothingCanScoreMessage } from "@/components/traces/NothingCanScoreMessage";
+import { AddToolCallEvaluatorButton } from "@/components/traces/AddToolCallEvaluatorButton";
 import { TraceScoringChip } from "@/components/traces/TraceScoringChip";
 import {
   AddRunToLabellingTaskDialog,
@@ -56,7 +57,11 @@ import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
 import { CONTACT_LINK } from "@/constants/limits";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
-import { isToolCallOutput, traceRowOutputFacts } from "@/lib/traceScoring";
+import {
+  isToolCallOutput,
+  NO_TOOL_CALL_EVALUATOR_NOTE,
+  traceRowOutputFacts,
+} from "@/lib/traceScoring";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
@@ -558,6 +563,7 @@ export function TracesTabContent({
   // Read again each time the tab comes back on screen, the same moment the
   // scoring eligibility is read again, so an evaluator linked meanwhile has a
   // type for its column.
+  const [evaluatorsReloadKey, setEvaluatorsReloadKey] = useState(0);
   useEffect(() => {
     if (!accessToken || !isActive) return;
     let cancelled = false;
@@ -581,7 +587,46 @@ export function TracesTabContent({
     return () => {
       cancelled = true;
     };
+  }, [agentUuid, accessToken, isActive, evaluatorsReloadKey]);
+
+  // Whether any trace, not only one on this page, is nothing but tool calls.
+  const [hasStoredToolCallTrace, setHasStoredToolCallTrace] = useState(false);
+  useEffect(() => {
+    if (!accessToken || !isActive) return;
+    let cancelled = false;
+    fetchTraces(accessToken, {
+      agentId: agentUuid,
+      outputType: "tool_call",
+      limit: 1,
+      offset: 0,
+    })
+      .then((page) => {
+        if (!cancelled) setHasStoredToolCallTrace((page?.total ?? 0) > 0);
+      })
+      .catch((err) => reportError("Error checking for tool call traces:", err));
+    return () => {
+      cancelled = true;
+    };
   }, [agentUuid, accessToken, isActive]);
+  const linkedEvaluatorUuids = Object.keys(evaluatorTypes);
+  const missingToolCallEvaluator =
+    !evaluatorTypesLoading &&
+    (hasStoredToolCallTrace ||
+      items.some((trace) => isToolCallOutput(traceRowOutputFacts(trace)))) &&
+    !Object.values(evaluatorTypes).includes("tool-call");
+  const addToolCallEvaluatorButton = (
+    <AddToolCallEvaluatorButton
+      agentUuid={agentUuid}
+      accessToken={accessToken}
+      linkedEvaluatorUuids={linkedEvaluatorUuids}
+      onAdded={() => {
+        setEvaluatorsReloadKey((key) => key + 1);
+        void traceScoring.refreshEligibility();
+        void refetch();
+        onAgentDefaultsAttached?.();
+      }}
+    />
+  );
 
   // The backend's own averages over every matching trace, not the page.
   const scoreCards = useMemo(
@@ -742,7 +787,7 @@ export function TracesTabContent({
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
 
-  const hasWarning = nothingCanScore || overLimit;
+  const hasWarning = nothingCanScore || overLimit || missingToolCallEvaluator;
 
   const integrationGuideButton = (
     <Button
@@ -898,6 +943,13 @@ export function TracesTabContent({
                     ineligible={ineligible}
                     onGoToEvaluators={onGoToEvaluators}
                   />
+                </p>
+              </div>
+            )}
+            {missingToolCallEvaluator && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  {NO_TOOL_CALL_EVALUATOR_NOTE} {addToolCallEvaluatorButton}
                 </p>
               </div>
             )}
@@ -1176,6 +1228,7 @@ export function TracesTabContent({
       <TraceDetailDialog
         evaluatorDescriptions={evaluatorDescriptions}
         ineligibleEvaluators={ineligible}
+        addToolCallEvaluator={addToolCallEvaluatorButton}
         isOpen={openTraceUuid != null}
         onClose={closeTrace}
         accessToken={accessToken}

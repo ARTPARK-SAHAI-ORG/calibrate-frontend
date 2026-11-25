@@ -262,3 +262,26 @@ it("names each evaluator that could not score the trace, and why", () => {
     screen.getByText(/uses variables, which cannot be filled/),
   ).toBeInTheDocument();
 });
+
+it("says the agent has no tool call evaluator and offers the button to add one", () => {
+  render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r9",
+        status: "skipped",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "no_tool_call_evaluator",
+        results: [],
+      }}
+      addToolCallEvaluator={
+        <button type="button">Add a tool call evaluator</button>
+      }
+    />,
+  );
+  expect(document.body).toHaveTextContent(
+    "No tool call evaluator is added to this agent, so its tool calls are not checked. Add a tool call evaluator",
+  );
+  expect(
+    screen.getByRole("button", { name: "Add a tool call evaluator" }),
+  ).toBeInTheDocument();
+});

@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { SpinnerIcon } from "@/components/icons";
 import { CONTACT_LINK } from "@/constants/limits";
@@ -7,6 +8,7 @@ import { useUsesOwnProviderKeys } from "@/hooks";
 import {
   ineligibleReasonCopy,
   isTraceScoringInProgress,
+  NO_TOOL_CALL_EVALUATOR_NOTE,
   scoringRunErrorCopy,
 } from "@/lib/traceScoring";
 import type {
@@ -25,6 +27,9 @@ type TraceScorePanelProps = {
   /** The agent's evaluators that cannot score traces, and why. Named under
    *  "No evaluators could score this trace" so the reader knows what to fix. */
   ineligible?: TraceScoringIneligibleEvaluator[];
+  /** The button that adds a tool call evaluator, shown when the run was
+   *  skipped because the agent has none. */
+  addToolCallEvaluator?: React.ReactNode;
 };
 
 /** The verdict card keeps binary and rating displays apart, so the stored
@@ -43,10 +48,12 @@ function RunBody({
   run,
   descriptions,
   ineligible = [],
+  addToolCallEvaluator,
 }: {
   run: TraceScoringRun;
   descriptions?: Record<string, string>;
   ineligible?: TraceScoringIneligibleEvaluator[];
+  addToolCallEvaluator?: React.ReactNode;
 }) {
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
   if (isTraceScoringInProgress(run.status)) {
@@ -61,6 +68,16 @@ function RunBody({
   // A trace that could not be scored is a warning whatever the reason, so
   // every reason gets the same amber box the Traces tab uses. Only the limit
   // has somewhere for the reader to go next, so only it carries the link.
+  if (run.status === "skipped" && run.error === "no_tool_call_evaluator") {
+    return (
+      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+        <p className="text-sm text-amber-700 dark:text-amber-300">
+          {NO_TOOL_CALL_EVALUATOR_NOTE} {addToolCallEvaluator}
+        </p>
+      </div>
+    );
+  }
+
   if (run.status === "failed" || run.status === "skipped") {
     return (
       <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
@@ -137,6 +154,7 @@ export function TraceScorePanel({
   error = null,
   descriptions,
   ineligible,
+  addToolCallEvaluator,
 }: TraceScorePanelProps) {
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -148,6 +166,7 @@ export function TraceScorePanel({
           run={run}
           descriptions={descriptions}
           ineligible={ineligible}
+          addToolCallEvaluator={addToolCallEvaluator}
         />
       ) : null}
     </div>
