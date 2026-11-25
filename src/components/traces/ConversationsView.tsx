@@ -41,12 +41,15 @@ type ConversationFacets = Omit<TraceFacets, "scores" | "conversationId">;
 export function ConversationsView({
   agentUuid,
   allLabels,
+  hasFeedback,
   onFilterChange,
   ...facets
 }: ConversationFacets & {
   agentUuid: string;
   /** Every label in use, for the filter's choices. */
   allLabels: string[];
+  /** Some trace of the agent's carries feedback from the chat link. */
+  hasFeedback?: boolean;
   onFilterChange: (next: ConversationFacets) => void;
 }) {
   const accessToken = useAccessToken();
@@ -190,6 +193,7 @@ export function ConversationsView({
           labels={allLabels}
           scoreEvaluators={[]}
           forConversations
+          hasFeedback={hasFeedback}
           onApply={({ outputType, labels, source, feedback }) =>
             onFilterChange({ outputType, labels, source, feedback })
           }

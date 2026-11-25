@@ -253,7 +253,7 @@ describe("TracesTable", () => {
       .getByText("Input")
       .closest("div[style]") as HTMLElement;
     expect(header.style.gridTemplateColumns).toBe(
-      "40px 400px 400px 10ch 11ch 90px 160px auto",
+      "40px 72px 400px 400px 10ch 11ch 160px auto",
     );
   });
 
@@ -299,7 +299,7 @@ describe("TracesTable", () => {
       traces: [trace({})],
     });
     // The name plus the arrow that orders the column.
-    const expected = `40px 400px 400px 10ch ${longName.length + 3}ch 90px 160px auto`;
+    const expected = `40px 72px 400px 400px 10ch ${longName.length + 3}ch 160px auto`;
     const header = screen
       .getByText("Input")
       .closest("div[style]") as HTMLElement;
@@ -501,46 +501,51 @@ describe("TracesTable", () => {
 });
 
 describe("chat link traces and feedback", () => {
-  it("labels a trace from the chat link", () => {
+  it("says Chat in the Source column for a trace from the chat link", () => {
     renderTable({ traces: [trace({ source: "chat" })] });
 
+    expect(screen.getByText("Source")).toBeInTheDocument();
     // One on the desktop row and one on the phone card.
-    expect(screen.getAllByText("Chat link")).toHaveLength(2);
+    expect(screen.getAllByText("Chat")).toHaveLength(2);
     expect(screen.queryByText("API")).not.toBeInTheDocument();
   });
 
-  it("labels every other trace as API, including one with no source", () => {
+  it("says API for every other trace, including one with no source", () => {
     renderTable({
       traces: [trace({ uuid: "a", source: "api" }), trace({ uuid: "b" })],
     });
 
     expect(screen.getAllByText("API")).toHaveLength(4);
-    expect(screen.queryByText("Chat link")).not.toBeInTheDocument();
+    expect(screen.queryByText("Chat")).not.toBeInTheDocument();
   });
 
-  it("shows the thumb under Feedback, with the comment on hover", async () => {
+  it("starts the output with the thumb, marking the ones that carry a comment", async () => {
     const user = setupUser();
     renderTable({
       traces: [
         trace({
           uuid: "t1",
-          feedback: { rating: "down", comment: "Wrong dose", at: "2026-07-20" },
+          feedback: { is_correct: false, comment: "Wrong dose", at: "2026-07-20" },
         }),
         trace({
           uuid: "t2",
-          feedback: { rating: "up", comment: null, at: "2026-07-20" },
+          feedback: { is_correct: true, comment: null, at: "2026-07-20" },
         }),
         trace({ uuid: "t3", feedback: null }),
       ],
     });
 
-    expect(screen.getByText("Feedback")).toBeInTheDocument();
-    const down = screen.getAllByRole("img", { name: "Thumbs down" });
+    expect(screen.queryByText("Feedback")).not.toBeInTheDocument();
+    const down = screen.getAllByRole("img", {
+      name: "Thumbs down, with a comment",
+    });
     expect(down).toHaveLength(2);
-    expect(down[0]).toHaveClass("text-red-600");
-    expect(screen.getAllByRole("img", { name: "Thumbs up" })[0]).toHaveClass(
-      "text-green-600",
-    );
+    expect(down[0]).toHaveClass("text-red-700");
+    const up = screen.getAllByRole("img", { name: "Thumbs up" });
+    expect(up[0]).toHaveClass("text-green-700");
+    // The dot that says a comment is there, on the commented thumb only.
+    expect(down[0].querySelector(".rounded-full")).not.toBeNull();
+    expect(up[0].querySelector(".rounded-full")).toBeNull();
     await user.hover(down[0]);
     expect((await screen.findAllByText("Wrong dose")).length).toBeGreaterThan(
       0,

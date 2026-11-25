@@ -37,7 +37,11 @@ import {
 import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
-import { formatTraceDate, TraceFeedbackThumb } from "./TracesTable";
+import {
+  formatTraceDate,
+  TraceFeedbackThumb,
+  TraceSourceChip,
+} from "./TracesTable";
 import { TraceScorePanel } from "./TraceScorePanel";
 
 type TraceDetailDialogProps = {
@@ -168,12 +172,29 @@ export function toTestCaseOutput(
  * uses. Tool calls sit under the output, or stand in for it when the agent
  * called a tool instead of replying.
  */
+/** The feedback a person left on the chat link, drawn under the reply it is
+ *  about: the thumb, then their comment. */
+function TraceFeedbackLine({ feedback }: { feedback: TraceFeedback }) {
+  return (
+    <div className="mt-2 flex items-start gap-2 text-sm text-foreground">
+      <TraceFeedbackThumb feedback={feedback} className="w-4 h-4 mt-0.5" />
+      {feedback.comment && (
+        <span className="whitespace-pre-wrap break-words">
+          {feedback.comment}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function PlainTraceView({
   input,
   output,
+  afterOutput,
 }: {
   input: string;
   output: TraceOutput;
+  afterOutput?: React.ReactNode;
 }) {
   const response = output.response?.trim() ?? "";
   const toolCalls = (output.tool_calls ?? []).filter((call) => call.tool);
@@ -204,6 +225,7 @@ function PlainTraceView({
         {!response && toolCalls.length === 0 && (
           <p className="text-sm text-muted-foreground">—</p>
         )}
+        {afterOutput}
       </Section>
     </div>
   );
@@ -249,7 +271,6 @@ function TraceMetaPanel({
   labels,
   metadata,
   source,
-  feedback,
 }: {
   messageId: string | null;
   conversationId: string | null;
@@ -257,7 +278,6 @@ function TraceMetaPanel({
   labels: string[] | null;
   metadata: MetadataEntry[] | null;
   source?: TraceSource;
-  feedback?: TraceFeedback | null;
 }) {
   const tags = labels ?? [];
 
@@ -269,24 +289,11 @@ function TraceMetaPanel({
       )}
       <MetaBlock label="Created" value={formatTraceDate(createdAt)} />
       {source && (
-        <MetaBlock
-          label="Source"
-          value={source === "chat" ? "Chat link" : "API"}
-        />
-      )}
-      {feedback && (
         <div>
-          <span className="block text-sm font-semibold text-foreground">
-            Feedback
+          <span className="block text-sm font-semibold text-foreground mb-1">
+            Source
           </span>
-          <div className="flex items-start gap-2 mt-0.5">
-            <TraceFeedbackThumb feedback={feedback} />
-            {feedback.comment && (
-              <span className="text-xs text-foreground break-words">
-                {feedback.comment}
-              </span>
-            )}
-          </div>
+          <TraceSourceChip source={source} />
         </div>
       )}
       {tags.length > 0 && (
@@ -429,6 +436,11 @@ export function TraceDetailDialog({
     () => (trace ? toTestCaseOutput(trace.output) : undefined),
     [trace],
   );
+  // A whole conversation is read back without any one turn's feedback.
+  const feedbackLine =
+    !isConversation && trace?.feedback ? (
+      <TraceFeedbackLine feedback={trace.feedback} />
+    ) : null;
   // The heading shortens a long trace id with an ellipsis, so the whole id goes
   // in hover text only when it has been cut short.
   const headingText = conversation
@@ -538,7 +550,6 @@ export function TraceDetailDialog({
                   labels={trace.labels ?? null}
                   metadata={trace.metadata}
                   source={trace.source}
-                  feedback={trace.feedback}
                 />
               )}
             </div>
@@ -556,7 +567,11 @@ export function TraceDetailDialog({
             )}
             {trace &&
               (typeof trace.input === "string" ? (
-                <PlainTraceView input={trace.input} output={trace.output} />
+                <PlainTraceView
+                  input={trace.input}
+                  output={trace.output}
+                  afterOutput={feedbackLine}
+                />
               ) : (
                 <TestDetailView
                   history={history}
@@ -564,6 +579,7 @@ export function TraceDetailDialog({
                   passed={true}
                   showVerdict={false}
                   markOutput={!isConversation}
+                  afterOutput={feedbackLine}
                 />
               ))}
             {/* Scores under the conversation on mobile only; on desktop

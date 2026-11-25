@@ -2,6 +2,7 @@
 
 import React from "react";
 import {
+  AngleBracketsIcon,
   ChatIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
@@ -16,6 +17,7 @@ import { openInPlace } from "@/lib/openInPlace";
 import type {
   TraceFeedback,
   TraceSortOrder,
+  TraceSource,
   TraceSummary,
   TraceToolCall,
 } from "@/lib/tracesApi";
@@ -109,43 +111,72 @@ function ScoreColumnHeading({
 }
 
 /** Where a trace came from, on every row: the chat link or the API. */
-function TraceSourceLabel({ trace }: { trace: TraceSummary }) {
+function TraceSourceCell({ trace }: { trace: TraceSummary }) {
   const chat = trace.source === "chat";
+  const Icon = chat ? ChatIcon : AngleBracketsIcon;
   return (
     <span
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium flex-shrink-0 whitespace-nowrap ${
+      className={`inline-flex items-center gap-1.5 text-sm whitespace-nowrap ${
+        chat ? "text-sky-800 dark:text-sky-300" : "text-muted-foreground"
+      }`}
+    >
+      <Icon className="w-4 h-4 flex-shrink-0" />
+      {chat ? "Chat" : "API"}
+    </span>
+  );
+}
+
+/** Where a trace came from as a small tag, for the trace window. */
+export function TraceSourceChip({ source }: { source: TraceSource }) {
+  const chat = source === "chat";
+  const Icon = chat ? ChatIcon : AngleBracketsIcon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${
         chat
           ? "bg-sky-500/15 text-sky-800 dark:text-sky-200"
           : "bg-muted text-muted-foreground"
       }`}
     >
-      {chat && <ChatIcon className="w-3 h-3" />}
+      <Icon className="w-3 h-3" />
       {chat ? "Chat link" : "API"}
     </span>
   );
 }
 
-/** The thumb left on a reply in the chat link, green up or red down. */
-export function TraceFeedbackThumb({ feedback }: { feedback: TraceFeedback }) {
-  const up = feedback.rating === "up";
+/** The thumb left on a reply in the chat link, green up or red down, with a
+ *  dot at its corner when a comment came with it. */
+export function TraceFeedbackThumb({
+  feedback,
+  className = "w-4 h-4",
+}: {
+  feedback: TraceFeedback;
+  className?: string;
+}) {
+  const up = feedback.is_correct;
   const Icon = up ? ThumbsUpIcon : ThumbsDownIcon;
+  const color = up
+    ? "text-green-700 dark:text-green-500"
+    : "text-red-700 dark:text-red-500";
+  const label = `${up ? "Thumbs up" : "Thumbs down"}${
+    feedback.comment ? ", with a comment" : ""
+  }`;
   return (
     <span
       role="img"
-      aria-label={up ? "Thumbs up" : "Thumbs down"}
-      className={`inline-flex flex-shrink-0 ${
-        up
-          ? "text-green-600 dark:text-green-500"
-          : "text-red-600 dark:text-red-500"
-      }`}
+      aria-label={label}
+      className={`relative inline-flex flex-shrink-0 ${color}`}
     >
-      <Icon className="w-4 h-4" />
+      <Icon className={className} />
+      {feedback.comment && (
+        <span className="absolute -top-0.5 -right-1 w-[7px] h-[7px] rounded-full bg-current ring-[1.5px] ring-background" />
+      )}
     </span>
   );
 }
 
-/** The thumb, with the comment on hover when one was left. */
-function FeedbackCell({ trace }: { trace: TraceSummary }) {
+/** The thumb at the start of the output, with the comment on hover. */
+function FeedbackThumb({ trace }: { trace: TraceSummary }) {
   if (!trace.feedback) return null;
   const thumb = <TraceFeedbackThumb feedback={trace.feedback} />;
   return trace.feedback.comment ? (
@@ -291,9 +322,9 @@ export function TracesTable({
     // Every track is a fixed width, because each row is its own grid: a track
     // sized to its content would come out different on every row and the
     // columns would not line up. The table scrolls sideways instead.
-    gridTemplateColumns: `40px 400px 400px${
+    gridTemplateColumns: `40px 72px 400px 400px${
       evaluatorTracks ? ` ${evaluatorTracks}` : ""
-    } 90px 160px auto`,
+    } 160px auto`,
   };
   // Each row's text is a link, so a right-click, middle-click or Cmd-click opens
   // the trace in a new tab, while a plain click opens the window in place. The
@@ -322,6 +353,9 @@ export function TracesTable({
               label="Select all traces"
             />
           </div>
+          <div className="text-sm font-medium text-muted-foreground">
+            Source
+          </div>
           <div className="text-sm font-medium text-muted-foreground">Input</div>
           <div className="text-sm font-medium text-muted-foreground">
             Output
@@ -335,9 +369,6 @@ export function TracesTable({
               onSortByEvaluator={onSortByEvaluator}
             />
           ))}
-          <div className="text-sm font-medium text-muted-foreground">
-            Feedback
-          </div>
           <div className="text-sm font-medium text-muted-foreground">
             Created
           </div>
@@ -356,10 +387,15 @@ export function TracesTable({
               </div>
               <Link
                 {...linkProps(trace.uuid)}
+                className="self-stretch py-2.5 flex items-center"
+              >
+                <TraceSourceCell trace={trace} />
+              </Link>
+              <Link
+                {...linkProps(trace.uuid)}
                 className="min-w-0 self-stretch py-2.5 flex items-center gap-2"
               >
                 <TraceScoreMark trace={trace} />
-                <TraceSourceLabel trace={trace} />
                 {trace.input_preview && (
                   <div className="text-sm font-medium text-foreground truncate">
                     {trace.input_preview}
@@ -368,18 +404,18 @@ export function TracesTable({
               </Link>
               <Link
                 {...linkProps(trace.uuid)}
-                className="min-w-0 self-stretch py-2.5 flex flex-col justify-center"
+                className="min-w-0 self-stretch py-2.5 flex items-center gap-2"
               >
-                <TraceOutputCell trace={trace} />
+                <FeedbackThumb trace={trace} />
+                <div className="min-w-0 flex-1">
+                  <TraceOutputCell trace={trace} />
+                </div>
               </Link>
               <TraceScoreCells
                 trace={trace}
                 columns={scoreColumns}
                 layout="row"
               />
-              <div className="flex items-center">
-                <FeedbackCell trace={trace} />
-              </div>
               <Link
                 {...linkProps(trace.uuid)}
                 className="self-stretch py-2.5 flex items-center text-sm text-muted-foreground whitespace-nowrap"
@@ -412,7 +448,6 @@ export function TracesTable({
                   className="min-w-0 flex items-start gap-2"
                 >
                   <TraceScoreMark trace={trace} />
-                  <TraceSourceLabel trace={trace} />
                   {trace.input_preview && (
                     <p className="text-sm font-medium text-foreground line-clamp-2">
                       {trace.input_preview}
@@ -421,22 +456,28 @@ export function TracesTable({
                 </Link>
                 <SelectCheckbox {...checkboxProps(trace)} />
               </div>
-              <Link {...linkProps(trace.uuid)} className="block mt-2">
-                <TraceOutputCell trace={trace} />
+              <Link
+                {...linkProps(trace.uuid)}
+                className="mt-2 flex items-start gap-2"
+              >
+                <FeedbackThumb trace={trace} />
+                <div className="min-w-0 flex-1">
+                  <TraceOutputCell trace={trace} />
+                </div>
               </Link>
               <TraceScoreCells
                 trace={trace}
                 columns={scoreColumns}
                 layout="card"
               />
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-3 mt-2">
+                <TraceSourceCell trace={trace} />
                 <Link
                   {...linkProps(trace.uuid)}
                   className="text-xs text-muted-foreground"
                 >
                   {formatTraceDate(trace.created_at)}
                 </Link>
-                <FeedbackCell trace={trace} />
                 <div className="ml-auto">
                   <DeleteIconButton
                     onClick={() => onDelete(trace)}

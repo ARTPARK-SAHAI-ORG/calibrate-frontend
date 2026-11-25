@@ -9,6 +9,7 @@ import {
   setAgentTraceScoring,
   configWithTraceScoring,
   fetchTraceUsage,
+  fetchHasTraceFeedback,
   convertTracesToTests,
   selectAllBody,
   traceFilterKey,
@@ -68,7 +69,7 @@ describe("the conversation filter on the traces list", () => {
 });
 
 describe("the source and feedback filters", () => {
-  const facets = { source: "chat", feedback: "down" } as const;
+  const facets = { source: "chat", feedback: "wrong" } as const;
 
   it("reach the list, the conversations list and a select-all body", async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
@@ -84,13 +85,13 @@ describe("the source and feedback filters", () => {
     for (const [url] of mockApiGet.mock.calls) {
       const query = new URLSearchParams(url.split("?")[1]);
       expect(query.get("source")).toBe("chat");
-      expect(query.get("feedback")).toBe("down");
+      expect(query.get("feedback")).toBe("wrong");
     }
     expect(selectAllBody({ agentId: "a", ...facets })).toEqual({
       select_all: true,
       agent_id: "a",
       source: "chat",
-      feedback: "down",
+      feedback: "wrong",
     });
   });
 
@@ -399,6 +400,24 @@ describe("fetchTraceUsage", () => {
       "/traces/usage?agent_id=ag%201",
       "tok",
     );
+  });
+});
+
+describe("fetchHasTraceFeedback", () => {
+  it("asks for one trace with any feedback, and says whether there is one", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 3, limit: 1, offset: 0 });
+
+    await expect(fetchHasTraceFeedback("tok", "ag-1")).resolves.toBe(true);
+    const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
+    expect(query.get("agent_id")).toBe("ag-1");
+    expect(query.get("feedback")).toBe("any");
+    expect(query.get("limit")).toBe("1");
+  });
+
+  it("says no when none of the agent's traces carries feedback", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 1, offset: 0 });
+
+    await expect(fetchHasTraceFeedback("tok", "ag-1")).resolves.toBe(false);
   });
 });
 

@@ -33,7 +33,7 @@ const OUTPUT_FILTER_OPTIONS: { value: TraceOutputFilter; label: string }[] = [
 const SOURCE_FILTER_OPTIONS: { value: TraceSourceFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "api", label: "API" },
-  { value: "chat", label: "Chat link" },
+  { value: "chat", label: "Chat" },
 ];
 
 const FEEDBACK_FILTER_OPTIONS: {
@@ -41,10 +41,9 @@ const FEEDBACK_FILTER_OPTIONS: {
   label: string;
 }[] = [
   { value: "all", label: "All" },
-  { value: "up", label: "Thumbs up" },
-  { value: "down", label: "Thumbs down" },
-  { value: "any", label: "Any feedback" },
-  { value: "none", label: "No feedback" },
+  { value: "correct", label: "Correct" },
+  { value: "wrong", label: "Wrong" },
+  { value: "any", label: "Any" },
 ];
 
 /** Past this many labels the list is worth searching rather than scrolling. */
@@ -144,6 +143,7 @@ export function TracesFilter({
   onApply,
   forConversations = false,
   conversationIds = [],
+  hasFeedback = false,
 }: {
   value: TracesFilterValue;
   /** Every label the agent's traces carry, not just the ones on this page. */
@@ -158,6 +158,9 @@ export function TracesFilter({
   /** Every conversation ID on the agent's traces, newest first. None leaves
    *  the conversation section out. */
   conversationIds?: string[];
+  /** Some trace of the agent's carries feedback from the chat link. Without
+   *  any, the feedback section is left out. */
+  hasFeedback?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<TracesFilterValue>(value);
@@ -267,6 +270,9 @@ export function TracesFilter({
         // downward from a toolbar at the top of the tab, so there is room.
         // Switch to a portal if it ever gets clipped.
         <div className="absolute left-0 top-full mt-2 z-30 w-max min-w-[min(30rem,calc(100vw-2rem))] max-w-[min(44rem,calc(100vw-2rem))] rounded-lg border border-border bg-background shadow-lg p-5">
+          <h3 className="text-base font-semibold text-foreground mb-4">
+            {forConversations ? "Filter conversations" : "Filter traces"}
+          </h3>
           {forConversations && (
             <InfoNote className="mb-4">
               <span>
@@ -275,9 +281,7 @@ export function TracesFilter({
             </InfoNote>
           )}
           <p className="text-sm font-medium text-foreground mb-2">
-            {forConversations
-              ? "Filter by type of agent's output across turns"
-              : "Filter by type of agent's output"}
+            Agent output
           </p>
           <SegmentedFilter
             value={draft.outputType}
@@ -291,36 +295,10 @@ export function TracesFilter({
             }
           />
 
-          <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-sm font-medium text-foreground mb-2">
-              Filter by where the trace came from
-            </p>
-            <SegmentedFilter
-              value={draft.source}
-              onChange={(source) => setDraft((d) => ({ ...d, source }))}
-              options={SOURCE_FILTER_OPTIONS}
-              className="w-fit"
-              ariaLabel="Filter by where the trace came from"
-            />
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-sm font-medium text-foreground mb-2">
-              Filter by feedback
-            </p>
-            <SegmentedFilter
-              value={draft.feedback}
-              onChange={(feedback) => setDraft((d) => ({ ...d, feedback }))}
-              options={FEEDBACK_FILTER_OPTIONS}
-              className="w-fit max-w-full overflow-x-auto"
-              ariaLabel="Filter by feedback"
-            />
-          </div>
-
           {!forConversations && allConversationIds.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
+            <div className="mt-4">
               <p className="text-sm font-medium text-foreground mb-2">
-                Filter by conversation ID
+                Conversation ID
               </p>
               <div className="flex items-center gap-2">
                 <SingleSelectPicker<string>
@@ -359,9 +337,9 @@ export function TracesFilter({
           )}
 
           {scoreEvaluators.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
+            <div className="mt-4">
               <p className="text-sm font-medium text-foreground mb-2">
-                Filter by scores
+                Scores
               </p>
               {/* Every evaluator stays on offer here; picking one adds a row
                   underneath. The chips never decide the panel's width, so a
@@ -450,10 +428,38 @@ export function TracesFilter({
             </div>
           )}
 
-          {labels.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
+          <div className="mt-4">
+            <p className="text-sm font-medium text-foreground mb-2">Source</p>
+            <SegmentedFilter
+              value={draft.source}
+              onChange={(source) => setDraft((d) => ({ ...d, source }))}
+              options={SOURCE_FILTER_OPTIONS}
+              className="w-fit"
+              ariaLabel="Filter by source"
+            />
+          </div>
+
+          {/* A feedback filter picked earlier stays on offer, so it can be
+              turned off even once no trace carries feedback. */}
+          {(hasFeedback || draft.feedback !== "all") && (
+            <div className="mt-4">
               <p className="text-sm font-medium text-foreground mb-2">
-                Filter by trace labels
+                User feedback
+              </p>
+              <SegmentedFilter
+                value={draft.feedback}
+                onChange={(feedback) => setDraft((d) => ({ ...d, feedback }))}
+                options={FEEDBACK_FILTER_OPTIONS}
+                className="w-fit"
+                ariaLabel="Filter by user feedback"
+              />
+            </div>
+          )}
+
+          {labels.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-foreground mb-2">
+                Trace labels
               </p>
               {labels.length > SEARCH_LABELS_FROM && (
                 <input

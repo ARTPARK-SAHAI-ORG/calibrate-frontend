@@ -17,7 +17,7 @@ describe("readTraceView", () => {
     setSearch(
       "?output=tool_call&label=production&label=staging" +
         "&score=ev-1%3Afailed&score=ev-2%3A%3C%3D2&sort=ev-2&dir=desc" +
-        "&source=chat&feedback=down",
+        "&source=chat&feedback=wrong",
     );
 
     expect(readTraceView()).toEqual({
@@ -29,7 +29,7 @@ describe("readTraceView", () => {
       conversations: false,
       conversationId: null,
       source: "chat",
-      feedback: "down",
+      feedback: "wrong",
     });
   });
 

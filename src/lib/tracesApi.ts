@@ -64,8 +64,10 @@ export type TraceSummary = {
 /** Where a trace came from: the customer's app, or the agent's chat link. */
 export type TraceSource = "api" | "chat";
 
+/** What the person on the chat link said about a reply: true is a thumbs up,
+ *  false a thumbs down. */
 export type TraceFeedback = {
-  rating: "up" | "down";
+  is_correct: boolean;
   comment: string | null;
   at: string;
 };
@@ -211,8 +213,8 @@ export function traceScoreParams(scores?: TraceScoreFilters): string[] {
 /** The source filter, where "all" means no filter at all. */
 export type TraceSourceFilter = "all" | TraceSource;
 
-/** The feedback filter: a thumb up, a thumb down, either, or none. */
-export type TraceFeedbackFilter = "all" | "up" | "down" | "any" | "none";
+/** The feedback filter: a thumb up, a thumb down, or either. */
+export type TraceFeedbackFilter = "all" | "correct" | "wrong" | "any";
 
 /** Which way a sorted column runs. */
 export type TraceSortOrder = "asc" | "desc";
@@ -464,6 +466,20 @@ export type TraceUsage = {
   /** Null means the chat link has no daily limit. */
   max_chat_replies_per_day: number | null;
 };
+
+/** Whether any of the agent's traces carries feedback from the chat link. */
+export async function fetchHasTraceFeedback(
+  accessToken: string,
+  agentId: string,
+): Promise<boolean> {
+  const page = await fetchTraces(accessToken, {
+    agentId,
+    feedback: "any",
+    limit: 1,
+    offset: 0,
+  });
+  return page.total > 0;
+}
 
 /** Usage for the workspace; the chat link's counts are for `agentId`. */
 export async function fetchTraceUsage(

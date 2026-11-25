@@ -36,9 +36,9 @@ const VIEW_PARAM = "view";
 const CONVERSATION_PARAM = "conversation";
 /** "api" or "chat"; absent means both. */
 const SOURCE_PARAM = "source";
-/** "up", "down", "any" or "none"; absent means every trace. */
+/** "correct", "wrong" or "any"; absent means every trace. */
 const FEEDBACK_PARAM = "feedback";
-const FEEDBACK_VALUES = ["up", "down", "any", "none"] as const;
+const FEEDBACK_VALUES = ["correct", "wrong", "any"] as const;
 
 export type TraceView = TraceFacets & {
   sortByEvaluator: string | null;
