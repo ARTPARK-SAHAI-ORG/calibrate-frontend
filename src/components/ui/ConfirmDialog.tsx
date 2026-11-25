@@ -34,7 +34,7 @@ export function ConfirmDialog({
           {title}
         </h2>
         {message && (
-          <p className="text-sm md:text-base text-muted-foreground mb-4">
+          <p className="text-sm md:text-base text-foreground mb-4">
             {message}
           </p>
         )}
