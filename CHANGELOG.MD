@@ -1,5 +1,6 @@
 ## November 2026
 
+- Traces you have ticked on the Monitoring tab now stay ticked when you press Apply in the filters without changing anything, or come back from a trace window with the browser's Back button ([#808](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/808))
 - Selecting all traces on an agent's Monitoring tab now covers only the traces that were there when you chose it, so a trace that arrives afterwards is no longer deleted or added to tests by mistake ([#804](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/804))
 - The Learn page now has an Other talks section with a button for each talk, including the IndiaFOSS 2026 talk, the Pragati masterclass and the AI Commons for Global Health talk, and it shows one talk at a time ([#834](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/834))
 - On the Analytics page, you can now copy a workspace owner's name or email with one click, and see and sort workspaces by when they were created ([#829](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/829))
