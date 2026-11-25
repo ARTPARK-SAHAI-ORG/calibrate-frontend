@@ -519,6 +519,8 @@ export type ConvertTracesToTestsResult = {
   created: number;
   /** Their ids, in the order the traces were sent. */
   test_uuids: string[];
+  /** What went wrong after the tests were made, in words for the reader. */
+  warnings?: string[] | null;
 };
 
 /**
