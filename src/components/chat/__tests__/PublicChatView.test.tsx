@@ -424,3 +424,32 @@ it("sends each reply's tool calls back with the next message", async () => {
     ),
   );
 });
+
+it("leaves a message that failed out of the conversation sent later", async () => {
+  const user = setupUser();
+  await open();
+  mockSend.mockResolvedValueOnce({ ok: false, error: "agent_failed" });
+  await sendMessage(user, "First");
+  expect(
+    await screen.findByText("The agent did not reply. Try again"),
+  ).toBeInTheDocument();
+  mockSend.mockResolvedValueOnce(reply());
+  await sendMessage(user, "Second");
+  expect(await screen.findByText("Simulated agent reply.")).toBeInTheDocument();
+  mockSend.mockResolvedValueOnce(reply());
+  await sendMessage(user, "Third");
+  await waitFor(() =>
+    expect(mockSend).toHaveBeenLastCalledWith(
+      "tok",
+      {
+        conversation_id: "c1",
+        message: "Third",
+        history: [
+          { role: "user", content: "Second" },
+          { role: "assistant", content: "Simulated agent reply.", tool_calls: [] },
+        ],
+      },
+      null,
+    ),
+  );
+});
