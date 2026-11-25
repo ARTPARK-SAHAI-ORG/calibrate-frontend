@@ -13,6 +13,28 @@ type ChatLink = {
   connection_verified: boolean;
 };
 
+const PREVIEW_CLASS =
+  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors bg-indigo-500/14 border-indigo-500/45 text-indigo-900 dark:text-indigo-200";
+
+function OpenIcon() {
+  return (
+    <svg
+      className="w-3.5 h-3.5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+      />
+    </svg>
+  );
+}
+
 /** Makes the agent's chat page public or private, and opens it to preview.
  *  `connectionUnverified` is only there to read the link again once the
  *  connection check passes. */
@@ -71,16 +93,18 @@ export function AgentChatLinkControl({
             href={previewUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background text-foreground hover:bg-accent transition-colors cursor-pointer"
+            className={`${PREVIEW_CLASS} hover:bg-indigo-500/26 dark:hover:bg-indigo-500/20 cursor-pointer`}
           >
+            <OpenIcon />
             Preview
           </a>
         ) : (
           <button
             type="button"
             disabled
-            className="flex items-center px-3 py-1.5 rounded-lg text-[13px] font-medium border border-border bg-background text-foreground cursor-not-allowed opacity-50"
+            className={`${PREVIEW_CLASS} opacity-50 cursor-not-allowed`}
           >
+            <OpenIcon />
             Preview
           </button>
         )}
