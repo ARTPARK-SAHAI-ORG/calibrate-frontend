@@ -849,7 +849,7 @@ export function TracesTabContent({
       {hasLoaded && chatLimitReached && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
           <p className="text-sm text-amber-700 dark:text-amber-300">
-            The chat link reached its limit of{" "}
+            Talking to this agent reached its limit of{" "}
             {chatReplyCap.toLocaleString()}{" "}
             {chatReplyCap === 1 ? "reply" : "replies"} today.{" "}
             <a

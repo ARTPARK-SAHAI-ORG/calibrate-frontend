@@ -65,7 +65,7 @@ it("says the link is not available when the token is unknown", async () => {
   mockAgent.mockResolvedValue({ ok: false, error: "not_found" });
   render(<PublicChatView token="tok" />);
   expect(
-    await screen.findByText("This chat link is not available"),
+    await screen.findByText("This chat is not available"),
   ).toBeInTheDocument();
 });
 
@@ -156,7 +156,7 @@ it("retries the same message when the agent did not reply", async () => {
 });
 
 it.each([
-  ["daily_limit", "This chat link has reached its limit for today"],
+  ["daily_limit", "This agent has reached its limit of messages for today"],
   [
     "agent_unavailable",
     "This agent cannot reply right now. Tell the person who shared this link",
@@ -213,7 +213,7 @@ it("locks the box once the link is no longer available", async () => {
   mockSend.mockResolvedValue({ ok: false, error: "not_found" });
   await sendMessage(user);
   expect(
-    await screen.findByText("This chat link is not available"),
+    await screen.findByText("This chat is not available"),
   ).toBeInTheDocument();
   expect(screen.getByLabelText("Message")).toBeDisabled();
 });

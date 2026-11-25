@@ -17,9 +17,9 @@ describe("formatCost", () => {
 
 describe("chat link labels", () => {
   it("names the chat link kind and its daily limit in plain words", () => {
-    expect(kindLabel("chat")).toBe("Chat link message");
+    expect(kindLabel("chat")).toBe("Message to an agent");
     expect(LIMIT_LABELS.max_chat_replies_per_day).toBe(
-      "Too many chat link replies in one day",
+      "Too many messages to an agent in one day",
     );
   });
 });

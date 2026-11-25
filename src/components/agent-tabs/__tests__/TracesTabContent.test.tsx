@@ -790,7 +790,7 @@ describe("TracesTabContent", () => {
       });
       render(<TracesTabContent {...tabProps} />);
       const line = await screen.findByText(
-        /The chat link reached its limit of 1,200 replies today\./,
+        /Talking to this agent reached its limit of 1,200 replies today\./,
       );
       expect(line).toHaveTextContent("Click here to contact us");
     });
@@ -813,7 +813,7 @@ describe("TracesTabContent", () => {
     it.each([
       ["below the limit", 199, 200],
       ["with no limit", 5000, null],
-    ])("says nothing about the chat link %s", async (_, today, cap) => {
+    ])("says nothing about the daily limit %s", async (_, today, cap) => {
       fetchTraceUsage.mockResolvedValue({
         traces_stored: 3,
         max_traces: 50000,
@@ -825,7 +825,7 @@ describe("TracesTabContent", () => {
       render(<TracesTabContent {...tabProps} />);
       await waitFor(() => expect(fetchTraceUsage).toHaveBeenCalled());
       await act(async () => {});
-      expect(screen.queryByText(/The chat link reached/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Talking to this agent reached/)).not.toBeInTheDocument();
     });
 
     it("says nothing about a limit when no trace was refused for one", () => {

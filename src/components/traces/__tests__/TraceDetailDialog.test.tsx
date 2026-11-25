@@ -1189,7 +1189,7 @@ it("says where the trace came from, and puts the feedback under the reply it rat
   );
 
   expect(await screen.findByText("Source")).toBeInTheDocument();
-  expect(screen.getByText("Chat link")).toBeInTheDocument();
+  expect(screen.getByText("Chat")).toBeInTheDocument();
   expect(screen.queryByText("Feedback")).not.toBeInTheDocument();
   expect(
     screen.getByRole("img", { name: "Thumbs up, with a comment" }),

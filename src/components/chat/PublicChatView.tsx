@@ -31,8 +31,8 @@ const MAX_MESSAGE_LENGTH = 4000;
 
 /** What the reader is told for each way a message can fail. */
 const SEND_ERRORS: Record<string, string> = {
-  not_found: "This chat link is not available",
-  daily_limit: "This chat link has reached its limit for today",
+  not_found: "This chat is not available",
+  daily_limit: "This agent has reached its limit of messages for today",
   agent_failed: "The agent did not reply. Try again",
   agent_unavailable:
     "This agent cannot reply right now. Tell the person who shared this link",
@@ -122,7 +122,7 @@ export function PublicChatView({ token }: { token: string }) {
     return (
       <PublicPageLayout>
         <PublicNotFound
-          message="This chat link is not available"
+          message="This chat is not available"
           detail="The link may have been turned off, or it may be incorrect"
         />
       </PublicPageLayout>

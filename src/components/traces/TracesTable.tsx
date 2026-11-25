@@ -110,8 +110,8 @@ function ScoreColumnHeading({
   );
 }
 
-/** Where a trace came from: "Chat" or "API" in the table, and as a small
- *  tag reading "Chat link" or "API" in the trace window. */
+/** Where a trace came from, "Chat" or "API": plain in the table, and as a
+ *  small tag in the trace window. */
 export function TraceSourceLabel({
   source,
   tag = false,
@@ -131,7 +131,7 @@ export function TraceSourceLabel({
         }`}
       >
         <Icon className="w-3 h-3" />
-        {chat ? "Chat link" : "API"}
+        {chat ? "Chat" : "API"}
       </span>
     );
   }
