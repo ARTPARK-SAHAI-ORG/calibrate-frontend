@@ -63,18 +63,17 @@ type Turn =
       toolCalls: ChatToolCall[];
     };
 
-/** The turns already answered, as the backend reads them. A message the agent
- *  never replied to (the one being sent, or one that failed) is left out
- *  wherever it sits, so the agent sees the same conversation every time. */
+/** The turns already answered, as the backend reads them. A message still
+ *  waiting on its reply (the one being sent, or one that failed) is left off
+ *  the end. */
 export function chatHistory(turns: Turn[]): ChatHistoryTurn[] {
-  return turns.flatMap((turn, i): ChatHistoryTurn[] => {
-    if (turn.role === "agent") {
-      return [{ role: "assistant", content: turn.reply, tool_calls: turn.toolCalls }];
-    }
-    return turns[i + 1]?.role === "agent"
-      ? [{ role: "user", content: turn.text }]
-      : [];
-  });
+  let end = turns.length;
+  while (end > 0 && turns[end - 1].role === "user") end -= 1;
+  return turns.slice(0, end).map((turn) =>
+    turn.role === "user"
+      ? { role: "user", content: turn.text }
+      : { role: "assistant", content: turn.reply, tool_calls: turn.toolCalls },
+  );
 }
 
 type Feedback = {
