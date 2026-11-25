@@ -26,9 +26,12 @@ import {
   traceFilterKey,
   type TraceConversation,
   type TraceFacets,
-  type TraceOutputFilter,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
+
+/** The filters a conversations list takes: every one but the scores and the
+ *  conversation itself. */
+type ConversationFacets = Omit<TraceFacets, "scores" | "conversationId">;
 
 /**
  * The Monitoring tab's conversations list: one row per conversation ID, and a
@@ -38,16 +41,16 @@ import { reportError } from "@/lib/reportError";
 export function ConversationsView({
   agentUuid,
   allLabels,
+  hasFeedback,
   onFilterChange,
   ...facets
-}: Omit<TraceFacets, "scores" | "conversationId"> & {
+}: ConversationFacets & {
   agentUuid: string;
   /** Every label in use, for the filter's choices. */
   allLabels: string[];
-  onFilterChange: (next: {
-    outputType: TraceOutputFilter;
-    labels: string[];
-  }) => void;
+  /** Some trace of the agent's carries feedback from the chat link. */
+  hasFeedback?: boolean;
+  onFilterChange: (next: ConversationFacets) => void;
 }) {
   const accessToken = useAccessToken();
   const [pageSize, setPageSize] = usePageSize();
@@ -190,8 +193,9 @@ export function ConversationsView({
           labels={allLabels}
           scoreEvaluators={[]}
           forConversations
-          onApply={(next) =>
-            onFilterChange({ outputType: next.outputType, labels: next.labels })
+          hasFeedback={hasFeedback}
+          onApply={({ outputType, labels, source, feedback }) =>
+            onFilterChange({ outputType, labels, source, feedback })
           }
         />
       </div>

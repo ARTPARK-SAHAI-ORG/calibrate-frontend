@@ -22,6 +22,11 @@ function renderDialog(props: Partial<React.ComponentProps<typeof DeleteConfirmat
 }
 
 describe("DeleteConfirmationDialog", () => {
+  it("shows the given words on the confirm button while it works", () => {
+    renderDialog({ confirmText: "Clear feedback", busyText: "Clearing...", isDeleting: true });
+    expect(screen.getByRole("button", { name: /Clearing\.\.\./ })).toBeDisabled();
+  });
+
   it("renders nothing when closed", () => {
     render(
       <DeleteConfirmationDialog

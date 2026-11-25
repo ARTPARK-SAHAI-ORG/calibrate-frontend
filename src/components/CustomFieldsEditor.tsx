@@ -135,7 +135,7 @@ export function CustomFieldsEditor({
         <label
           className={
             lockFields
-              ? "block text-xs font-medium text-muted-foreground"
+              ? "block text-xs font-medium text-foreground/80"
               : "text-sm md:text-base font-medium text-foreground"
           }
         >
@@ -143,7 +143,7 @@ export function CustomFieldsEditor({
         </label>
       )}
       {helpText && (
-        <p className="text-xs text-muted-foreground">{helpText}</p>
+        <p className="text-xs text-foreground/80">{helpText}</p>
       )}
       <div className={lockFields ? "space-y-3" : "space-y-2"}>
         {rows.map((row, index) => {
@@ -183,7 +183,7 @@ export function CustomFieldsEditor({
           if (lockFields) {
             return (
               <div key={index} className="space-y-1">
-                <label className="block text-xs font-medium text-muted-foreground truncate">
+                <label className="block text-xs font-medium text-foreground/80 truncate">
                   {row.key}
                 </label>
                 <div className="flex items-center gap-2">
@@ -275,7 +275,7 @@ export function CustomFieldsEditor({
           type="button"
           onClick={handleAdd}
           disabled={disabled}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="text-xs text-foreground/80 hover:text-foreground transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <svg
             className="w-3.5 h-3.5"

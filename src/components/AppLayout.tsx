@@ -871,7 +871,7 @@ export function AppLayout({
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-14 flex items-center justify-between px-4 md:px-6">
+        <header className="h-14 flex items-center justify-between gap-3 px-4 md:px-6">
           {/* Mobile menu button */}
           <button
             onClick={onSidebarToggle}
@@ -893,10 +893,11 @@ export function AppLayout({
             </svg>
           </button>
 
-          <div className="hidden md:block">{customHeader}</div>
+          {/* The name side shrinks first, so the actions keep their width. */}
+          <div className="hidden md:block min-w-0 flex-1 overflow-hidden">{customHeader}</div>
 
           {/* Header Actions and User Profile */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             {headerActions}
 
             {/* User Profile */}

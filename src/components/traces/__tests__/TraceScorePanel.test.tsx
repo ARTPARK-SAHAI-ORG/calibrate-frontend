@@ -235,3 +235,30 @@ it("shows the error when the scores could not be loaded", () => {
   render(<TraceScorePanel run={null} error="Could not load scores." />);
   expect(screen.getByText("Could not load scores.")).toBeInTheDocument();
 });
+
+it("names each evaluator that could not score the trace, and why", () => {
+  render(
+    <TraceScorePanel
+      run={{
+        ...completed,
+        status: "skipped",
+        error: "no_usable_evaluators",
+        results: [],
+      }}
+      ineligible={[
+        {
+          evaluator_uuid: "e1",
+          name: "Tone check",
+          reason: "declares_variables",
+        },
+      ]}
+    />,
+  );
+  expect(
+    screen.getByText("No evaluators could score this trace"),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Tone check")).toBeInTheDocument();
+  expect(
+    screen.getByText(/uses variables, which cannot be filled/),
+  ).toBeInTheDocument();
+});

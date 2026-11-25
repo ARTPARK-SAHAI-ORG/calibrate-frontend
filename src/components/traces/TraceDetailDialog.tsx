@@ -1,5 +1,6 @@
 "use client";
 
+import { StoppedEarlyNote } from "@/components/chat/StoppedEarlyNote";
 import React, { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Link } from "@/lib/nav";
@@ -24,18 +25,27 @@ import {
 import { Section } from "@/components/human-labelling/item-panes/shared";
 import {
   fetchTrace,
+  fetchTraces,
   fetchTraceScores,
+  MAX_TRACES_PAGE_SIZE,
   traceInputTurns,
   TraceDetail,
   TraceOutput,
   TraceConversation,
+  TraceFeedback,
+  TraceScoringIneligibleEvaluator,
   TraceScoringRun,
+  TraceSource,
   TraceTurn,
 } from "@/lib/tracesApi";
 import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
-import { formatTraceDate } from "./TracesTable";
+import {
+  formatTraceDate,
+  TraceFeedbackThumb,
+  TraceSourceLabel,
+} from "./TracesTable";
 import { TraceScorePanel } from "./TraceScorePanel";
 
 type TraceDetailDialogProps = {
@@ -52,6 +62,8 @@ type TraceDetailDialogProps = {
    *  name the evaluator but not what it judges, so the words come from the
    *  agent's own evaluator list. */
   evaluatorDescriptions?: Record<string, string>;
+  /** The agent's evaluators that cannot score traces, and why. */
+  ineligibleEvaluators?: TraceScoringIneligibleEvaluator[];
   /** Whether this trace is ticked in the list behind the dialog. */
   isSelected?: boolean;
   /** Tick or untick this trace without closing the dialog and going back to
@@ -98,6 +110,33 @@ function historyToolCalls(turn: TraceTurn): TestCaseHistory["tool_calls"] {
       },
     };
   });
+}
+
+/**
+ * Which feedback goes under which agent reply in a conversation read back
+ * whole. A chat trace is one user message and the agent's answer to it, so the
+ * Nth trace (oldest first) is the last agent text reply after the Nth user
+ * message. The newest trace's reply is the conversation's output, so its
+ * feedback comes back as `last` rather than by position.
+ */
+export function feedbackByReply(
+  history: TestCaseHistory[],
+  feedbacks: (TraceFeedback | null | undefined)[],
+): { byIndex: Map<number, TraceFeedback>; last: TraceFeedback | null } {
+  const byIndex = new Map<number, TraceFeedback>();
+  let users = 0;
+  let reply = -1;
+  history.forEach((message, index) => {
+    if (message.role === "user") {
+      const feedback = users > 0 && reply >= 0 ? feedbacks[users - 1] : null;
+      if (feedback) byIndex.set(reply, feedback);
+      users += 1;
+      reply = -1;
+    } else if (message.role === "assistant" && !message.tool_calls?.length) {
+      reply = index;
+    }
+  });
+  return { byIndex, last: (users > 0 && feedbacks[users - 1]) || null };
 }
 
 /** Map stored OpenAI-ish turns into the shared conversation renderer. */
@@ -166,12 +205,31 @@ export function toTestCaseOutput(
  * uses. Tool calls sit under the output, or stand in for it when the agent
  * called a tool instead of replying.
  */
+/** The feedback a person left on the chat link, drawn under the reply it is
+ *  about: the thumb, then their comment. */
+function TraceFeedbackLine({ feedback }: { feedback: TraceFeedback }) {
+  return (
+    <div className="mt-2 flex items-start gap-2 text-sm text-foreground">
+      <span className="mt-0.5 flex">
+        <TraceFeedbackThumb feedback={feedback} />
+      </span>
+      {feedback.comment && (
+        <span className="whitespace-pre-wrap break-words">
+          {feedback.comment}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function PlainTraceView({
   input,
   output,
+  afterOutput,
 }: {
   input: string;
   output: TraceOutput;
+  afterOutput?: React.ReactNode;
 }) {
   const response = output.response?.trim() ?? "";
   const toolCalls = (output.tool_calls ?? []).filter((call) => call.tool);
@@ -202,6 +260,7 @@ function PlainTraceView({
         {!response && toolCalls.length === 0 && (
           <p className="text-sm text-muted-foreground">—</p>
         )}
+        {afterOutput}
       </Section>
     </div>
   );
@@ -246,12 +305,14 @@ function TraceMetaPanel({
   createdAt,
   labels,
   metadata,
+  source,
 }: {
   messageId: string | null;
   conversationId: string | null;
   createdAt: string;
   labels: string[] | null;
   metadata: MetadataEntry[] | null;
+  source?: TraceSource;
 }) {
   const tags = labels ?? [];
 
@@ -262,6 +323,14 @@ function TraceMetaPanel({
         <MetaBlock label="Conversation" value={conversationId} />
       )}
       <MetaBlock label="Created" value={formatTraceDate(createdAt)} />
+      {source && (
+        <div>
+          <span className="block text-sm font-semibold text-foreground mb-1">
+            Source
+          </span>
+          <TraceSourceLabel source={source} tag />
+        </div>
+      )}
       {tags.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-foreground">Labels</h3>
@@ -303,6 +372,7 @@ export function TraceDetailDialog({
   onToggleSelected,
   selectedCount = 0,
   conversation = null,
+  ineligibleEvaluators,
 }: TraceDetailDialogProps) {
   useHideFloatingButton(isOpen);
   // Scores belong to one turn, not the conversation, so none are loaded for it.
@@ -321,6 +391,10 @@ export function TraceDetailDialog({
   // Only the newest run is drawn, so only that one is kept.
   const [latestRun, setLatestRun] = useState<TraceScoringRun | null>(null);
   const [scoresError, setScoresError] = useState<string | null>(null);
+  // A conversation's feedback, one entry per trace, oldest first.
+  const [turnFeedback, setTurnFeedback] = useState<
+    (TraceFeedback | null | undefined)[]
+  >([]);
   const trace = isOpen && loaded?.uuid === traceUuid ? loaded.trace : null;
   const visibleRun = loaded?.uuid === traceUuid ? latestRun : null;
   const hasOpenScoreRun = isTraceScoringInProgress(visibleRun?.status);
@@ -337,8 +411,9 @@ export function TraceDetailDialog({
       setLoaded(null);
       setLatestRun(null);
       setScoresError(null);
+      setTurnFeedback([]);
       try {
-        const [data, scores] = await Promise.all([
+        const [data, scores, turns] = await Promise.all([
           fetchTrace(accessToken, traceUuid),
           isConversation
             ? { runs: [] as TraceScoringRun[] }
@@ -349,10 +424,27 @@ export function TraceDetailDialog({
                 }
                 return { runs: [] as TraceScoringRun[] };
               }),
+          // ponytail: one page of 200 turns; a longer conversation shows no
+          // feedback on its oldest replies. Page through if that happens.
+          conversation
+            ? fetchTraces(accessToken, {
+                agentId: conversation.agent_id,
+                conversationId: conversation.conversation_id,
+                limit: MAX_TRACES_PAGE_SIZE,
+                offset: 0,
+              }).catch((err) => {
+                reportError("Error fetching conversation feedback:", err);
+                return null;
+              })
+            : null,
         ]);
         if (!cancelled) {
           setLoaded({ uuid: traceUuid, trace: data });
           setLatestRun(scores.runs?.[0] ?? null);
+          // The list comes newest first.
+          setTurnFeedback(
+            (turns?.items ?? []).map((t) => t.feedback).reverse(),
+          );
         }
       } catch (err) {
         reportError("Error fetching trace:", err);
@@ -370,6 +462,9 @@ export function TraceDetailDialog({
     return () => {
       cancelled = true;
     };
+    // The conversation object changes with every list read; its id is what
+    // decides what to fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, traceUuid, accessToken, isConversation]);
 
   useEffect(() => {
@@ -402,6 +497,26 @@ export function TraceDetailDialog({
     () => (trace ? toTestCaseOutput(trace.output) : undefined),
     [trace],
   );
+  // In a conversation each reply carries the feedback of its own trace.
+  const conversationFeedback = useMemo(
+    () => (isConversation ? feedbackByReply(history, turnFeedback) : null),
+    [isConversation, history, turnFeedback],
+  );
+  const lastFeedback = conversationFeedback
+    ? conversationFeedback.last
+    : trace?.feedback;
+  const feedbackLine = (
+    <>
+      {trace?.output?.stopped_early && <StoppedEarlyNote />}
+      {lastFeedback && <TraceFeedbackLine feedback={lastFeedback} />}
+    </>
+  );
+  const afterTurn = conversationFeedback
+    ? (index: number) => {
+        const feedback = conversationFeedback.byIndex.get(index);
+        return feedback ? <TraceFeedbackLine feedback={feedback} /> : null;
+      }
+    : undefined;
   // The heading shortens a long trace id with an ellipsis, so the whole id goes
   // in hover text only when it has been cut short.
   const headingText = conversation
@@ -457,10 +572,10 @@ export function TraceDetailDialog({
                 "what did that press do", so it goes away with the trace it
                 was counting. */}
             {onToggleSelected && isSelected && selectedCount > 0 && (
-                <span className="inline-flex items-center h-8 px-2.5 rounded-md border border-border bg-muted/40 text-xs font-medium text-foreground whitespace-nowrap">
-                  {selectedCount} selected
-                </span>
-              )}
+              <span className="inline-flex items-center h-8 px-2.5 rounded-md border border-border bg-muted/40 text-xs font-medium text-foreground whitespace-nowrap">
+                {selectedCount} selected
+              </span>
+            )}
             {onToggleSelected && (
               // Both states are filled so neither reads as switched off, and
               // they are different colours so a glance says which one it is.
@@ -510,6 +625,7 @@ export function TraceDetailDialog({
                   createdAt={trace.created_at}
                   labels={trace.labels ?? null}
                   metadata={trace.metadata}
+                  source={trace.source}
                 />
               )}
             </div>
@@ -527,7 +643,11 @@ export function TraceDetailDialog({
             )}
             {trace &&
               (typeof trace.input === "string" ? (
-                <PlainTraceView input={trace.input} output={trace.output} />
+                <PlainTraceView
+                  input={trace.input}
+                  output={trace.output}
+                  afterOutput={feedbackLine}
+                />
               ) : (
                 <TestDetailView
                   history={history}
@@ -535,6 +655,8 @@ export function TraceDetailDialog({
                   passed={true}
                   showVerdict={false}
                   markOutput={!isConversation}
+                  afterOutput={feedbackLine}
+                  afterTurn={afterTurn}
                 />
               ))}
             {/* Scores under the conversation on mobile only; on desktop
@@ -545,6 +667,7 @@ export function TraceDetailDialog({
                   run={visibleRun}
                   error={scoresError}
                   descriptions={evaluatorDescriptions}
+                  ineligible={ineligibleEvaluators}
                 />
               </div>
             )}
@@ -568,6 +691,7 @@ export function TraceDetailDialog({
                     run={visibleRun}
                     error={scoresError}
                     descriptions={evaluatorDescriptions}
+                    ineligible={ineligibleEvaluators}
                   />
                 </div>
               </div>

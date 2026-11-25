@@ -5,10 +5,15 @@ import { SpinnerIcon } from "@/components/icons";
 import { CONTACT_LINK } from "@/constants/limits";
 import { useUsesOwnProviderKeys } from "@/hooks";
 import {
+  ineligibleReasonCopy,
   isTraceScoringInProgress,
   scoringRunErrorCopy,
 } from "@/lib/traceScoring";
-import type { TraceScoreResult, TraceScoringRun } from "@/lib/tracesApi";
+import type {
+  TraceScoreResult,
+  TraceScoringIneligibleEvaluator,
+  TraceScoringRun,
+} from "@/lib/tracesApi";
 
 type TraceScorePanelProps = {
   /** The newest scoring run for this trace. The parent leaves the whole
@@ -17,6 +22,9 @@ type TraceScorePanelProps = {
   error?: string | null;
   /** What each evaluator is for, by evaluator id. */
   descriptions?: Record<string, string>;
+  /** The agent's evaluators that cannot score traces, and why. Named under
+   *  "No evaluators could score this trace" so the reader knows what to fix. */
+  ineligible?: TraceScoringIneligibleEvaluator[];
 };
 
 /** The verdict card keeps binary and rating displays apart, so the stored
@@ -34,9 +42,11 @@ function verdictFields(result: TraceScoreResult): {
 function RunBody({
   run,
   descriptions,
+  ineligible = [],
 }: {
   run: TraceScoringRun;
   descriptions?: Record<string, string>;
+  ineligible?: TraceScoringIneligibleEvaluator[];
 }) {
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
   if (isTraceScoringInProgress(run.status)) {
@@ -75,6 +85,16 @@ function RunBody({
             </>
           )}
         </p>
+        {run.error === "no_usable_evaluators" && ineligible.length > 0 && (
+          <ul className="mt-1 list-disc pl-5 text-sm text-amber-700 dark:text-amber-300">
+            {ineligible.map((item) => (
+              <li key={item.evaluator_uuid}>
+                <span className="font-medium">{item.name}</span>:{" "}
+                {ineligibleReasonCopy(item.reason).toLowerCase()}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     );
   }
@@ -116,6 +136,7 @@ export function TraceScorePanel({
   run,
   error = null,
   descriptions,
+  ineligible,
 }: TraceScorePanelProps) {
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -123,7 +144,11 @@ export function TraceScorePanel({
       {error ? (
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
       ) : run ? (
-        <RunBody run={run} descriptions={descriptions} />
+        <RunBody
+          run={run}
+          descriptions={descriptions}
+          ineligible={ineligible}
+        />
       ) : null}
     </div>
   );

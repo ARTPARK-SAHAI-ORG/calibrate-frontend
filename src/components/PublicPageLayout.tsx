@@ -8,6 +8,8 @@ interface PublicPageLayoutProps {
   children: React.ReactNode;
   title?: string;
   pills?: React.ReactNode;
+  /** Buttons for this page, on the right before the theme toggle. */
+  actions?: React.ReactNode;
   contentClassName?: string;
 }
 
@@ -35,6 +37,7 @@ export function PublicPageLayout({
   children,
   title,
   pills,
+  actions,
   contentClassName = "max-w-7xl",
 }: PublicPageLayoutProps) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -78,7 +81,7 @@ export function PublicPageLayout({
         {(title || pills) && (
           <div className="flex items-center gap-2 truncate max-w-[50%]">
             {title && (
-              <span className="text-[13px] text-muted-foreground truncate">{title}</span>
+              <span className="text-sm font-semibold text-foreground truncate">{title}</span>
             )}
             {pills && (
               <div className="flex items-center gap-1.5 shrink-0">{pills}</div>
@@ -88,6 +91,7 @@ export function PublicPageLayout({
         {/* Right side: theme toggle + auth link — only after mount */}
         {mounted && (
           <div className="flex items-center gap-2 shrink-0">
+            {actions}
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
@@ -112,14 +116,14 @@ export function PublicPageLayout({
               isAuthenticated ? (
                 <Link
                   href="/agents"
-                  className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex items-center h-8 px-4 rounded-lg text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
                 >
                   Go to app
                 </Link>
               ) : (
                 <Link
                   href="/login"
-                  className="inline-flex items-center px-4 py-1.5 rounded-lg text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity"
+                  className="inline-flex items-center h-8 px-4 rounded-lg text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
                 >
                   Sign in
                 </Link>
@@ -137,7 +141,14 @@ export function PublicPageLayout({
   );
 }
 
-export function PublicNotFound({ message }: { message?: string }) {
+export function PublicNotFound({
+  message,
+  detail = "The results may have been made private, or the link may be incorrect.",
+}: {
+  message?: string;
+  /** A second line under the message; null leaves it out. */
+  detail?: string | null;
+}) {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
       <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
@@ -148,9 +159,11 @@ export function PublicNotFound({ message }: { message?: string }) {
       <p className="text-[15px] font-medium text-foreground">
         {message ?? "This link is not available"}
       </p>
-      <p className="text-[13px] text-muted-foreground text-center max-w-sm">
-        The results may have been made private, or the link may be incorrect.
-      </p>
+      {detail && (
+        <p className="text-[13px] text-muted-foreground text-center max-w-sm">
+          {detail}
+        </p>
+      )}
     </div>
   );
 }

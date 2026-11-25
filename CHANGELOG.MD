@@ -1,5 +1,7 @@
 ## November 2026
 
+- The grey text in the Custom fields section is now darker and easier to read on an agent's Connection tab, when writing a test and before checking a connection ([#871](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/871))
+- The descriptions on an agent's Connection tab are now in darker text that is easier to read ([#870](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/870))
 - When traces are added to tests, you now see a message on screen if some of the new tests have no evaluator or were not added to the agent's Tests tab ([#853](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/853))
 - Traces you have ticked on the Monitoring tab now stay ticked when you press Apply in the filters without changing anything, or come back from a trace window with the browser's Back button ([#808](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/808))
 - Selecting all traces on an agent's Monitoring tab now covers only the traces that were there when you chose it, so a trace that arrives afterwards is no longer deleted or added to tests by mistake ([#804](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/804))

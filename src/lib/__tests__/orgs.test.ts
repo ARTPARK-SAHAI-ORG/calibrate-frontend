@@ -9,6 +9,7 @@ import {
   clearActiveOrgUuid,
   pickDefaultOrg,
   workspaceRunModelsInParallel,
+  workspaceDefaultMessagesPerDay,
   type Organization,
 } from "@/lib/orgs";
 
@@ -263,5 +264,20 @@ describe("workspaceRunModelsInParallel", () => {
 
   it("is not known when there is no workspace yet", () => {
     expect(workspaceRunModelsInParallel(undefined)).toBeUndefined();
+  });
+});
+
+describe("workspaceDefaultMessagesPerDay", () => {
+  it("reads the saved number", () => {
+    expect(
+      workspaceDefaultMessagesPerDay(
+        org({ settings: { talk_to_agent: { default_messages_per_day: 50 } } }),
+      ),
+    ).toBe(50);
+  });
+
+  it("falls back to the backend default when nothing is saved", () => {
+    expect(workspaceDefaultMessagesPerDay(org())).toBe(200);
+    expect(workspaceDefaultMessagesPerDay(undefined)).toBe(200);
   });
 });

@@ -5,13 +5,19 @@ import { apiGet } from "@/lib/api";
 import { getActiveOrgUuid } from "@/lib/orgs";
 import { useOrgUuid } from "@/lib/nav";
 import { useAccessToken } from "./useAccessToken";
+import { LIMITS } from "@/constants/limits";
 
-/** The part of `GET /org-limits/me` the app reads. */
+/** The parts of `GET /org-limits/me` the app reads. */
 export type OrgLimits = {
   uses_own_provider_keys: boolean;
+  /** Replies one chat link may send a day; null means no limit. */
+  max_chat_replies_per_day: number | null;
 };
 
-const FALLBACK: OrgLimits = { uses_own_provider_keys: false };
+const FALLBACK: OrgLimits = {
+  uses_own_provider_keys: false,
+  max_chat_replies_per_day: LIMITS.DEFAULT_MAX_CHAT_REPLIES_PER_DAY,
+};
 
 // One request per signed-in user and workspace, shared by every caller.
 let cachedPromise: Promise<OrgLimits> | null = null;
@@ -43,6 +49,10 @@ export function getOrgLimits(
     cachedPromise = apiGet<Partial<OrgLimits>>("/org-limits/me", accessToken)
       .then((data) => ({
         uses_own_provider_keys: data.uses_own_provider_keys === true,
+        max_chat_replies_per_day:
+          data.max_chat_replies_per_day === undefined
+            ? LIMITS.DEFAULT_MAX_CHAT_REPLIES_PER_DAY
+            : data.max_chat_replies_per_day,
       }))
       .catch(() => {
         cachedPromise = null;

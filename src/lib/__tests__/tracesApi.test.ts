@@ -9,6 +9,7 @@ import {
   setAgentTraceScoring,
   configWithTraceScoring,
   fetchTraceUsage,
+  fetchHasTraceFeedback,
   convertTracesToTests,
   selectAllBody,
   traceFilterKey,
@@ -64,6 +65,46 @@ describe("the conversation filter on the traces list", () => {
     expect(selectAllBody({ agentId: "agent-1" })).not.toHaveProperty(
       "conversation_id",
     );
+  });
+});
+
+describe("the source and feedback filters", () => {
+  const facets = { source: "chat", feedback: "wrong" } as const;
+
+  it("reach the list, the conversations list and a select-all body", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
+
+    await fetchTraces("tok", { limit: 10, offset: 0, agentId: "a", ...facets });
+    await fetchTraceConversations("tok", {
+      limit: 10,
+      offset: 0,
+      agentId: "a",
+      ...facets,
+    });
+
+    for (const [url] of mockApiGet.mock.calls) {
+      const query = new URLSearchParams(url.split("?")[1]);
+      expect(query.get("source")).toBe("chat");
+      expect(query.get("feedback")).toBe("wrong");
+    }
+    expect(selectAllBody({ agentId: "a", ...facets })).toEqual({
+      select_all: true,
+      agent_id: "a",
+      source: "chat",
+      feedback: "wrong",
+    });
+  });
+
+  it("are left off when set to every trace", () => {
+    expect(
+      selectAllBody({ agentId: "a", source: "all", feedback: "all" }),
+    ).toEqual({ select_all: true, agent_id: "a" });
+  });
+
+  it("change the filter key", () => {
+    const plain = traceFilterKey({ agentId: "a" });
+    expect(traceFilterKey({ agentId: "a", source: "chat" })).not.toBe(plain);
+    expect(traceFilterKey({ agentId: "a", feedback: "wrong" })).not.toBe(plain);
   });
 });
 
@@ -356,6 +397,24 @@ describe("fetchTraceUsage", () => {
       max_scored_traces: 100,
     });
     expect(mockApiGet).toHaveBeenCalledWith("/traces/usage", "tok");
+  });
+});
+
+describe("fetchHasTraceFeedback", () => {
+  it("asks for one trace with any feedback, and says whether there is one", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 3, limit: 1, offset: 0 });
+
+    await expect(fetchHasTraceFeedback("tok", "ag-1")).resolves.toBe(true);
+    const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
+    expect(query.get("agent_id")).toBe("ag-1");
+    expect(query.get("feedback")).toBe("any");
+    expect(query.get("limit")).toBe("1");
+  });
+
+  it("says no when none of the agent's traces carries feedback", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 1, offset: 0 });
+
+    await expect(fetchHasTraceFeedback("tok", "ag-1")).resolves.toBe(false);
   });
 });
 

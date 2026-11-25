@@ -411,9 +411,11 @@ export function AgentConnectionTabContent({
               placeholder="https://your-agent.example.com/chat"
               className="w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-foreground/80">
               Calibrate will create a POST request to this URL with the{" "}
-              {isGeneral ? "input" : "conversation messages"}.{" "}
+              {isGeneral ? "input" : "conversation messages"}
+            </p>
+            <p className="text-xs">
               <a
                 href={AGENT_CONNECTIONS_DOCS_URL}
                 target="_blank"
@@ -431,7 +433,7 @@ export function AgentConnectionTabContent({
             <label className="text-sm md:text-base font-medium text-foreground">
               Headers
             </label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-foreground/80">
               Add headers for authentication or custom metadata
             </p>
             <div className="space-y-2 md:space-y-2">
@@ -527,7 +529,7 @@ export function AgentConnectionTabContent({
             <button
               type="button"
               onClick={handleAddHeader}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1"
+              className="text-xs text-foreground/80 hover:text-foreground transition-colors cursor-pointer flex items-center gap-1"
             >
               <svg
                 className="w-3.5 h-3.5"
@@ -569,7 +571,7 @@ export function AgentConnectionTabContent({
                 <label className="block text-sm md:text-base font-medium text-foreground">
                   Support benchmarking different models
                 </label>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-foreground/80">
                   Calibrate sends a model name with every request, so the same
                   tests can be run on several models
                 </p>
@@ -598,7 +600,7 @@ export function AgentConnectionTabContent({
                 <label className="block text-sm md:text-base font-medium text-foreground">
                   Model provider
                 </label>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-foreground/80">
                   Choose the provider your agent uses to route model requests
                   during benchmarks
                 </p>
@@ -642,7 +644,7 @@ export function AgentConnectionTabContent({
             <h3 className="text-sm md:text-base font-medium text-foreground">
               Connection check
             </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-xs text-foreground/80 mt-0.5">
               Verifies your agent is reachable and returns the expected response
               format. Required before running LLM tests and text simulations
             </p>
@@ -658,7 +660,7 @@ export function AgentConnectionTabContent({
                   <span className="text-sm text-green-600">
                     Verified
                     {verifiedAt && (
-                      <span className="text-muted-foreground font-normal">
+                      <span className="text-foreground/80 font-normal">
                         {" "}
                         · {verifiedAt}
                       </span>
@@ -673,7 +675,7 @@ export function AgentConnectionTabContent({
               ) : (
                 <>
                   <div className="w-2 h-2 rounded-full bg-muted-foreground/40" />
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm text-foreground/80">
                     Not verified
                   </span>
                 </>
@@ -706,7 +708,7 @@ export function AgentConnectionTabContent({
                 {verifyError && <p>{verifyError}</p>}
                 {verify.verifySampleResponse && (
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground">
+                    <p className="text-xs font-medium text-foreground/80">
                       Your agent responded with:
                     </p>
                     <div className="relative">
@@ -759,7 +761,7 @@ export function AgentConnectionTabContent({
           </div>
           <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-4 border-t border-border bg-muted/10">
             <div className="pt-4 space-y-3">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-foreground/80">
                 Calibrate will{" "}
                 <code className="text-xs bg-muted px-1 py-0.5 rounded">
                   POST
@@ -778,7 +780,7 @@ export function AgentConnectionTabContent({
 
               {supportsBenchmark && (
                 <>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-foreground/80">
                     To support benchmarking multiple models, a{" "}
                     <code className="text-xs bg-muted px-1 py-0.5 rounded">
                       model
@@ -838,12 +840,12 @@ export function AgentConnectionTabContent({
                     }`}
                   />
                 </button>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-foreground/80">
                   Does your agent return tool calls?
                 </span>
               </label>
 
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-foreground/80">
                 Your agent must respond with:
               </p>
               <div className="relative">
@@ -859,7 +861,7 @@ export function AgentConnectionTabContent({
                   {showToolCalls ? (
                     <>
                       {responseWithToolCallsExample.split("// optional")[0]}
-                      <span className="italic text-muted-foreground">
+                      <span className="italic text-foreground/80">
                         {`// optional`}
                       </span>
                       {responseWithToolCallsExample.split("// optional")[1]}
@@ -870,7 +872,7 @@ export function AgentConnectionTabContent({
                 </pre>
               </div>
               {showToolCalls && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-foreground/80">
                   <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
                     output
                   </code>{" "}
@@ -881,7 +883,7 @@ export function AgentConnectionTabContent({
                 </p>
               )}
 
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-foreground/80">
                 You can also include an optional{" "}
                 <code className="text-xs bg-muted px-1 py-0.5 rounded">
                   metrics
@@ -898,7 +900,7 @@ export function AgentConnectionTabContent({
                   {metricsExample}
                 </pre>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-foreground/80">
                 Every field inside{" "}
                 <code className="text-[11px] bg-muted px-1 py-0.5 rounded">
                   metrics

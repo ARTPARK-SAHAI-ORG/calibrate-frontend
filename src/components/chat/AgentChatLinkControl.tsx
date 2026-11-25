@@ -1,0 +1,121 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { fetchChatLink, type ChatLink } from "@/lib/chatLinkApi";
+import { useAccessToken } from "@/hooks";
+import { reportError } from "@/lib/reportError";
+import { ShareButton, publicSharePath } from "@/components/ShareButton";
+import { Tooltip } from "@/components/Tooltip";
+
+const PREVIEW_CLASS =
+  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors bg-pink-500/14 border-pink-500/45 text-pink-900 dark:text-pink-200";
+
+function OpenIcon() {
+  return (
+    <svg
+      className="w-3.5 h-3.5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+      />
+    </svg>
+  );
+}
+
+/** Makes the agent's chat page public or private, and opens it to preview.
+ *  `connectionUnverified` and `saveCount` are only there to read the link
+ *  again once a passed connection check is stored: the check on the agent's
+ *  header stores it at once, the one on the Connection tab with the next
+ *  save. */
+export function AgentChatLinkControl({
+  agentUuid,
+  connectionUnverified,
+  saveCount = 0,
+}: {
+  agentUuid: string;
+  connectionUnverified: boolean;
+  saveCount?: number;
+}) {
+  const accessToken = useAccessToken();
+  const [link, setLink] = useState<ChatLink | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    let cancelled = false;
+    fetchChatLink(accessToken, agentUuid)
+      .then((data) => !cancelled && setLink(data))
+      .catch((err) => reportError("Failed to read the chat link", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [agentUuid, accessToken, connectionUnverified, saveCount]);
+
+  if (!link || !accessToken) return null;
+
+  const unverified = !link.connection_verified;
+  const previewUrl = link.share_token
+    ? publicSharePath("agent-chat", link.share_token)
+    : null;
+  const previewOff = unverified
+    ? "Verify your agent connection first"
+    : !previewUrl
+      ? "Make it public to preview"
+      : null;
+
+  return (
+    <div className="flex items-center gap-2">
+      <ShareButton
+        entityType="agent-chat"
+        entityId={agentUuid}
+        accessToken={accessToken}
+        initialIsPublic={link.is_public}
+        initialShareToken={link.share_token}
+        onChange={(is_public, share_token) =>
+          setLink(
+            (l) =>
+              l && {
+                ...l,
+                is_public,
+                share_token: share_token ?? l.share_token,
+              },
+          )
+        }
+        disabledReason={
+          // A link already public can still be made private.
+          unverified && !link.is_public
+            ? "Verify your agent connection first"
+            : undefined
+        }
+      />
+      {previewOff ? (
+        <Tooltip content={previewOff} position="bottom">
+          <button
+            type="button"
+            disabled
+            className={`${PREVIEW_CLASS} opacity-50 cursor-not-allowed`}
+          >
+            <OpenIcon />
+            Preview
+          </button>
+        </Tooltip>
+      ) : (
+        <a
+          href={previewUrl!}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${PREVIEW_CLASS} hover:bg-pink-500/26 dark:hover:bg-pink-500/20 cursor-pointer`}
+        >
+          <OpenIcon />
+          Preview
+        </a>
+      )}
+    </div>
+  );
+}
