@@ -76,9 +76,11 @@ test.describe("Agent chat link (authenticated, real backend)", () => {
       await expect(
         page.getByLabel("What was wrong with this reply? (optional)"),
       ).toHaveCount(0);
+      // Both thumbs stay, so the rating can be switched; the picked one is
+      // pressed.
       await expect(
-        page.getByRole("button", { name: "Good reply" }),
-      ).toHaveCount(0);
+        page.getByRole("button", { name: "Bad reply" }),
+      ).toHaveAttribute("aria-pressed", "true");
 
       // The rating and comment are stored on the trace the reply made.
       const traces = await page.request.get(
