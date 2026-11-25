@@ -868,23 +868,6 @@ function buildInitialConfig(
 }
 
 /** `expected_tool_calls` as saved from the item dialog's config. */
-function expectedToolCallsField(
-  config: TestConfig,
-  previous?: Record<string, unknown>,
-) {
-  return keepList(previous?.expected_tool_calls, config.evaluation.tool_calls ?? []);
-}
-
-function llmGeneralRowWithExpected(item: LabellingItem) {
-  const p = (item.payload ?? {}) as Record<string, unknown>;
-  return {
-    ...llmGeneralDialogRow(item),
-    expectedToolCalls: Array.isArray(p.expected_tool_calls)
-      ? p.expected_tool_calls
-      : [],
-  };
-}
-
 function ItemRowActions({
   itemUuid,
   onDelete,
@@ -3542,7 +3525,7 @@ function LabellingTaskPageInner() {
                               if (taskType === "llm-general") {
                                 setDuplicateLlmGeneralRows([
                                   {
-                                    ...llmGeneralRowWithExpected(item),
+                                    ...llmGeneralDialogRow(item),
                                     name: `Copy of ${name}`,
                                   },
                                 ]);
@@ -3778,9 +3761,9 @@ function LabellingTaskPageInner() {
                 taskType,
                 duplicateSourcePayload ?? undefined,
               ),
-              expected_tool_calls: expectedToolCallsField(
-                config,
-                duplicateSourcePayload ?? undefined,
+              expected_tool_calls: keepList(
+                duplicateSourcePayload?.expected_tool_calls,
+                config.evaluation.tool_calls ?? [],
               ),
               evaluator_variables,
             };
@@ -3883,9 +3866,9 @@ function LabellingTaskPageInner() {
               name: editLlmItemName.trim(),
               ...descriptionField,
               ...historyToPayloadFields(history, taskType, existingPayload),
-              expected_tool_calls: expectedToolCallsField(
-                config,
-                existingPayload,
+              expected_tool_calls: keepList(
+                existingPayload?.expected_tool_calls,
+                config.evaluation.tool_calls ?? [],
               ),
               evaluator_variables,
             };
@@ -4261,7 +4244,7 @@ function LabellingTaskPageInner() {
         evaluators={llmGeneralEvaluatorDefs}
         initialRows={items
           .filter((it) => it.uuid === editLlmGeneralSingleItemUuid)
-          .map(llmGeneralRowWithExpected)}
+          .map(llmGeneralDialogRow)}
         onClose={() => {
           editPager.cancel();
           setEditLlmGeneralSingleItemUuid(null);

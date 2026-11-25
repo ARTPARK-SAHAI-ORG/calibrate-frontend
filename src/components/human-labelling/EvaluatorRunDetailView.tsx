@@ -1882,7 +1882,6 @@ export function EvaluatorRunDetailView({
 
   // An item counts as done as soon as every evaluator on it has a finished
   // score, even while the rest of the run is still going.
-
   const itemDone = (item: Item): boolean => {
     if (!job) return false;
     const rs = runsByItem[item.uuid] ?? [];
@@ -1939,7 +1938,7 @@ export function EvaluatorRunDetailView({
       })
     : [];
 
-  const doneCount = itemsForRun.filter((it) => itemDone(it)).length;
+  const doneCount = itemsForRun.filter(itemDone).length;
   const showDoneCount =
     (job.status === "in_progress" || job.status === "queued") &&
     itemsForRun.length > 0;

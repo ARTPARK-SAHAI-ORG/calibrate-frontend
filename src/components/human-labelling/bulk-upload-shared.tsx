@@ -1581,36 +1581,33 @@ const TOOL_CALLS_EXAMPLE = `[
 // uploads. `replyColumn` is the reply that may be left empty when they are set.
 export function toolCallColumns(replyColumn: string): BulkContentColumn[] {
   const emptyReply = `Filling in this column or the other tool call column, even with an empty list [], makes the row a tool call row. Only tool call evaluators score a tool call row, and "${replyColumn}" can be left empty on it.`;
-  return [
-    {
-      payloadKey: "actual_tool_calls",
-      csvColumn: "actual_tool_calls",
-      headerCandidates: ["actual_tool_calls"],
-      previewLabel: "Tool calls made",
+  return (
+    [
+      [
+        "actual_tool_calls",
+        "Tool calls made",
+        `(optional) A JSON array of the tool calls the agent made. Each call is an object with a "tool" field naming the tool and, if the tool takes any, an "arguments" object. ${emptyReply}`,
+      ],
+      [
+        "expected_tool_calls",
+        "Expected tool calls",
+        `(optional) A JSON array of the tool calls the agent should have made, in the same format as "actual_tool_calls". ${emptyReply}`,
+      ],
+    ] as const
+  ).map(
+    ([key, previewLabel, guidelineDescription]): BulkContentColumn => ({
+      payloadKey: key,
+      csvColumn: key,
+      headerCandidates: [key],
+      previewLabel,
       previewWidth: "minmax(120px, 200px)",
-      guidelineDescription: `(optional) A JSON array of the tool calls the agent made. Each call is an object with a "tool" field naming the tool and, if the tool takes any, an "arguments" object. ${emptyReply}`,
+      guidelineDescription,
       guidelineExample: TOOL_CALLS_EXAMPLE,
       optional: true,
-      parse: (raw, rowIndex) =>
-        parseToolCallsCell(raw, rowIndex, "actual_tool_calls"),
+      parse: (raw, rowIndex) => parseToolCallsCell(raw, rowIndex, key),
       renderPreview: (value) => (
         <ToolCallsPreview calls={(value as BulkToolCall[]) ?? []} />
       ),
-    },
-    {
-      payloadKey: "expected_tool_calls",
-      csvColumn: "expected_tool_calls",
-      headerCandidates: ["expected_tool_calls"],
-      previewLabel: "Expected tool calls",
-      previewWidth: "minmax(120px, 200px)",
-      guidelineDescription: `(optional) A JSON array of the tool calls the agent should have made, in the same format as "actual_tool_calls". ${emptyReply}`,
-      guidelineExample: TOOL_CALLS_EXAMPLE,
-      optional: true,
-      parse: (raw, rowIndex) =>
-        parseToolCallsCell(raw, rowIndex, "expected_tool_calls"),
-      renderPreview: (value) => (
-        <ToolCallsPreview calls={(value as BulkToolCall[]) ?? []} />
-      ),
-    },
-  ];
+    }),
+  );
 }

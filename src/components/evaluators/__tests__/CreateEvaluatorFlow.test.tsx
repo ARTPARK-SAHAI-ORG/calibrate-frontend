@@ -127,7 +127,7 @@ describe("CreateEvaluatorFlow", () => {
         onClose={jest.fn()}
         existingEvaluators={[]}
         onCreated={jest.fn()}
-        useCaseGroups={["conversation"]}
+        useCaseTypes={["llm", "conversation"]}
       />,
     );
 
@@ -149,7 +149,7 @@ describe("CreateEvaluatorFlow", () => {
         onClose={onClose}
         existingEvaluators={[]}
         onCreated={jest.fn()}
-        useCaseGroups={["conversation"]}
+        useCaseTypes={["llm", "conversation"]}
       />,
     );
 
@@ -168,7 +168,6 @@ describe("CreateEvaluatorFlow", () => {
         onClose={onClose}
         existingEvaluators={[]}
         onCreated={onCreated}
-        useCaseGroups={["conversation"]}
         useCaseTypes={["llm"]}
       />,
     );
@@ -292,7 +291,6 @@ describe("CreateEvaluatorFlow", () => {
         onClose={jest.fn()}
         existingEvaluators={[]}
         onCreated={jest.fn()}
-        useCaseGroups={["conversation"]}
         useCaseTypes={["llm"]}
       />,
     );
@@ -317,7 +315,6 @@ describe("CreateEvaluatorFlow", () => {
         onClose={jest.fn()}
         existingEvaluators={[]}
         onCreated={onCreated}
-        useCaseGroups={["conversation"]}
         useCaseTypes={["llm"]}
       />,
     );

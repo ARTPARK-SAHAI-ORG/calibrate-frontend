@@ -97,9 +97,16 @@ describe("llmGeneralDialogRow", () => {
   it("carries the item's tool calls", () => {
     const row = llmGeneralDialogRow({
       uuid: "i1",
-      payload: { name: "A", input: "hi", output: "", actual_tool_calls: calls },
+      payload: {
+        name: "A",
+        input: "hi",
+        output: "",
+        actual_tool_calls: calls,
+        expected_tool_calls: calls,
+      },
     });
     expect(row.toolCalls).toEqual(calls);
+    expect(row.expectedToolCalls).toEqual(calls);
     expect(row.output).toBe("");
   });
 
@@ -126,6 +133,7 @@ describe("llmGeneralDialogRow", () => {
       inputExtras: { label: "English" },
       outputExtras: {},
       toolCalls: [],
+      expectedToolCalls: [],
       varValues: { ev: { x: "1" } },
       metadata,
     });
@@ -138,6 +146,7 @@ describe("llmGeneralDialogRow", () => {
       input: "",
       output: "",
       toolCalls: [],
+      expectedToolCalls: [],
       varValues: {},
     });
   });

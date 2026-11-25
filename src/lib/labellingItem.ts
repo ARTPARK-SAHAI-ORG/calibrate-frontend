@@ -7,6 +7,7 @@
 // field silently here is exactly the bug that made the dialog draw every
 // evaluator on a tool-call item instead of just Tool call correctness.
 import type { EvaluatorType } from "@/components/EvaluatorPills";
+import type { ExpectedToolCall } from "@/components/ToolCallExpectationsEditor";
 import type { MetadataEntry } from "@/components/ui";
 import { readTurnExtras, textOf, type TurnExtras } from "@/lib/messageVersions";
 
@@ -114,6 +115,7 @@ export type LlmGeneralDialogRow = {
   inputExtras: TurnExtras;
   outputExtras: TurnExtras;
   toolCalls: unknown[];
+  expectedToolCalls: ExpectedToolCall[];
   varValues: Record<string, Record<string, string>>;
   metadata?: MetadataEntry[] | null;
 };
@@ -135,6 +137,9 @@ export function llmGeneralDialogRow(item: {
     inputExtras: readTurnExtras(p.input),
     outputExtras: readTurnExtras(p.output),
     toolCalls: Array.isArray(p.actual_tool_calls) ? p.actual_tool_calls : [],
+    expectedToolCalls: Array.isArray(p.expected_tool_calls)
+      ? p.expected_tool_calls
+      : [],
     varValues: readEvaluatorVariables(p),
     metadata: item.metadata,
   };

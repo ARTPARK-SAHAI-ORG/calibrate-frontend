@@ -2,7 +2,7 @@ import { render, screen, setupUser } from "@/test-utils";
 import { ChoiceCard, EVALUATOR_USE_CASE_OPTIONS } from "../evaluatorUseCases";
 
 describe("EVALUATOR_USE_CASE_OPTIONS", () => {
-  it("contains the six canonical use cases with expected groups", () => {
+  it("contains the six canonical use cases in order", () => {
     expect(EVALUATOR_USE_CASE_OPTIONS.map((o) => o.value)).toEqual([
       "llm",
       "conversation",
@@ -11,21 +11,6 @@ describe("EVALUATOR_USE_CASE_OPTIONS", () => {
       "stt",
       "tts",
     ]);
-    expect(
-      EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "tool-call")?.group,
-    ).toBe("text");
-    expect(
-      EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "llm")?.group,
-    ).toBe("conversation");
-    expect(
-      EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "llm-general")?.group,
-    ).toBe("text");
-    expect(
-      EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "stt")?.group,
-    ).toBe("audio");
-    expect(
-      EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "tts")?.group,
-    ).toBe("audio");
   });
 });
 

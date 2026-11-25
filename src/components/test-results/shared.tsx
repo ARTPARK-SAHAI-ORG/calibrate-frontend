@@ -1153,8 +1153,7 @@ export function TestDetailView({
               {history.map((message, index) => {
                 const isEvalTarget =
                   index >= evalTargetStart.start &&
-                  index <= evalTargetStart.last &&
-                  evalTargetStart.start >= 0;
+                  index <= evalTargetStart.last;
                 const turnLabel = readTurnExtras(message).label;
                 const timestamp = formatTurnTimestamp(message.created_at);
                 // Tool-response entries are surfaced inline on their parent

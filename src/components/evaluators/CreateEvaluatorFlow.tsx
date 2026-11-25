@@ -25,7 +25,6 @@ import {
 } from "@/components/evaluators/BinaryScaleEditor";
 import { UseCasePickerDialog } from "@/components/evaluators/UseCasePickerDialog";
 import { EVALUATOR_USE_CASE_OPTIONS } from "@/components/evaluators/evaluatorUseCases";
-import type { EvaluatorUseCaseOption } from "@/components/evaluators/evaluatorUseCases";
 import { defaultBinaryLabel } from "@/lib/binaryLabels";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
 import {
@@ -81,8 +80,6 @@ type CreateEvaluatorFlowProps = {
   existingEvaluators: Pick<EvaluatorData, "name">[];
   /** Called with the created evaluator after a successful POST. */
   onCreated: (evaluator: EvaluatorData) => void;
-  /** Limit the use-case picker to these groups (e.g. conversation-only on agent detail). */
-  useCaseGroups?: EvaluatorUseCaseOption["group"][];
   /** Further narrow the picker to specific evaluator types (e.g. `llm` on next-reply tests). */
   useCaseTypes?: EvaluatorType[];
   /** Open the form already filled in from this evaluator, as a copy of it. */
@@ -100,7 +97,6 @@ export function CreateEvaluatorFlow({
   onClose,
   existingEvaluators,
   onCreated,
-  useCaseGroups,
   useCaseTypes,
   duplicateOf,
 }: CreateEvaluatorFlowProps) {
@@ -140,17 +136,13 @@ export function CreateEvaluatorFlow({
     useState<BinaryScaleRow[]>(defaultBinaryScale());
 
   const useCaseOptions = useMemo(() => {
-    let options = useCaseGroups
-      ? EVALUATOR_USE_CASE_OPTIONS.filter((option) =>
-          useCaseGroups.includes(option.group),
-        )
-      : EVALUATOR_USE_CASE_OPTIONS;
-    if (useCaseTypes && useCaseTypes.length > 0) {
-      const allowed = new Set(useCaseTypes);
-      options = options.filter((option) => allowed.has(option.value));
-    }
-    return options;
-  }, [useCaseGroups, useCaseTypes]);
+    if (!useCaseTypes || useCaseTypes.length === 0)
+      return EVALUATOR_USE_CASE_OPTIONS;
+    const allowed = new Set(useCaseTypes);
+    return EVALUATOR_USE_CASE_OPTIONS.filter((option) =>
+      allowed.has(option.value),
+    );
+  }, [useCaseTypes]);
 
   // The only use case on offer, when the caller left just one.
   const onlyUseCase = useCaseOptions.length === 1 ? useCaseOptions[0] : null;

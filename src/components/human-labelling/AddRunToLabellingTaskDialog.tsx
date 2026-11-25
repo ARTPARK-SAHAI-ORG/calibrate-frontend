@@ -170,8 +170,6 @@ export function targetTaskTypeForSource(
   }
 }
 
-export { isToolCallOutput };
-
 /** Whether a trace can be labelled at all. It can if it either replied or
  * called a tool; both become items in the same task. A trace that did neither
  * has nothing to show an annotator.

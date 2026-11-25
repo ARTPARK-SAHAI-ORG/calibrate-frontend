@@ -2,21 +2,19 @@
 
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 
-// The evaluator kinds a create flow can offer, in order. `group` lets a caller
-// narrow the offer (CreateEvaluatorFlow's `useCaseGroups`). The words on each
+// The evaluator kinds a create flow can offer, in order. The words on each
 // card live in EvaluatorTypeQuestions, the one place that draws them.
 export type EvaluatorUseCaseOption = {
   value: EvaluatorType;
-  group: "conversation" | "text" | "audio";
 };
 
 export const EVALUATOR_USE_CASE_OPTIONS: EvaluatorUseCaseOption[] = [
-  { value: "llm", group: "conversation" },
-  { value: "conversation", group: "conversation" },
-  { value: "llm-general", group: "text" },
-  { value: "tool-call", group: "text" },
-  { value: "stt", group: "audio" },
-  { value: "tts", group: "audio" },
+  { value: "llm" },
+  { value: "conversation" },
+  { value: "llm-general" },
+  { value: "tool-call" },
+  { value: "stt" },
+  { value: "tts" },
 ];
 
 /** The colours a card can be painted. One per answer on screen, so no two

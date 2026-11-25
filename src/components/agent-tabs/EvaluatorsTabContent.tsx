@@ -13,6 +13,7 @@ import {
   EVALUATOR_CARD_BUTTON_CLASS,
 } from "@/components/evaluators/DuplicateEvaluatorButton";
 import { XIcon } from "@/components/icons";
+import type { EvaluatorType } from "@/components/EvaluatorPills";
 import {
   type EvaluatorData,
   fetchAllEvaluators,
@@ -40,10 +41,12 @@ const CREATE_BUTTON_CLASS =
 // Full-conversation evaluators are hidden for now, so a conversation agent
 // lists the next-reply (`llm`) ones and a general agent the output-type ones.
 // Tool call evaluators fit both.
-function agentEvaluatorTypes(agentNature: "conversation" | "general") {
+function agentEvaluatorTypes(
+  agentNature: "conversation" | "general",
+): EvaluatorType[] {
   return agentNature === "general"
-    ? new Set(["llm-general", "tool-call"])
-    : new Set(["llm", "tool-call"]);
+    ? ["llm-general", "tool-call"]
+    : ["llm", "tool-call"];
 }
 
 export function EvaluatorsTabContent({
@@ -211,7 +214,7 @@ export function EvaluatorsTabContent({
 
   // Library minus already-attached — what the Add dialog can offer.
   const attachedUuids = new Set(attachedEvaluators.map((e) => e.uuid));
-  const evaluatorTypes = agentEvaluatorTypes(agentNature);
+  const evaluatorTypes = new Set(agentEvaluatorTypes(agentNature));
   const availableEvaluators = allEvaluators.filter(
     (e) =>
       !attachedUuids.has(e.uuid) &&
@@ -389,11 +392,7 @@ export function EvaluatorsTabContent({
         onClose={() => setCreateFlowOpen(false)}
         existingEvaluators={allEvaluators}
         onCreated={handleCreated}
-        useCaseTypes={
-          agentNature === "general"
-            ? ["llm-general", "tool-call"]
-            : ["llm", "tool-call"]
-        }
+        useCaseTypes={agentEvaluatorTypes(agentNature)}
       />
 
       {/* Shared detach/delete confirmation */}

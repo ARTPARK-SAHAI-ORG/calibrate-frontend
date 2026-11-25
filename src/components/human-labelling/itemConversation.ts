@@ -205,56 +205,56 @@ export function historyToPayloadFields(
     ? (previous.actual_tool_calls as unknown[])
     : [];
   const calls: ToolCallRecord[] = hasCalls
-    ? trailing
-        .filter(isCall)
-        .flatMap((turn) =>
-          (turn.tool_calls ?? []).map((call) => {
-            const { args } = normalizeToolCall(call);
-            const response = trailing.find(
-              (t) => t.role === "tool" && t.tool_call_id === call.id,
-            );
+    ? restoreToolCalls(
+        trailing
+          .filter(isCall)
+          .flatMap((turn) =>
+            (turn.tool_calls ?? []).map((call) => {
+              const { args } = normalizeToolCall(call);
+              const response = trailing.find(
+                (t) => t.role === "tool" && t.tool_call_id === call.id,
+              );
+              return {
+                tool: call.function.name,
+                arguments: args as Record<string, unknown>,
+                content:
+                  typeof response?.content === "string"
+                    ? response.content
+                    : undefined,
+              };
+            }),
+          )
+          .map(({ tool, arguments: args, content }, i) => {
+            const prior =
+              before[i] === undefined
+                ? undefined
+                : normalizeToolCall(before[i]);
+            const same = prior?.toolName === tool;
+            const priorOutput = same ? prior?.output : undefined;
+            let output: unknown;
+            if (content !== undefined) {
+              if (
+                priorOutput !== undefined &&
+                content === outputText(priorOutput)
+              ) {
+                output = priorOutput;
+              } else if (!(
+                same &&
+                priorOutput === undefined &&
+                (content === DEFAULT_STRUCTURED_RESPONSE ||
+                  content === DEFAULT_WEBHOOK_RESPONSE)
+              )) {
+                output = parseToolOutput(content);
+              }
+            }
             return {
-              tool: call.function.name,
-              arguments: args as Record<string, unknown>,
-              content:
-                typeof response?.content === "string"
-                  ? response.content
-                  : undefined,
+              tool,
+              arguments: args,
+              ...(output !== undefined ? { output } : {}),
             };
           }),
-        )
-        .map(({ tool, arguments: args, content }, i) => {
-          const prior = before[i];
-          const same =
-            prior !== undefined && normalizeToolCall(prior).toolName === tool;
-          const priorOutput = same
-            ? normalizeToolCall(prior).output
-            : undefined;
-          const restored = same
-            ? restoreArguments(args, normalizeToolCall(prior).args)
-            : args;
-          let output: unknown;
-          if (content !== undefined) {
-            if (
-              priorOutput !== undefined &&
-              content === outputText(priorOutput)
-            ) {
-              output = priorOutput;
-            } else if (!(
-              same &&
-              priorOutput === undefined &&
-              (content === DEFAULT_STRUCTURED_RESPONSE ||
-                content === DEFAULT_WEBHOOK_RESPONSE)
-            )) {
-              output = parseToolOutput(content);
-            }
-          }
-          return {
-            tool,
-            arguments: restored,
-            ...(output !== undefined ? { output } : {}),
-          };
-        })
+        previous?.actual_tool_calls,
+      )
     : [];
   return {
     chat_history,
