@@ -432,16 +432,11 @@ export function historyToPayloadFields(
       const prior = storedCall(before, storedAt);
       const priorOutput = prior?.output;
       let output: unknown;
-      if (content !== undefined) {
+      if (content === undefined) {
+        // The dialog shows no box for an empty stored reply, so it sends none.
+        if (priorOutput === "") output = "";
+      } else {
         if (priorOutput !== undefined && content === outputText(priorOutput)) {
-          output = priorOutput;
-        } else if (
-          prior &&
-          (priorOutput === undefined || priorOutput === "") &&
-          (content === DEFAULT_STRUCTURED_RESPONSE ||
-            content === DEFAULT_WEBHOOK_RESPONSE)
-        ) {
-          // The dialog filled in its default because no reply was stored.
           output = priorOutput;
         } else {
           output =

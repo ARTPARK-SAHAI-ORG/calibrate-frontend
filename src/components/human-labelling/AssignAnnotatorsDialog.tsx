@@ -376,9 +376,7 @@ export function AssignAnnotatorsDialog({
 
   // Only worth showing the column when there is more than one label on
   // screen in total. With just one there is nothing to weigh.
-  const totalShownLabels =
-    choosableEvaluators.length + lockedEvaluators.length;
-  const showEvaluatorChoice = totalShownLabels > 1;
+  const showEvaluatorChoice = offeredLabels.length > 1;
 
   const reasoningModeOf = (id: string) => reasoningModes[id] ?? "optional";
 

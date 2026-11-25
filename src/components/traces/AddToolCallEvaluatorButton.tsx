@@ -42,14 +42,18 @@ export function AddToolCallEvaluatorButton({
     return () => onOpenChange?.(false);
   }, [windowOpen, onOpenChange]);
 
+  const [loading, setLoading] = useState(false);
   const open = async () => {
-    if (!accessToken) return;
+    if (!accessToken || loading) return;
+    setLoading(true);
     try {
       setLibrary(await fetchAllEvaluators(accessToken));
     } catch (err) {
       reportError("Error fetching tool call evaluators:", err);
       toast.error("Could not load your evaluators. Please try again.");
       return;
+    } finally {
+      setLoading(false);
     }
     setPickerOpen(true);
   };

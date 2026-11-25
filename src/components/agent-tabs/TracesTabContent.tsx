@@ -490,22 +490,25 @@ export function TracesTabContent({
   // scores it already gave.
   const scoreColumns = useMemo(() => {
     const byId = new Map<string, TraceScoreColumn>();
-    const add = (evaluator_uuid: string, name: string) => {
+    // An evaluator that only scored past traces may be off the agent, so no
+    // read will give its type; its cells wait only for the first read.
+    const add = (evaluator_uuid: string, name: string, linked: boolean) => {
       if (byId.has(evaluator_uuid)) return;
+      const waiting =
+        evaluatorTypesReading && (linked || evaluatorTypes === null);
       byId.set(evaluator_uuid, {
         evaluator_uuid,
         name,
         evaluator_type:
-          evaluatorTypes?.[evaluator_uuid] ??
-          (evaluatorTypesReading ? null : undefined),
+          evaluatorTypes?.[evaluator_uuid] ?? (waiting ? null : undefined),
       });
     };
     for (const item of eligibility?.eligible ?? []) {
-      add(item.evaluator_uuid, item.name);
+      add(item.evaluator_uuid, item.name, true);
     }
     for (const trace of items) {
       for (const result of trace.results ?? []) {
-        add(result.evaluator_uuid, result.name);
+        add(result.evaluator_uuid, result.name, false);
       }
     }
     return [...byId.values()];

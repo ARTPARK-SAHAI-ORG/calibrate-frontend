@@ -98,7 +98,7 @@ function RunBody({
           : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`}
         {run.error === "no_usable_evaluators" && onGoToEvaluators && (
           <>
-            . Add one that does in the{" "}
+            . Add one that can in the{" "}
             <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
           </>
         )}

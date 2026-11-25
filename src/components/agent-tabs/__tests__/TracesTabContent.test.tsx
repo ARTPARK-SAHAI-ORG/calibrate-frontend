@@ -76,7 +76,7 @@ const fetchAgentEvaluators = jest.fn(
   async () =>
     [] as { uuid: string; description?: string; evaluator_type?: string }[],
 );
-const addEvaluatorsToAgent = jest.fn(async () => ({}));
+const addEvaluatorsToAgent = jest.fn(async (..._args: unknown[]) => ({}));
 jest.mock("../../../lib/evaluatorApi", () => ({
   fetchAgentEvaluators: () => fetchAgentEvaluators(),
   fetchAllEvaluators: async () => [],
@@ -1872,6 +1872,46 @@ describe("TracesTabContent", () => {
         />,
       );
       expect(screen.getAllByText("Retired judge").length).toBeGreaterThan(0);
+    });
+
+    it("keeps a retired evaluator's empty cells as they were while the kinds are read again", async () => {
+      fetchAgentEvaluators.mockResolvedValue([]);
+      mockUseTraces.mockReturnValue(
+        tracesResult([
+          trace({
+            latest_run_status: "completed",
+            results: [
+              {
+                evaluator_uuid: "ev-gone",
+                name: "Retired judge",
+                output_type: "binary",
+                value: 1,
+                passed: true,
+              },
+            ],
+          }),
+          trace({ uuid: "trace-2", latest_run_status: "completed" }),
+        ]),
+      );
+      const noEligible = {
+        ...traceScoring,
+        eligibility: { eligible: [], ineligible: [] },
+      };
+      const { container, rerender } = render(
+        <TracesTabContent {...tabProps} traceScoring={noEligible} />,
+      );
+      await waitFor(() => expect(fetchAgentEvaluators).toHaveBeenCalled());
+      await act(async () => {});
+      const before = container.textContent;
+      rerender(
+        <TracesTabContent {...tabProps} traceScoring={noEligible} isActive={false} />,
+      );
+      fetchAgentEvaluators.mockReturnValue(new Promise(() => {}));
+      rerender(<TracesTabContent {...tabProps} traceScoring={noEligible} isActive />);
+      await waitFor(() =>
+        expect(fetchAgentEvaluators).toHaveBeenCalledTimes(2),
+      );
+      expect(container.textContent).toBe(before);
     });
 
     it("says nothing is being scored when no evaluator can, and points at the Evaluators tab", async () => {

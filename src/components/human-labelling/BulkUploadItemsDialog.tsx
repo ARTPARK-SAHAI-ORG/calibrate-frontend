@@ -426,9 +426,8 @@ export function BulkUploadItemsDialog({
             for (const slot of slots) {
               const raw = (row[slot.columnKey] ?? "").trim();
               if (!raw) {
-                // Same reason as the content columns above: a blank cell in
-                // the downloaded file means the item never carried a value
-                // for this variable, so it is left out instead of failing.
+                // A blank cell is skipped when the evaluator does not score
+                // this row or the item never carried a value for it.
                 if (
                   uploadAnnotations ||
                   !evaluatorFitsItem(e.evaluator_type, toolCallRow)

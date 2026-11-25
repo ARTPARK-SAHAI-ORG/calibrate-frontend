@@ -280,7 +280,7 @@ it("points at the Evaluators tab when no evaluator fits and none is listed", asy
     />,
   );
   expect(document.body).toHaveTextContent(
-    "No evaluator on this agent could score this trace. Add one that does in the Evaluators tab.",
+    "No evaluator on this agent could score this trace. Add one that can in the Evaluators tab.",
   );
   await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
   expect(onGoToEvaluators).toHaveBeenCalled();

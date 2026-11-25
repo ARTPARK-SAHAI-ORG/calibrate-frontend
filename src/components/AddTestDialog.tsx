@@ -1793,13 +1793,9 @@ export function AddTestDialog({
 
         const argsObj = paramsToArgs(message.toolParams ?? []);
 
-        const args =
-          keptCallIds.has(message.id) || isLabelItem
-            ? typeArguments(
-                argsObj,
-                findFormTool(message.toolId, message.toolName),
-              )
-            : argsObj;
+        const args = isLabelItem
+          ? typeArguments(argsObj, findFormTool(message.toolId, message.toolName))
+          : argsObj;
 
         // Add the assistant message with tool_calls
         history.push({

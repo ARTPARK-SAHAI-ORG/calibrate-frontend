@@ -4,8 +4,6 @@ import {
   clearOldToolCallsField,
   gradedAnswerStart,
   typeArguments,
-  DEFAULT_STRUCTURED_RESPONSE,
-  DEFAULT_WEBHOOK_RESPONSE,
   historyToPayloadFields,
   keepList,
   restoreToolCalls,
@@ -410,13 +408,6 @@ function throughTheDialog(history: HistoryItem[]): HistoryItem[] {
         { ...call, function: { ...call.function, arguments: JSON.stringify(asText(args)) } },
       ],
     });
-    if (history[i + 1]?.role !== "tool") {
-      out.push({
-        role: "tool",
-        content: args.body ? DEFAULT_WEBHOOK_RESPONSE : DEFAULT_STRUCTURED_RESPONSE,
-        tool_call_id: call.id,
-      });
-    }
   });
   return out;
 }
@@ -735,7 +726,11 @@ describe("historyToPayloadFields with a renamed call", () => {
 
   it("puts back its stored values and adds no reply that was never stored", () => {
     expect(
-      historyToPayloadFields(renamed(DEFAULT_STRUCTURED_RESPONSE), "llm", previous),
+      historyToPayloadFields(
+        renamed("").filter((t) => t.role !== "tool"),
+        "llm",
+        previous,
+      ),
     ).toEqual({
       ...previous,
       actual_tool_calls: [{ tool: "store", arguments: { n: 7, ok: true }, output: "" }],
@@ -880,11 +875,11 @@ describe("historyToPayloadFields with a stored tool reply", () => {
       t.role === "tool" ? { ...t, content } : t,
     );
 
-  it("keeps an empty reply the dialog showed as its default", () => {
+  it("keeps an empty reply the dialog sends no box for", () => {
     const payload = withOutput("");
     expect(
       historyToPayloadFields(
-        replyAs(payload, DEFAULT_STRUCTURED_RESPONSE),
+        payloadToHistory(payload, "llm").filter((t) => t.role !== "tool"),
         "llm",
         payload,
       ),
