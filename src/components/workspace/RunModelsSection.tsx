@@ -4,13 +4,20 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useAccessToken, useOrganizations } from "@/hooks";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
-import { workspaceRunModelsInParallel, type Organization } from "@/lib/orgs";
+import {
+  workspaceRunModelsInParallel,
+  workspaceShowsLikelyRanges,
+  type Organization,
+  type OrganizationSettings,
+} from "@/lib/orgs";
+import { Switch } from "@/components/ui";
 import { RunModelsChoice } from "./RunModelsChoice";
 
 /**
- * How a model comparison runs its models for every agent in this workspace.
- * Picking a choice saves it straight away; the rows stay disabled until the
- * save answers, and a save that fails puts them back to what was saved.
+ * How a model comparison runs its models for every agent in this workspace,
+ * and whether agent-test results show likely ranges. Each change saves
+ * straight away; the controls stay disabled until the save answers, and a
+ * save that fails puts them back to what was saved.
  *
  * It lives here rather than inside the workspace settings page so it can be
  * tested on its own: nothing under `src/app` is measured for coverage.
@@ -24,28 +31,51 @@ export function RunModelsSection({ org }: { org: Organization }) {
   // Reading straight off it would snap the rows back to the old choice for as
   // long as that takes, which reads as the save having failed.
   const [value, setValue] = useState(workspaceRunModelsInParallel(org) ?? true);
+  const [showRanges, setShowRanges] = useState(workspaceShowsLikelyRanges(org));
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleChange = async (next: boolean) => {
-    const before = value;
+  const save = async (
+    setting: NonNullable<OrganizationSettings["model_benchmarking"]>,
+    undo: () => void,
+    saved: string,
+    failed: string,
+  ) => {
     setError(null);
     setIsSaving(true);
-    setValue(next);
     try {
       await updateOrganization(org.uuid, {
-        settings: { model_benchmarking: { run_models_in_parallel: next } },
+        settings: { model_benchmarking: setting },
       });
-      toast.success("Saved how the models run in a comparison");
+      toast.success(saved);
     } catch (err) {
       // Never leave the screen claiming a choice that did not save.
-      setValue(before);
-      setError(
-        parseBackendErrorMessage(err, "Failed to save how the models run"),
-      );
+      undo();
+      setError(parseBackendErrorMessage(err, failed));
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleChange = (next: boolean) => {
+    const before = value;
+    setValue(next);
+    return save(
+      { run_models_in_parallel: next },
+      () => setValue(before),
+      "Saved how the models run in a comparison",
+      "Failed to save how the models run",
+    );
+  };
+
+  const handleRangesChange = (next: boolean) => {
+    setShowRanges(next);
+    return save(
+      { show_likely_ranges: next },
+      () => setShowRanges(!next),
+      next ? "Likely ranges are now shown" : "Likely ranges are now hidden",
+      "Failed to save whether likely ranges are shown",
+    );
   };
 
   return (
@@ -68,6 +98,24 @@ export function RunModelsSection({ org }: { org: Organization }) {
           disabled={isSaving}
           inline
         />
+      </div>
+      <div className="flex items-start gap-3">
+        <Switch
+          checked={showRanges}
+          onChange={handleRangesChange}
+          disabled={isSaving}
+          label="Show likely ranges"
+        />
+        <div>
+          <p className="text-sm font-medium text-foreground">
+            Show likely ranges
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Show a likely range under each pass rate and score, on single test
+            runs and comparisons. The real pass rate falls inside this range
+            95% of the time.
+          </p>
+        </div>
       </div>
     </section>
   );

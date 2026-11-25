@@ -18,6 +18,7 @@ import {
   withTestType,
   type BenchmarkCaseDetail,
   type BenchmarkModelRows,
+  type BenchmarkStatusResponse,
   type BenchmarkTabId,
 } from "./eval-details/BenchmarkResultView";
 import {
@@ -39,10 +40,9 @@ import {
   runErrorText,
 } from "@/lib/testRunApi";
 import {
+  answeredCounts,
   modelComparisonName,
   isRunStopped,
-  isUnanswered,
-  rowVerdict,
   runStateOf,
 } from "@/lib/testTypes";
 import { EditableRunName } from "@/components/EditableRunName";
@@ -57,40 +57,17 @@ import {
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
-import { useAccessToken, useDialogNavKeys } from "@/hooks";
+import {
+  useAccessToken,
+  useDialogNavKeys,
+  useShowLikelyRanges,
+} from "@/hooks";
 import { overEvalLimit } from "@/lib/evalLimit";
 import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
 } from "@/lib/defaultEvaluators";
 import { type BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
-
-type BenchmarkStatusResponse = {
-  task_id: string;
-  name?: string;
-  status: string;
-  model_results?: BenchmarkModelRows[];
-  leaderboard_summary?: BenchmarkLeaderboardSummaryRow[];
-  /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
-  evaluators?: TestRunEvaluator[];
-  /** The test uuids this benchmark executed, in run order (shared across all
-   * models — not repeated per model). Used to rerun the same subset. Absent on
-   * benchmarks that predate the backend snapshot. */
-  test_uuids?: string[];
-  /** Whether this comparison ran its models at the same time. Absent on
-   * comparisons made before the backend recorded it. */
-  parallel_models?: boolean | null;
-  results_s3_prefix?: string;
-  /** Why the run could not be carried out, as text. Older runs carry true or
-   * false instead. */
-  error?: string | boolean | null;
-  /** True when the run gave up before it started every test. */
-  stopped_early?: boolean;
-  is_public?: boolean;
-  share_token?: string | null;
-  /** True when someone stopped the run before it finished. */
-  aborted?: boolean;
-};
 
 /** What a rerun of a finished comparison needs to start the same run again. */
 export type BenchmarkRerunRequest = {
@@ -101,29 +78,6 @@ export type BenchmarkRerunRequest = {
    * predates the backend recording it. */
   parallelModels?: boolean;
 };
-
-/**
- * One model's tests split into the ones it answered and the ones it could not
- * run: a test that gave no answer, or a row the run ended without a verdict
- * for. Counted per model, the way the mark's own total is, so a comparison of
- * 10 tests across three models is read out of 30 and not out of 10.
- */
-export function benchmarkAnswerCounts(
-  modelResults: BenchmarkModelRows[],
-  wasStopped: boolean,
-  isDone: boolean,
-): { unanswered: number; answered: number } {
-  let unanswered = 0;
-  let answered = 0;
-  for (const model of modelResults) {
-    for (const row of model.test_results ?? []) {
-      const verdict = rowVerdict(row, wasStopped, isDone);
-      if (isUnanswered(row) || verdict === "not_run") unanswered += 1;
-      else if (verdict === "passed" || verdict === "failed") answered += 1;
-    }
-  }
-  return { unanswered, answered };
-}
 
 type BenchmarkResultsDialogProps = {
   isOpen: boolean;
@@ -266,6 +220,7 @@ export function BenchmarkResultsDialog({
     clear: clearLabellingSelection,
   } = useLabellingSelection();
   const backendAccessToken = useAccessToken();
+  const showLikelyRanges = useShowLikelyRanges();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // True until the first reply about this run lands, so a comparison that was
   // already finished when the window opened can land on its Results.
@@ -713,7 +668,10 @@ export function BenchmarkResultsDialog({
   // per model, and one test that could not be run under two models counts
   // under each, which is also how the total is counted.
   const { unanswered: unansweredTests, answered: scoredTests } =
-    benchmarkAnswerCounts(modelResults, wasStopped, isDone);
+    answeredCounts(
+      modelResults.flatMap((m) => m.test_results ?? []),
+      isDone || wasStopped,
+    );
   const hasLabellingEligibleTests = modelResults.some((mr) =>
     (mr.test_results ?? []).some((tr) => isLabellingEligibleRaw(tr)),
   );
@@ -978,6 +936,7 @@ export function BenchmarkResultsDialog({
           <BenchmarkResultView
             key={currentTaskId ?? "new"}
             surface="window"
+            likelyRanges={showLikelyRanges}
             isDone={isDone}
             modelResults={getProvidersToDisplay()}
             leaderboardSummary={leaderboardSummary}

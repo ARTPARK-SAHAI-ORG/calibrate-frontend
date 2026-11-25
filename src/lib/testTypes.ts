@@ -157,6 +157,40 @@ export function rowVerdict(
   return row.passed ? "passed" : "failed";
 }
 
+/**
+ * How many of a run's tests were answered and judged, how many of those
+ * passed, and how many produced no answer. A row with no verdict is still
+ * going while the run is, and counts as unanswered once `runOver`.
+ *
+ * The pass rate is `passed` out of `answered`: a test that never answered is
+ * kept out of it, since counting it as a fail would blame the agent for a run
+ * that never reached it. The ONE count behind every pass rate the browser
+ * works out itself.
+ */
+export function answeredCounts(
+  rows: readonly TestRowLike[],
+  runOver = false,
+): { passed: number; answered: number; unanswered: number } {
+  let passed = 0;
+  let answered = 0;
+  let unanswered = 0;
+  for (const row of rows) {
+    if (isUnanswered(row)) unanswered++;
+    else if (row.passed === null || row.passed === undefined) {
+      if (runOver) unanswered++;
+    } else {
+      answered++;
+      if (row.passed) passed++;
+    }
+  }
+  return { passed, answered, unanswered };
+}
+
+/** `passed` out of `answered`, out of 100, or null when nothing was answered. */
+export function passRateOf(passed: number, answered: number): number | null {
+  return answered > 0 ? (passed / answered) * 100 : null;
+}
+
 /** A finished run, trimmed to the counts the buckets need. */
 export type RunCountsLike = {
   total_tests?: number | null;
@@ -391,9 +425,11 @@ export function getModelPassRange(
     // its share against that total would score a run that never happened.
     if (typeof model.passed !== "number" || typeof model.failed !== "number")
       continue;
-    const answered = modelAnsweredCount(model);
-    if (answered <= 0) continue;
-    rates.push((Math.max(model.passed, 0) / answered) * 100);
+    const rate = passRateOf(
+      Math.max(model.passed, 0),
+      modelAnsweredCount(model),
+    );
+    if (rate !== null) rates.push(rate);
   }
   if (rates.length === 0) {
     return failedModels > 0

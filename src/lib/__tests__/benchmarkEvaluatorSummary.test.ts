@@ -1,6 +1,5 @@
 import {
-  benchmarkAnsweredPassFail,
-  benchmarkToolCallPassFail,
+  likelyRangeText,
   benchmarkRatingEvaluatorCaption,
   benchmarkEvaluatorColumnKey,
   benchmarkMetricKeyOrder,
@@ -10,77 +9,6 @@ import {
   type BenchmarkModelLike,
   type BenchmarkLeaderboardSummaryRow,
 } from "../benchmarkEvaluatorSummary";
-
-describe("benchmarkToolCallPassFail", () => {
-  it("returns zero passed/total when test_results is missing", () => {
-    expect(benchmarkToolCallPassFail({ model: "m" })).toEqual({
-      passed: 0,
-      total: 0,
-    });
-  });
-
-  it("returns zero when test_results is null", () => {
-    expect(
-      benchmarkToolCallPassFail({ model: "m", test_results: null }),
-    ).toEqual({ passed: 0, total: 0 });
-  });
-
-  it("skips non tool_call tests", () => {
-    const model: BenchmarkModelLike = {
-      model: "m",
-      test_results: [
-        { passed: true, test_case: { evaluation: { type: "response" } } },
-      ],
-    };
-    expect(benchmarkToolCallPassFail(model)).toEqual({ passed: 0, total: 0 });
-  });
-
-  it("skips tool_call tests that produced no answer", () => {
-    const model: BenchmarkModelLike = {
-      model: "m",
-      test_results: [
-        {
-          passed: false,
-          unanswered: true,
-          test_case: { evaluation: { type: "tool_call" } },
-        },
-      ],
-    };
-    expect(benchmarkToolCallPassFail(model)).toEqual({ passed: 0, total: 0 });
-  });
-
-  it("skips tool_call tests with null/undefined passed (still running)", () => {
-    const model: BenchmarkModelLike = {
-      model: "m",
-      test_results: [
-        { passed: null, test_case: { evaluation: { type: "tool_call" } } },
-        { test_case: { evaluation: { type: "tool_call" } } },
-      ],
-    };
-    expect(benchmarkToolCallPassFail(model)).toEqual({ passed: 0, total: 0 });
-  });
-
-  it("counts passed and failed tool_call tests", () => {
-    const model: BenchmarkModelLike = {
-      model: "m",
-      test_results: [
-        { passed: true, test_case: { evaluation: { type: "tool_call" } } },
-        { passed: false, test_case: { evaluation: { type: "tool_call" } } },
-        { passed: true, test_case: { evaluation: { type: "tool_call" } } },
-        { passed: true, test_case: { evaluation: { type: "response" } } },
-      ],
-    };
-    expect(benchmarkToolCallPassFail(model)).toEqual({ passed: 2, total: 3 });
-  });
-
-  it("handles missing test_case/evaluation gracefully", () => {
-    const model: BenchmarkModelLike = {
-      model: "m",
-      test_results: [{ passed: true }, { passed: true, test_case: null }],
-    };
-    expect(benchmarkToolCallPassFail(model)).toEqual({ passed: 0, total: 0 });
-  });
-});
 
 describe("benchmarkRatingEvaluatorCaption", () => {
   it("appends the scale range when both bounds are finite", () => {
@@ -627,57 +555,155 @@ describe("buildBenchmarkCombinedLeaderboardPayload", () => {
 
 describe("hasBenchmarkTopPicks", () => {
   const models: BenchmarkModelLike[] = [{ model: "m1" }];
+  const topPicks = (summary?: BenchmarkLeaderboardSummaryRow[]) =>
+    hasBenchmarkTopPicks(
+      buildBenchmarkCombinedLeaderboardPayload(summary, models, "Score"),
+    );
 
   it("is true when a model has both a cost and an overall pass rate", () => {
-    const summary: BenchmarkLeaderboardSummaryRow[] = [
-      { model: "m1", pass_rate: "90", cost: "0.05" },
-    ];
-    expect(hasBenchmarkTopPicks(summary, models)).toBe(true);
+    expect(topPicks([{ model: "m1", pass_rate: "90", cost: "0.05" }])).toBe(
+      true,
+    );
   });
 
   it("is false when there is a pass rate but no cost", () => {
-    const summary: BenchmarkLeaderboardSummaryRow[] = [
-      { model: "m1", pass_rate: "90" },
-    ];
-    expect(hasBenchmarkTopPicks(summary, models)).toBe(false);
+    expect(topPicks([{ model: "m1", pass_rate: "90" }])).toBe(false);
   });
 
   it("is false when there is no leaderboard summary", () => {
-    expect(hasBenchmarkTopPicks(undefined, models)).toBe(false);
-    expect(hasBenchmarkTopPicks([], models)).toBe(false);
+    expect(topPicks(undefined)).toBe(false);
+    expect(topPicks([])).toBe(false);
   });
 });
 
-describe("benchmarkAnsweredPassFail", () => {
-  it("returns null when the model carries no cases", () => {
-    expect(benchmarkAnsweredPassFail({ model: "m" })).toBeNull();
-    expect(
-      benchmarkAnsweredPassFail({ model: "m", test_results: [] }),
-    ).toBeNull();
+describe("likelyRangeText", () => {
+  it("says a pass rate's range in whole percents", () => {
+    expect(likelyRangeText({ low: 76.4, high: 99.1 }, "percent")).toBe(
+      "Likely range 76% to 99%",
+    );
   });
 
-  it("counts the tests that answered apart from the ones that did not", () => {
-    // Every row here is `passed: false` except the first, so only the flag
-    // separates a wrong answer from a test that never answered.
-    expect(
-      benchmarkAnsweredPassFail({
-        model: "m",
-        test_results: [
-          { passed: true },
-          { passed: false },
-          { passed: false, unanswered: true },
-          { passed: false, unanswered: true },
-        ],
-      }),
-    ).toEqual({ passed: 1, answered: 2, unanswered: 2 });
+  it("says a rating's range on its own scale", () => {
+    expect(likelyRangeText({ low: 3.214, high: 4.1 }, "rating")).toBe(
+      "Likely range 3.21 to 4.1",
+    );
   });
 
-  it("leaves a test that has not finished out of every count", () => {
-    expect(
-      benchmarkAnsweredPassFail({
-        model: "m",
-        test_results: [{ passed: true }, { passed: null }],
-      }),
-    ).toEqual({ passed: 1, answered: 1, unanswered: 0 });
+  it("says nothing when there is no usable range", () => {
+    expect(likelyRangeText(null, "percent")).toBeNull();
+    expect(likelyRangeText(undefined, "rating")).toBeNull();
+    expect(likelyRangeText({ low: 1 }, "rating")).toBeNull();
+    expect(likelyRangeText({ low: null, high: 4 }, "rating")).toBeNull();
+  });
+});
+
+describe("buildBenchmarkCombinedLeaderboardPayload with likely ranges", () => {
+  const summary: BenchmarkLeaderboardSummaryRow[] = [
+    { model: "m1", passed: "3", total: "4", pass_rate: "75" },
+  ];
+
+  it("shows the backend's pass rate and carries its range", () => {
+    const result = buildBenchmarkCombinedLeaderboardPayload(
+      summary,
+      [
+        {
+          model: "m1",
+          pass_rate: 80,
+          pass_rate_ci: { low: 50, high: 95 },
+          evaluator_summary: [
+            {
+              metric_key: "c",
+              type: "binary",
+              passed: 3,
+              total: 4,
+              pass_rate: 75,
+              ci: { low: 30, high: 95 },
+            },
+            {
+              metric_key: "r",
+              type: "rating",
+              mean: 4,
+              min: 3,
+              max: 5,
+              count: 4,
+              scale_min: 1,
+              scale_max: 5,
+              ci: null,
+            },
+          ],
+        },
+      ],
+      "Score",
+    )!;
+    expect(result.rows[0]).toMatchObject({
+      pass_rate: 80,
+      "range:pass_rate": { low: 50, high: 95 },
+      ev_c: 75,
+      "range:ev_c": { low: 30, high: 95 },
+      ev_r: 4,
+      "range:ev_r": undefined,
+    });
+    const charts = result.chartRows.flat();
+    expect(charts.find((c) => c.dataKey === "pass_rate")?.rangeKey).toBe(
+      "range:pass_rate",
+    );
+    expect(charts.find((c) => c.dataKey === "ev_c")?.rangeKey).toBe(
+      "range:ev_c",
+    );
+    expect(charts.find((c) => c.dataKey === "ev_r")?.rangeKey).toBe(
+      "range:ev_r",
+    );
+  });
+
+  it("keeps an evaluator named like another's range apart from that range", () => {
+    const entry = (metric_key: string, pass_rate: number) => ({
+      metric_key,
+      type: "binary" as const,
+      passed: 1,
+      total: 2,
+      pass_rate,
+      ci: { low: 10, high: 90 },
+    });
+    const row = buildBenchmarkCombinedLeaderboardPayload(
+      summary,
+      [{ model: "m1", evaluator_summary: [entry("x", 50), entry("x ci", 60)] }],
+      "Score",
+    )!.rows[0];
+    expect(row.ev_x).toBe(50);
+    expect(row.ev_x_ci).toBe(60);
+    expect(row["range:ev_x"]).toEqual({ low: 10, high: 90 });
+  });
+
+  it("keeps the summary's pass rate when the backend sends none", () => {
+    const result = buildBenchmarkCombinedLeaderboardPayload(
+      summary,
+      [{ model: "m1" }],
+      "Score",
+    )!;
+    expect(result.rows[0].pass_rate).toBe(75);
+    expect(result.rows[0]["range:pass_rate"]).toBeUndefined();
+  });
+
+  // Before calibrate 0.0.74 a test that timed out came back with no verdict
+  // and no `unanswered` mark, and its leaderboard row counted it as a failure.
+  it("shows the counts the backend's pass rate covers on an older finished run", () => {
+    const test_results = [
+      ...Array.from({ length: 15 }, () => ({ passed: true })),
+      { passed: false },
+      ...Array.from({ length: 4 }, () => ({ passed: null })),
+    ];
+    const build = (runOver: boolean) =>
+      buildBenchmarkCombinedLeaderboardPayload(
+        [{ model: "m1", passed: "15", total: "20", pass_rate: "75" }],
+        [{ model: "m1", pass_rate: 93.75, test_results }],
+        "Score",
+        runOver,
+      )!.rows[0];
+    expect(build(true)).toMatchObject({
+      passed: "15",
+      total: "16",
+      pass_rate: 93.75,
+    });
+    expect(build(false)).toMatchObject({ passed: "15", total: "20" });
   });
 });

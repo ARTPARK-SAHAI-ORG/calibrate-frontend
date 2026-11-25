@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   Cell,
   LabelList,
+  ErrorBar,
 } from "recharts";
 import { downloadChartPng } from "./downloadChart";
 import { Tooltip as AppTooltip } from "@/components/Tooltip";
@@ -42,6 +43,9 @@ type ChartDataItem = {
   label: string;
   value: number;
   colorKey?: string;
+  /** Where the true value is likely to fall. Drawn as an error bar when
+   * given; a chart with no ranges draws none. */
+  range?: { low: number; high: number } | null;
 };
 
 type LeaderboardBarChartProps = {
@@ -103,6 +107,8 @@ export function LeaderboardBarChart({
     Math.round(Math.min(labelReach - halfSlot, chartWidth * 0.33)),
   );
 
+  const hasRanges = data.some((d) => d.range);
+
   // Generate color map from data if not provided
   const colors =
     colorMap || getColorMap(data.map((d) => d.colorKey || d.label));
@@ -155,6 +161,9 @@ export function LeaderboardBarChart({
             data={data.map((d) => ({
               label: d.label,
               value: d.value,
+              error: d.range
+                ? [d.value - d.range.low, d.range.high - d.value]
+                : undefined,
             }))}
             margin={{
               top: 24,
@@ -193,7 +202,19 @@ export function LeaderboardBarChart({
                 position="top"
                 formatter={formatBarLabel}
                 style={{ fontSize: 11, fill: "currentColor" }}
+                // The range line runs up the middle of the bar, so the label
+                // starts just past its end caps instead of across it.
+                textAnchor={hasRanges ? "start" : undefined}
+                dx={hasRanges ? 5 : undefined}
               />
+              {hasRanges && (
+                <ErrorBar
+                  dataKey="error"
+                  width={6}
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                />
+              )}
               {data.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}

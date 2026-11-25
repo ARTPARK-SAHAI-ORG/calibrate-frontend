@@ -20,8 +20,10 @@ import {
   getRememberedOrgUuid,
   notifyOrganizationsChanged,
   setActiveOrgUuid as persistActiveOrgUuid,
+  workspaceShowsLikelyRanges,
 } from "@/lib/orgs";
 import { useOrgUuid } from "@/lib/nav";
+import { useAccessToken } from "./useAccessToken";
 import { clearOrgLimitsCache } from "./useMaxRowsPerEval";
 import { clearEnabledProvidersCache } from "./useEnabledProviders";
 
@@ -289,6 +291,16 @@ export function useActiveOrgUuid(): [string | null, (uuid: string) => void] {
   }, [fromAddress]);
 
   return [fromAddress ?? remembered, persistActiveOrgUuid];
+}
+
+/** Whether the active workspace shows likely ranges on agent-test results. */
+export function useShowLikelyRanges(): boolean {
+  const accessToken = useAccessToken();
+  const [activeOrgUuid] = useActiveOrgUuid();
+  const { organizations } = useOrganizations(accessToken);
+  return workspaceShowsLikelyRanges(
+    organizations.find((org) => org.uuid === activeOrgUuid),
+  );
 }
 
 type UseOrgMembersReturn = {

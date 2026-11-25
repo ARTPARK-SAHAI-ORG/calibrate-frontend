@@ -49,6 +49,36 @@ export type BenchmarkModelRows = Omit<BenchmarkModelResult, "test_results"> & {
   test_results: BenchmarkRow[] | null;
 };
 
+/** A model comparison as the backend answers it, signed in or on the shared
+ * link (which leaves the sharing and rerun fields out). */
+export type BenchmarkStatusResponse = {
+  task_id: string;
+  status: string;
+  /** What the run is called. Absent on a backend that predates naming. */
+  name?: string | null;
+  model_results?: BenchmarkModelRows[];
+  leaderboard_summary?: BenchmarkLeaderboardSummaryRow[];
+  /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
+  evaluators?: TestRunEvaluator[];
+  /** The test uuids this benchmark executed, in run order (shared across all
+   * models — not repeated per model). Used to rerun the same subset. Absent on
+   * benchmarks that predate the backend snapshot. */
+  test_uuids?: string[];
+  /** Whether this comparison ran its models at the same time. Absent on
+   * comparisons made before the backend recorded it. */
+  parallel_models?: boolean | null;
+  results_s3_prefix?: string;
+  /** Why the run could not be carried out, as text. Older runs carry true or
+   * false instead. */
+  error?: string | boolean | null;
+  /** True when the run gave up before it started every test. */
+  stopped_early?: boolean;
+  is_public?: boolean;
+  share_token?: string | null;
+  /** True when someone stopped the run before it finished. */
+  aborted?: boolean;
+};
+
 /** One test read in full: what the light reply left out. */
 export type BenchmarkCaseDetail = {
   test_case?: TestCaseData | null;
@@ -155,6 +185,9 @@ type BenchmarkResultViewProps = {
   onNavChange?: (nav: PagerNav) => void;
   /** Sits at the right of the tab row (the shared link's download button). */
   tabsRight?: React.ReactNode;
+  /** Whether the workspace shows likely ranges. The shared link leaves it
+   * out and shows neither the ranges nor the line pointing to the setting. */
+  likelyRanges?: boolean;
 };
 
 /**
@@ -185,6 +218,7 @@ export function BenchmarkResultView({
   selectionStrip,
   onNavChange,
   tabsRight,
+  likelyRanges,
 }: BenchmarkResultViewProps) {
   const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
   const [selectedTest, setSelectedTest] = useState<{
@@ -319,13 +353,24 @@ export function BenchmarkResultView({
     onNavChangeRef.current?.(next);
   }, []);
 
+  // The leaderboard table and charts, which the Results, Model selection and
+  // About tabs all read. A run that did not finish normally (it broke, or
+  // someone stopped it) has no summary from the backend, so what did finish
+  // is counted instead.
+  const payload = useMemo(
+    () =>
+      buildBenchmarkCombinedLeaderboardPayload(
+        leaderboardSummary,
+        modelResults,
+        BENCHMARK_SCORE_LABEL,
+        runFailureReason !== null || isDone,
+      ),
+    [leaderboardSummary, modelResults, runFailureReason, isDone],
+  );
+
   // Only offer the Model selection tab when there is cost + pass-rate data to
   // plot.
-  const showTopPicks = hasBenchmarkTopPicks(
-    leaderboardSummary,
-    modelResults,
-    BENCHMARK_SCORE_LABEL,
-  );
+  const showTopPicks = hasBenchmarkTopPicks(payload);
   const tabs: BenchmarkTabId[] = [
     "summary",
     ...(showTopPicks ? (["top-picks"] as const) : []),
@@ -333,16 +378,8 @@ export function BenchmarkResultView({
     "about",
   ];
 
-  // Which metrics the About tab explains (built only while it is showing, so
-  // the scan does not run on every poll). Shares the leaderboard's builder.
-  const aboutPlan =
-    isDone && activeTab === "about"
-      ? (buildBenchmarkCombinedLeaderboardPayload(
-          leaderboardSummary,
-          modelResults,
-          BENCHMARK_SCORE_LABEL,
-        )?.plan ?? null)
-      : null;
+  // Which metrics the About tab explains.
+  const aboutPlan = payload?.plan ?? null;
 
   const toggleModel = (model: string) => {
     setExpandedModels((prev) => {
@@ -357,7 +394,7 @@ export function BenchmarkResultView({
 
   const leaderboard = (
     <BenchmarkCombinedLeaderboard
-      leaderboardSummary={leaderboardSummary}
+      payload={payload}
       modelResults={modelResults}
       filename={`benchmark-leaderboard-${filename}`}
       benchmarkScoreLabel={BENCHMARK_SCORE_LABEL}
@@ -366,6 +403,7 @@ export function BenchmarkResultView({
       stoppedEarly={runStoppedEarly}
       failureReason={runFailureReason}
       runOver={isDone}
+      likelyRanges={likelyRanges}
     />
   );
 
@@ -381,14 +419,9 @@ export function BenchmarkResultView({
 
   const topPicks = (
     <>
-      <BenchmarkWeightedRanking
-        leaderboardSummary={leaderboardSummary}
-        modelResults={modelResults}
-        benchmarkScoreLabel={BENCHMARK_SCORE_LABEL}
-      />
+      <BenchmarkWeightedRanking payload={payload} />
       <BenchmarkTopPicks
-        leaderboardSummary={leaderboardSummary}
-        modelResults={modelResults}
+        payload={payload}
         filename={`benchmark-top-picks-${filename}`}
         benchmarkScoreLabel={BENCHMARK_SCORE_LABEL}
       />

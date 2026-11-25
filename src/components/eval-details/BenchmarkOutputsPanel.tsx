@@ -18,7 +18,10 @@ import {
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Tooltip } from "@/components/Tooltip";
 import type { DefaultEvaluatorSummary } from "@/lib/defaultEvaluators";
-import type { BenchmarkEvaluatorSummaryEntry } from "@/lib/benchmarkEvaluatorSummary";
+import type {
+  BenchmarkEvaluatorSummaryEntry,
+  LikelyRange,
+} from "@/lib/benchmarkEvaluatorSummary";
 import type { AggStat, LatencyStat } from "@/lib/llmMetrics";
 import { isLabellingEligibleRaw } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
@@ -73,6 +76,10 @@ export type BenchmarkModelResult = {
   latency_ms?: LatencyStat;
   cost?: AggStat;
   total_tokens?: AggStat;
+  /** Pass rate over the tests this model answered, out of 100, and where the
+   * true pass rate is likely to fall. Absent from older payloads. */
+  pass_rate?: number | null;
+  pass_rate_ci?: LikelyRange | null;
 };
 
 type BenchmarkOutputsPanelProps = {

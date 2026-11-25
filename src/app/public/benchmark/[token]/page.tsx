@@ -14,35 +14,18 @@ import {
   evaluatorsByUuid,
   type BenchmarkCaseDetail,
   type BenchmarkModelRows,
+  type BenchmarkStatusResponse,
   type BenchmarkTabId,
 } from "@/components/eval-details/BenchmarkResultView";
-import type { TestRunEvaluator } from "@/components/test-results/shared";
-import type { BenchmarkLeaderboardSummaryRow } from "@/lib/benchmarkEvaluatorSummary";
 import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { RunStateMark } from "@/components/ui";
 import {
+  answeredCounts,
   isRunStopped,
   modelComparisonName,
   runStateOf,
 } from "@/lib/testTypes";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
-import { benchmarkAnswerCounts } from "@/components/BenchmarkResultsDialog";
-
-type BenchmarkStatusResponse = {
-  task_id: string;
-  status: string;
-  /** What the run is called. Absent on a backend that predates naming. */
-  name?: string | null;
-  model_results?: BenchmarkModelRows[];
-  leaderboard_summary?: BenchmarkLeaderboardSummaryRow[];
-  /** Top-level per-evaluator metadata block — see TestRunEvaluator. */
-  evaluators?: TestRunEvaluator[];
-  error?: string | boolean | null;
-  /** True when someone stopped the run before it finished. */
-  aborted?: boolean;
-  /** True when the run gave up before it started every test. */
-  stopped_early?: boolean;
-};
 
 export default function PublicBenchmarkPage() {
   const params = useParams();
@@ -124,7 +107,10 @@ export default function PublicBenchmarkPage() {
   // rather than added up across them, so a comparison of ten tests never
   // reports more than ten.
   const { unanswered: unansweredTests, answered: scoredTests } =
-    benchmarkAnswerCounts(modelResults, wasStopped, true);
+    answeredCounts(
+      modelResults.flatMap((m) => m.test_results ?? []),
+      true,
+    );
   const runState = runStateOf({
     status: runFailed ? "failed" : data.status,
     aborted: data.aborted,

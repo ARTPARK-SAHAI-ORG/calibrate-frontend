@@ -9,6 +9,7 @@ import {
   clearActiveOrgUuid,
   pickDefaultOrg,
   workspaceRunModelsInParallel,
+  workspaceShowsLikelyRanges,
   type Organization,
 } from "@/lib/orgs";
 
@@ -263,5 +264,27 @@ describe("workspaceRunModelsInParallel", () => {
 
   it("is not known when there is no workspace yet", () => {
     expect(workspaceRunModelsInParallel(undefined)).toBeUndefined();
+  });
+});
+
+describe("workspaceShowsLikelyRanges", () => {
+  it("is on only when the workspace turned it on", () => {
+    expect(
+      workspaceShowsLikelyRanges(
+        org({ settings: { model_benchmarking: { show_likely_ranges: true } } }),
+      ),
+    ).toBe(true);
+    expect(
+      workspaceShowsLikelyRanges(
+        org({
+          settings: { model_benchmarking: { show_likely_ranges: false } },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("is off when the workspace is not known or never set it", () => {
+    expect(workspaceShowsLikelyRanges(undefined)).toBe(false);
+    expect(workspaceShowsLikelyRanges(org())).toBe(false);
   });
 });

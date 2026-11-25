@@ -2,10 +2,7 @@ import { render, screen, setupUser, waitFor, act } from "../../test-utils";
 import { toast } from "sonner";
 import { reportError } from "../../lib/reportError";
 import { POLLING_INTERVAL_MS } from "../../constants/polling";
-import {
-  BenchmarkResultsDialog,
-  benchmarkAnswerCounts,
-} from "../BenchmarkResultsDialog";
+import { BenchmarkResultsDialog } from "../BenchmarkResultsDialog";
 import type { BenchmarkModelRows } from "../eval-details/BenchmarkResultView";
 
 // ---------------------------------------------------------------------------
@@ -107,6 +104,7 @@ jest.mock("../eval-details", () => {
         data-failure-reason={
           props.failureReason === null ? "null" : props.failureReason
         }
+        data-likely-ranges={String(props.likelyRanges)}
       >
         {props.filename}
       </div>
@@ -200,11 +198,13 @@ jest.mock("../../lib/exportTestResults", () => ({
 }));
 
 const useAccessTokenMock = jest.fn(() => "test-token");
+const useShowLikelyRangesMock = jest.fn(() => false);
 // The workspace limit on how many tests one run may cover. High by default so
 // the existing runs are never blocked; lowered in the limit test below.
 jest.mock("../../hooks", () => ({
   __esModule: true,
   useAccessToken: () => useAccessTokenMock(),
+  useShowLikelyRanges: () => useShowLikelyRangesMock(),
   // The real arrow-key handling, so the key tests below exercise it.
   useDialogNavKeys: jest.requireActual("../../hooks/useDialogNavKeys")
     .useDialogNavKeys,
@@ -988,6 +988,41 @@ describe("BenchmarkResultsDialog", () => {
       "null",
     );
   });
+
+  it.each([true, false])(
+    "hands the leaderboard whether the workspace shows likely ranges (%s)",
+    async (on) => {
+      useShowLikelyRangesMock.mockReturnValue(on);
+      (global.fetch as jest.Mock).mockImplementation((url: string) =>
+        isBenchmarkDetail(url, "task-ranges")
+          ? Promise.resolve(
+              jsonResponse({
+                task_id: "task-ranges",
+                status: "done",
+                model_results: [],
+              }),
+            )
+          : Promise.reject(new Error(`Unexpected fetch ${url}`)),
+      );
+
+      render(
+        <BenchmarkResultsDialog
+          {...defaultProps}
+          isOpen
+          models={[]}
+          taskId="task-ranges"
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("leaderboard")).toHaveAttribute(
+          "data-likely-ranges",
+          String(on),
+        ),
+      );
+      useShowLikelyRangesMock.mockReturnValue(false);
+    },
+  );
 
   it("marks a finished comparison that left a test with no result", async () => {
     // The model's own counts say nothing is missing (no total), so the mark
@@ -2589,49 +2624,5 @@ describe("stepping from run to run", () => {
     await user.keyboard("{ArrowLeft}");
     expect(onNextRun).not.toHaveBeenCalled();
     expect(onPrevRun).not.toHaveBeenCalled();
-  });
-});
-
-describe("benchmarkAnswerCounts", () => {
-  const model = (rows: unknown[]) =>
-    ({ model: "m", test_results: rows }) as never;
-
-  it("counts a test that gave no answer as one the run could not do", () => {
-    expect(
-      benchmarkAnswerCounts(
-        [model([{ passed: false, unanswered: true }, { passed: true }])],
-        false,
-        true,
-      ),
-    ).toEqual({ unanswered: 1, answered: 1 });
-  });
-
-  it("counts a row the run ended without a verdict for", () => {
-    expect(
-      benchmarkAnswerCounts([model([{ passed: null }])], false, true),
-    ).toEqual({ unanswered: 1, answered: 0 });
-  });
-
-  it("leaves a row still being worked on out of both counts", () => {
-    expect(
-      benchmarkAnswerCounts([model([{ passed: null }])], false, false),
-    ).toEqual({ unanswered: 0, answered: 0 });
-  });
-
-  it("counts every model, since each one runs every test", () => {
-    expect(
-      benchmarkAnswerCounts(
-        [model([{ passed: null }]), model([{ passed: null }])],
-        false,
-        true,
-      ),
-    ).toEqual({ unanswered: 2, answered: 0 });
-  });
-
-  it("counts nothing when there are no models", () => {
-    expect(benchmarkAnswerCounts([], false, true)).toEqual({
-      unanswered: 0,
-      answered: 0,
-    });
   });
 });

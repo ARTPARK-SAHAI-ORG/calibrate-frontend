@@ -76,6 +76,9 @@ export type OrganizationSettings = {
      *  runs them at the same time, false one after another. It applies to
      *  agents you connect, whose own server answers each call. */
     run_models_in_parallel?: boolean;
+    /** Whether agent-test results show the range each pass rate and score
+     *  is likely to fall in. Off unless turned on. */
+    show_likely_ranges?: boolean;
   };
 };
 
@@ -99,6 +102,14 @@ export function workspaceRunModelsInParallel(
   org: Organization | undefined,
 ): boolean | undefined {
   return org?.settings?.model_benchmarking?.run_models_in_parallel;
+}
+
+/** Whether this workspace shows likely ranges on agent-test results. Off when
+ *  the workspace is not known yet or never turned it on. */
+export function workspaceShowsLikelyRanges(
+  org: Organization | undefined,
+): boolean {
+  return org?.settings?.model_benchmarking?.show_likely_ranges === true;
 }
 
 export type OrganizationMember = {
