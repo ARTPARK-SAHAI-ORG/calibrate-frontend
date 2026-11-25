@@ -356,6 +356,20 @@ it("drops the old tool calls from an llm-general item when the edit removes them
   expect(payload).not.toHaveProperty("expected_tool_calls");
 });
 
+it("shows and saves llm-general calls stored under tool_calls", async () => {
+  const user = setupUser();
+  const calls = [{ tool: "book_flight", arguments: {} }];
+  itemsTabWith("llm-general", { name: "Books", input: "Book it", output: "", tool_calls: calls });
+  render(<LabellingTaskPage />);
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  const props = mockDialogProps.general.filter((p) => p.isOpen && p.mode === "edit").at(-1);
+  expect(props.initialRows[0].toolCalls).toEqual(calls);
+  await props.onSubmit([{ ...props.initialRows[0], output: "Booked", toolCalls: [] }]);
+  const payload = putPayload();
+  expect(payload).not.toHaveProperty("tool_calls");
+  expect(payload).not.toHaveProperty("actual_tool_calls");
+});
+
 it("keeps an empty tool-call list the llm-general item already had", async () => {
   const user = setupUser();
   itemsTabWith("llm-general", {
@@ -386,6 +400,40 @@ it("keeps an empty tool-call list the llm-general item already had", async () =>
   const payload = putPayload();
   expect(payload.actual_tool_calls).toEqual([]);
   expect(payload.expected_tool_calls).toEqual([]);
+});
+
+it("keeps an empty tool-call list when an llm-general item is duplicated", async () => {
+  const user = setupUser();
+  itemsTabWith("llm-general", {
+    name: "Answers in words",
+    input: "Book it",
+    output: "I cannot",
+    actual_tool_calls: [],
+  });
+  render(<LabellingTaskPage />);
+  await user.click(await screen.findByRole("button", { name: "Duplicate item" }));
+  const props = mockDialogProps.general.filter((p) => p.isOpen && p.mode !== "edit").at(-1);
+  expect(props.storesEmptyToolCallList).toBe(true);
+  await props.onSubmit([
+    {
+      name: "Copy of Answers in words",
+      description: "",
+      input: "Book it",
+      output: "I cannot",
+      inputExtras: {},
+      outputExtras: {},
+      toolCalls: [],
+      expectedToolCalls: [],
+      evaluator_variables: {},
+      metadata: [],
+    },
+  ]);
+  const post = mockApiCalls.find(
+    (c) => c.endpoint === "/annotation-tasks/t-1/items" && c.options?.method === "POST",
+  )!;
+  const payload = JSON.parse(JSON.stringify(post.options?.body)).items[0].payload;
+  expect(payload.actual_tool_calls).toEqual([]);
+  expect(payload).not.toHaveProperty("expected_tool_calls");
 });
 
 it("tells the llm edit dialog when the item stores an empty tool call list", async () => {

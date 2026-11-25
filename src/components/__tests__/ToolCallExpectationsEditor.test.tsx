@@ -50,6 +50,20 @@ describe("toolCallsToSelectedTools and selectedToolsToCalls", () => {
     ]);
   });
 
+  it("keeps a call that should not be made on a re-save", () => {
+    const calls = [
+      {
+        tool: "get_weather",
+        arguments: {},
+        accept_any_arguments: true,
+        is_called: false,
+      },
+    ];
+    expect(
+      selectedToolsToCalls(toolCallsToSelectedTools(calls, [WEATHER])),
+    ).toEqual(calls);
+  });
+
   it("gives back no rows for no calls", () => {
     expect(toolCallsToSelectedTools(undefined, [])).toEqual([]);
     expect(toolCallsToSelectedTools([], [])).toEqual([]);

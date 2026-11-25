@@ -4,13 +4,9 @@ import { useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import { EvaluatorTypeQuestions } from "@/components/evaluators/EvaluatorTypeQuestions";
-import { type EvaluatorUseCaseOption } from "@/components/evaluators/evaluatorUseCases";
-
-export type EvaluatorTypeOption = EvaluatorUseCaseOption;
-
 type UseCasePickerDialogProps = {
   initialValue: EvaluatorType | null;
-  options: EvaluatorTypeOption[];
+  options: EvaluatorType[];
   onCancel: () => void;
   onSelect: (value: EvaluatorType) => void;
 };
@@ -65,7 +61,7 @@ export function UseCasePickerDialog({
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
           <EvaluatorTypeQuestions
-            allowed={options.map((option) => option.value)}
+            allowed={options}
             value={selected}
             onChange={setSelected}
           />

@@ -13,6 +13,7 @@ import {
   EVALUATOR_CARD_BUTTON_CLASS,
 } from "@/components/evaluators/DuplicateEvaluatorButton";
 import { XIcon } from "@/components/icons";
+import { evaluatorTypesForTask } from "@/lib/labellingItem";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import {
   type EvaluatorData,
@@ -40,13 +41,12 @@ const CREATE_BUTTON_CLASS =
 
 // Full-conversation evaluators are hidden for now, so a conversation agent
 // lists the next-reply (`llm`) ones and a general agent the output-type ones.
-// Tool call evaluators fit both.
 function agentEvaluatorTypes(
   agentNature: "conversation" | "general",
 ): EvaluatorType[] {
-  return agentNature === "general"
-    ? ["llm-general", "tool-call"]
-    : ["llm", "tool-call"];
+  return evaluatorTypesForTask(
+    agentNature === "general" ? "llm-general" : "llm",
+  );
 }
 
 export function EvaluatorsTabContent({

@@ -37,7 +37,7 @@ export function ToolCallItemPane({
     TestCaseHistory["tool_calls"]
   >;
   const hasCalls = actualToolCalls.length > 0;
-  if (agentResponse && hasReply) {
+  if (hasReply) {
     history.push({
       role: "assistant",
       ...agentResponse,

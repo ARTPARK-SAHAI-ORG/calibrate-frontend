@@ -26,20 +26,11 @@ type TaskEvaluator = {
   name: string;
   description?: string | null;
   evaluator_type?: string | null;
-  is_protected?: boolean;
-  slug?: string | null;
   source_default_slug?: string | null;
 };
 
-const TOOL_CALL_CORRECTNESS_SLUG = "default-tool-call-correctness";
-
-function isBuiltInToolCallEvaluator(ev: TaskEvaluator): boolean {
-  return (
-    ev.is_protected === true ||
-    ev.slug === TOOL_CALL_CORRECTNESS_SLUG ||
-    ev.source_default_slug === TOOL_CALL_CORRECTNESS_SLUG
-  );
-}
+const isBuiltInToolCallEvaluator = (ev: TaskEvaluator) =>
+  ev.source_default_slug === "default-tool-call-correctness";
 
 /** Returns a new Set with `id` toggled in or out. */
 function toggleInSet(set: Set<string>, id: string): Set<string> {
@@ -250,7 +241,7 @@ export function AssignAnnotatorsDialog({
   const choosableEvaluators = evaluators.filter(
     (ev) =>
       !isBuiltInToolCallEvaluator(ev) &&
-      (ev.evaluator_type === "tool-call"
+      (evaluatorFitsItem(ev.evaluator_type, true)
         ? hasToolCallItems
         : hasNonToolCallItems),
   );
@@ -345,13 +336,17 @@ export function AssignAnnotatorsDialog({
   const toggleEvaluator = (id: string) =>
     setPickedEvaluators((prev) => toggleInSet(prev, id));
 
+  // What gets a reasoning choice is what the job will show, in the order the
+  // labels sit on screen. This does not depend on showEvaluatorChoice: a job
+  // with one label has no Labels column, and that label is still in here.
+  const shownLabels = [
+    ...choosableEvaluators.filter((ev) => pickedEvaluators.has(ev.uuid)),
+    ...lockedEvaluators,
+  ];
+
   // Each kind of chosen item needs at least one label that fits it, when the
   // task has one to offer.
   const offeredLabels = [...lockedEvaluators, ...choosableEvaluators];
-  const keptLabels = [
-    ...lockedEvaluators,
-    ...choosableEvaluators.filter((ev) => pickedEvaluators.has(ev.uuid)),
-  ];
   const evaluatorSelectionValid = [
     { isToolCall: true, chosen: hasToolCallItems },
     { isToolCall: false, chosen: hasNonToolCallItems },
@@ -361,7 +356,7 @@ export function AssignAnnotatorsDialog({
       !offeredLabels.some((ev) =>
         evaluatorFitsItem(ev.evaluator_type, isToolCall),
       ) ||
-      keptLabels.some((ev) => evaluatorFitsItem(ev.evaluator_type, isToolCall)),
+      shownLabels.some((ev) => evaluatorFitsItem(ev.evaluator_type, isToolCall)),
   );
   const allEvaluatorsPicked =
     choosableEvaluators.length > 0 &&
@@ -374,14 +369,6 @@ export function AssignAnnotatorsDialog({
   const showEvaluatorChoice = totalShownLabels > 1;
 
   const reasoningModeOf = (id: string) => reasoningModes[id] ?? "optional";
-
-  // What gets a reasoning choice is what the job will show, in the order the
-  // labels sit on screen. This does not depend on showEvaluatorChoice: a job
-  // with one label has no Labels column, and that label is still in here.
-  const shownLabels = [
-    ...choosableEvaluators.filter((ev) => pickedEvaluators.has(ev.uuid)),
-    ...lockedEvaluators,
-  ];
 
   const handleConfirm = async () => {
     if (picked.size === 0 || !evaluatorSelectionValid || submitting) return;

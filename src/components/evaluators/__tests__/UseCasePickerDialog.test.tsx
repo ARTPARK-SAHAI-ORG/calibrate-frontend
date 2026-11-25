@@ -44,7 +44,7 @@ describe("UseCasePickerDialog", () => {
       <UseCasePickerDialog
         initialValue={null}
         options={EVALUATOR_USE_CASE_OPTIONS.filter(
-          (option) => option.value === "llm" || option.value === "llm-general",
+          (option) => option === "llm" || option === "llm-general",
         )}
         onCancel={jest.fn()}
         onSelect={jest.fn()}

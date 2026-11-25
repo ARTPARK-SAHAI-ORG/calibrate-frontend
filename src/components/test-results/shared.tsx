@@ -1023,7 +1023,7 @@ export function TestDetailView({
 
   // The agent's final answer can be a reply followed by tool calls, which the
   // judge reads together, so every assistant turn in the final run is marked.
-  const evalTargetStart = highlightEvalTarget
+  const evalTarget = highlightEvalTarget
     ? (() => {
         let last = history.length - 1;
         while (last >= 0 && history[last].role !== "assistant") last--;
@@ -1152,8 +1152,8 @@ export function TestDetailView({
             <div className="space-y-4">
               {history.map((message, index) => {
                 const isEvalTarget =
-                  index >= evalTargetStart.start &&
-                  index <= evalTargetStart.last;
+                  index >= evalTarget.start &&
+                  index <= evalTarget.last;
                 const turnLabel = readTurnExtras(message).label;
                 const timestamp = formatTurnTimestamp(message.created_at);
                 // Tool-response entries are surfaced inline on their parent

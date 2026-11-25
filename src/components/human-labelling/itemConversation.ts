@@ -5,7 +5,7 @@ import {
   type TextField,
   type TurnExtras,
 } from "@/lib/messageVersions";
-import { normaliseHistoryItem } from "./item-panes/shared";
+import { agentToolCalls, normaliseHistoryItem } from "./item-panes/shared";
 import { normalizeToolCall } from "@/components/test-results/shared";
 
 export type HistoryItem = NonNullable<TestConfig["history"]>[number];
@@ -17,6 +17,29 @@ function parseHistory(raw: unknown): HistoryItem[] {
     .filter((turn) => turn !== null) as HistoryItem[];
 }
 
+/** The id every tool call taken from `actual_tool_calls` starts with, which
+ * tells it apart from a call earlier in the conversation. */
+export const ACTUAL_CALL_ID_PREFIX = "actual-call-";
+
+/** Where the agent's own tool calls start: the run of calls with an
+ * ACTUAL_CALL_ID_PREFIX id, and their responses, the conversation ends on.
+ * -1 when it does not end on one. */
+export function actualToolCallsStart<T>(
+  turns: T[],
+  callId: (turn: T) => string | undefined,
+  isResponse: (turn: T) => boolean,
+): number {
+  const isActual = (t: T) =>
+    callId(t)?.startsWith(ACTUAL_CALL_ID_PREFIX) === true;
+  let start = turns.length;
+  while (start > 0 && (isActual(turns[start - 1]) || isResponse(turns[start - 1]))) {
+    start -= 1;
+  }
+  // A response that follows an earlier call belongs with that call.
+  while (start < turns.length && isResponse(turns[start])) start += 1;
+  return start < turns.length ? start : -1;
+}
+
 export type ToolCallRecord = {
   tool: string;
   arguments: Record<string, unknown>;
@@ -25,7 +48,7 @@ export type ToolCallRecord = {
 
 /** The dialog's history for a stored item: the transcript for a
  * conversation item; for an llm item the chat history, then the graded reply
- * as a trailing assistant turn, then any `actual_tool_calls` as trailing
+ * as a trailing assistant turn, then the agent's tool calls as trailing
  * tool-call turns each followed by its response. */
 export function payloadToHistory(
   payload: Record<string, unknown>,
@@ -38,12 +61,9 @@ export function payloadToHistory(
     const { content, ...extras } = reply;
     history.push({ role: "assistant", content, ...extras });
   }
-  const calls = Array.isArray(payload.actual_tool_calls)
-    ? payload.actual_tool_calls
-    : [];
-  calls.forEach((raw, i) => {
+  agentToolCalls(payload).forEach((raw, i) => {
     const { toolName, args, output } = normalizeToolCall(raw);
-    const id = `actual-call-${i}`;
+    const id = `${ACTUAL_CALL_ID_PREFIX}${i}`;
     history.push({
       role: "assistant",
       tool_calls: [
@@ -90,9 +110,13 @@ function argumentText(value: unknown): string {
   return String(value);
 }
 
-function isPlainObject(v: unknown): v is Record<string, unknown> {
+export function isPlainObject(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
+
+// A webhook call's own keys: the dialog shows only these and the values
+// inside them, so any other key missing from what it sends back was hidden.
+const WEBHOOK_GROUPS = ["body", "query"];
 
 /** The dialog edits argument values as text, so a value it shows unchanged is
  * put back as the original value. Returns `previous` itself when nothing was
@@ -101,15 +125,19 @@ function restoreArguments(
   next: Record<string, unknown>,
   previous: Record<string, unknown>,
   text: (value: unknown) => string = argumentText,
+  nested = false,
 ): Record<string, unknown> {
-  let changed = Object.keys(next).some((k) => !(k in previous));
+  const webhook = !nested && WEBHOOK_GROUPS.some((k) => k in previous);
+  let changed =
+    Object.keys(next).some((k) => !(k in previous)) ||
+    (!webhook && Object.keys(previous).some((k) => !(k in next)));
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(next)) {
     const before = previous[k];
     if (v === before) {
       out[k] = before;
     } else if (isPlainObject(v) && isPlainObject(before)) {
-      out[k] = restoreArguments(v, before, text);
+      out[k] = restoreArguments(v, before, text, true);
       if (out[k] !== before) changed = true;
     } else if (typeof v === "string" && v === text(before)) {
       out[k] = before;
@@ -148,8 +176,8 @@ export function keepList<T>(previous: unknown, next: T[]): T[] | undefined {
   return Array.isArray(previous) && previous.length === 0 ? [] : undefined;
 }
 
-/** The stored fields for the dialog's history. For an llm item, trailing
- * tool-call turns (with their responses) become `actual_tool_calls`, and an
+/** The stored fields for the dialog's history. For an llm item, the agent's
+ * tool calls (see actualToolCallsStart) become `actual_tool_calls`, and an
  * agent text reply at the end, or just before those turns, becomes
  * `agent_response`. `previous` is the item being edited: values the dialog
  * shows unchanged are saved exactly as they were. */
@@ -174,15 +202,14 @@ export function historyToPayloadFields(
     h.role === "assistant" &&
     !isCall(h) &&
     typeof h.content === "string";
-  let start = history.length;
-  while (
-    start > 0 &&
-    (isCall(history[start - 1]) || history[start - 1].role === "tool")
-  ) {
-    start -= 1;
-  }
+  const callStart = actualToolCallsStart(
+    history,
+    (h) => (isCall(h) ? h.tool_calls?.[0]?.id : undefined),
+    (h) => h.role === "tool",
+  );
+  const hasCalls = callStart >= 0;
+  const start = hasCalls ? callStart : history.length;
   const trailing = history.slice(start);
-  const hasCalls = trailing.some(isCall);
   const replyIndex = hasCalls
     ? isReply(history[start - 1])
       ? start - 1
@@ -201,9 +228,7 @@ export function historyToPayloadFields(
         versions: reply.versions,
       })
     : "";
-  const before = Array.isArray(previous?.actual_tool_calls)
-    ? (previous.actual_tool_calls as unknown[])
-    : [];
+  const before = agentToolCalls(previous ?? {});
   const calls: ToolCallRecord[] = hasCalls
     ? restoreToolCalls(
         trailing
@@ -253,7 +278,7 @@ export function historyToPayloadFields(
               ...(output !== undefined ? { output } : {}),
             };
           }),
-        previous?.actual_tool_calls,
+        before,
       )
     : [];
   return {

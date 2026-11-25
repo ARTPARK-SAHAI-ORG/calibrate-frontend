@@ -201,13 +201,6 @@ describe("EvaluatorTypeQuestions", () => {
     expect(chosen()).toBe("none");
   });
 
-  it("shows the one card left rather than a blank step", async () => {
-    const user = setupUser();
-    render(<Harness allowed={["tool-call"]} />);
-    await user.click(screen.getByText("The tool calls"));
-    expect(chosen()).toBe("tool-call");
-  });
-
   it("takes a tool call without asking when it is the only text kind", async () => {
     const user = setupUser();
     render(<Harness allowed={["tool-call", "stt"]} />);

@@ -40,8 +40,10 @@ import { applyToolEditToMessages } from "@/lib/toolEditsInForm";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
 import { evaluatorFitsItem } from "@/lib/labellingItem";
 import {
+  ACTUAL_CALL_ID_PREFIX,
   DEFAULT_STRUCTURED_RESPONSE,
   DEFAULT_WEBHOOK_RESPONSE,
+  actualToolCallsStart,
 } from "@/components/human-labelling/itemConversation";
 import {
   ToolCallExpectationsEditor,
@@ -74,11 +76,15 @@ import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow
 import { sampleTest } from "@/lib/testSamples";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 
-// Default tool-response payloads shown in the Tool Response box. Webhook
-// tools require a body, so the default mimics a successful HTTP response;
-// structured-output tools default to a minimal acknowledgement. Shared with
-// the labelling item save, which leaves out a response that is only this.
 const RESPONSE_PLACEHOLDER = `// any valid JSON value\n${DEFAULT_WEBHOOK_RESPONSE}`;
+
+// The same rule the labelling item save uses to pick `actual_tool_calls`.
+const chatActualCallsStart = (messages: { id: string; role: string }[]) =>
+  actualToolCallsStart(
+    messages,
+    (m) => (m.role === "tool_call" ? m.id : undefined),
+    (m) => m.role === "tool_response",
+  );
 
 export type TestConfig = {
   /** Absent for a general test — see `input` below instead. */
@@ -717,7 +723,10 @@ export function AddTestDialog({
       // correctness evaluator's `variable_values.criteria` (handled separately
       // in the attached-evaluators initialization effect below).
       if (initialConfig.evaluation) {
-        if (initialConfig.evaluation.type === "tool_call" || isLabelItem) {
+        if (
+          initialConfig.evaluation.type === "tool_call" ||
+          showsExpectedToolCalls
+        ) {
           setSelectedTools(
             toolCallsToSelectedTools(
               initialConfig.evaluation.tool_calls,
@@ -727,7 +736,7 @@ export function AddTestDialog({
         }
       }
     }
-  }, [initialConfig, toolsFetched, isLabelItem, setSelectedTools]);
+  }, [initialConfig, toolsFetched, showsExpectedToolCalls, setSelectedTools]);
 
 
   // Evaluators attached to this test (next-reply tab only).
@@ -895,7 +904,7 @@ export function AddTestDialog({
     isWebhook: boolean = false,
     isInbuilt: boolean = false,
   ) => {
-    const toolCallId = Date.now().toString();
+    const toolCallId = `${ACTUAL_CALL_ID_PREFIX}${Date.now()}`;
     const newMessages: typeof chatMessages = [
       ...chatMessages,
       {
@@ -1767,6 +1776,12 @@ export function AddTestDialog({
   // Build the config object for API submission
   const buildConfig = (): TestConfig => {
     const history: TestConfig["history"] = [];
+    // An item's own tool calls keep their ids so the save can tell them
+    // apart from calls earlier in the conversation.
+    const actualStart = isLabelItem ? chatActualCallsStart(chatMessages) : -1;
+    const keptCallIds = new Set(
+      actualStart >= 0 ? chatMessages.slice(actualStart).map((m) => m.id) : [],
+    );
 
     // Convert chat messages to the API format
     for (const message of chatMessages) {
@@ -1796,8 +1811,9 @@ export function AddTestDialog({
           ...extras,
         });
       } else if (message.role === "tool_call") {
-        // Generate a unique ID for this tool call
-        const toolCallId = generateUUID();
+        const toolCallId = keptCallIds.has(message.id)
+          ? message.id
+          : generateUUID();
 
         // Build the arguments object from tool params
         const argsObj: Record<string, any> = {};
@@ -1862,11 +1878,6 @@ export function AddTestDialog({
 
     if (activeTab === "tool-invocation") {
       if (selectedTools.length > 0) {
-        // Build tool_calls array from all selected tools. The "should not
-        // have been called" expectation is intentionally suppressed for now
-        // — every selected tool is treated as `should-call` regardless of
-        // any pre-existing `expectation` value loaded from the backend, so
-        // the API always receives a positive should-call payload.
         evaluation = {
           type: "tool_call",
           tool_calls: selectedToolsToCalls(selectedTools),
@@ -2200,21 +2211,7 @@ export function AddTestDialog({
     onNext: showRunUnsavedConfirm || roleChange ? undefined : navNext,
   });
 
-  // Where the run of tool calls (with their responses) the conversation ends
-  // on starts. -1 when it does not end on a tool call.
-  const trailingToolCallsStart = () => {
-    let start = chatMessages.length;
-    while (
-      start > 0 &&
-      (chatMessages[start - 1].role === "tool_call" ||
-        chatMessages[start - 1].role === "tool_response")
-    ) {
-      start -= 1;
-    }
-    return chatMessages.slice(start).some((m) => m.role === "tool_call")
-      ? start
-      : -1;
-  };
+  const trailingToolCallsStart = () => chatActualCallsStart(chatMessages);
 
   // An llm item is a tool-call item when it ends on the agent's tool calls,
   // has expected tool calls, or stores an empty tool call list. Only tool-call evaluators score such an item,
@@ -4260,13 +4257,7 @@ export function AddTestDialog({
                   // its own "empty input" validation runs on submit instead.
                   isLastMessageInvalid = false;
                 } else if (requireAssistantLastMessage) {
-                  // The agent's answer is its last text reply or the tool
-                  // calls it made after the last user message.
-                  const lastTurn = [...chatMessages]
-                    .reverse()
-                    .find((m) => m.role !== "tool_response");
-                  isLastMessageInvalid =
-                    lastTurn?.role !== "agent" && lastTurn?.role !== "tool_call";
+                  isLastMessageInvalid = evalTargetStartIndex() < 0;
                 } else if (allowAgentLastMessage) {
                   isLastMessageInvalid = isEmpty;
                 } else {

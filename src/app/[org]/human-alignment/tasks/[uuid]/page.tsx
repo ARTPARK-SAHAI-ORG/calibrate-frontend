@@ -876,7 +876,6 @@ function buildInitialConfig(
   };
 }
 
-/** `expected_tool_calls` as saved from the item dialog's config. */
 function ItemRowActions({
   itemUuid,
   onDelete,
@@ -2273,7 +2272,6 @@ function LabellingTaskPageInner() {
     position: editPager.position,
   };
 
-
   // Sync the name field whenever a different item is opened for edit.
   useEffect(() => {
     if (editingItem) {
@@ -3534,6 +3532,7 @@ function LabellingTaskPageInner() {
                                   ? (p.name as string)
                                   : `Item ${item.id}`;
                               if (taskType === "llm-general") {
+                                setDuplicateSourcePayload(p);
                                 setDuplicateLlmGeneralRows([
                                   {
                                     ...llmGeneralDialogRow(item),
@@ -4212,10 +4211,14 @@ function LabellingTaskPageInner() {
       <AddLlmGeneralItemsDialog
         isOpen={addLlmGeneralItemsOpen}
         evaluators={llmGeneralEvaluatorDefs}
+        storesEmptyToolCallList={storesEmptyToolCallList(
+          duplicateSourcePayload,
+        )}
         initialRows={duplicateLlmGeneralRows ?? undefined}
         onClose={() => {
           setAddLlmGeneralItemsOpen(false);
           setDuplicateLlmGeneralRows(null);
+          setDuplicateSourcePayload(null);
         }}
         onSubmit={async (rows) => {
           if (!accessToken) return;
@@ -4227,12 +4230,14 @@ function LabellingTaskPageInner() {
                   ...(r.name ? { name: r.name } : {}),
                   ...(r.description ? { description: r.description } : {}),
                   ...textFieldsToPayload(r),
-                  ...(r.toolCalls.length > 0
-                    ? { actual_tool_calls: r.toolCalls }
-                    : {}),
-                  ...(r.expectedToolCalls.length > 0
-                    ? { expected_tool_calls: r.expectedToolCalls }
-                    : {}),
+                  actual_tool_calls: keepList(
+                    duplicateSourcePayload?.actual_tool_calls,
+                    r.toolCalls,
+                  ),
+                  expected_tool_calls: keepList(
+                    duplicateSourcePayload?.expected_tool_calls,
+                    r.expectedToolCalls,
+                  ),
                   ...(Object.keys(r.evaluator_variables).length > 0
                     ? { evaluator_variables: r.evaluator_variables }
                     : {}),
@@ -4245,6 +4250,7 @@ function LabellingTaskPageInner() {
           await Promise.all([fetchTask(), fetchTaskSummary()]);
           setAddLlmGeneralItemsOpen(false);
           setDuplicateLlmGeneralRows(null);
+          setDuplicateSourcePayload(null);
         }}
       />
 
@@ -4294,6 +4300,7 @@ function LabellingTaskPageInner() {
                         name: r.name,
                         description: r.description,
                         ...textFieldsToPayload(r),
+                        tool_calls: undefined,
                         actual_tool_calls: keepList(
                           existing.actual_tool_calls,
                           r.toolCalls,

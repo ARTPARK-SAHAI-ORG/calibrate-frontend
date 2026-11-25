@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { publicFetch } from "@/lib/publicFetch";
-import { evaluatorFitsItem } from "@/lib/labellingItem";
+import { evaluatorFitsItem, isToolCallContent } from "@/lib/labellingItem";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
@@ -1584,8 +1584,7 @@ export function ItemPane({
   // and on older responses, so the lists it is worked out from count too.
   if (
     item.is_tool_call === true ||
-    Array.isArray(payload.expected_tool_calls) ||
-    Array.isArray(payload.actual_tool_calls)
+    isToolCallContent(payload)
   )
     return <ToolCallItemPane payload={payload} />;
   if (taskType === "llm") return <LlmItemPane payload={payload} />;

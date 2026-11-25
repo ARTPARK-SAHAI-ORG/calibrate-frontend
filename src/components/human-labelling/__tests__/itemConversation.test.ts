@@ -1,4 +1,5 @@
 import {
+  actualToolCallsStart,
   DEFAULT_STRUCTURED_RESPONSE,
   DEFAULT_WEBHOOK_RESPONSE,
   historyToPayloadFields,
@@ -184,25 +185,25 @@ describe("historyToPayloadFields", () => {
         role: "assistant",
         tool_calls: [
           {
-            id: "c1",
+            id: "actual-call-0",
             type: "function",
             function: { name: "lookup", arguments: '{"city":"Pune"}' },
           },
         ],
       },
-      { role: "tool", content: '{"ok":true}', tool_call_id: "c1" },
+      { role: "tool", content: '{"ok":true}', tool_call_id: "actual-call-0" },
       {
         role: "assistant",
         tool_calls: [
           {
-            id: "c2",
+            id: "actual-call-1",
             type: "function",
             function: { name: "notify", arguments: "{}" },
           },
         ],
       },
-      { role: "tool", content: "sent", tool_call_id: "c2" },
-      { role: "assistant", tool_calls: [{ ...toolCall, id: "c3" }] },
+      { role: "tool", content: "sent", tool_call_id: "actual-call-1" },
+      { role: "assistant", tool_calls: [{ ...toolCall, id: "actual-call-2" }] },
     ];
     expect(historyToPayloadFields(history, "llm")).toEqual({
       chat_history: [{ role: "user", content: "hi" }],
@@ -283,6 +284,36 @@ describe("historyToPayloadFields", () => {
       },
     ]);
     expect(historyToPayloadFields(history, "llm")).toEqual(payload);
+  });
+
+  it("keeps an earlier call at the end of chat_history out of actual_tool_calls", () => {
+    const payload = {
+      chat_history: [
+        { role: "user", content: "save my city" },
+        { role: "assistant", tool_calls: [toolCall] },
+        { role: "tool", content: "Pune", tool_call_id: "c1" },
+      ],
+      agent_response: "",
+      actual_tool_calls: [{ tool: "save", arguments: { city: "Pune" } }],
+    };
+    expect(
+      historyToPayloadFields(payloadToHistory(payload, "llm"), "llm", payload),
+    ).toEqual(payload);
+  });
+
+  it("reads calls stored under tool_calls and saves them unchanged", () => {
+    const payload = {
+      chat_history: [{ role: "user", content: "hi" }],
+      agent_response: "",
+      tool_calls: [{ tool: "lookup", arguments: { n: 3 } }],
+    };
+    const history = throughTheDialog(payloadToHistory(payload, "llm"));
+    expect(history[1].tool_calls?.[0].function.name).toBe("lookup");
+    expect(
+      historyToPayloadFields(history, "llm", payload),
+    ).toMatchObject({
+      actual_tool_calls: [{ tool: "lookup", arguments: { n: 3 } }],
+    });
   });
 
   it("reads a string tool output back as the same string", () => {
@@ -475,6 +506,31 @@ describe("keepList", () => {
   });
 });
 
+describe("actualToolCallsStart", () => {
+  const turns = (...ids: (string | null)[]) => ids;
+  const callId = (t: string | null) => (t === null ? undefined : t);
+  const isResponse = (t: string | null) => t === "response";
+  it("starts at the agent's own calls and leaves an earlier call and its response before them", () => {
+    expect(
+      actualToolCallsStart(
+        turns(null, "c1", "response", "actual-call-0", "response"),
+        (t) => (t === "response" ? undefined : callId(t)),
+        isResponse,
+      ),
+    ).toBe(3);
+  });
+  it("is -1 when the conversation ends on an earlier call or a response alone", () => {
+    expect(actualToolCallsStart(turns(null, "c1"), callId, isResponse)).toBe(-1);
+    expect(
+      actualToolCallsStart(
+        turns(null, "response"),
+        (t) => (t === "response" ? undefined : callId(t)),
+        isResponse,
+      ),
+    ).toBe(-1);
+  });
+});
+
 describe("restoreToolCalls", () => {
   it("puts back stored values whose text is unchanged, for the same tool only", () => {
     const text = (v: unknown) =>
@@ -498,5 +554,28 @@ describe("restoreToolCalls", () => {
       { tool: "c", arguments: { n: "3" } },
       { tool: "d", arguments: {} },
     ]);
+  });
+
+  it("drops an argument the reader removed", () => {
+    expect(
+      restoreToolCalls(
+        [{ tool: "a", arguments: { n: 3 } }],
+        [{ tool: "a", arguments: { n: 3, extra: 1 } }],
+      ),
+    ).toEqual([{ tool: "a", arguments: { n: 3 } }]);
+  });
+});
+
+describe("restoreToolCalls with webhook arguments", () => {
+  it("keeps hidden keys when nothing changed and drops a removed body value", () => {
+    const stored = [
+      { tool: "w", arguments: { body: { id: 7, x: 1 }, headers: { k: "v" } } },
+    ];
+    expect(
+      restoreToolCalls([{ tool: "w", arguments: { body: { id: 7, x: 1 } } }], stored),
+    ).toEqual(stored);
+    expect(
+      restoreToolCalls([{ tool: "w", arguments: { body: { id: 7 } } }], stored),
+    ).toEqual([{ tool: "w", arguments: { body: { id: 7 } } }]);
   });
 });

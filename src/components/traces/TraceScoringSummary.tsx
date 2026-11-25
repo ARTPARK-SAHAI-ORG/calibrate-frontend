@@ -11,6 +11,7 @@ import {
   traceRowOutputFacts,
 } from "@/lib/traceScoring";
 import type { TraceSummary } from "@/lib/tracesApi";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { defaultBinaryLabel } from "@/lib/binaryLabels";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 
@@ -105,8 +106,10 @@ function ScoreValue({
   if (
     !score &&
     column.evaluator_type &&
-    (column.evaluator_type === "tool-call") !==
-      isToolCallOutput(traceRowOutputFacts(trace))
+    !evaluatorFitsItem(
+      column.evaluator_type,
+      isToolCallOutput(traceRowOutputFacts(trace)),
+    )
   ) {
     return DOES_NOT_APPLY;
   }

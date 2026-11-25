@@ -12,9 +12,10 @@ import { Section, agentToolCalls } from "./shared";
  * Renders a general (non-conversational) "llm-general" evaluation item.
  *
  * The backend payload shape for this task type is
- * `{ name, input, output, actual_tool_calls? }` or `tool_calls` (plus an optional
- * `evaluator_variables` map for per-item `{{variable}}` substitution, which
- * isn't shown here — it feeds the evaluator prompt, not the displayed item).
+ * `{ name, input, output }` plus the agent's calls in `actual_tool_calls` or
+ * `tool_calls` (plus an optional `evaluator_variables` map for per-item
+ * `{{variable}}` substitution, which isn't shown here — it feeds the
+ * evaluator prompt, not the displayed item).
  * `input` and `output` are a string or `{ content, label?, versions? }`.
  * A tool-call test usually has an empty `output` and the calls the agent made
  * in `actual_tool_calls`, drawn the same way the run results screen draws

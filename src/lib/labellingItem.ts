@@ -9,6 +9,7 @@
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import type { ExpectedToolCall } from "@/components/ToolCallExpectationsEditor";
 import type { MetadataEntry } from "@/components/ui";
+import { agentToolCalls } from "@/components/human-labelling/item-panes/shared";
 import { readTurnExtras, textOf, type TurnExtras } from "@/lib/messageVersions";
 
 export type ItemDetailSourceItem = {
@@ -64,14 +65,6 @@ export function evaluatorFitsItem(
   isToolCallItem: boolean,
 ): boolean {
   return (evaluatorType === "tool-call") === isToolCallItem;
-}
-
-// True when an older evaluation run recorded no score for a row and marked it
-// skipped instead.
-export function isSkippedRunResult(
-  value: { skipped?: unknown; value?: unknown } | null | undefined,
-): boolean {
-  return value?.skipped === true;
 }
 
 export type ItemEditForm = "tts" | "stt" | "llm-general" | "chat";
@@ -136,11 +129,18 @@ export function llmGeneralDialogRow(item: {
     output: textOf(p.output),
     inputExtras: readTurnExtras(p.input),
     outputExtras: readTurnExtras(p.output),
-    toolCalls: Array.isArray(p.actual_tool_calls) ? p.actual_tool_calls : [],
+    toolCalls: agentToolCalls(p),
     expectedToolCalls: Array.isArray(p.expected_tool_calls)
       ? p.expected_tool_calls
       : [],
     varValues: readEvaluatorVariables(p),
     metadata: item.metadata,
   };
+}
+
+export function isToolCallContent(content: Record<string, unknown>): boolean {
+  return (
+    Array.isArray(content.actual_tool_calls) ||
+    Array.isArray(content.expected_tool_calls)
+  );
 }

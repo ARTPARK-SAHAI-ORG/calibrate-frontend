@@ -1,5 +1,5 @@
 import { textFieldsToPayload } from "@/components/human-labelling/itemConversation";
-import { evaluatorFitsItem, evaluatorTypesForTask, fitsTaskType, isSkippedRunResult, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables } from "../labellingItem";
+import { evaluatorFitsItem, evaluatorTypesForTask, fitsTaskType, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables } from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
 // field by field, and is_tool_call was left off the list. The dialog then
@@ -52,16 +52,6 @@ describe("evaluatorFitsItem", () => {
   });
 });
 
-describe("isSkippedRunResult", () => {
-  it("is true only when the run recorded a skip", () => {
-    expect(isSkippedRunResult({ skipped: true })).toBe(true);
-    expect(isSkippedRunResult({ skipped: false })).toBe(false);
-    expect(isSkippedRunResult({ value: "yes" })).toBe(false);
-    expect(isSkippedRunResult(null)).toBe(false);
-    expect(isSkippedRunResult(undefined)).toBe(false);
-  });
-});
-
 describe("itemEditForm", () => {
   it.each([
     ["tts", "tts"],
@@ -77,6 +67,13 @@ describe("itemEditForm", () => {
 // Duplicate once built this row inline and left the tool calls off, so a copy
 // of a tool-call item opened with no answer and Save stayed off.
 describe("llmGeneralDialogRow", () => {
+  it("reads the agent's calls stored under tool_calls", () => {
+    const calls = [{ tool: "book_flight", arguments: {} }];
+    expect(
+      llmGeneralDialogRow({ uuid: "i1", payload: { input: "hi", tool_calls: calls } }).toolCalls,
+    ).toEqual(calls);
+  });
+
   it("carries the input's and output's headings and versions", () => {
     const input = { content: "hi", label: "English", versions: { Hindi: "नमस्ते" } };
     const row = llmGeneralDialogRow({

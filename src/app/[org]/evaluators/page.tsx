@@ -280,8 +280,8 @@ function MetricsPageInner() {
             >
               <option value="all">All purposes</option>
               {EVALUATOR_USE_CASE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {EVALUATOR_TYPE_LABELS[opt.value]}
+                <option key={opt} value={opt}>
+                  {EVALUATOR_TYPE_LABELS[opt]}
                 </option>
               ))}
             </Select>

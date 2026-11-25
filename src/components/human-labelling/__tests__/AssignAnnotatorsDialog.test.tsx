@@ -1131,26 +1131,6 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     });
   });
 
-  it.each([
-    ["is_protected", { is_protected: true }],
-    ["slug", { slug: "default-tool-call-correctness" }],
-  ])("locks the built-in one when it is marked by %s", async (_, mark) => {
-    mockedApiClient.mockResolvedValue(annotators);
-    renderDialog({
-      evaluators: [
-        ...evaluators,
-        { uuid: "ev-tool", name: "Tool call correctness", evaluator_type: "tool-call", ...mark },
-      ],
-      hasToolCallItems: true,
-    });
-    await screen.findByText("Alice");
-    expect(
-      screen.getByRole("checkbox", {
-        name: "Tool call correctness is always included",
-      }),
-    ).toBeDisabled();
-  });
-
   it("lets a custom tool-call evaluator be unticked like any other label", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValue(annotators);

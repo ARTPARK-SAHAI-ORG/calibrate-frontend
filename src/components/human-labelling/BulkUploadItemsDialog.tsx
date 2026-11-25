@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { apiClient } from "@/lib/api";
+import { evaluatorFitsItem, isToolCallContent } from "@/lib/labellingItem";
 import { ClippedText, ErrorNote } from "@/components/ui";
 import {
   AnnotationOptIn,
@@ -33,7 +34,6 @@ import {
   useAnnotatedItemsCheck,
   useAnnotators,
   useTaskItems,
-  isToolCallContent,
 } from "./bulk-upload-shared";
 
 export type EvaluatorVariableDef = {
@@ -431,7 +431,7 @@ export function BulkUploadItemsDialog({
                 // for this variable, so it is left out instead of failing.
                 if (
                   uploadAnnotations ||
-                  toolCallRow !== (e.evaluator_type === "tool-call")
+                  !evaluatorFitsItem(e.evaluator_type, toolCallRow)
                 )
                   continue;
                 rowError = `Row ${i + 1}: missing value for "${variableColumnName(

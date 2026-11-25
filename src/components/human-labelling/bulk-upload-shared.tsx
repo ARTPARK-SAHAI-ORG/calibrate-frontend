@@ -11,6 +11,7 @@ import { parseJsonLenient } from "@/lib/jsonSanitize";
 import type { BulkContentColumn } from "./BulkUploadItemsDialog";
 import { AddAnnotatorInline } from "./AddAnnotatorInline";
 import { humaniseNameConflictDetail } from "./itemNameConflict";
+import { isPlainObject } from "./itemConversation";
 
 // ─── Shared types ─────────────────────────────────────────────────────────
 
@@ -1493,19 +1494,8 @@ export type BulkToolCall = {
 const TOOL_CALL_KEYS = ["tool", "arguments", "output", "accept_any_arguments"];
 const MAX_TOOL_NAME_CHARS = 255;
 
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return !!v && typeof v === "object" && !Array.isArray(v);
-}
-
 // The backend treats an item with either list, even an empty one, as a tool
 // call that only tool-call evaluators score.
-export function isToolCallContent(content: Record<string, unknown>): boolean {
-  return (
-    Array.isArray(content.actual_tool_calls) ||
-    Array.isArray(content.expected_tool_calls)
-  );
-}
-
 function parseToolCallsCell(
   raw: string,
   rowIndex: number,

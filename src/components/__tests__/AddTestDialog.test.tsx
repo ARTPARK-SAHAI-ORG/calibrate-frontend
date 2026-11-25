@@ -1754,16 +1754,64 @@ describe("AddTestDialog", () => {
           role: "assistant",
           tool_calls: [
             {
-              id: "c1",
+              id: "actual-call-0",
               type: "function",
               function: { name: "get_weather", arguments: '{"city":"Pune"}' },
             },
           ],
         },
-        { role: "tool", content: '{"temp":30}', tool_call_id: "c1" },
+        { role: "tool", content: '{"temp":30}', tool_call_id: "actual-call-0" },
       ],
       evaluation: { type: "response" },
     };
+
+    it("marks only the item's own tool calls, not an earlier call at the end of the history, as the evaluation target", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      const history = endsOnToolCall.history!;
+      render(
+        <ControlledDialog
+          {...labelProps({
+            onSubmit,
+            initialConfig: {
+              ...endsOnToolCall,
+              history: [
+                history[0],
+                {
+                  role: "assistant",
+                  tool_calls: [
+                    {
+                      id: "c1",
+                      type: "function",
+                      function: { name: "lookup_city", arguments: "{}" },
+                    },
+                  ],
+                },
+                { role: "tool", content: "Pune", tool_call_id: "c1" },
+                ...history.slice(1),
+              ],
+            },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Weather in Pune?")).toBeInTheDocument(),
+      );
+      const target = screen.getByText("Evaluation target").closest(".border-l-2");
+      expect(target).toHaveTextContent("get_weather");
+      expect(target).not.toHaveTextContent("lookup_city");
+      const criteria = screen.queryByPlaceholderText(
+        "Enter value for {{criteria}}",
+      );
+      if (criteria) await user.type(criteria, "Calls the tool");
+      await user.click(screen.getByRole("button", { name: "Create" }));
+      const ids = onSubmit.mock.calls[0][0].history
+        .filter((h: { tool_calls?: unknown[] }) => h.tool_calls)
+        .map((h: { tool_calls: { id: string }[] }) => h.tool_calls[0].id);
+      expect(ids[0]).not.toBe("c1");
+      expect(ids[0].startsWith("actual-call-")).toBe(false);
+      expect(ids[1]).toBe("actual-call-0");
+    });
 
     it("saves a conversation that ends on the agent's tool call", async () => {
       const user = setupUser();

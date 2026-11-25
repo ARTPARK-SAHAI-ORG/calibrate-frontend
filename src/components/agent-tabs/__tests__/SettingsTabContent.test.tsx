@@ -255,7 +255,7 @@ describe("SettingsTabContent", () => {
     await user.hover(validEvaluators);
     expect(
       await screen.findByText(
-        "Evaluators that fit this agent, have a prompt and a live version, and use no variables",
+        "Evaluators that fit this agent, have a live version, and use no variables",
       ),
     ).toBeInTheDocument();
 

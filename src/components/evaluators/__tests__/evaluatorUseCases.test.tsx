@@ -3,7 +3,7 @@ import { ChoiceCard, EVALUATOR_USE_CASE_OPTIONS } from "../evaluatorUseCases";
 
 describe("EVALUATOR_USE_CASE_OPTIONS", () => {
   it("contains the six canonical use cases in order", () => {
-    expect(EVALUATOR_USE_CASE_OPTIONS.map((o) => o.value)).toEqual([
+    expect(EVALUATOR_USE_CASE_OPTIONS).toEqual([
       "llm",
       "conversation",
       "llm-general",

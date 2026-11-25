@@ -139,9 +139,7 @@ export function CreateEvaluatorFlow({
     if (!useCaseTypes || useCaseTypes.length === 0)
       return EVALUATOR_USE_CASE_OPTIONS;
     const allowed = new Set(useCaseTypes);
-    return EVALUATOR_USE_CASE_OPTIONS.filter((option) =>
-      allowed.has(option.value),
-    );
+    return EVALUATOR_USE_CASE_OPTIONS.filter((option) => allowed.has(option));
   }, [useCaseTypes]);
 
   // The only use case on offer, when the caller left just one.
@@ -211,10 +209,10 @@ export function CreateEvaluatorFlow({
       // With one use case to choose from there is nothing to ask: go straight
       // to the form with that purpose already set.
       if (onlyUseCase) {
-        setNewEvaluatorType(onlyUseCase.value);
+        setNewEvaluatorType(onlyUseCase);
         setUseCasePickerOpen(false);
         setSidebarOpen(true);
-        void prefillDefaultPrompt(onlyUseCase.value);
+        void prefillDefaultPrompt(onlyUseCase);
       } else {
         setUseCasePickerOpen(true);
         setSidebarOpen(false);
@@ -225,7 +223,7 @@ export function CreateEvaluatorFlow({
       setLlmModalOpen(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, onlyUseCase?.value, duplicateOf]);
+  }, [open, onlyUseCase, duplicateOf]);
 
   // The name from the model list, once it has loaded.
   const judgeModel =

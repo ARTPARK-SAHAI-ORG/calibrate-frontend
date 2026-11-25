@@ -570,7 +570,6 @@ export function TracesTabContent({
   useEffect(() => {
     if (!accessToken || !isActive) return;
     let cancelled = false;
-    setEvaluatorTypesLoading(true);
     fetchAgentEvaluators(agentUuid, accessToken)
       .then((list) => {
         if (cancelled) return;

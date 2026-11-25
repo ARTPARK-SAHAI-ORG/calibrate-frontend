@@ -1347,6 +1347,29 @@ describe("TracesTabContent", () => {
         expect(onAgentDefaultsAttached).toHaveBeenCalled();
       });
 
+      it("stays while the evaluators are read again on returning to the tab", async () => {
+        fetchTraces.mockResolvedValue({
+          items: [],
+          total: 3,
+          limit: 1,
+          offset: 0,
+        });
+        fetchAgentEvaluators.mockResolvedValue([
+          { uuid: "ev-1", evaluator_type: "llm" },
+        ]);
+        const { rerender } = render(<TracesTabContent {...tabProps} />);
+        expect(await screen.findByText(new RegExp(NOTE))).toBeInTheDocument();
+
+        rerender(<TracesTabContent {...tabProps} isActive={false} />);
+        fetchAgentEvaluators.mockReturnValue(new Promise(() => {}));
+        rerender(<TracesTabContent {...tabProps} isActive />);
+
+        await waitFor(() =>
+          expect(fetchAgentEvaluators).toHaveBeenCalledTimes(2),
+        );
+        expect(screen.getByText(new RegExp(NOTE))).toBeInTheDocument();
+      });
+
       it("shows for a tool-call trace on the page even before the check answers", async () => {
         fetchTraces.mockReturnValue(new Promise(() => {}));
         mockUseTraces.mockReturnValue(

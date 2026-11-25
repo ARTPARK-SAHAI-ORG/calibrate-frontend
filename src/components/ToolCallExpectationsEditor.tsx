@@ -633,6 +633,7 @@ export function selectedToolsToCalls(
       ? {}
       : buildArgsFromExpectedParams(tool.expectedParameters),
     accept_any_arguments: tool.acceptAnyParameterValues,
+    ...(tool.expectation === "should-not-call" ? { is_called: false } : {}),
   }));
 }
 

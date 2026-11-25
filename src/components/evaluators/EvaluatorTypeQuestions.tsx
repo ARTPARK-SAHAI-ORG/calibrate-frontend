@@ -248,28 +248,24 @@ export function EvaluatorTypeQuestions({
         </Question>
       )}
 
-      {/* With every question above answered for the reader, the one card
-          left is still shown, so the step is never blank. */}
-      {textKind &&
-        (finalKinds(textKind).length > 1 ||
-          (forcedMedium && forcedTextKind)) && (
-          <Question>
-            {finalKinds(textKind).map((kind) => {
-              const card = FINAL_CARDS[kind];
-              return (
-                <ChoiceCard
-                  key={kind}
-                  title={card.title}
-                  description={card.description}
-                  tone={card.tone}
-                  selected={value === kind}
-                  dimmed={value !== null && value !== kind}
-                  onSelect={() => onChange(kind)}
-                />
-              );
-            })}
-          </Question>
-        )}
+      {textKind && finalKinds(textKind).length > 1 && (
+        <Question>
+          {finalKinds(textKind).map((kind) => {
+            const card = FINAL_CARDS[kind];
+            return (
+              <ChoiceCard
+                key={kind}
+                title={card.title}
+                description={card.description}
+                tone={card.tone}
+                selected={value === kind}
+                dimmed={value !== null && value !== kind}
+                onSelect={() => onChange(kind)}
+              />
+            );
+          })}
+        </Question>
+      )}
     </div>
   );
 }

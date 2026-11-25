@@ -4,17 +4,13 @@ import type { EvaluatorType } from "@/components/EvaluatorPills";
 
 // The evaluator kinds a create flow can offer, in order. The words on each
 // card live in EvaluatorTypeQuestions, the one place that draws them.
-export type EvaluatorUseCaseOption = {
-  value: EvaluatorType;
-};
-
-export const EVALUATOR_USE_CASE_OPTIONS: EvaluatorUseCaseOption[] = [
-  { value: "llm" },
-  { value: "conversation" },
-  { value: "llm-general" },
-  { value: "tool-call" },
-  { value: "stt" },
-  { value: "tts" },
+export const EVALUATOR_USE_CASE_OPTIONS: EvaluatorType[] = [
+  "llm",
+  "conversation",
+  "llm-general",
+  "tool-call",
+  "stt",
+  "tts",
 ];
 
 /** The colours a card can be painted. One per answer on screen, so no two

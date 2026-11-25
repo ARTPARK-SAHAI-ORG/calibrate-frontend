@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
@@ -41,17 +41,12 @@ export function AddToolCallEvaluatorButton({
       !linkedEvaluatorUuids.includes(e.uuid),
   );
 
-  // A ref, so a new callback on each render does not tell the parent closed then open.
-  const onOpenChangeRef = useRef(onOpenChange);
-  useEffect(() => {
-    onOpenChangeRef.current = onOpenChange;
-  });
   const windowOpen = pickerOpen || createOpen;
   useEffect(() => {
     if (!windowOpen) return;
-    onOpenChangeRef.current?.(true);
-    return () => onOpenChangeRef.current?.(false);
-  }, [windowOpen]);
+    onOpenChange?.(true);
+    return () => onOpenChange?.(false);
+  }, [windowOpen, onOpenChange]);
 
   const open = async () => {
     if (!accessToken) return;

@@ -25,7 +25,7 @@ import {
 } from "@/components/human-labelling/AgreementOverviewTable";
 import { summariseValues } from "@/lib/evaluatorResultStat";
 import { payloadHasVersions, textOf } from "@/lib/messageVersions";
-import { evaluatorFitsItem, isSkippedRunResult } from "@/lib/labellingItem";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { agentToolCalls } from "@/components/human-labelling/item-panes/shared";
 import {
   ItemPane,
@@ -956,7 +956,7 @@ export function EvaluatorResultsPane({
 
         // The judge did not run on this row, so there is no score to draw.
         // Say why, rather than leaving an empty card behind.
-        if (isSkippedRunResult(r.value)) {
+        if (r.value?.skipped === true) {
           return (
             <div
               key={`${ev.evaluator_id}-${ev.evaluator_version_id ?? ""}`}
