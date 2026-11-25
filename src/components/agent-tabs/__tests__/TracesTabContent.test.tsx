@@ -242,6 +242,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
       outputType?: string;
       labels?: string[];
       scores?: Record<string, string>;
+      createdBefore?: string | null;
     } | null;
     agentNature?: string;
     onConverted: (
@@ -263,6 +264,9 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
         </span>
         <span data-testid="convert-select-all-scores">
           {JSON.stringify(selectAll?.scores ?? null)}
+        </span>
+        <span data-testid="convert-select-all-before">
+          {selectAll?.createdBefore ?? "none"}
         </span>
         <span data-testid="convert-nature">{agentNature}</span>
         <button
@@ -1230,6 +1234,35 @@ describe("TracesTabContent", () => {
     expect(fetchTraces).toHaveBeenCalledWith(
       "test-token",
       expect.objectContaining({ labels: ["production"] }),
+    );
+  });
+
+  it("stops at the moment the reader asked for every trace", async () => {
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ uuid: "trace-1" })], { total: 4, hasNext: true }),
+    );
+    (fetchTraces as jest.Mock).mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 1,
+      offset: 0,
+    });
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+    const before = new Date().toISOString();
+
+    await user.click(screen.getByLabelText("Select all traces"));
+    await user.click(screen.getByText("Select all 4 traces"));
+    await user.click(screen.getByText("Add to tests (4)"));
+
+    const chosenAt = (await screen.findByTestId("convert-select-all-before"))
+      .textContent as string;
+    expect(chosenAt >= before).toBe(true);
+    expect(chosenAt <= new Date().toISOString()).toBe(true);
+    // The counts that decide the kind of test stop at the same moment.
+    expect(fetchTraces).toHaveBeenCalledWith(
+      "test-token",
+      expect.objectContaining({ createdBefore: chosenAt }),
     );
   });
 

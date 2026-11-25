@@ -122,6 +122,20 @@ describe("fetchTraceConversations", () => {
 });
 
 describe("fetchTraces", () => {
+  it("stops at the given time when there is one", async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 1, offset: 0 });
+
+    await fetchTraces("tok", {
+      limit: 1,
+      offset: 0,
+      agentId: "ag-1",
+      createdBefore: "2026-11-04T10:00:00.000Z",
+    });
+
+    const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
+    expect(query.get("created_before")).toBe("2026-11-04T10:00:00.000Z");
+  });
+
   it("sends limit, offset and the agent, and no search term when none is given", async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
 
@@ -549,6 +563,20 @@ describe("selectAllBody", () => {
       agent_id: "ag-1",
       q: "refund",
       output_type: "tool_call",
+    });
+  });
+
+  it("carries the time the reader chose, and leaves it out when there is none", () => {
+    expect(
+      selectAllBody({ agentId: "ag-1", createdBefore: "2026-11-04T10:00:00.000Z" }),
+    ).toEqual({
+      select_all: true,
+      agent_id: "ag-1",
+      created_before: "2026-11-04T10:00:00.000Z",
+    });
+    expect(selectAllBody({ agentId: "ag-1", createdBefore: null })).toEqual({
+      select_all: true,
+      agent_id: "ag-1",
     });
   });
 
