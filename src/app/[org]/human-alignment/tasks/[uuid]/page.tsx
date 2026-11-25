@@ -1506,10 +1506,22 @@ function LabellingTaskPageInner() {
    * search change, or on action success.
    */
   const [selectAllTotal, setSelectAllTotal] = useState(false);
-  const selectedLoadedItems = selectedTaskItems(
-    task?.items ?? [],
-    selectAllTotal ? { q: itemsSearch } : { ids: selectedItemIds },
-  );
+  // Empty when the chosen items are not loaded, and then every evaluator is offered.
+  const itemsForRun = (
+    selectAll: { q?: string } | null,
+    itemUuids: string[] | null,
+  ) =>
+    selectedTaskItems(
+      task?.items ?? [],
+      selectAll
+        ? { q: selectAll.q ?? "" }
+        : itemUuids
+          ? { ids: new Set(itemUuids) }
+          : { q: "" },
+    );
+  const selectedLoadedItems = selectAllTotal
+    ? itemsForRun({ q: itemsSearch }, null)
+    : itemsForRun(null, [...selectedItemIds]);
   const selectedToolCall = selectedLoadedItems.some(
     (it) => it.is_tool_call === true,
   );
@@ -1697,19 +1709,6 @@ function LabellingTaskPageInner() {
   const [runDialogSubmitError, setRunDialogSubmitError] = useState<
     string | null
   >(null);
-  // Empty when the chosen items are not loaded, and then every evaluator is offered.
-  const itemsForRun = (
-    selectAll: { q?: string } | null,
-    itemUuids: string[] | null,
-  ) =>
-    selectedTaskItems(
-      task?.items ?? [],
-      selectAll
-        ? { q: selectAll.q ?? "" }
-        : itemUuids
-          ? { ids: new Set(itemUuids) }
-          : { q: "" },
-    );
   const runDialogEvaluators = evaluatorsFittingItems(
     task?.evaluators ?? [],
     itemsForRun(runDialogSelectAll, runDialogItemUuids),
@@ -1744,7 +1743,7 @@ function LabellingTaskPageInner() {
       ).length === 0
     ) {
       toast.error(
-        "None of the selected evaluators fit the chosen items. Tool-call items need a tool-call evaluator, and every other item needs an evaluator that is not a tool-call evaluator.",
+        "None of this task's evaluators fit the chosen items. Tool-call items need a tool-call evaluator, and every other item needs an evaluator that is not a tool-call evaluator.",
       );
       return;
     }

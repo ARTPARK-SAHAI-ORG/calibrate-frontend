@@ -57,7 +57,7 @@ import {
   useTraces,
 } from "@/hooks";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
-import { ExtendLimitsLink } from "@/components/traces/ExtendLimitsLink";
+import { ExtendLimitsLink } from "@/constants/limits";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import { isToolCallTraceRow, traceRowOutputFacts } from "@/lib/traceScoring";
@@ -633,6 +633,7 @@ export function TracesTabContent({
   const outputsWord = isGeneral ? "outputs" : "replies";
   const onlyToolCallEvaluators =
     knownScoringTypes !== null &&
+    knownScoringTypes.length > 0 &&
     knownScoringTypes.every((type) => type === "tool-call") &&
     hasReplyTrace;
   const addToolCallEvaluatorButton = (
@@ -979,7 +980,7 @@ export function TracesTabContent({
                 <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
               </WarningBox>
             )}
-            {onlyToolCallEvaluators && !nothingCanScore && (
+            {onlyToolCallEvaluators && (
               <WarningBox>
                 Only tool call evaluators can score this agent&apos;s traces, so
                 its {outputsWord} are not checked. Add an evaluator that checks{" "}

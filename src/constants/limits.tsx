@@ -24,17 +24,29 @@ export const LIMITS = {
 // TODO: Replace with actual contact link
 export const CONTACT_LINK = "https://forms.gle/3VmAyWdWaCKnTqTs8";
 
+export function ExtendLimitsLink() {
+  return (
+    <>
+      <a
+        href={CONTACT_LINK}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-bold"
+      >
+        Click here
+      </a>{" "}
+      to contact us to extend your limits.
+    </>
+  );
+}
+
 /**
  * Show a limit-exceeded error toast with an inline "Contact us" link.
  */
 export function showLimitToast(message: string) {
   toast.error(
     <span>
-      {message}{" "}
-      <a href={CONTACT_LINK} target="_blank" rel="noopener noreferrer" className="font-bold">
-        Click here
-      </a>{" "}
-      to contact us to extend your limits.
+      {message} <ExtendLimitsLink />
     </span>,
   );
 }

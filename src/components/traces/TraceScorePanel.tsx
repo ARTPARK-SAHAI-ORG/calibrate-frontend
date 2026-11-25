@@ -3,7 +3,7 @@
 import type React from "react";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { SpinnerIcon } from "@/components/icons";
-import { ExtendLimitsLink } from "./ExtendLimitsLink";
+import { ExtendLimitsLink } from "@/constants/limits";
 import { useUsesOwnProviderKeys } from "@/hooks";
 import { EvaluatorsTabLink } from "./NothingCanScoreMessage";
 import { WarningBox } from "./WarningBox";

@@ -1,6 +1,7 @@
 "use client";
 
 import { nothingCanScoreCopy } from "@/lib/traceScoring";
+import type { TraceScoringIneligibleReason } from "@/lib/tracesApi";
 
 /** The words "Evaluators tab", as a button that opens that tab. */
 export function EvaluatorsTabLink({
@@ -28,7 +29,7 @@ export function NothingCanScoreMessage({
   ineligible,
   onGoToEvaluators,
 }: {
-  ineligible: { reason: string }[];
+  ineligible: { reason: TraceScoringIneligibleReason }[];
   onGoToEvaluators: () => void;
 }) {
   return (

@@ -1745,9 +1745,11 @@ export function AddTestDialog({
   // Build the config object for API submission
   const buildConfig = (): TestConfig => {
     const history: TestConfig["history"] = [];
-    // An item's own tool calls keep their ids so the save can tell them
+    // An llm item's own tool calls keep their ids so the save can tell them
     // apart from calls earlier in the conversation.
-    const actualStart = isLabelItem ? chatActualCallsStart(chatMessages) : -1;
+    const actualStart = showsExpectedToolCalls
+      ? chatActualCallsStart(chatMessages)
+      : -1;
     const keptCallIds = new Set(
       actualStart >= 0 ? chatMessages.slice(actualStart).map((m) => m.id) : [],
     );

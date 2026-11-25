@@ -185,6 +185,8 @@ let expParamIdCounter = 0;
 const newExpParamId = () =>
   `exp-${++expParamIdCounter}-${Math.random().toString(36).slice(2, 8)}`;
 
+// Null shows as an empty box here because a row marks null with its own
+// isNull switch, unlike the item dialogs' argumentText.
 const expectedValueToString = (v: any): string => {
   if (v === null || v === undefined) return "";
   if (typeof v === "object") return JSON.stringify(v);

@@ -1,11 +1,3 @@
-// Shrinks a task's item row down to the shape ItemDetailDialog wants,
-// field by field, when the item detail view is opened from the task's
-// Items tab.
-//
-// Pulled out of the page so it can be unit tested directly: the page it was
-// inline in sits outside what the coverage setup measures, and dropping a
-// field silently here is exactly the bug that made the dialog draw every
-// evaluator on a tool-call item.
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import type { ExpectedToolCall } from "@/components/ToolCallExpectationsEditor";
 import type { MetadataEntry } from "@/components/ui";
@@ -22,6 +14,7 @@ export type ItemDetailSourceItem = {
   metadata?: MetadataEntry[] | null;
 };
 
+// Shrinks a task's item row down to the shape ItemDetailDialog wants.
 export function toItemDetailItem(
   match: ItemDetailSourceItem,
 ): ItemDetailSourceItem {

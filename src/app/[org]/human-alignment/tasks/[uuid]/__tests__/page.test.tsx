@@ -310,7 +310,7 @@ it("says why and keeps Run evaluators closed when no linked evaluator fits the c
   render(<LabellingTaskPage />);
   await user.click(await screen.findByRole("button", { name: "Evaluate" }));
   expect(mockToastError).toHaveBeenCalledWith(
-    "None of the selected evaluators fit the chosen items. Tool-call items need a tool-call evaluator, and every other item needs an evaluator that is not a tool-call evaluator.",
+    "None of this task's evaluators fit the chosen items. Tool-call items need a tool-call evaluator, and every other item needs an evaluator that is not a tool-call evaluator.",
   );
   expect(screen.queryByText("Run evaluators")).not.toBeInTheDocument();
 });

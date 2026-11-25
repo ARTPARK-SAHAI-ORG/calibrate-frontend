@@ -117,10 +117,4 @@ describe("nothingCanScoreCopy", () => {
       "None of this agent's evaluators can score traces: some use variables, some have no live version. Add an evaluator that can score traces in the",
     );
   });
-
-  it("falls back to a general line for a reason it does not know", () => {
-    expect(nothingCanScoreCopy([{ reason: "something_new" }])).toBe(
-      "None of this agent's evaluators can score traces. Add an evaluator that can score traces in the",
-    );
-  });
 });

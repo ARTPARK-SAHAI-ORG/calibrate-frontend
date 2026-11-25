@@ -29,7 +29,7 @@ describe("ToolCallItemPane", () => {
     expect(screen.getByText("Book a flight")).toBeInTheDocument();
   });
 
-  it("says the agent made no tool call and marks only that line as what is judged", () => {
+  it("says under the conversation that the agent made no tool call, without making it a turn", () => {
     render(
       <ToolCallItemPane
         payload={{
@@ -43,9 +43,9 @@ describe("ToolCallItemPane", () => {
         }}
       />,
     );
-    expect(screen.getByText("The agent made no tool call")).toBeInTheDocument();
-    expect(screen.getByText("Agent's answer")).toBeInTheDocument();
-    expect(screen.getAllByText("Evaluation target")).toHaveLength(1);
+    expect(screen.getByText("The agent made no tool call").tagName).toBe("P");
+    expect(screen.queryByText("Agent's answer")).not.toBeInTheDocument();
+    expect(screen.queryByText("Evaluation target")).not.toBeInTheDocument();
   });
 
   it("renders the agent's actual tool call", () => {

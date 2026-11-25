@@ -350,17 +350,26 @@ export function AssignAnnotatorsDialog({
   // Each kind of chosen item needs at least one label that fits it, when the
   // task has one to offer.
   const offeredLabels = [...lockedEvaluators, ...choosableEvaluators];
-  const evaluatorSelectionValid = [
+  const kindsMissingLabel = [
     { isToolCall: true, chosen: hasToolCallItems },
     { isToolCall: false, chosen: hasNonToolCallItems },
-  ].every(
+  ].filter(
     ({ isToolCall, chosen }) =>
-      !chosen ||
-      !offeredLabels.some((ev) =>
+      chosen &&
+      offeredLabels.some((ev) =>
         evaluatorFitsItem(ev.evaluator_type, isToolCall),
-      ) ||
-      shownLabels.some((ev) => evaluatorFitsItem(ev.evaluator_type, isToolCall)),
+      ) &&
+      !shownLabels.some((ev) =>
+        evaluatorFitsItem(ev.evaluator_type, isToolCall),
+      ),
   );
+  const evaluatorSelectionValid = kindsMissingLabel.length === 0;
+  const missingLabelMessage =
+    kindsMissingLabel.length === 1 && hasToolCallItems && hasNonToolCallItems
+      ? `Pick at least one label for the ${
+          kindsMissingLabel[0].isToolCall ? "tool-call items" : "other items"
+        }`
+      : "Pick at least one label";
   const allEvaluatorsPicked =
     choosableEvaluators.length > 0 &&
     pickedEvaluators.size === choosableEvaluators.length;
@@ -769,6 +778,9 @@ export function AssignAnnotatorsDialog({
                     </div>
                   ))}
                 </div>
+                {!evaluatorSelectionValid && (
+                  <p className="text-xs text-red-500">{missingLabelMessage}</p>
+                )}
               </div>
             )}
 

@@ -1170,6 +1170,9 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     await user.click(screen.getByRole("checkbox", { name: "Alice" }));
     await user.click(screen.getByRole("checkbox", { name: "Unselect all labels" }));
     expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
+    expect(
+      screen.getByText("Pick at least one label for the other items"),
+    ).toBeInTheDocument();
   });
 
   it("needs a label for the tool-call items when only custom ones are offered", async () => {
@@ -1183,5 +1186,18 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     await user.click(screen.getByRole("checkbox", { name: "Alice" }));
     await user.click(screen.getByRole("checkbox", { name: /Right arguments/ }));
     expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
+    expect(
+      screen.getByText("Pick at least one label for the tool-call items"),
+    ).toBeInTheDocument();
+  });
+
+  it("asks for a label without naming a kind when only one kind is chosen", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+    expect(screen.queryByText(/Pick at least one label/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "Unselect all labels" }));
+    expect(screen.getByText("Pick at least one label")).toBeInTheDocument();
   });
 });

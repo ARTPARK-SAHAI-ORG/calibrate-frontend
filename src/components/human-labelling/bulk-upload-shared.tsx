@@ -12,7 +12,6 @@ import type { BulkContentColumn } from "./BulkUploadItemsDialog";
 import { AddAnnotatorInline } from "./AddAnnotatorInline";
 import { humaniseNameConflictDetail } from "./itemNameConflict";
 import { isPlainObject } from "./itemConversation";
-import type { ExpectedToolCall } from "@/components/ToolCallExpectationsEditor";
 
 // ─── Shared types ─────────────────────────────────────────────────────────
 
@@ -1485,10 +1484,12 @@ export function FormatHelpToggle({
   );
 }
 
-type BulkToolCall = Pick<ExpectedToolCall, "tool"> &
-  Partial<Pick<ExpectedToolCall, "arguments" | "accept_any_arguments">> & {
-    output?: unknown;
-  };
+type BulkToolCall = {
+  tool: string;
+  arguments?: Record<string, any>;
+  accept_any_arguments?: boolean;
+  output?: unknown;
+};
 
 const TOOL_CALL_KEYS: Record<string, string[]> = {
   actual_tool_calls: ["tool", "arguments", "output"],

@@ -54,13 +54,6 @@ export function ToolCallItemPane({
       label: hasReply ? "Agent's tool calls" : AGENT_ANSWER,
     });
   }
-  if (!hasReply && !hasCalls && history.length > 0) {
-    history.push({
-      role: "assistant",
-      content: NO_TOOL_CALL,
-      label: AGENT_ANSWER,
-    });
-  }
 
   if (history.length === 0) {
     return (
@@ -79,9 +72,12 @@ export function ToolCallItemPane({
     <TestDetailView
       history={history}
       passed={true}
-      highlightEvalTarget={hasReply && hasCalls ? 2 : true}
+      highlightEvalTarget={hasReply && hasCalls ? 2 : hasReply || hasCalls}
       afterHistory={
         <>
+          {!hasReply && !hasCalls && (
+            <p className="text-sm text-muted-foreground">{NO_TOOL_CALL}</p>
+          )}
           {hasReply && hasCalls && <JudgedTogetherNote />}
           <ExpectedToolCalls payload={payload} />
         </>

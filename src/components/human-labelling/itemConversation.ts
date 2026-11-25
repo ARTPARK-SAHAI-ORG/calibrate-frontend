@@ -125,7 +125,9 @@ export const DEFAULT_WEBHOOK_RESPONSE =
 export const DEFAULT_STRUCTURED_RESPONSE = '{\n  "status": "received"\n}';
 
 // How the item dialogs show a saved argument value in their one-line text
-// box, which drops line breaks, so objects are written on one line.
+// box, which drops line breaks, so objects are written on one line. Null is
+// written out because these rows have no null switch, unlike the expected
+// call editor's expectedValueToString.
 function argumentText(value: unknown): string {
   if (value === null) return "null";
   if (value === undefined) return "";
@@ -418,7 +420,12 @@ export function historyToPayloadFields(
       };
     }),
   );
-  const calls: ToolCallRecord[] = read.map(
+  const restored = restoreToolCalls(
+    read,
+    before,
+    read.map((r) => r.storedAt),
+  );
+  const calls: ToolCallRecord[] = restored.map(
     ({ tool, arguments: args, content, storedAt }) => {
       const prior = storedCall(before, storedAt);
       const priorOutput = prior?.output;
@@ -441,7 +448,7 @@ export function historyToPayloadFields(
       }
       return {
         tool,
-        arguments: prior ? restoreArguments(args, prior.args) : args,
+        arguments: args,
         ...(output !== undefined ? { output } : {}),
       };
     },

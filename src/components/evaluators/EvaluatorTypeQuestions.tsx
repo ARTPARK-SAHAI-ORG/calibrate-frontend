@@ -127,11 +127,7 @@ export function EvaluatorTypeQuestions({
   const textPossible = conversationKinds.length > 0 || hasSingle || hasToolCall;
   // The answers left once the reader has said what kind of text it is.
   const finalKinds = (kind: TextKind): TextEvaluatorType[] => [
-    ...(kind === "single"
-      ? hasSingle
-        ? [SINGLE_KIND]
-        : []
-      : conversationKinds),
+    ...(kind === "single" ? [SINGLE_KIND] : conversationKinds),
     ...(hasToolCall ? [TOOL_CALL_KIND] : []),
   ];
 
@@ -177,7 +173,7 @@ export function EvaluatorTypeQuestions({
     const kinds = finalKinds(next);
     // The tool calls are offered under both kinds of text, so that choice
     // stays when the reader moves between them.
-    if (value === TOOL_CALL_KIND && kinds.includes(TOOL_CALL_KIND)) return;
+    if (value === TOOL_CALL_KIND) return;
     onChange(kinds.length === 1 ? kinds[0] : null);
   };
 

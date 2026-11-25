@@ -13,11 +13,7 @@ import { JudgedTogetherNote, NO_TOOL_CALL } from "./ToolCallItemPane";
 /**
  * Renders a general (non-conversational) "llm-general" evaluation item.
  *
- * The backend payload shape for this task type is
- * `{ name, input, output }` plus the agent's calls in `actual_tool_calls` or
- * `tool_calls` (plus an optional `evaluator_variables` map for per-item
- * `{{variable}}` substitution, which isn't shown here — it feeds the
- * evaluator prompt, not the displayed item).
+ * The agent's calls are in `actual_tool_calls`, or in `tool_calls` when there is no reply.
  * `input` and `output` are a string or `{ content, label?, versions? }`.
  * A tool-call test usually has an empty `output` and the calls the agent made
  * in `actual_tool_calls`, drawn the same way the run results screen draws

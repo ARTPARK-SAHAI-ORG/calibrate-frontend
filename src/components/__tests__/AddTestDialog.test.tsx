@@ -1813,6 +1813,38 @@ describe("AddTestDialog", () => {
       expect(ids[1]).toBe("actual-call-0");
     });
 
+    it("saves a conversation item's last tool call with a new id, like its earlier calls", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...labelProps({
+            onSubmit,
+            requireAssistantLastMessage: false,
+            initialConfig: endsOnToolCall,
+            initialEvaluators: [
+              {
+                evaluator_uuid: "ev-tone",
+                name: "Tone",
+                slug: null,
+                evaluator_type: "conversation",
+                variables: [],
+                variable_values: {},
+              },
+            ],
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Weather in Pune?")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: "Create" }));
+      const call = onSubmit.mock.calls[0][0].history.find(
+        (h: { tool_calls?: unknown[] }) => h.tool_calls,
+      );
+      expect(call.tool_calls[0].id.startsWith("actual-call-")).toBe(false);
+    });
+
     it("explains that an earlier tool call is not the agent's answer when there is no reply", async () => {
       const history = endsOnToolCall.history!;
       render(

@@ -97,22 +97,19 @@ export function ineligibleReasonCopy(
  * text ends with "in the", because the caller follows it with a link to the
  * Evaluators tab.
  */
-export function nothingCanScoreCopy(ineligible: { reason: string }[]): string {
+export function nothingCanScoreCopy(
+  ineligible: { reason: TraceScoringIneligibleReason }[],
+): string {
   if (ineligible.length === 0) {
     return "This agent has no evaluators, so its traces are not scored. Add one in the";
   }
-  const reasons = [...new Set(ineligible.map((item) => item.reason))];
-  const known = reasons.flatMap(
-    (reason) =>
-      NOTHING_CAN_SCORE_BY_REASON[reason as TraceScoringIneligibleReason] ?? [],
+  const copies = [...new Set(ineligible.map((item) => item.reason))].map(
+    (reason) => NOTHING_CAN_SCORE_BY_REASON[reason],
   );
-  if (reasons.length === 1 && known.length === 1) {
-    return `${known[0].every} ${known[0].fix}`;
+  if (copies.length === 1) {
+    return `${copies[0].every} ${copies[0].fix}`;
   }
-  const why = known.length
-    ? `None of this agent's evaluators can score traces: ${known.map((copy) => copy.some).join(", ")}.`
-    : "None of this agent's evaluators can score traces.";
-  return `${why} Add an evaluator that can score traces in the`;
+  return `None of this agent's evaluators can score traces: ${copies.map((copy) => copy.some).join(", ")}. Add an evaluator that can score traces in the`;
 }
 
 /**
