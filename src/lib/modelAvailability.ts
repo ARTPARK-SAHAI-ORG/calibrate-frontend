@@ -66,6 +66,16 @@ export function blocksUse(problem: ModelProblem | null): boolean {
   return problem !== null && problem.kind !== "soon";
 }
 
+/** The border for a box showing a model with this problem: red when it
+ *  cannot be used, amber when it is being removed, or `fallback`. */
+export function modelProblemBorder(
+  problem: ModelProblem | null,
+  fallback = "border-border",
+): string {
+  if (!problem) return fallback;
+  return blocksUse(problem) ? "border-red-500/60" : "border-amber-500/60";
+}
+
 /** "11 December 2026", or "11 Dec" when `short`. Read as a calendar date, so
  *  no time zone moves it a day. */
 export function formatRemovalDate(isoDate: string, short = false): string {

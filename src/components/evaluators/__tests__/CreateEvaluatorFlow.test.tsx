@@ -33,6 +33,7 @@ jest.mock("../CreateEvaluatorSidebar", () => ({
     systemPrompt,
     createNameError,
     nameInputRef,
+    judgeModel,
   }: {
     isOpen: boolean;
     onCreate: () => void;
@@ -42,10 +43,12 @@ jest.mock("../CreateEvaluatorSidebar", () => ({
     systemPrompt: string;
     createNameError: string | null;
     nameInputRef?: React.RefObject<HTMLInputElement | null>;
+    judgeModel: { id: string; name: string } | null;
   }) =>
     isOpen ? (
       <div data-testid="create-sidebar">
         <span data-testid="prompt-field">{systemPrompt}</span>
+        <span data-testid="judge-model">{judgeModel?.name}</span>
         <input
           aria-label="Name"
           ref={nameInputRef}
@@ -308,6 +311,10 @@ describe("CreateEvaluatorFlow", () => {
         />,
       );
 
+      // The copy shows the model's name from the model list, and saves its id.
+      expect(await screen.findByTestId("judge-model")).toHaveTextContent(
+        "GPT-4",
+      );
       await user.click(await screen.findByText("Submit create"));
 
       await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));

@@ -191,7 +191,6 @@ async function fetchModelsFromOpenRouter(
       name: model.name,
       inputModalities,
       outputModalities,
-      ...(model.expiration_date ? { expiresOn: model.expiration_date } : {}),
     });
   }
 

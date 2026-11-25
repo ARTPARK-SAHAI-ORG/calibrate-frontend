@@ -3,8 +3,6 @@ export type LLMModel = {
   name: string;
   inputModalities?: string[];
   outputModalities?: string[];
-  /** The day OpenRouter will stop serving it, when one is set. */
-  expiresOn?: string;
 };
 
 export type LLMProvider = {

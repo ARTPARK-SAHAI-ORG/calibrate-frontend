@@ -20,8 +20,8 @@ import {
 import { useModelAvailability } from "@/hooks/useModelAvailability";
 import { ModelProblemNote } from "@/components/ModelProblemNote";
 import {
-  blocksUse,
   modelProblem,
+  modelProblemBorder,
   resolveSavedModel,
 } from "@/lib/modelAvailability";
 import { JUDGE_PROVIDER_SLUGS } from "@/constants/judgeProviders";
@@ -1414,11 +1414,7 @@ function EvaluatorDetailPageInner() {
                         className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent flex items-center justify-between cursor-pointer transition-colors ${
                           newVersionValidated && !newVersionJudgeModel
                             ? "border-red-500"
-                            : newVersionJudgeProblem
-                              ? blocksUse(newVersionJudgeProblem)
-                                ? "border-red-500/60"
-                                : "border-amber-500/60"
-                              : "border-border"
+                            : modelProblemBorder(newVersionJudgeProblem)
                         }`}
                       >
                         <span

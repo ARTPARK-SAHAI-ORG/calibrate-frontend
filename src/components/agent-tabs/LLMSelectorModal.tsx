@@ -9,7 +9,6 @@ import { useModelAvailability } from "@/hooks/useModelAvailability";
 import {
   blocksUse,
   formatRemovalDate,
-  isPastRemovalDate,
   modelProblem,
 } from "@/lib/modelAvailability";
 
@@ -172,25 +171,28 @@ export function LLMSelectorModal({
                 <h3 className="px-4 py-2 text-sm font-medium text-muted-foreground">
                   {provider.name}
                 </h3>
-                {provider.models.map((model) => (
-                  <button
-                    key={model.id}
-                    onClick={() => handleSelect(model)}
-                    className={`w-full px-4 py-3 flex items-center gap-2.5 hover:bg-muted/50 transition-colors cursor-pointer ${
-                      selectedLLM?.id === model.id ? "bg-muted/50" : ""
-                    }`}
-                  >
-                    <span className="text-base font-medium text-foreground">
-                      {model.name}
-                    </span>
-                    {model.expiresOn && !isPastRemovalDate(model.expiresOn) && (
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-500/12 text-amber-700 dark:text-amber-300">
-                        Will be removed on{" "}
-                        {formatRemovalDate(model.expiresOn, true)}
+                {provider.models.map((model) => {
+                  const problem = modelProblem(model.id, availability);
+                  return (
+                    <button
+                      key={model.id}
+                      onClick={() => handleSelect(model)}
+                      className={`w-full px-4 py-3 flex items-center gap-2.5 hover:bg-muted/50 transition-colors cursor-pointer ${
+                        selectedLLM?.id === model.id ? "bg-muted/50" : ""
+                      }`}
+                    >
+                      <span className="text-base font-medium text-foreground">
+                        {model.name}
                       </span>
-                    )}
-                  </button>
-                ))}
+                      {problem?.kind === "soon" && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-500/12 text-amber-700 dark:text-amber-300">
+                          Will be removed on{" "}
+                          {formatRemovalDate(problem.expiresOn, true)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             ))
           )}

@@ -35,12 +35,13 @@ jest.mock("../../hooks", () => ({
 }));
 
 let mockAvailability: ModelAvailability | null = null;
-const mockServerCalls: boolean[] = [];
+// Behaves like the real hook: the privacy list only applies when the
+// server itself calls the model.
 jest.mock("../../hooks/useModelAvailability", () => ({
-  useModelAvailability: (serverCalls: boolean) => {
-    mockServerCalls.push(serverCalls);
-    return mockAvailability;
-  },
+  useModelAvailability: (serverCalls: boolean) =>
+    mockAvailability && !serverCalls
+      ? { ...mockAvailability, privacyAllowed: null }
+      : mockAvailability,
 }));
 
 jest.mock("../../lib/reportError", () => ({
@@ -1149,12 +1150,36 @@ describe("BenchmarkDialog", () => {
       ).toBeEnabled();
     });
 
-    it("leaves the privacy setting out for a connection agent, whose own server calls the models", async () => {
-      mockServerCalls.length = 0;
+    it("blocks a model the privacy setting rules out for a built agent, but not for a connection agent", async () => {
+      // Both models are on OpenRouter; only one has a provider that keeps no
+      // copy of the data.
+      mockAvailability = {
+        models: new Map([
+          ["openai/gpt-4o", { expiresOn: null }],
+          ["openai/gpt-retired", { expiresOn: null }],
+        ]),
+        privacyAllowed: new Set(["openai/gpt-4o"]),
+      };
+      const privacyLine = /cannot be used with this workspace/;
+
+      const { unmount } = render(<BenchmarkDialog {...props} />);
+      const blocked = await screen.findByRole("button", {
+        name: "openai/gpt-retired",
+      });
+      expect(blocked.className).toContain("border-red-500/60");
+      expect(screen.getByText(privacyLine)).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Run comparison/ }),
+      ).toBeDisabled();
+      unmount();
+
+      // A connection agent's own server calls the model with its own keys.
       render(<BenchmarkDialog {...props} agentType="connection" />);
-      await screen.findByRole("button", { name: "openai/gpt-retired" });
-      expect(mockServerCalls).toContain(false);
-      expect(mockServerCalls).not.toContain(true);
+      const row = await screen.findByRole("button", {
+        name: "openai/gpt-retired",
+      });
+      expect(row.className).not.toContain("border-red-500/60");
+      expect(screen.queryByText(privacyLine)).not.toBeInTheDocument();
     });
 
     it("only warns in amber about a model to be removed later", async () => {

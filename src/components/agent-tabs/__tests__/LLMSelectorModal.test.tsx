@@ -329,10 +329,7 @@ describe("LLMSelectorModal", () => {
       providers: [
         {
           ...providers[0],
-          models: [
-            { ...providers[0].models[0], expiresOn: "2999-12-11" },
-            { ...providers[0].models[1], expiresOn: "2000-01-01" },
-          ],
+          models: [providers[0].models[0], providers[0].models[1]],
         },
         providers[1],
       ],
@@ -349,7 +346,7 @@ describe("LLMSelectorModal", () => {
       />,
     );
     expect(screen.getByText("Will be removed on 11 Dec")).toBeInTheDocument();
-    // A past date gets no pill.
+    // A model with no removal date gets no tag.
     expect(screen.getAllByText(/Will be removed on/)).toHaveLength(1);
     expect(screen.queryByText("Claude")).not.toBeInTheDocument();
     expect(mockAvailability).toHaveBeenLastCalledWith(true);

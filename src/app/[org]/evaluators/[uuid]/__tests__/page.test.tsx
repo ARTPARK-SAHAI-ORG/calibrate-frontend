@@ -41,8 +41,9 @@ jest.mock("../../../../../hooks", () => ({
   // each test lines up for the page.
   useOpenRouterModels: () => ({ providers: [], availability: null }),
 }));
+let mockModelAvailability: unknown = null;
 jest.mock("../../../../../hooks/useModelAvailability", () => ({
-  useModelAvailability: () => null,
+  useModelAvailability: () => mockModelAvailability,
 }));
 
 const toastError = jest.fn();
@@ -86,7 +87,12 @@ jest.mock("../../../../../components/charts/AgreementTrendChart", () => ({
     points,
     renderHover,
   }: {
-    points: { key: string; label: string; agreement: number | null; live?: boolean }[];
+    points: {
+      key: string;
+      label: string;
+      agreement: number | null;
+      live?: boolean;
+    }[];
     renderHover?: (key: string, label: string) => React.ReactNode;
   }) => (
     <div data-testid="trend-chart">
@@ -368,6 +374,32 @@ describe("evaluator page header actions", () => {
   });
 });
 
+describe("a judge model that cannot be used", () => {
+  afterEach(() => {
+    mockModelAvailability = null;
+  });
+
+  it("says so under the current version, and how to move off it", async () => {
+    // OpenRouter no longer lists the current version's model.
+    mockModelAvailability = {
+      models: new Map([["anthropic/claude-sonnet-4", { expiresOn: null }]]),
+      privacyAllowed: null,
+    };
+    render(<EvaluatorDetailPage />);
+    expect(
+      await screen.findByText(
+        "This model is no longer available. Create a new version with another model.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing while the model list has not loaded", async () => {
+    render(<EvaluatorDetailPage />);
+    await screen.findByText("Grade the reply");
+    expect(screen.queryByText(/no longer available/)).toBeNull();
+  });
+});
+
 describe("the versions and the one on screen", () => {
   it("opens on the current version and shows only its details", async () => {
     render(<EvaluatorDetailPage />);
@@ -621,7 +653,9 @@ describe("the Agreement tab", () => {
       /^v1 0.8 live$/,
     );
     const hover = screen.getByTestId("hover-ver-1");
-    expect(within(hover).getByTestId("hover-label")).toHaveTextContent("v1Live");
+    expect(within(hover).getByTestId("hover-label")).toHaveTextContent(
+      "v1Live",
+    );
     expect(hover).toHaveTextContent("80%Kappa0.50");
     // The hover uses the roomier cell, with a larger number than the table.
     expect(within(hover).getByText("80%").className).toContain("text-base");
@@ -679,4 +713,3 @@ describe("the Agreement tab", () => {
     expect(within(hover).getByTestId("chance-tick").style.left).toBe("50%");
   });
 });
-

@@ -10,7 +10,7 @@ import { LLMSelectorModal } from "./LLMSelectorModal";
 import { useEnabledProviders, isProviderEnabled } from "@/hooks";
 import { useModelAvailability } from "@/hooks/useModelAvailability";
 import { ModelProblemNote } from "@/components/ModelProblemNote";
-import { blocksUse, modelProblem } from "@/lib/modelAvailability";
+import { modelProblem, modelProblemBorder } from "@/lib/modelAvailability";
 
 export type { LLMModel };
 
@@ -204,7 +204,7 @@ export function AgentTabContent({
             <div className="mt-2 md:mt-3">
               <button
                 onClick={() => setLlmModalOpen(true)}
-                className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border ${llmProblem ? (blocksUse(llmProblem) ? "border-red-500/60" : "border-amber-500/60") : "border-border"} bg-background hover:bg-muted/50 flex items-center justify-between cursor-pointer transition-colors`}
+                className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border ${modelProblemBorder(llmProblem)} bg-background hover:bg-muted/50 flex items-center justify-between cursor-pointer transition-colors`}
               >
                 <span
                   className={

@@ -291,7 +291,7 @@ describe("useOpenRouterModels", () => {
       "mistralai/mixtral": { expiresOn: null },
     });
     expect(result.current.providers[0].models).toEqual([
-      expect.objectContaining({ id: "openai/future", expiresOn: "2999-01-01" }),
+      expect.objectContaining({ id: "openai/future" }),
     ]);
   });
 

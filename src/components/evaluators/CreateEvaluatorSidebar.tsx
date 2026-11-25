@@ -3,7 +3,7 @@
 import { InfoNote } from "@/components/ui";
 import { ModelProblemNote } from "@/components/ModelProblemNote";
 import { useModelAvailability } from "@/hooks/useModelAvailability";
-import { blocksUse, modelProblem } from "@/lib/modelAvailability";
+import { modelProblem, modelProblemBorder } from "@/lib/modelAvailability";
 import type { Dispatch, SetStateAction } from "react";
 import {
   EVALUATOR_TYPE_LABELS,
@@ -245,11 +245,7 @@ export function CreateEvaluatorSidebar({
               className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent flex items-center justify-between cursor-pointer transition-colors ${
                 validationAttempted && !judgeModel
                   ? "border-red-500"
-                  : judgeProblem
-                    ? blocksUse(judgeProblem)
-                      ? "border-red-500/60"
-                      : "border-amber-500/60"
-                    : "border-border"
+                  : modelProblemBorder(judgeProblem)
               }`}
             >
               <span
