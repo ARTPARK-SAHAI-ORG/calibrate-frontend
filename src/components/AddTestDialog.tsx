@@ -38,6 +38,7 @@ import {
 import { OpenToolButton } from "@/components/tools/OpenToolButton";
 import { applyToolEditToMessages } from "@/lib/toolEditsInForm";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import {
   DEFAULT_STRUCTURED_RESPONSE,
   DEFAULT_WEBHOOK_RESPONSE,
@@ -131,6 +132,7 @@ export type AttachedEvaluatorInit = {
   slug: string | null;
   variables: EvaluatorVariableDef[];
   variable_values?: Record<string, string> | null;
+  evaluator_type?: string;
 };
 
 export type EvaluatorRefPayload = {
@@ -145,6 +147,7 @@ type AttachedEvaluator = {
   slug: string | null;
   variables: EvaluatorVariableDef[];
   variable_values: Record<string, string>;
+  evaluator_type?: string;
 };
 
 type LLMEvaluatorOption = {
@@ -1490,6 +1493,7 @@ export function AddTestDialog({
             e.variables ?? [],
             e.variable_values ?? undefined,
           ),
+          evaluator_type: e.evaluator_type,
         })),
       );
       setAttachedEvaluatorsInitialized(true);
@@ -1910,7 +1914,7 @@ export function AddTestDialog({
     if (!isEvaluatorTab) return [];
     return attachedEvaluators.map((e) => {
       const ref: EvaluatorRefPayload = { evaluator_uuid: e.evaluator_uuid };
-      if (e.variables.length > 0) {
+      if (e.variables.length > 0 && evaluatorFits(e)) {
         ref.variable_values = { ...e.variable_values };
       }
       return ref;
@@ -1951,6 +1955,7 @@ export function AddTestDialog({
   const hasUnfilledEvaluatorVariables = () => {
     if (!isEvaluatorTab) return false;
     for (const e of attachedEvaluators) {
+      if (!evaluatorFits(e)) continue;
       for (const v of e.variables) {
         const value = e.variable_values[v.name];
         if (typeof value !== "string" || value.trim().length === 0) {
@@ -2059,6 +2064,9 @@ export function AddTestDialog({
         return;
       }
       if (hasUnfilledEvaluatorVariables()) {
+        setToolValidationError(
+          "Fill in every value under Evaluators before saving.",
+        );
         return;
       }
       if (showsExpectedToolCalls && selectedToolsInvalid()) return;
@@ -2188,10 +2196,9 @@ export function AddTestDialog({
     onNext: showRunUnsavedConfirm || roleChange ? undefined : navNext,
   });
 
-  // Where the graded answer starts: the agent's last message, or the run of
-  // tool calls (with their responses) it ended on, together with the message
-  // just before them when that is the agent's. -1 when there is neither.
-  const evalTargetStartIndex = () => {
+  // Where the run of tool calls (with their responses) the conversation ends
+  // on starts. -1 when it does not end on a tool call.
+  const trailingToolCallsStart = () => {
     let start = chatMessages.length;
     while (
       start > 0 &&
@@ -2200,7 +2207,28 @@ export function AddTestDialog({
     ) {
       start -= 1;
     }
-    if (chatMessages.slice(start).some((m) => m.role === "tool_call")) {
+    return chatMessages.slice(start).some((m) => m.role === "tool_call")
+      ? start
+      : -1;
+  };
+
+  // An llm item is a tool-call item when it ends on the agent's tool calls or
+  // has expected tool calls. Only tool-call evaluators score such an item,
+  // and only the others score the rest, so values are asked for the
+  // evaluators that score this item and no others.
+  const isToolCallItem =
+    showsExpectedToolCalls &&
+    (trailingToolCallsStart() >= 0 || selectedTools.length > 0);
+  const evaluatorFits = (e: { evaluator_type?: string }) =>
+    !showsExpectedToolCalls ||
+    evaluatorFitsItem(e.evaluator_type, isToolCallItem);
+
+  // Where the graded answer starts: the agent's last message, or the run of
+  // tool calls (with their responses) it ended on, together with the message
+  // just before them when that is the agent's. -1 when there is neither.
+  const evalTargetStartIndex = () => {
+    const start = trailingToolCallsStart();
+    if (start >= 0) {
       return chatMessages[start - 1]?.role === "agent" ? start - 1 : start;
     }
     return chatMessages[chatMessages.length - 1]?.role === "agent"
@@ -2649,7 +2677,7 @@ export function AddTestDialog({
                 does not carry it. */}
             <div
               className={`flex items-start justify-between gap-2 ${
-                ev.variables.length > 0 ? "mb-3" : ""
+                ev.variables.length > 0 || !evaluatorFits(ev) ? "mb-3" : ""
               }`}
             >
               {/* Opens the prompt on top, so how this
@@ -2699,7 +2727,14 @@ export function AddTestDialog({
               )}
             </div>
 
-            {ev.variables.length > 0 && (
+            {!evaluatorFits(ev) && (
+              <p className="text-xs text-muted-foreground">
+                {isToolCallItem
+                  ? "Does not score tool calls, so it is skipped for this item."
+                  : "Only scores tool calls, so it is skipped for this item."}
+              </p>
+            )}
+            {ev.variables.length > 0 && evaluatorFits(ev) && (
               <div className="space-y-3">
                 {ev.variables.map((v) => {
                   // Uniform rendering for every evaluator variable:

@@ -2202,6 +2202,7 @@ function LabellingTaskPageInner() {
         slug: ev.slug ?? null,
         variables,
         variable_values: saved,
+        evaluator_type: ev.evaluator_type,
       };
     });
   };
