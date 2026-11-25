@@ -1195,9 +1195,9 @@ describe("BenchmarkDialog", () => {
       expect(
         await screen.findByText(/will be removed on 1 January 2999/),
       ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "openai/gpt-retired" }).className,
-      ).not.toContain("border-red-500/60");
+      const row = screen.getByRole("button", { name: "openai/gpt-retired" });
+      expect(row.className).not.toContain("border-red-500/60");
+      expect(row.className).toContain("border-amber-500/60");
       expect(
         screen.getByRole("button", { name: /Run comparison/ }),
       ).toBeEnabled();
@@ -1236,6 +1236,14 @@ describe("BenchmarkDialog", () => {
         screen.getAllByRole("button", { name: "Remove model" }),
       ).toHaveLength(2);
       expect(screen.getAllByText("Select a model")).toHaveLength(1);
+
+      // The question before starting names the models too, not their ids.
+      await setupUser().click(
+        screen.getByRole("button", { name: /Run comparison/ }),
+      );
+      expect(
+        await screen.findByText(/with GPT-4o, Claude 3 Haiku\./),
+      ).toBeInTheDocument();
     });
 
     it("still shows a row for a model that is no longer offered, named by its id", async () => {

@@ -26,6 +26,7 @@ import { useModelAvailability } from "@/hooks/useModelAvailability";
 import {
   blocksUse,
   modelProblem,
+  modelProblemBorder,
   resolveSavedModel,
 } from "@/lib/modelAvailability";
 import {
@@ -418,7 +419,10 @@ export function BenchmarkDialog({
     }));
   };
 
-  const chosenModels = selectedModels.filter((m): m is LLMModel => m !== null);
+  // Stored by id until the model list arrives, so the names come from the list.
+  const chosenModels = selectedModels
+    .filter((m): m is LLMModel => m !== null)
+    .map((m) => resolveSavedModel(m.id, llmProviders));
   // The same rule `handleRunBenchmark` runs on: a connection agent has to pass
   // a check with each model it has not been verified with yet, so the question
   // says so before the reader agrees to it.
@@ -672,11 +676,13 @@ export function BenchmarkDialog({
                     <button
                       onClick={() => openModelSelector(index)}
                       className={`flex-1 h-10 px-4 rounded-md text-sm border flex items-center cursor-pointer transition-colors ${
-                        blocksUse(rowProblems[index])
-                          ? "border-red-500/60 bg-red-500/5 font-medium"
-                          : selectedModel
-                            ? "border-border bg-muted font-medium hover:bg-muted/70"
-                            : "border-border border-dashed bg-background hover:bg-muted/50"
+                        !selectedModel
+                          ? "border-border border-dashed bg-background hover:bg-muted/50"
+                          : `${modelProblemBorder(rowProblems[index])} font-medium ${
+                              blocksUse(rowProblems[index])
+                                ? "bg-red-500/5"
+                                : "bg-muted hover:bg-muted/70"
+                            }`
                       }`}
                     >
                       <span
