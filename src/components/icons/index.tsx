@@ -118,6 +118,17 @@ export function CheckIcon({ className }: IconProps) {
   );
 }
 
+// Dots Icon (three in a row) — a menu of more actions
+export function DotsIcon({ className }: IconProps) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <circle cx="5" cy="12" r="1.75" />
+      <circle cx="12" cy="12" r="1.75" />
+      <circle cx="19" cy="12" r="1.75" />
+    </svg>
+  );
+}
+
 // Copy Icon (two stacked sheets) — duplicate actions
 export function CopyIcon({ className }: IconProps) {
   return (

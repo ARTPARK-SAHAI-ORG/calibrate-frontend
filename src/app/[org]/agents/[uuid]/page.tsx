@@ -8,11 +8,11 @@ import { useSidebarState } from "@/lib/sidebar";
 import {
   SpinnerIcon,
   CheckCircleIcon,
-  CopyIcon,
   SaveIcon,
 } from "@/components/icons";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
 import { AgentChatLinkControl } from "@/components/chat/AgentChatLinkControl";
+import { AgentMoreMenu } from "@/components/AgentMoreMenu";
 import { Breadcrumbs, InteractionTypePill, type Crumb } from "@/components/ui";
 
 // Map tab IDs to display names for page title
@@ -86,20 +86,14 @@ export default function AgentDetailPage() {
   const headerActions =
     headerState && !headerState.isLoading && !headerState.hasError ? (
       <div className="flex items-center gap-2 mr-1 md:mr-2">
-        {/* No room beside Duplicate and Save on a phone. */}
+        {/* No room beside the more menu and Save on a phone. */}
         <div className="hidden md:block">
           <AgentChatLinkControl
             agentUuid={uuid}
             connectionUnverified={headerState.isConnectionUnverified}
           />
         </div>
-        <button
-          onClick={() => headerState.onDuplicate()}
-          className="h-8 px-3 md:px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background text-foreground hover:bg-accent transition-colors cursor-pointer flex items-center gap-2"
-        >
-          <CopyIcon className="w-4 h-4" />
-          Duplicate
-        </button>
+        <AgentMoreMenu onDuplicate={() => headerState.onDuplicate()} />
         {headerState.isConnectionUnverified &&
           headerState.activeTab !== "connection" && (
             <div className="relative">
