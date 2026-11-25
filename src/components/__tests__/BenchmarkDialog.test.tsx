@@ -1160,7 +1160,7 @@ describe("BenchmarkDialog", () => {
         ]),
         privacyAllowed: new Set(["openai/gpt-4o"]),
       };
-      const privacyLine = /cannot be used with this workspace/;
+      const privacyLine = /This model cannot be used\. Remove it/;
 
       const { unmount } = render(<BenchmarkDialog {...props} />);
       const blocked = await screen.findByRole("button", {

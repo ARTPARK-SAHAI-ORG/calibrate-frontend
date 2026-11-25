@@ -25,7 +25,7 @@ describe("ModelProblemNote", () => {
     render(<ModelProblemNote problem={{ kind: "privacy" }} nextStep={nextStep} />);
     expect(
       screen.getByText(
-        `This model cannot be used with this workspace’s privacy settings. ${step}`,
+        `This model cannot be used. ${step}`,
       ),
     ).toBeInTheDocument();
   });

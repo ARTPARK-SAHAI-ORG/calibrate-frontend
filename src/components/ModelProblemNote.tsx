@@ -38,7 +38,7 @@ export function ModelProblemNote({
   return (
     <ErrorNote className={className}>
       {problem.kind === "privacy"
-        ? "This model cannot be used with this workspace’s privacy settings."
+        ? "This model cannot be used."
         : "This model is no longer available."}{" "}
       {NEXT_STEP[nextStep]}
     </ErrorNote>
