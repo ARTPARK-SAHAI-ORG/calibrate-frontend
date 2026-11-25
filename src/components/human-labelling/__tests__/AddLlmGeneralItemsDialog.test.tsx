@@ -849,7 +849,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     ]);
   });
 
-  it("keeps a phone number as text and only converts true, false and null", async () => {
+  it("keeps text typed into a stored text value as text", async () => {
     const user = setupUser();
     const { onSubmit } = renderDialog({
       mode: "edit",
@@ -862,7 +862,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
           toolCalls: [
             {
               tool: "dummy",
-              arguments: { phone: "", success: true, note: "" },
+              arguments: { phone: "", success: true, note: "", flag: "true" },
             },
           ],
         },
@@ -875,7 +875,12 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
       {
         tool: "dummy",
-        arguments: { phone: "9876543210", success: true, note: null },
+        arguments: {
+          phone: "9876543210",
+          success: true,
+          note: "null",
+          flag: "true",
+        },
       },
     ]);
   });
@@ -1134,7 +1139,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     await user.click(screen.getByRole("button", { name: "Save item" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
-      { tool: "send_email", arguments: { body: '{"to":"a"}' } },
+      { tool: "send_email", arguments: { body: { to: "a" } } },
     ]);
   });
 

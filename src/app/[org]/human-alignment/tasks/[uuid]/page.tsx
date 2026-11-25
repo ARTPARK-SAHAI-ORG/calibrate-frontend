@@ -3606,7 +3606,7 @@ function LabellingTaskPageInner() {
               ...descriptionField,
               ...historyToPayloadFields(history, taskType, existingPayload),
               expected_tool_calls: keepList(
-                existingPayload?.expected_tool_calls,
+                existingPayload.expected_tool_calls,
                 config.evaluation.tool_calls ?? [],
               ),
               evaluator_variables,

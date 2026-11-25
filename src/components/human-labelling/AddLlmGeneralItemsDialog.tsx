@@ -43,11 +43,9 @@ import {
 } from "./MetadataFieldsEditor";
 import { parseItemNameConflictFromError } from "./itemNameConflict";
 import {
-  argumentText,
-  hasArgumentGroups,
+  argumentRows,
   isPlainObject,
   restoreToolCalls,
-  WEBHOOK_GROUPS,
 } from "./itemConversation";
 import {
   DiscardChangesDialog,
@@ -97,38 +95,22 @@ type DraftToolCall = {
  * on a tool that is not a webhook. */
 function ungroupParams(params: ToolCallParam[]): ToolCallParam[] {
   if (!params.some((p) => p.group)) return params;
-  return Object.entries(paramsToArgs(params)).map(([name, value]) => ({
-    name,
-    value: argumentText(value),
-  }));
+  return argumentRows(paramsToArgs(params), false);
 }
 
 /** The typed-in inputs, back to the arguments the tool call is saved with. */
 function paramsToArgs(params: ToolCallParam[]): Record<string, unknown> {
   if (!params.some((p) => p.group)) {
     return Object.fromEntries(
-      params.map((p) => [p.name, parseArgValue(p.value)]),
+      params.map((p) => [p.name, p.value]),
     );
   }
   const args: Record<string, Record<string, unknown>> = {};
   for (const p of params) {
     const group = p.group ?? "body";
-    args[group] = { ...args[group], [p.name]: parseArgValue(p.value) };
+    args[group] = { ...args[group], [p.name]: p.value };
   }
   return args;
-}
-
-/** A typed-in argument, back to a real value. Only the three words that
- * cannot be anything else are converted: true, false and null. Digits stay
- * text, because a phone number, a postcode and an account number are all
- * digits and all text, and turning them into numbers loses leading zeros
- * and breaks the match against what the agent really sent. */
-function parseArgValue(text: string): unknown {
-  const t = text.trim();
-  if (t === "true") return true;
-  if (t === "false") return false;
-  if (t === "null") return null;
-  return text;
 }
 
 let draftIdCounter = 0;
@@ -141,22 +123,7 @@ function seedToolCalls(raw: unknown): DraftToolCall[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((tc, i) => {
     const { toolName, args } = normalizeToolCall(tc);
-    const record =
-      args && typeof args === "object" && !Array.isArray(args)
-        ? (args as Record<string, unknown>)
-        : {};
-    const params: ToolCallParam[] = hasArgumentGroups(record)
-      ? WEBHOOK_GROUPS.flatMap((group) =>
-          Object.entries(
-            isPlainObject(record[group]) ? record[group] : {},
-          ).map(
-            ([name, value]) => ({ name, value: argumentText(value), group }),
-          ),
-        )
-      : Object.entries(record).map(([name, value]) => ({
-          name,
-          value: argumentText(value),
-        }));
+    const params = argumentRows(isPlainObject(args) ? args : {}, true);
     return { id: `seed-${i}`, tool: toolName, params };
   });
 }

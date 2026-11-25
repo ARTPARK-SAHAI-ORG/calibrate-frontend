@@ -83,8 +83,7 @@ const SAMPLE_ROWS: BulkSampleRow[] = [
         { tool: "save", arguments: { months: 7 } },
       ]),
     },
-    variableValue:
-      "The model should save the plan for the number of months asked.",
+    variableValue: "",
     reasoning: "",
   },
 ];

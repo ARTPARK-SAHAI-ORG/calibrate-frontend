@@ -88,7 +88,9 @@ describe("ToolCallItemPane", () => {
       />,
     );
     expect(screen.getByText("Agent's answer")).toBeInTheDocument();
-    expect(screen.queryByText(/reads the agent's reply/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("The reply and the tool calls are judged together"),
+    ).not.toBeInTheDocument();
   });
 
   it("reads tool_calls only when actual_tool_calls is not a list", () => {
@@ -212,5 +214,30 @@ describe("ToolCallItemPane", () => {
     );
     expect(screen.getByText("search_flights")).toBeInTheDocument();
     expect(screen.getAllByText("Evaluation target")).toHaveLength(2);
+  });
+
+  it("heads only the agent's own calls as its answer, not an earlier call in the conversation", () => {
+    render(
+      <ToolCallItemPane
+        payload={{
+          chat_history: [
+            { role: "user", content: "Book a flight" },
+            {
+              role: "assistant",
+              tool_calls: [
+                {
+                  id: "call-0",
+                  type: "function",
+                  function: { name: "search_flights", arguments: "{}" },
+                },
+              ],
+            },
+          ],
+          actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
+        }}
+      />,
+    );
+    expect(screen.getAllByText("Agent's answer")).toHaveLength(1);
+    expect(screen.getByText("Agent Tool Call")).toBeInTheDocument();
   });
 });

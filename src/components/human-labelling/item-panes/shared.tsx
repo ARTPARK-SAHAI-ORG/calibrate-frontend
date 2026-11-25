@@ -105,4 +105,3 @@ export function normaliseHistoryItem(raw: unknown): TestCaseHistory | null {
   return null;
 }
 
-export { agentToolCalls } from "@/lib/labellingItem";

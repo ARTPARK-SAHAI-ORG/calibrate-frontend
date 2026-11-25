@@ -84,6 +84,7 @@ export function AddToolCallEvaluatorButton({
             isOpen
             availableEvaluators={available}
             description="Choose tool call evaluators from your library to add to this agent"
+            emptyMessage="Your workspace has no tool call evaluators yet."
             onClose={() => setPickerOpen(false)}
             onEvaluatorDeleted={(uuid) =>
               setLibrary((prev) => prev.filter((e) => e.uuid !== uuid))

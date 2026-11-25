@@ -146,6 +146,9 @@ it("offers to create a tool call evaluator when none is left to add, and adds th
     screen.getByRole("button", { name: "Add a tool call evaluator" }),
   );
   expect(onOpenChange).toHaveBeenLastCalledWith(true);
+  expect(
+    await screen.findByText("Your workspace has no tool call evaluators yet."),
+  ).toBeInTheDocument();
   await user.click(
     await screen.findByRole("button", { name: "Create evaluator" }),
   );

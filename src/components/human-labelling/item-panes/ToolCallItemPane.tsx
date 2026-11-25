@@ -46,7 +46,11 @@ export function ToolCallItemPane({
     });
   }
   if (hasCalls) {
-    history.push({ role: "assistant", tool_calls: actualToolCalls });
+    history.push({
+      role: "assistant",
+      tool_calls: actualToolCalls,
+      label: hasReply ? "Agent's tool calls" : AGENT_ANSWER,
+    });
   }
 
   if (history.length === 0) {
@@ -67,7 +71,6 @@ export function ToolCallItemPane({
       history={history}
       passed={true}
       highlightEvalTarget={hasReply && hasCalls ? 2 : true}
-      toolCallLabel={hasReply ? "Agent's tool calls" : AGENT_ANSWER}
       afterHistory={
         <>
           {hasReply && hasCalls && (

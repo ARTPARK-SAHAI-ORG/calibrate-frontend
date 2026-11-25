@@ -5,8 +5,11 @@ import {
   type TextField,
   type TurnExtras,
 } from "@/lib/messageVersions";
-import { agentToolCalls, normaliseHistoryItem } from "./item-panes/shared";
+import { normaliseHistoryItem } from "./item-panes/shared";
+import { agentToolCalls } from "@/lib/labellingItem";
 import { normalizeToolCall } from "@/components/test-results/shared";
+import type { ExpectedToolCall } from "@/components/ToolCallExpectationsEditor";
+import type { ToolCallParam } from "@/components/ToolPicker";
 
 export type HistoryItem = NonNullable<TestConfig["history"]>[number];
 
@@ -43,9 +46,7 @@ export function actualToolCallsStart<T>(
   return start < turns.length ? start : -1;
 }
 
-type ToolCallRecord = {
-  tool: string;
-  arguments: Record<string, unknown>;
+type ToolCallRecord = Pick<ExpectedToolCall, "tool" | "arguments"> & {
   output?: unknown;
 };
 
@@ -106,6 +107,26 @@ export function argumentText(value: unknown): string {
   return String(value);
 }
 
+/** Saved arguments as the dialogs' rows of text. With `grouped`, a webhook's
+ * body and query values become rows tagged with their group. */
+export function argumentRows(
+  args: Record<string, unknown>,
+  grouped: boolean,
+): ToolCallParam[] {
+  if (!grouped || !hasArgumentGroups(args)) {
+    return Object.entries(args).map(([name, value]) => ({
+      name,
+      value: argumentText(value),
+    }));
+  }
+  return WEBHOOK_GROUPS.flatMap((group) => {
+    const values = args[group];
+    return Object.entries(isPlainObject(values) ? values : {}).map(
+      ([name, value]) => ({ name, value: argumentText(value), group }),
+    );
+  });
+}
+
 export function isPlainObject(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
@@ -119,13 +140,18 @@ export function hasArgumentGroups(args: Record<string, unknown>): boolean {
 }
 
 // Text read back as the value it spells when it is valid JSON, so `7` edited
-// to `8` is saved as 8, not "8".
+// to `8` is saved as 8, not "8". A number that would not be written back the
+// same way, such as 20 digits that lose precision, stays text.
 function parseEdited(text: string): unknown {
+  let value: unknown;
   try {
-    return JSON.parse(text);
+    value = JSON.parse(text);
   } catch {
     return text;
   }
+  return typeof value === "number" && String(value) !== text.trim()
+    ? text
+    : value;
 }
 
 /** Values typed for a call or key with nothing stored behind it, read the way
@@ -136,10 +162,6 @@ function parseTyped(value: unknown): unknown {
   return Object.fromEntries(
     Object.entries(value).map(([k, v]) => [k, parseTyped(v)]),
   );
-}
-
-function typedArguments(args: Record<string, unknown>) {
-  return parseTyped(args) as Record<string, unknown>;
 }
 
 /** The dialog edits argument values as text, so a value it shows unchanged is
@@ -172,7 +194,11 @@ function restoreArguments(
     } else if (isPlainObject(v) && isPlainObject(before)) {
       out[k] = restoreArguments(v, before, true);
       if (out[k] !== before) changed = true;
-    } else if (typeof v === "string" && v === argumentText(before)) {
+    } else if (
+      before !== undefined &&
+      typeof v === "string" &&
+      v === argumentText(before)
+    ) {
       out[k] = before;
     } else {
       out[k] =
@@ -189,9 +215,9 @@ function restoreArguments(
 
 /** Tool calls back from a dialog that edits argument values as text.
  * `storedIndex[i]` is the position in `previous` that call i was read from,
- * or undefined for a call added in the dialog. A call that still names the
- * same tool as its stored call gets the stored values back where its text is
- * unchanged. */
+ * or undefined for a call added in the dialog. A call read from a stored
+ * call gets the stored values back where its text is unchanged, even when its
+ * tool was renamed. */
 export function restoreToolCalls<
   T extends { tool: string; arguments: Record<string, unknown> },
 >(next: T[], previous: unknown, storedIndex: (number | undefined)[]): T[] {
@@ -202,11 +228,11 @@ export function restoreToolCalls<
       at === undefined || before[at] === undefined
         ? undefined
         : normalizeToolCall(before[at]);
-    if (!prior) return { ...call, arguments: typedArguments(call.arguments) };
-    if (prior.toolName !== call.tool) return call;
     return {
       ...call,
-      arguments: restoreArguments(call.arguments, prior.args),
+      arguments: prior
+        ? restoreArguments(call.arguments, prior.args)
+        : (parseTyped(call.arguments) as Record<string, unknown>),
     };
   });
 }
@@ -293,14 +319,13 @@ export function historyToPayloadFields(
         storedAt === undefined || before[storedAt] === undefined
           ? undefined
           : normalizeToolCall(before[storedAt]);
-      const same = prior?.toolName === tool;
-      const priorOutput = same ? prior?.output : undefined;
+      const priorOutput = prior?.output;
       let output: unknown;
       if (content !== undefined) {
         if (priorOutput !== undefined && content === outputText(priorOutput)) {
           output = priorOutput;
         } else if (
-          same &&
+          prior &&
           (priorOutput === undefined || priorOutput === "") &&
           (content === DEFAULT_STRUCTURED_RESPONSE ||
             content === DEFAULT_WEBHOOK_RESPONSE)
@@ -314,11 +339,9 @@ export function historyToPayloadFields(
       }
       return {
         tool,
-        arguments: !prior
-          ? typedArguments(args)
-          : same
-            ? restoreArguments(args, prior.args)
-            : args,
+        arguments: prior
+          ? restoreArguments(args, prior.args)
+          : (parseTyped(args) as Record<string, unknown>),
         ...(output !== undefined ? { output } : {}),
       };
     },

@@ -49,7 +49,7 @@ describe("LlmItemPane", () => {
     expect(screen.getAllByText("Evaluation target")).toHaveLength(1);
   });
 
-    it("renders when only agent_response is present (no chat_history)", () => {
+  it("renders when only agent_response is present (no chat_history)", () => {
     render(<LlmItemPane payload={{ agent_response: "Just a reply" }} />);
     expect(screen.getByText("Just a reply")).toBeInTheDocument();
   });

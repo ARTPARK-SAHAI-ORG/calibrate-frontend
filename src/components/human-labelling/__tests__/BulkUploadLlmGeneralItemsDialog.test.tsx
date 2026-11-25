@@ -64,6 +64,10 @@ describe("BulkUploadLlmGeneralItemsDialog", () => {
     expect(capturedProps.guidelinesIntro).toMatch(/non-conversational/);
     expect(capturedProps.sampleFilenameBase).toBe("llm_response_items");
     expect(capturedProps.sampleRows).toHaveLength(3);
+    const toolCallRow = capturedProps.sampleRows.find(
+      (r: { name: string }) => r.name === "Save plan",
+    );
+    expect(toolCallRow.variableValue).toBe("");
     expect(capturedProps.contentColumns).toHaveLength(4);
   });
 

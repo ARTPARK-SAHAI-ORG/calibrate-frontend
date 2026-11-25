@@ -44,10 +44,7 @@ import {
   DEFAULT_STRUCTURED_RESPONSE,
   DEFAULT_WEBHOOK_RESPONSE,
   actualToolCallsStart,
-  argumentText,
-  hasArgumentGroups,
-  isPlainObject,
-  WEBHOOK_GROUPS,
+  argumentRows,
 } from "@/components/human-labelling/itemConversation";
 import {
   ToolCallExpectationsEditor,
@@ -578,37 +575,7 @@ export function AddTestDialog({
                   t.name === toolCall.function.name,
               );
 
-              let toolParams: Array<{
-                name: string;
-                value: string;
-                group?: string;
-              }> = [];
-
-              if (isWebhook && hasArgumentGroups(parsedArgs)) {
-                // Extract params from body, query with their group (headers are not shown in UI)
-                WEBHOOK_GROUPS.forEach((groupKey) => {
-                  const groupValue = parsedArgs[groupKey];
-                  if (isPlainObject(groupValue)) {
-                    Object.entries(groupValue).forEach(
-                      ([paramName, paramValue]) => {
-                        toolParams.push({
-                          name: paramName,
-                          value: argumentText(paramValue),
-                          group: groupKey,
-                        });
-                      },
-                    );
-                  }
-                });
-              } else {
-                // Regular tool params (non-webhook)
-                toolParams = Object.entries(parsedArgs).map(
-                  ([name, value]) => ({
-                    name,
-                    value: argumentText(value),
-                  }),
-                );
-              }
+              const toolParams = argumentRows(parsedArgs, isWebhook);
 
               messages.push({
                 id: toolCallId,

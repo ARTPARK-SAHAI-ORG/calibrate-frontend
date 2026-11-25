@@ -75,6 +75,10 @@ describe("BulkUploadLlmItemsDialog", () => {
     );
     expect(capturedProps.sampleFilenameBase).toBe("llm_items");
     expect(capturedProps.sampleRows).toHaveLength(3);
+    const toolCallRow = capturedProps.sampleRows.find(
+      (r: { name: string }) => r.name === "Save plan",
+    );
+    expect(toolCallRow.variableValue).toBe("");
     expect(capturedProps.sampleFallbackEvaluators).toHaveLength(1);
   });
 

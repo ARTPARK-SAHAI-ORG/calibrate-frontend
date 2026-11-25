@@ -30,6 +30,8 @@ type AddEvaluatorsDialogProps = {
    * parent can drop it from its own evaluators list too.
    */
   onEvaluatorDeleted?: (evaluatorUuid: string) => void;
+  /** Shown when there is nothing to pick. */
+  emptyMessage?: string;
 };
 
 export function AddEvaluatorsDialog({
@@ -41,6 +43,7 @@ export function AddEvaluatorsDialog({
   allowConversationType = false,
   onCreateEvaluator,
   onEvaluatorDeleted,
+  emptyMessage = "Every evaluator in your library is already added",
 }: AddEvaluatorsDialogProps) {
   // Hide the floating "Talk to Us" button while the modal is open.
   useHideFloatingButton(isOpen);
@@ -177,7 +180,7 @@ export function AddEvaluatorsDialog({
             evaluators={availableEvaluators}
             selectedIds={selectedIds}
             onToggle={toggle}
-            emptyMessage="Every evaluator in your library is already added"
+            emptyMessage={emptyMessage}
             emptyAction={
               onCreateEvaluator && (
                 <button

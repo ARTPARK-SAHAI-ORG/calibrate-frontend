@@ -563,16 +563,16 @@ describe("actualToolCallsStart", () => {
 });
 
 describe("restoreToolCalls", () => {
-  it("puts back stored values for the same tool only, and reads an added call's values as JSON", () => {
+  it("puts back stored values, also on a renamed call, and reads an added call's values as JSON", () => {
     const stored = [
       { tool: "a", arguments: { n: 3, ok: true } },
-      { tool: "b", arguments: { n: 3 } },
+      { tool: "b", arguments: { n: 3, s: "7" } },
     ];
     expect(
       restoreToolCalls(
         [
           { tool: "a", arguments: { n: "3", ok: true } },
-          { tool: "c", arguments: { n: "3" } },
+          { tool: "c", arguments: { n: "3", s: "7" } },
           { tool: "d", arguments: { n: "7" } },
         ],
         stored,
@@ -580,9 +580,19 @@ describe("restoreToolCalls", () => {
       ),
     ).toEqual([
       { tool: "a", arguments: { n: 3, ok: true } },
-      { tool: "c", arguments: { n: "3" } },
+      { tool: "c", arguments: { n: 3, s: "7" } },
       { tool: "d", arguments: { n: 7 } },
     ]);
+  });
+
+  it("keeps an added argument left empty as empty text", () => {
+    expect(
+      restoreToolCalls(
+        [{ tool: "a", arguments: { n: "3", reason: "" } }],
+        [{ tool: "a", arguments: { n: 3 } }],
+        [0],
+      ),
+    ).toEqual([{ tool: "a", arguments: { n: 3, reason: "" } }]);
   });
 
   it("drops an argument the reader removed", () => {
@@ -696,6 +706,64 @@ describe("historyToPayloadFields matching stored calls", () => {
     expect("actual_tool_calls" in fields && fields.actual_tool_calls).toEqual([
       { tool: "save", arguments: { note: "7", n: 7 } },
       { tool: "save", arguments: { n: 7, body: { ok: true, city: "Pune" } } },
+    ]);
+  });
+});
+
+describe("historyToPayloadFields with a renamed call", () => {
+  const previous = {
+    chat_history: [],
+    agent_response: "",
+    actual_tool_calls: [{ tool: "save", arguments: { n: 7, ok: true }, output: "" }],
+  };
+  const renamed = (content: string) =>
+    payloadToHistory(previous, "llm").map((t) =>
+      t.role === "tool"
+        ? { ...t, content }
+        : {
+            ...t,
+            tool_calls: t.tool_calls?.map((c) => ({
+              ...c,
+              function: { name: "store", arguments: '{"n":"7","ok":"true"}' },
+            })),
+          },
+    );
+
+  it("puts back its stored values and adds no reply that was never stored", () => {
+    expect(
+      historyToPayloadFields(renamed(DEFAULT_STRUCTURED_RESPONSE), "llm", previous),
+    ).toEqual({
+      ...previous,
+      actual_tool_calls: [{ tool: "store", arguments: { n: 7, ok: true }, output: "" }],
+    });
+  });
+});
+
+describe("historyToPayloadFields with long digits", () => {
+  it("keeps a typed value as text when a number would change it", () => {
+    const fields = historyToPayloadFields(
+      [
+        {
+          role: "assistant",
+          tool_calls: [
+            {
+              id: "actual-call-1764000000000",
+              type: "function",
+              function: {
+                name: "save",
+                arguments: '{"account":"12345678901234567890","code":"007","n":"42"}',
+              },
+            },
+          ],
+        },
+      ],
+      "llm",
+    );
+    expect("actual_tool_calls" in fields && fields.actual_tool_calls).toEqual([
+      {
+        tool: "save",
+        arguments: { account: "12345678901234567890", code: "007", n: 42 },
+      },
     ]);
   });
 });

@@ -954,15 +954,12 @@ export function TestDetailView({
   legacyDefaultEvaluator,
   enableEvaluatorLinks = true,
   highlightEvalTarget = false,
-  toolCallLabel = "Agent Tool Call",
   afterHistory,
   showVerdict = true,
   markOutput = true,
   afterOutput,
   afterTurn,
 }: {
-  /** The heading above a tool call the agent made. */
-  toolCallLabel?: string;
   /** Drawn right under the conversation, lined up with it. */
   afterHistory?: React.ReactNode;
   history: TestCaseHistory[];
@@ -1241,7 +1238,7 @@ export function TestDetailView({
                         <>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium text-foreground">
-                              {toolCallLabel}
+                              {turnLabel || "Agent Tool Call"}
                             </span>
                             {isEvalTarget && (
                               <span className={EVAL_TARGET_CHIP_CLASS}>
