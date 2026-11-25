@@ -391,6 +391,7 @@ function tracesResult(
 const onTestsCreated = jest.fn();
 const onViewTests = jest.fn();
 const onGoToEvaluators = jest.fn();
+const onGoToSettings = jest.fn();
 const setEnabled = jest.fn(async () => {});
 // Scoring off, with one evaluator able to score, unless a test says otherwise.
 const traceScoring = {
@@ -413,6 +414,7 @@ const tabProps = {
   onTestsCreated,
   onViewTests,
   onGoToEvaluators,
+  onGoToSettings,
   traceScoring,
 };
 
@@ -792,13 +794,16 @@ describe("TracesTabContent", () => {
       expect(fetchChatLink).toHaveBeenCalledWith("test-token", "agent-1");
     });
 
-    it("says the chat link reached its daily limit, with a way to ask for more", async () => {
+    it("says the chat link reached its daily limit, and opens Settings to raise it", async () => {
       fetchChatLink.mockResolvedValue(chatLink(1200, 1200));
+      const user = setupUser();
       render(<TracesTabContent {...tabProps} />);
       const line = await screen.findByText(
         /Talking to this agent reached its limit of 1,200 replies today\./,
       );
-      expect(line).toHaveTextContent("Click here to contact us");
+      expect(line).toHaveTextContent("Click here to increase the limit.");
+      await user.click(within(line).getByRole("button", { name: "Click here" }));
+      expect(onGoToSettings).toHaveBeenCalled();
     });
 
     it("warns at the agent's own limit, below the workspace maximum", async () => {

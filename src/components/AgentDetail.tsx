@@ -270,6 +270,8 @@ export function AgentDetail({
   const [pendingTab, setPendingTab] = useState<TabType | null>(null);
 
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
+  // Bumped when the Monitoring tab sends the reader to raise the daily limit.
+  const [highlightMessagesPerDay, setHighlightMessagesPerDay] = useState(0);
 
   // Hide the floating "Talk to Us" button while a dialog is open
   useHideFloatingButton(isEditNameDialogOpen);
@@ -1495,6 +1497,10 @@ export function AgentDetail({
               agentNature={agent.interaction_type ?? "conversation"}
               traceScoring={traceScoring}
               onGoToEvaluators={() => performTabSwitch("evaluators")}
+              onGoToSettings={() => {
+                performTabSwitch("settings");
+                setHighlightMessagesPerDay((n) => n + 1);
+              }}
               isActive={activeTab === "monitoring"}
               onTestsCreated={() => setTestsReloadKey((k) => k + 1)}
               onViewTests={() => performTabSwitch("tests")}
@@ -1530,6 +1536,7 @@ export function AgentDetail({
               setMessagesPerDay={setMessagesPerDay}
               messagesPerDayMaximum={messagesPerDayMaximum}
               onGoToEvaluators={() => performTabSwitch("evaluators")}
+              highlightMessagesPerDay={highlightMessagesPerDay}
             />
           </div>
         )}

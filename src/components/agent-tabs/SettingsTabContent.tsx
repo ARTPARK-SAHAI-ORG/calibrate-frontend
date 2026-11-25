@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { TraceScoringConfirmDialog } from "@/components/traces/TraceScoringConfirmDialog";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
@@ -24,6 +24,9 @@ type SettingsTabContentProps = {
   messagesPerDayMaximum: number | null;
   /** Opens the Evaluators tab, where the set that can score is chosen. */
   onGoToEvaluators: () => void;
+  /** Goes up by one each time the reader is sent here to raise the messages
+   *  per day, which brings that box into view and outlines it for a moment. */
+  highlightMessagesPerDay?: number;
 };
 
 export function SettingsTabContent({
@@ -36,7 +39,23 @@ export function SettingsTabContent({
   setMessagesPerDay,
   messagesPerDayMaximum,
   onGoToEvaluators,
+  highlightMessagesPerDay = 0,
 }: SettingsTabContentProps) {
+  const messagesPerDayRef = useRef<HTMLInputElement>(null);
+  // The outline is on from a new request until its three seconds are up.
+  const [outlineEndedFor, setOutlineEndedFor] = useState(0);
+  const messagesPerDayOutlined = highlightMessagesPerDay > outlineEndedFor;
+  useEffect(() => {
+    if (!highlightMessagesPerDay) return;
+    const input = messagesPerDayRef.current;
+    input?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    input?.focus({ preventScroll: true });
+    const timer = window.setTimeout(
+      () => setOutlineEndedFor(highlightMessagesPerDay),
+      3000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [highlightMessagesPerDay]);
   const messagesTooHigh = overMessagesPerDayMaximum(
     messagesPerDay,
     messagesPerDayMaximum,
@@ -197,10 +216,18 @@ export function SettingsTabContent({
         <h2 className="text-sm md:text-base font-semibold text-foreground">
           Talk to agent
         </h2>
-        <div className="border border-border rounded-xl overflow-hidden">
+        <div
+          data-testid="messages-per-day-box"
+          className={`border rounded-xl overflow-hidden transition-colors duration-500 ${
+            messagesPerDayOutlined
+              ? "border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/40"
+              : "border-border"
+          }`}
+        >
           <div className="px-3 md:px-4 py-3 md:py-4 space-y-2">
             <div className="flex flex-col-reverse md:flex-row items-start md:items-center gap-2 md:gap-4">
               <input
+                ref={messagesPerDayRef}
                 type="number"
                 min="1"
                 aria-label="Messages per day"

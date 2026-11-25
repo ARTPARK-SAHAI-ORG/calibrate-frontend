@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, setupUser, fireEvent } from "@/test-utils";
+import { act, render, screen, setupUser, fireEvent } from "@/test-utils";
 import { SettingsTabContent } from "../SettingsTabContent";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
 
@@ -342,7 +342,10 @@ describe("SettingsTabContent", () => {
           onGoToEvaluators={jest.fn()}
         />,
       );
-      return { setMessagesPerDay, box: screen.getByLabelText("Messages per day") };
+      return {
+        setMessagesPerDay,
+        box: screen.getByLabelText("Messages per day"),
+      };
     };
 
     it("shows the number and passes every whole number typed, including 0", () => {
@@ -369,5 +372,35 @@ describe("SettingsTabContent", () => {
       expect(box.className).not.toContain("border-red-500/60");
       expect(screen.queryByText(/This is more than/)).toBeNull();
     });
+  });
+
+  it("brings the messages per day box into view and outlines it when sent there", () => {
+    const props = {
+      agentSpeaksFirst: false,
+      setAgentSpeaksFirst: jest.fn(),
+      maxAssistantTurns: 5,
+      setMaxAssistantTurns: jest.fn(),
+      messagesPerDay: 2,
+      setMessagesPerDay: jest.fn(),
+      messagesPerDayMaximum: 300,
+      traceScoring: scoring(),
+      onGoToEvaluators: jest.fn(),
+    };
+    jest.useFakeTimers();
+    const { rerender } = render(<SettingsTabContent {...props} />);
+    const box = screen.getByTestId("messages-per-day-box");
+    expect(box.className).not.toContain("border-amber-500");
+
+    rerender(<SettingsTabContent {...props} highlightMessagesPerDay={1} />);
+    expect(box.className).toContain("border-amber-500");
+    expect(
+      screen.getByRole("spinbutton", { name: "Messages per day" }),
+    ).toHaveFocus();
+
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
+    expect(box.className).not.toContain("border-amber-500");
+    jest.useRealTimers();
   });
 });

@@ -2,12 +2,14 @@ import React from "react";
 import { act, render, screen, setupUser, waitFor } from "@/test-utils";
 import {
   TraceDetailDialog,
+  feedbackByReply,
   humanTraceName,
   toTestCaseOutput,
   turnsToHistory,
 } from "../TraceDetailDialog";
 import {
   fetchTrace,
+  fetchTraces,
   fetchTraceScores,
   TraceConversation,
   TraceDetail,
@@ -19,6 +21,7 @@ jest.mock("../../../lib/tracesApi", () => ({
   ...jest.requireActual("../../../lib/tracesApi"),
   fetchTrace: jest.fn(),
   fetchTraceScores: jest.fn(),
+  fetchTraces: jest.fn(),
 }));
 jest.mock("../../../lib/reportError", () => ({
   __esModule: true,
@@ -27,6 +30,7 @@ jest.mock("../../../lib/reportError", () => ({
 
 const mockFetchTrace = fetchTrace as jest.Mock;
 const mockFetchTraceScores = fetchTraceScores as jest.Mock;
+const mockFetchTraces = fetchTraces as jest.Mock;
 
 const detail: TraceDetail = {
   uuid: "t1",
@@ -57,6 +61,38 @@ beforeEach(() => {
   mockFetchTrace.mockReset();
   mockFetchTraceScores.mockReset();
   mockFetchTraceScores.mockResolvedValue({ runs: [] });
+  mockFetchTraces.mockReset();
+  mockFetchTraces.mockResolvedValue({ items: [] });
+});
+
+describe("feedbackByReply", () => {
+  const up = { is_correct: true, comment: null, at: "x" };
+  const down = { is_correct: false, comment: "No", at: "y" };
+  it("puts each trace's feedback on the last agent reply after its user message", () => {
+    const { byIndex, last } = feedbackByReply(
+      [
+        { role: "user", content: "a" },
+        {
+          role: "assistant",
+          tool_calls: [{ id: "c", function: { name: "f", arguments: "{}" } }],
+        },
+        { role: "tool", tool_call_id: "c", content: "r" },
+        { role: "assistant", content: "reply a" },
+        { role: "user", content: "b" },
+        { role: "assistant", content: "reply b" },
+        { role: "user", content: "c" },
+      ],
+      [up, null, down],
+    );
+    expect([...byIndex.entries()]).toEqual([[3, up]]);
+    expect(last).toBe(down);
+  });
+  it("gives nothing when no feedback was left", () => {
+    expect(feedbackByReply([{ role: "user", content: "a" }], [])).toEqual({
+      byIndex: new Map(),
+      last: null,
+    });
+  });
 });
 
 describe("humanTraceName", () => {
@@ -1053,11 +1089,22 @@ describe("showing a whole conversation", () => {
     },
   };
 
-  it("leaves one turn's feedback out of a whole conversation", async () => {
+  it("shows each reply's own feedback and comment", async () => {
     mockFetchTrace.mockResolvedValue({
       ...detail,
       uuid: "t-last",
-      feedback: { is_correct: false, comment: "Too slow", at: "2026-07-20" },
+      input: [
+        { role: "user", content: "Hi" },
+        { role: "assistant", content: "Hello there" },
+        { role: "user", content: "When is the next vaccination?" },
+      ],
+    });
+    // Newest first, the way the list answers.
+    mockFetchTraces.mockResolvedValue({
+      items: [
+        { feedback: { is_correct: false, comment: "Too slow", at: "b" } },
+        { feedback: { is_correct: true, comment: "Friendly", at: "a" } },
+      ],
     });
     render(
       <TraceDetailDialog
@@ -1069,8 +1116,38 @@ describe("showing a whole conversation", () => {
       />,
     );
 
-    await screen.findByText("At 14 weeks, for OPV and DPT.");
-    expect(screen.queryByText("Too slow")).not.toBeInTheDocument();
+    expect(await screen.findByText("Friendly")).toBeInTheDocument();
+    expect(screen.getByText("Too slow")).toBeInTheDocument();
+    // The first reply's comment sits under the first reply, before the second
+    // user message.
+    expect(
+      screen
+        .getByText("Friendly")
+        .compareDocumentPosition(
+          screen.getByText("When is the next vaccination?"),
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(mockFetchTraces).toHaveBeenCalledWith(
+      "tok",
+      expect.objectContaining({ agentId: "ag-1", conversationId: "conv-1" }),
+    );
+  });
+
+  it("still shows the conversation when its feedback cannot be read", async () => {
+    mockFetchTrace.mockResolvedValue({ ...detail, uuid: "t-last" });
+    mockFetchTraces.mockRejectedValue(new Error("down"));
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+        conversation={conversation}
+      />,
+    );
+    expect(
+      await screen.findByText("At 14 weeks, for OPV and DPT."),
+    ).toBeInTheDocument();
   });
 
   it("draws the newest turn's trace under the conversation id, with no scores", async () => {
@@ -1127,7 +1204,12 @@ describe("showing a whole conversation", () => {
   it("marks the final reply on a single trace but not in a whole conversation", async () => {
     mockFetchTrace.mockResolvedValue({ ...detail, uuid: "t-last" });
     const { unmount } = render(
-      <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t-last" />,
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t-last"
+      />,
     );
     await screen.findByText("At 14 weeks, for OPV and DPT.");
     expect(document.querySelector(".border-l-4")).not.toBeNull();
@@ -1149,7 +1231,12 @@ describe("showing a whole conversation", () => {
   it("has no conversation link on a single trace", async () => {
     mockFetchTrace.mockResolvedValue(detail);
     render(
-      <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+      />,
     );
     await screen.findByText("At 14 weeks, for OPV and DPT.");
     expect(
@@ -1185,7 +1272,12 @@ it("says where the trace came from, and puts the feedback under the reply it rat
     feedback: { is_correct: true, comment: "Clear answer", at: "2026-07-20" },
   });
   render(
-    <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
   );
 
   expect(await screen.findByText("Source")).toBeInTheDocument();
@@ -1202,13 +1294,24 @@ it("says where the trace came from, and puts the feedback under the reply it rat
 });
 
 it("shows an API trace with no feedback and no thumb", async () => {
-  mockFetchTrace.mockResolvedValue({ ...detail, source: "api", feedback: null });
+  mockFetchTrace.mockResolvedValue({
+    ...detail,
+    source: "api",
+    feedback: null,
+  });
   render(
-    <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
   );
 
   expect(await screen.findByText("API")).toBeInTheDocument();
-  expect(screen.queryByRole("img", { name: /^Thumbs/ })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("img", { name: /^Thumbs/ }),
+  ).not.toBeInTheDocument();
 });
 
 it("shows a thumb with no comment on its own", async () => {
@@ -1217,7 +1320,12 @@ it("shows a thumb with no comment on its own", async () => {
     feedback: { is_correct: false, comment: null, at: "2026-07-20" },
   });
   render(
-    <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
   );
 
   expect(
@@ -1233,7 +1341,12 @@ it("puts the feedback under the output of a basic agent's trace", async () => {
     feedback: { is_correct: false, comment: "No slot given", at: "2026-07-20" },
   });
   render(
-    <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
   );
 
   expect(await screen.findByText("No slot given")).toBeInTheDocument();
@@ -1249,17 +1362,31 @@ it("says when the agent was stopped after too many tool calls, and only then", a
     output: { ...detail.output, stopped_early: true },
   });
   const { unmount } = render(
-    <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
   );
   expect(
-    await screen.findByText(/stopped after using tools too many times in a row/),
+    await screen.findByText(
+      /stopped after using tools too many times in a row/,
+    ),
   ).toBeInTheDocument();
   unmount();
 
   mockFetchTrace.mockResolvedValue({ ...detail, source: "chat" });
   render(
-    <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
   );
   expect(await screen.findByText("Source")).toBeInTheDocument();
-  expect(screen.queryByText(/stopped after using tools/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(/stopped after using tools/),
+  ).not.toBeInTheDocument();
 });

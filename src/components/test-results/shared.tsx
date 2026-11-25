@@ -959,6 +959,7 @@ export function TestDetailView({
   showVerdict = true,
   markOutput = true,
   afterOutput,
+  afterTurn,
 }: {
   /** The heading above a tool call the agent made. */
   toolCallLabel?: string;
@@ -999,6 +1000,9 @@ export function TestDetailView({
   /** Drawn just under the agent's final reply, such as the feedback a
    *  person left on it. */
   afterOutput?: React.ReactNode;
+  /** Drawn just under an agent reply inside `history`, by its place in
+   *  `history`, such as the feedback a person left on that reply. */
+  afterTurn?: (index: number) => React.ReactNode;
 }) {
   // Precompute tool_call_id → response content map so the inline tool-call
   // card lookup is O(1) instead of scanning the entire history once per
@@ -1047,10 +1051,10 @@ export function TestDetailView({
   const outputAccent = !markOutput
     ? ""
     : showVerdict
-    ? passed
-      ? "border-l-4 border-l-green-500 pl-2 md:pl-3"
-      : "border-l-4 border-l-red-500 pl-2 md:pl-3"
-    : "border-l-4 border-l-foreground pl-2 md:pl-3";
+      ? passed
+        ? "border-l-4 border-l-green-500 pl-2 md:pl-3"
+        : "border-l-4 border-l-red-500 pl-2 md:pl-3"
+      : "border-l-4 border-l-foreground pl-2 md:pl-3";
   // A basic agent test has no conversation — its "history" is
   // just one user turn standing in for the input. Rendered through the
   // chat-bubble view below it reads as a two-message conversation, so it
@@ -1218,6 +1222,7 @@ export function TestDetailView({
                           versions={message.versions}
                           side="assistant"
                         />
+                        {afterTurn?.(index)}
                       </>
                     )}
 

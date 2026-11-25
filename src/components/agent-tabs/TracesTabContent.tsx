@@ -99,6 +99,7 @@ export function TracesTabContent({
   agentNature = "conversation",
   traceScoring,
   onGoToEvaluators,
+  onGoToSettings,
   isActive = true,
   onTestsCreated,
   onViewTests,
@@ -112,6 +113,8 @@ export function TracesTabContent({
   traceScoring: TraceScoringControls;
   /** Opens the Evaluators tab, where the set that scores traces is chosen. */
   onGoToEvaluators: () => void;
+  /** Opens the Settings tab, where the agent's replies per day are set. */
+  onGoToSettings: () => void;
   /** The traces tab is on screen. Polling pauses when this is false. */
   isActive?: boolean;
   /** Called after traces are turned into tests, so the Tests tab reloads. */
@@ -831,81 +834,84 @@ export function TracesTabContent({
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
       {viewSwitch}
-      {/* Shown even over the setup steps: with storage full, the very thing
+      {/* The warnings sit close together as one group; the wrapper takes no
+          room when none of them shows. */}
+      <div className="space-y-2 empty:hidden">
+        {/* Shown even over the setup steps: with storage full, the very thing
           those steps ask for cannot happen, and the reader would be left
           sending traces that are quietly turned away. */}
-      {hasLoaded && storageFull && usage && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-          <p className="text-sm text-amber-700 dark:text-amber-300">
-            New traces are no longer being stored because this workspace has
-            reached its limit of {traceCount(usage.max_traces)}. Delete traces
-            to make room.{" "}
-            <a
-              href={CONTACT_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-bold"
-            >
-              Click here
-            </a>{" "}
-            to contact us to extend your limits.
-          </p>
-        </div>
-      )}
+        {hasLoaded && storageFull && usage && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              New traces are no longer being stored because this workspace has
+              reached its limit of {traceCount(usage.max_traces)}. Delete traces
+              to make room.{" "}
+              <a
+                href={CONTACT_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold"
+              >
+                Click here
+              </a>{" "}
+              to contact us to extend your limits.
+            </p>
+          </div>
+        )}
 
-      {hasLoaded && chatLimitReached && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-          <p className="text-sm text-amber-700 dark:text-amber-300">
-            Talking to this agent reached its limit of{" "}
-            {chatReplyCap.toLocaleString()}{" "}
-            {chatReplyCap === 1 ? "reply" : "replies"} today.{" "}
-            <a
-              href={CONTACT_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-bold"
-            >
-              Click here
-            </a>{" "}
-            to contact us to extend your limits.
-          </p>
-        </div>
-      )}
+        {hasLoaded && chatLimitReached && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Talking to this agent reached its limit of{" "}
+              {chatReplyCap.toLocaleString()}{" "}
+              {chatReplyCap === 1 ? "reply" : "replies"} today.{" "}
+              <button
+                type="button"
+                onClick={onGoToSettings}
+                className="font-bold cursor-pointer hover:opacity-80"
+              >
+                Click here
+              </button>{" "}
+              to increase the limit.
+            </p>
+          </div>
+        )}
 
-      {/* Quiet while scoring works: the chip in the toolbar carries the state
+        {/* Quiet while scoring works: the chip in the toolbar carries the state
           and its detail. Only a real problem takes a row of its own. */}
-      {hasLoaded && !showEmptyState && hasWarning && (
-        <div className="space-y-3">
-          {nothingCanScore && (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                <NothingCanScoreMessage
-                  ineligible={ineligible}
-                  onGoToEvaluators={onGoToEvaluators}
-                />
-              </p>
-            </div>
-          )}
-          {overLimit && (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                {usage?.max_scored_traces != null
-                  ? `Some traces were not scored because this workspace has reached its limit of scoring ${traceCount(usage.max_scored_traces)}.`
-                  : "Some traces were not scored because this workspace has reached its limit for scoring traces."}{" "}
-                <a
-                  href={CONTACT_LINK}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold"
-                >
-                  Click here
-                </a>{" "}
-                to contact us to extend your limits.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+        {hasLoaded && !showEmptyState && hasWarning && (
+          <div className="space-y-2">
+            {nothingCanScore && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  <NothingCanScoreMessage
+                    ineligible={ineligible}
+                    onGoToEvaluators={onGoToEvaluators}
+                  />
+                </p>
+              </div>
+            )}
+            {overLimit && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  {usage?.max_scored_traces != null
+                    ? `Some traces were not scored because this workspace has reached its limit of scoring ${traceCount(usage.max_scored_traces)}.`
+                    : "Some traces were not scored because this workspace has reached its limit for scoring traces."}{" "}
+                  <a
+                    href={CONTACT_LINK}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold"
+                  >
+                    Click here
+                  </a>{" "}
+                  to contact us to extend your limits.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Above the list rather than inside it, so a search that matches nothing
           still leaves the box that got there. */}
