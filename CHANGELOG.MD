@@ -1,5 +1,6 @@
 ## November 2026
 
+- Model lists now hide models that cannot be used and mark ones that will be removed soon, and an agent, evaluator or benchmark that still uses such a model shows a warning, with the benchmark refusing to start until it is swapped ([#874](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/874))
 - When a speech-to-text or text-to-speech run is refused because it is too big, the app now shows the reason, and test runs show the reason instead of a general failure message ([#867](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/867))
 - The grey text in the Custom fields section is now darker and easier to read on an agent's Connection tab, when writing a test and before checking a connection ([#871](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/871))
 - The descriptions on an agent's Connection tab are now in darker text that is easier to read ([#870](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/870))
