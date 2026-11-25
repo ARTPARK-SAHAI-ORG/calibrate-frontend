@@ -1248,7 +1248,7 @@ export function TestDetailView({
                           </div>
                           <div className="w-[88%] md:w-3/4 flex flex-col">
                             {message.tool_calls.map((toolCall, tcIndex) => {
-                              const { toolName, args } =
+                              const { toolName, args, output } =
                                 normalizeToolCall(toolCall);
                               const toolResponse = toolResponseByCallId.get(
                                 toolCall.id,
@@ -1258,7 +1258,7 @@ export function TestDetailView({
                                   key={tcIndex}
                                   toolName={toolName}
                                   args={args}
-                                  output={toolResponse}
+                                  output={toolResponse ?? output}
                                 />
                               );
                             })}

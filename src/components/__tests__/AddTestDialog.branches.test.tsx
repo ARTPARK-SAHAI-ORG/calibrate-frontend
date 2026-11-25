@@ -946,5 +946,70 @@ describe("AddTestDialog — additional branch coverage", () => {
         content: "Agent replies",
       });
     });
+
+    it("saves an earlier tool call of an item as it was stored", async () => {
+      const user = setupUser();
+      (global as any).fetch = mockFetchImpl([WEATHER_TOOL]);
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            mode: "labelItem",
+            isEditing: true,
+            testName: "Item",
+            onSubmit,
+            initialEvaluators: [
+              {
+                evaluator_uuid: "eval-tone",
+                name: "Tone check",
+                slug: null,
+                variables: [],
+                variable_values: {},
+              },
+            ],
+            setItemDescription: jest.fn(),
+            requireAssistantLastMessage: true,
+            initialConfig: {
+              history: [
+                { role: "user", content: "Weather in Pune?" },
+                {
+                  role: "assistant",
+                  content: "",
+                  tool_calls: [
+                    {
+                      id: "call-1",
+                      type: "function",
+                      function: {
+                        name: "get_weather",
+                        arguments: JSON.stringify({ city: "Pune", days: 3 }),
+                      },
+                    },
+                  ],
+                },
+                { role: "user", content: "Thanks" },
+                { role: "assistant", content: "Welcome" },
+              ],
+              evaluation: { type: "response" },
+            },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Welcome")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: /^(Save|Update)/ }));
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config] = onSubmit.mock.calls[0];
+      const call = config.history.find(
+        (m: { tool_calls?: unknown[] }) => m.tool_calls,
+      );
+      expect(JSON.parse(call.tool_calls[0].function.arguments)).toEqual({
+        city: "Pune",
+        days: 3,
+      });
+      expect(
+        config.history.some((m: { role: string }) => m.role === "tool"),
+      ).toBe(false);
+    });
   });
 });

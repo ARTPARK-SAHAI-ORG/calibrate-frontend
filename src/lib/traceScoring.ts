@@ -126,7 +126,7 @@ export function scoringRunErrorCopy(error: string | null | undefined): string {
     case "no_tool_call_evaluator":
       return "This trace was not scored because the agent had no tool call evaluator";
     case "no_usable_evaluators":
-      return "No evaluator on this agent fits this trace";
+      return "No evaluator on this agent could score this trace";
     case "scoring_disabled":
       return "Monitoring was turned off before this trace was scored";
     case "unsupported_interaction_type":

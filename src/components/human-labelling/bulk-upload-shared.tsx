@@ -1557,17 +1557,17 @@ function ToolCallsPreview({ calls }: { calls: BulkToolCall[] }) {
       {calls.length === 0
         ? "No calls"
         : calls
-        .map(
-          (c) =>
-            `${c.tool}(${
-              c.accept_any_arguments
-                ? "any arguments"
-                : c.arguments
-                  ? JSON.stringify(c.arguments)
-                  : ""
-            })`,
-        )
-        .join("\n")}
+          .map(
+            (c) =>
+              `${c.tool}(${
+                c.accept_any_arguments
+                  ? "any arguments"
+                  : c.arguments
+                    ? JSON.stringify(c.arguments)
+                    : ""
+              })`,
+          )
+          .join("\n")}
     </div>
   );
 }

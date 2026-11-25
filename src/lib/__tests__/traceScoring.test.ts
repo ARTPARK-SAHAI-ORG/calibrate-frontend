@@ -57,7 +57,7 @@ describe("copy", () => {
 
   it("explains skip and failure reasons without averaging", () => {
     expect(scoringRunErrorCopy("no_usable_evaluators")).toBe(
-      "No evaluator on this agent fits this trace",
+      "No evaluator on this agent could score this trace",
     );
     expect(scoringRunErrorCopy("no_tool_call_evaluator")).toBe(
       "This trace was not scored because the agent had no tool call evaluator",

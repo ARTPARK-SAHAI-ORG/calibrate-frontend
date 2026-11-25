@@ -146,7 +146,7 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
     />,
   );
   expect(
-    screen.getByText("No evaluator on this agent fits this trace"),
+    screen.getByText("No evaluator on this agent could score this trace"),
   ).toBeInTheDocument();
   expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
 
@@ -255,7 +255,7 @@ it("names each evaluator that could not score the trace, and why", () => {
     />,
   );
   expect(
-    screen.getByText("No evaluator on this agent fits this trace"),
+    screen.getByText("No evaluator on this agent could score this trace"),
   ).toBeInTheDocument();
   expect(screen.getByText("Tone check")).toBeInTheDocument();
   expect(
@@ -280,7 +280,7 @@ it("points at the Evaluators tab when no evaluator fits and none is listed", asy
     />,
   );
   expect(document.body).toHaveTextContent(
-    "No evaluator on this agent fits this trace. Add one that does in the Evaluators tab.",
+    "No evaluator on this agent could score this trace. Add one that does in the Evaluators tab.",
   );
   await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
   expect(onGoToEvaluators).toHaveBeenCalled();

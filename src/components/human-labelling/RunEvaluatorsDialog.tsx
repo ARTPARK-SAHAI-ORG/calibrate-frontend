@@ -224,9 +224,10 @@ export function RunEvaluatorsDialog({
           evaluatorFitsItem(e.evaluator_type, it.is_tool_call === true),
       ),
   ).length;
+  const nothingFits = items.length > 0 && unfittedCount === items.length;
 
   const handleConfirm = async () => {
-    if (pickedCount === 0 || submitting) return;
+    if (pickedCount === 0 || nothingFits || submitting) return;
     const selections: RunEvaluatorsSelection[] = [];
     for (const e of evaluators) {
       if (!picked[e.uuid]) continue;
@@ -435,8 +436,9 @@ export function RunEvaluatorsDialog({
           )}
           {pickedCount > 0 && unfittedCount > 0 && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground">
-              {unfittedCount} of the chosen items fit none of the ticked
-              evaluators, so they will be left out of this run
+              {nothingFits
+                ? "None of the chosen items fit the ticked evaluators"
+                : `${unfittedCount} of the chosen items fit none of the ticked evaluators, so they will be left out of this run`}
             </div>
           )}
           {submitError && <p className="text-sm text-red-500">{submitError}</p>}
@@ -451,7 +453,12 @@ export function RunEvaluatorsDialog({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={pickedCount === 0 || submitting || loading}
+            disabled={
+              pickedCount === 0 ||
+              nothingFits ||
+              submitting ||
+              loading
+            }
             className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? "Starting..." : "Run"}

@@ -1793,12 +1793,13 @@ export function AddTestDialog({
 
         const argsObj = paramsToArgs(message.toolParams ?? []);
 
-        const args = keptCallIds.has(message.id)
-          ? typeArguments(
-              argsObj,
-              findFormTool(message.toolId, message.toolName),
-            )
-          : argsObj;
+        const args =
+          keptCallIds.has(message.id) || isLabelItem
+            ? typeArguments(
+                argsObj,
+                findFormTool(message.toolId, message.toolName),
+              )
+            : argsObj;
 
         // Add the assistant message with tool_calls
         history.push({
@@ -1824,7 +1825,18 @@ export function AddTestDialog({
           (m) =>
             m.role === "tool_response" && m.linkedToolCallId === message.id,
         );
-        if (linkedResponse && linkedResponse.content.trim()) {
+        // An item's call that stored no response keeps none: the dialog's
+        // default stands in for it only on screen.
+        const isUnchangedDefault =
+          isLabelItem &&
+          linkedResponse?.id === `tool-response-synth-${message.id}` &&
+          (linkedResponse.content === DEFAULT_WEBHOOK_RESPONSE ||
+            linkedResponse.content === DEFAULT_STRUCTURED_RESPONSE);
+        if (
+          linkedResponse &&
+          linkedResponse.content.trim() &&
+          !isUnchangedDefault
+        ) {
           history.push({
             role: "tool",
             content: linkedResponse.content,

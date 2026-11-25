@@ -26,7 +26,7 @@ type TraceScorePanelProps = {
   /** What each evaluator is for, by evaluator id. */
   descriptions?: Record<string, string>;
   /** The agent's evaluators that cannot score traces, and why. Named under
-   *  "No evaluator on this agent fits this trace" so the reader knows what to fix. */
+   *  "No evaluator on this agent could score this trace" so the reader knows what to fix. */
   ineligible?: TraceScoringIneligibleEvaluator[];
   /** The button that adds a tool call evaluator, shown when the run was
    *  skipped because the agent has none. */

@@ -1718,25 +1718,15 @@ function LabellingTaskPageInner() {
   );
 
   const handleRunEvaluators = (
-    target?: string[] | { selectAll: true; q?: string },
+    target: string[] | { selectAll: true; q?: string },
   ) => {
     if (!accessToken || !uuid || startingRun) return;
     if ((task?.evaluators ?? []).length === 0) {
       toast.error("Link an evaluator before running.");
       return;
     }
-    const selectAll =
-      target &&
-      typeof target === "object" &&
-      !Array.isArray(target) &&
-      "selectAll" in target
-        ? { q: target.q }
-        : null;
-    const itemUuids = selectAll
-      ? null
-      : Array.isArray(target)
-        ? target
-        : null;
+    const selectAll = Array.isArray(target) ? null : { q: target.q };
+    const itemUuids = Array.isArray(target) ? target : null;
     if (
       evaluatorsFittingItems(
         task?.evaluators ?? [],

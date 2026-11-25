@@ -14,6 +14,20 @@ describe("ToolCallItemPane", () => {
     expect(screen.getByText(NO_TOOL_CALL)).toBeInTheDocument();
   });
 
+  it("shows what each of the agent's tool calls returned", () => {
+    render(
+      <ToolCallItemPane
+        payload={{
+          chat_history: [{ role: "user", content: "Book a flight" }],
+          actual_tool_calls: [
+            { tool: "book_flight", arguments: {}, output: "Booked BA123" },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText(/Booked BA123/)).toBeInTheDocument();
+  });
+
   it("renders the conversation history", () => {
     render(
       <ToolCallItemPane
