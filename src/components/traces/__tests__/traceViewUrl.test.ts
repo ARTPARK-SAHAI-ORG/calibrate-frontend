@@ -16,7 +16,8 @@ describe("readTraceView", () => {
   it("reads back every choice, including several labels and several scores", () => {
     setSearch(
       "?output=tool_call&label=production&label=staging" +
-        "&score=ev-1%3Afailed&score=ev-2%3A%3C%3D2&sort=ev-2&dir=desc",
+        "&score=ev-1%3Afailed&score=ev-2%3A%3C%3D2&sort=ev-2&dir=desc" +
+        "&source=chat&feedback=wrong",
     );
 
     expect(readTraceView()).toEqual({
@@ -27,7 +28,15 @@ describe("readTraceView", () => {
       sortOrder: "desc",
       conversations: false,
       conversationId: null,
+      source: "chat",
+      feedback: "wrong",
     });
+  });
+
+  it("shows every source and every feedback when the address names neither", () => {
+    setSearch("?source=banana&feedback=sideways");
+
+    expect(readTraceView()).toMatchObject({ source: "all", feedback: "all" });
   });
 
   it("reads and writes the conversations view", () => {
@@ -128,6 +137,8 @@ describe("writeTraceView", () => {
       sortOrder: "desc" as const,
       conversations: true,
       conversationId: "conv a/1",
+      source: "api" as const,
+      feedback: "any" as const,
     };
 
     writeTraceView(view);
@@ -152,6 +163,8 @@ describe("useTraceView", () => {
       sortOrder: "desc",
       conversations: false,
       conversationId: null,
+      source: "all",
+      feedback: "all",
     });
   });
 

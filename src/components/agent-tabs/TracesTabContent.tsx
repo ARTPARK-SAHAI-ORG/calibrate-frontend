@@ -60,6 +60,7 @@ import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScore
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
   fetchTrace,
+  fetchHasTraceFeedback,
   fetchTraceUsage,
   fetchTraces,
   traceFilterKey,
@@ -69,6 +70,7 @@ import {
   type TraceSummary,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
+import { fetchChatLink, type ChatLink } from "@/lib/chatLinkApi";
 
 /**
  * A number of traces, said the way a person says it: "1 trace", "50,000
@@ -97,6 +99,7 @@ export function TracesTabContent({
   agentNature = "conversation",
   traceScoring,
   onGoToEvaluators,
+  onGoToSettings,
   isActive = true,
   onTestsCreated,
   onViewTests,
@@ -110,6 +113,8 @@ export function TracesTabContent({
   traceScoring: TraceScoringControls;
   /** Opens the Evaluators tab, where the set that scores traces is chosen. */
   onGoToEvaluators: () => void;
+  /** Opens the Settings tab, where the agent's replies per day are set. */
+  onGoToSettings: () => void;
   /** The traces tab is on screen. Polling pauses when this is false. */
   isActive?: boolean;
   /** Called after traces are turned into tests, so the Tests tab reloads. */
@@ -599,6 +604,13 @@ export function TracesTabContent({
   // logs the refusal on its own server, and this tab just looks like a quiet
   // day. The scoring limit's own number comes from the same answer.
   const [usage, setUsage] = useState<TraceUsage | null>(null);
+  // Today's chat messages against this agent's own daily limit.
+  const [chatLink, setChatLink] = useState<ChatLink | null>(null);
+  // Whether any of the agent's traces carries feedback from the chat link,
+  // which is what puts the feedback section in the filter.
+  const [hasFeedback, setHasFeedback] = useState(false);
+  // Refresh bumps this, since the chat link's count moves during the day.
+  const [usageReads, setUsageReads] = useState(0);
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
@@ -607,17 +619,32 @@ export function TracesTabContent({
         if (!cancelled) setUsage(next);
       })
       .catch((err) => reportError("Error fetching trace usage:", err));
+    fetchChatLink(accessToken, agentUuid)
+      .then((next) => {
+        if (!cancelled) setChatLink(next);
+      })
+      .catch((err) => reportError("Error fetching the chat link:", err));
+    fetchHasTraceFeedback(accessToken, agentUuid)
+      .then((has) => {
+        if (!cancelled) setHasFeedback(has);
+      })
+      .catch((err) => reportError("Error checking for trace feedback:", err));
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, agentUuid, usageReads]);
+  // A row on the page with feedback counts too, so feedback that arrives
+  // while the tab is open shows the section without a Refresh.
+  const anyFeedback = hasFeedback || items.some((t) => t.feedback);
   // Rows skipped before the workspace's limit was lifted still say over_limit.
   const overLimit =
     usage?.max_scored_traces !== null &&
     items.some((t) => t.latest_run_error === "over_limit");
-  const storageFull =
-    usage != null && usage.traces_stored >= usage.max_traces;
+  const storageFull = usage != null && usage.traces_stored >= usage.max_traces;
   const isScoringLive = traceScoring.enabled && !overLimit && !storageFull;
+  const chatReplyCap = chatLink?.daily_message_limit ?? null;
+  const chatLimitReached =
+    chatReplyCap !== null && chatLink!.messages_today >= chatReplyCap;
 
   const handleRefresh = async () => {
     // A refresh can bring in traces of the other kind, which the counts read
@@ -629,6 +656,7 @@ export function TracesTabContent({
       // choices are read again with them.
       refetchLabels();
       refetchConversationIds();
+      setUsageReads((n) => n + 1);
       await refetch();
     } finally {
       setIsRefreshing(false);
@@ -793,7 +821,10 @@ export function TracesTabContent({
           agentUuid={agentUuid}
           outputType={facets.outputType}
           labels={facets.labels}
+          source={facets.source}
+          feedback={facets.feedback}
           allLabels={allLabels}
+          hasFeedback={anyFeedback}
           onFilterChange={(next) => setView(next)}
         />
       </div>
@@ -803,62 +834,84 @@ export function TracesTabContent({
   return (
     <div className="flex flex-col space-y-4 md:space-y-6">
       {viewSwitch}
-      {/* Shown even over the setup steps: with storage full, the very thing
+      {/* The warnings sit close together as one group; the wrapper takes no
+          room when none of them shows. */}
+      <div className="space-y-2 empty:hidden">
+        {/* Shown even over the setup steps: with storage full, the very thing
           those steps ask for cannot happen, and the reader would be left
           sending traces that are quietly turned away. */}
-      {hasLoaded && storageFull && usage && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-          <p className="text-sm text-amber-700 dark:text-amber-300">
-            New traces are no longer being stored because this workspace has
-            reached its limit of {traceCount(usage.max_traces)}. Delete traces
-            to make room.{" "}
-            <a
-              href={CONTACT_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-bold"
-            >
-              Click here
-            </a>{" "}
-            to contact us to extend your limits.
-          </p>
-        </div>
-      )}
+        {hasLoaded && storageFull && usage && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              New traces are no longer being stored because this workspace has
+              reached its limit of {traceCount(usage.max_traces)}. Delete traces
+              to make room.{" "}
+              <a
+                href={CONTACT_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold"
+              >
+                Click here
+              </a>{" "}
+              to contact us to extend your limits.
+            </p>
+          </div>
+        )}
 
-      {/* Quiet while scoring works: the chip in the toolbar carries the state
+        {hasLoaded && chatLimitReached && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Talking to this agent reached its limit of{" "}
+              {chatReplyCap.toLocaleString()}{" "}
+              {chatReplyCap === 1 ? "reply" : "replies"} today.{" "}
+              <button
+                type="button"
+                onClick={onGoToSettings}
+                className="font-bold cursor-pointer hover:opacity-80"
+              >
+                Click here
+              </button>{" "}
+              to increase the limit.
+            </p>
+          </div>
+        )}
+
+        {/* Quiet while scoring works: the chip in the toolbar carries the state
           and its detail. Only a real problem takes a row of its own. */}
-      {hasLoaded && !showEmptyState && hasWarning && (
-        <div className="space-y-3">
-          {nothingCanScore && (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                <NothingCanScoreMessage
-                  ineligible={ineligible}
-                  onGoToEvaluators={onGoToEvaluators}
-                />
-              </p>
-            </div>
-          )}
-          {overLimit && (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                {usage?.max_scored_traces != null
-                  ? `Some traces were not scored because this workspace has reached its limit of scoring ${traceCount(usage.max_scored_traces)}.`
-                  : "Some traces were not scored because this workspace has reached its limit for scoring traces."}{" "}
-                <a
-                  href={CONTACT_LINK}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold"
-                >
-                  Click here
-                </a>{" "}
-                to contact us to extend your limits.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+        {hasLoaded && !showEmptyState && hasWarning && (
+          <div className="space-y-2">
+            {nothingCanScore && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  <NothingCanScoreMessage
+                    ineligible={ineligible}
+                    onGoToEvaluators={onGoToEvaluators}
+                  />
+                </p>
+              </div>
+            )}
+            {overLimit && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  {usage?.max_scored_traces != null
+                    ? `Some traces were not scored because this workspace has reached its limit of scoring ${traceCount(usage.max_scored_traces)}.`
+                    : "Some traces were not scored because this workspace has reached its limit for scoring traces."}{" "}
+                  <a
+                    href={CONTACT_LINK}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold"
+                  >
+                    Click here
+                  </a>{" "}
+                  to contact us to extend your limits.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Above the list rather than inside it, so a search that matches nothing
           still leaves the box that got there. */}
@@ -877,6 +930,7 @@ export function TracesTabContent({
             labels={allLabels}
             scoreEvaluators={scoreFilterEvaluators}
             conversationIds={conversationIds}
+            hasFeedback={anyFeedback}
             onApply={(next) =>
               setView({
                 ...next,
@@ -1111,6 +1165,7 @@ export function TracesTabContent({
 
       <TraceDetailDialog
         evaluatorDescriptions={evaluatorDescriptions}
+        ineligibleEvaluators={ineligible}
         isOpen={openTraceUuid != null}
         onClose={closeTrace}
         accessToken={accessToken}
@@ -1150,8 +1205,9 @@ export function TracesTabContent({
         traceCount={selectionCount}
         testType={
           everyTraceMatching
-            ? (facets.outputType === "all" ? wholeListKind : facets.outputType) ===
-              "tool_call"
+            ? (facets.outputType === "all"
+                ? wholeListKind
+                : facets.outputType) === "tool_call"
               ? "tool_call"
               : isGeneral
                 ? "general"

@@ -57,6 +57,8 @@ describe("useTraces", () => {
       sortByEvaluator: null,
       sortOrder: "desc",
       conversationId: null,
+      source: "all",
+      feedback: "all",
       includeScoreAverages: true,
     });
   });
@@ -464,6 +466,8 @@ describe("useTraces", () => {
         sortByEvaluator: null,
         sortOrder: "desc",
         conversationId: null,
+        source: "all",
+        feedback: "all",
         includeScoreAverages: true,
       }),
     );

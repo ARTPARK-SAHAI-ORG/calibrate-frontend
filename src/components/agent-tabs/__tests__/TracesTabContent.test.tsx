@@ -39,11 +39,25 @@ jest.mock("../../../hooks", () => ({
 const fetchTrace = jest.fn();
 const fetchTraces = jest.fn();
 const fetchTraceUsage = jest.fn();
+const fetchHasTraceFeedback = jest.fn();
+const fetchChatLink = jest.fn();
+const chatLink = (messagesToday: number, limit: number) => ({
+  is_public: false,
+  share_token: "tok",
+  connection_verified: true,
+  messages_today: messagesToday,
+  daily_message_limit: limit,
+});
+jest.mock("../../../lib/chatLinkApi", () => ({
+  fetchChatLink: (...args: unknown[]) => fetchChatLink(...args),
+}));
 jest.mock("../../../lib/tracesApi", () => ({
   ...jest.requireActual("../../../lib/tracesApi"),
   fetchTrace: (...args: unknown[]) => fetchTrace(...args),
   fetchTraces: (...args: unknown[]) => fetchTraces(...args),
   fetchTraceUsage: (...args: unknown[]) => fetchTraceUsage(...args),
+  fetchHasTraceFeedback: (...args: unknown[]) =>
+    fetchHasTraceFeedback(...args),
 }));
 
 // The agent's own evaluators decide whether the attach prompt has anything to
@@ -343,6 +357,8 @@ const loaded = (over: Record<string, unknown> = {}) => ({
   labels: [],
   scores: {},
   conversationId: null,
+  source: "all",
+  feedback: "all",
   ...over,
 });
 
@@ -375,6 +391,7 @@ function tracesResult(
 const onTestsCreated = jest.fn();
 const onViewTests = jest.fn();
 const onGoToEvaluators = jest.fn();
+const onGoToSettings = jest.fn();
 const setEnabled = jest.fn(async () => {});
 // Scoring off, with one evaluator able to score, unless a test says otherwise.
 const traceScoring = {
@@ -397,6 +414,7 @@ const tabProps = {
   onTestsCreated,
   onViewTests,
   onGoToEvaluators,
+  onGoToSettings,
   traceScoring,
 };
 
@@ -409,6 +427,7 @@ beforeEach(() => {
   mockUseTraces.mockReturnValue(tracesResult([trace()]));
   mockUseTraceLabels.mockReturnValue({ labels: [], refetch: refetchLabels });
   fetchAgentEvaluators.mockResolvedValue([]);
+  fetchHasTraceFeedback.mockResolvedValue(false);
   // Read on every visit now, so every test needs an answer. Well inside both
   // limits, which is the ordinary case; the limit tests override it.
   fetchTraceUsage.mockResolvedValue({
@@ -417,6 +436,7 @@ beforeEach(() => {
     traces_scored: 12,
     max_scored_traces: 100,
   });
+  fetchChatLink.mockResolvedValue(chatLink(0, 200));
   // A test that opens a trace from the address replaces this, and
   // clearAllMocks leaves the replacement in place, so it is put back here.
   mockUseDialogUrlParam.mockImplementation(() => ({ setParam: jest.fn() }));
@@ -441,7 +461,13 @@ async function applyTraceFilter(
   },
 ) {
   await openTraceFilter(user);
-  if (output) await user.click(screen.getByRole("button", { name: output }));
+  if (output) {
+    await user.click(
+      within(
+        screen.getByRole("group", { name: "Filter traces by output" }),
+      ).getByRole("button", { name: output }),
+    );
+  }
   for (const label of labels) {
     await user.click(screen.getByRole("checkbox", { name: label }));
   }
@@ -467,7 +493,7 @@ const openTraceFilter = (user: ReturnType<typeof setupUser>) =>
  *  inside the scores section, since the evaluator's name is also on its card
  *  above the list and on its column heading. */
 const scoreChip = (name: string) =>
-  within(screen.getByText("Filter by scores").parentElement!).getByRole(
+  within(screen.getByText("Scores").parentElement!).getByRole(
     "button",
     { name },
   );
@@ -485,6 +511,17 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByRole("button", { name: "Refresh" }));
 
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the chat link's daily count again when the list is refreshed", async () => {
+    refetch.mockResolvedValue(false);
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+    await waitFor(() => expect(fetchTraceUsage).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() => expect(fetchTraceUsage).toHaveBeenCalledTimes(2));
   });
 
   it("reads the labels again when the list is refreshed", async () => {
@@ -753,7 +790,44 @@ describe("TracesTabContent", () => {
       // logs. Waiting for something here to go wrong would mean never saying
       // it at all.
       render(<TracesTabContent {...tabProps} />);
-      expect(fetchTraceUsage).toHaveBeenCalled();
+      expect(fetchTraceUsage).toHaveBeenCalledWith("test-token");
+      expect(fetchChatLink).toHaveBeenCalledWith("test-token", "agent-1");
+    });
+
+    it("says the chat link reached its daily limit, and opens Settings to raise it", async () => {
+      fetchChatLink.mockResolvedValue(chatLink(1200, 1200));
+      const user = setupUser();
+      render(<TracesTabContent {...tabProps} />);
+      const line = await screen.findByText(
+        /Talking to this agent reached its limit of 1,200 replies today\./,
+      );
+      expect(line).toHaveTextContent("Click here to increase the limit.");
+      await user.click(within(line).getByRole("button", { name: "Click here" }));
+      expect(onGoToSettings).toHaveBeenCalled();
+    });
+
+    it("warns at the agent's own limit, below the workspace maximum", async () => {
+      fetchChatLink.mockResolvedValue(chatLink(3, 3));
+      render(<TracesTabContent {...tabProps} />);
+      expect(
+        await screen.findByText(/reached its limit of 3 replies today/),
+      ).toBeInTheDocument();
+    });
+
+    it("says one reply, not one replies, when the daily limit is one", async () => {
+      fetchChatLink.mockResolvedValue(chatLink(1, 1));
+      render(<TracesTabContent {...tabProps} />);
+      expect(
+        await screen.findByText(/reached its limit of 1 reply today/),
+      ).toBeInTheDocument();
+    });
+
+    it("says nothing about the daily limit below the agent's own limit", async () => {
+      fetchChatLink.mockResolvedValue(chatLink(6, 7));
+      render(<TracesTabContent {...tabProps} />);
+      await waitFor(() => expect(fetchChatLink).toHaveBeenCalled());
+      await act(async () => {});
+      expect(screen.queryByText(/Talking to this agent reached/)).not.toBeInTheDocument();
     });
 
     it("says nothing about a limit when no trace was refused for one", () => {
@@ -1404,9 +1478,61 @@ describe("TracesTabContent", () => {
     const props = screen.getByTestId("conversations-view").dataset.props;
     expect(props).not.toContain("scores");
     expect(props).not.toContain("conversationId");
+    expect(props).toContain("source");
+    expect(props).toContain("feedback");
     const address = new URLSearchParams(window.location.search);
     expect(address.get("score")).toBe("ev-1:failed");
     expect(address.get("conversation")).toBe("conv-9");
+  });
+
+  it("offers the user feedback filter once any of the agent's traces carries feedback", async () => {
+    fetchHasTraceFeedback.mockResolvedValue(true);
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+    await waitFor(() =>
+      expect(fetchHasTraceFeedback).toHaveBeenCalledWith("test-token", "agent-1"),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Filter traces" }));
+
+    expect(await screen.findByText("User feedback")).toBeInTheDocument();
+  });
+
+  it("leaves the user feedback filter out while no trace carries feedback", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+    await waitFor(() => expect(fetchHasTraceFeedback).toHaveBeenCalled());
+
+    await user.click(screen.getByRole("button", { name: "Filter traces" }));
+
+    expect(screen.getByText("Agent output")).toBeInTheDocument();
+    expect(screen.queryByText("User feedback")).not.toBeInTheDocument();
+  });
+
+  it("offers the user feedback filter when a row on the page carries feedback", async () => {
+    mockUseTraces.mockReturnValue(
+      tracesResult([
+        trace({ feedback: { is_correct: true, comment: null, at: "2026-07-20" } }),
+      ]),
+    );
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByRole("button", { name: "Filter traces" }));
+
+    expect(screen.getByText("User feedback")).toBeInTheDocument();
+  });
+
+  it("hands the conversations whether any trace carries feedback", async () => {
+    fetchHasTraceFeedback.mockResolvedValue(true);
+    window.history.replaceState(null, "", "/?view=conversations");
+    render(<TracesTabContent {...tabProps} />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("conversations-view").dataset.props,
+      ).toContain("hasFeedback"),
+    );
   });
 
   it("keeps the ticks when the list is sorted", async () => {

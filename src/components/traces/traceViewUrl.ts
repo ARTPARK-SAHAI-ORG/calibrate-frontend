@@ -34,6 +34,11 @@ const DIRECTION_PARAM = "dir";
 const VIEW_PARAM = "view";
 /** The one conversation the traces list is narrowed to. */
 const CONVERSATION_PARAM = "conversation";
+/** "api" or "chat"; absent means both. */
+const SOURCE_PARAM = "source";
+/** "correct", "wrong" or "any"; absent means every trace. */
+const FEEDBACK_PARAM = "feedback";
+const FEEDBACK_VALUES = ["correct", "wrong", "any"] as const;
 
 export type TraceView = TraceFacets & {
   sortByEvaluator: string | null;
@@ -52,6 +57,8 @@ export function readTraceView(): TraceView {
   if (typeof window === "undefined") return EMPTY_TRACE_VIEW;
   const params = new URLSearchParams(window.location.search);
   const output = params.get(OUTPUT_PARAM);
+  const source = params.get(SOURCE_PARAM);
+  const feedback = params.get(FEEDBACK_PARAM);
   const scores: TraceScoreFilters = {};
   for (const entry of params.getAll(SCORE_PARAM)) {
     const at = entry.indexOf(":");
@@ -68,6 +75,8 @@ export function readTraceView(): TraceView {
     sortOrder: params.get(DIRECTION_PARAM) === "desc" ? "desc" : "asc",
     conversations: params.get(VIEW_PARAM) === "conversations",
     conversationId: params.get(CONVERSATION_PARAM) || null,
+    source: source === "api" || source === "chat" ? source : "all",
+    feedback: FEEDBACK_VALUES.find((value) => value === feedback) ?? "all",
   };
 }
 
@@ -82,6 +91,8 @@ export function writeTraceView(view: TraceView): void {
     DIRECTION_PARAM,
     VIEW_PARAM,
     CONVERSATION_PARAM,
+    SOURCE_PARAM,
+    FEEDBACK_PARAM,
   ]) {
     params.delete(name);
   }
@@ -96,6 +107,8 @@ export function writeTraceView(view: TraceView): void {
   }
   if (view.conversations) params.set(VIEW_PARAM, "conversations");
   if (view.conversationId) params.set(CONVERSATION_PARAM, view.conversationId);
+  if (view.source !== "all") params.set(SOURCE_PARAM, view.source);
+  if (view.feedback !== "all") params.set(FEEDBACK_PARAM, view.feedback);
   const query = params.toString();
   const { pathname, hash } = window.location;
   window.history.replaceState(

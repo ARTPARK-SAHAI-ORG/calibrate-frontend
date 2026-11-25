@@ -4,6 +4,7 @@ import React, { Fragment, useRef, useState } from "react";
 import { SegmentedFilter, type SegmentedFilterOption } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { useDismissOnOutside } from "@/hooks/useDismissOnOutside";
+import { useKeepInView } from "@/hooks/useKeepInView";
 import { ArrowDownIcon, SortIcon } from "@/components/icons";
 import type { TraceSortOrder } from "@/lib/tracesApi";
 
@@ -59,6 +60,8 @@ export function TracesSort({
   onChange: (next: TracesSortValue) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const shift = useKeepInView(panelRef, open);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useDismissOnOutside(open, rootRef, () => setOpen(false));
@@ -92,7 +95,10 @@ export function TracesSort({
       {open && (
         // Positioned against the button, the way the filter panel beside it
         // is. Switch to a portal if it ever gets clipped.
-        <div className="absolute right-0 top-full mt-2 z-30 w-max min-w-[min(24rem,calc(100vw-2rem))] max-w-[min(38rem,calc(100vw-2rem))] rounded-lg border border-border bg-background shadow-lg p-5">
+        <div
+          ref={panelRef}
+          style={{ transform: `translateX(${shift}px)` }}
+          className="absolute right-0 top-full mt-2 z-30 w-max min-w-[min(24rem,calc(100vw-2rem))] max-w-[min(38rem,calc(100vw-2rem))] rounded-lg border border-border bg-background shadow-lg p-5">
           <p className="text-sm font-medium text-foreground mb-3">Sort by</p>
           {/* Newest first is what the list does with no evaluator picked, so
               it sits in the same list rather than behind a Clear. */}

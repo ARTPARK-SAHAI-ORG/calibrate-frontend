@@ -14,6 +14,7 @@
  */
 
 import { orgFromPath } from "@/lib/routes";
+import { LIMITS } from "@/constants/limits";
 
 export const ACTIVE_ORG_UUID_KEY = "activeOrgUuid";
 export const ACTIVE_ORG_CHANGED_EVENT = "calibrate:active-org-changed";
@@ -77,6 +78,11 @@ export type OrganizationSettings = {
      *  agents you connect, whose own server answers each call. */
     run_models_in_parallel?: boolean;
   };
+  talk_to_agent?: {
+    /** Messages a day an agent's chat link answers, for every agent in this
+     *  workspace that has no number of its own. */
+    default_messages_per_day?: number;
+  };
 };
 
 export type Organization = {
@@ -99,6 +105,17 @@ export function workspaceRunModelsInParallel(
   org: Organization | undefined,
 ): boolean | undefined {
   return org?.settings?.model_benchmarking?.run_models_in_parallel;
+}
+
+/** Messages a day an agent's chat link answers when the agent has no number
+ *  of its own. Unknown reads as the backend's default. */
+export function workspaceDefaultMessagesPerDay(
+  org: Organization | undefined,
+): number {
+  return (
+    org?.settings?.talk_to_agent?.default_messages_per_day ??
+    LIMITS.DEFAULT_MAX_CHAT_REPLIES_PER_DAY
+  );
 }
 
 export type OrganizationMember = {

@@ -898,7 +898,7 @@ export const TEXT_FIELD_COLOR_CLASS = {
 export const PILL_CLASS =
   "inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-medium";
 
-const TURN_BUBBLE_CLASS =
+export const TURN_BUBBLE_CLASS =
   "px-3 md:px-4 py-2.5 md:py-3 rounded-xl border border-border";
 
 export function TurnVersionBubbles({
@@ -958,6 +958,8 @@ export function TestDetailView({
   afterHistory,
   showVerdict = true,
   markOutput = true,
+  afterOutput,
+  afterTurn,
 }: {
   /** The heading above a tool call the agent made. */
   toolCallLabel?: string;
@@ -995,6 +997,12 @@ export function TestDetailView({
   /** When false, the final reply gets no left border: nothing on screen is
    * being judged, as in a whole conversation read back. */
   markOutput?: boolean;
+  /** Drawn just under the agent's final reply, such as the feedback a
+   *  person left on it. */
+  afterOutput?: React.ReactNode;
+  /** Drawn just under an agent reply inside `history`, by its place in
+   *  `history`, such as the feedback a person left on that reply. */
+  afterTurn?: (index: number) => React.ReactNode;
 }) {
   // Precompute tool_call_id → response content map so the inline tool-call
   // card lookup is O(1) instead of scanning the entire history once per
@@ -1043,10 +1051,10 @@ export function TestDetailView({
   const outputAccent = !markOutput
     ? ""
     : showVerdict
-    ? passed
-      ? "border-l-4 border-l-green-500 pl-2 md:pl-3"
-      : "border-l-4 border-l-red-500 pl-2 md:pl-3"
-    : "border-l-4 border-l-foreground pl-2 md:pl-3";
+      ? passed
+        ? "border-l-4 border-l-green-500 pl-2 md:pl-3"
+        : "border-l-4 border-l-red-500 pl-2 md:pl-3"
+      : "border-l-4 border-l-foreground pl-2 md:pl-3";
   // A basic agent test has no conversation — its "history" is
   // just one user turn standing in for the input. Rendered through the
   // chat-bubble view below it reads as a two-message conversation, so it
@@ -1114,6 +1122,7 @@ export function TestDetailView({
               !(output?.tool_calls && output.tool_calls.length > 0) && (
                 <p className="text-sm text-muted-foreground">—</p>
               )}
+            {afterOutput}
           </div>
         </div>
       )}
@@ -1213,6 +1222,7 @@ export function TestDetailView({
                           versions={message.versions}
                           side="assistant"
                         />
+                        {afterTurn?.(index)}
                       </>
                     )}
 
@@ -1324,6 +1334,7 @@ export function TestDetailView({
               </div>
             </div>
           )}
+          {afterOutput}
         </div>
       )}
 

@@ -9,7 +9,8 @@ export type AnalyticsKind =
   | "tts"
   | "labelling_evaluator_run"
   | "trace_scoring"
-  | "trace";
+  | "trace"
+  | "chat";
 
 export type AnalyticsActivity = {
   new_users: number;
@@ -76,7 +77,8 @@ export type AnalyticsFailure = {
 export type AnalyticsLimitName =
   | "max_rows_per_eval"
   | "max_traces"
-  | "max_scored_traces";
+  | "max_scored_traces"
+  | "max_chat_replies_per_day";
 
 export type AnalyticsLimitHit = {
   created_at: string;

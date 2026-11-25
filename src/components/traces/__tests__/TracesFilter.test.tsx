@@ -7,7 +7,15 @@ import {
   type TracesFilterValue,
 } from "@/components/traces/TracesFilter";
 
-const NONE: TracesFilterValue = { outputType: "all", labels: [], scores: {} };
+/** The source and feedback filters left off, as they are by default. */
+const ANY_SOURCE = { source: "all", feedback: "all" } as const;
+
+const NONE: TracesFilterValue = {
+  ...ANY_SOURCE,
+  outputType: "all",
+  labels: [],
+  scores: {},
+};
 
 /** One yes-or-no evaluator and one rating, so both kinds of picker show. */
 const EVALUATORS = [
@@ -71,7 +79,7 @@ it("reports both choices together, and only once Apply is clicked", async () => 
   await user.click(applyButton());
 
   expect(onApply).toHaveBeenCalledWith({
-    outputType: "response",
+    ...ANY_SOURCE, outputType: "response",
     labels: ["production"],
     scores: {},
   });
@@ -97,7 +105,7 @@ it("counts the picks on Apply, before they narrow anything", async () => {
 
 it("says on the button how many choices are on", () => {
   setup({
-    outputType: "response",
+    ...ANY_SOURCE, outputType: "response",
     labels: ["production", "staging"],
     scores: {},
   });
@@ -122,7 +130,7 @@ it("drops a tick that was never applied", async () => {
   await user.click(applyButton());
 
   expect(onApply).toHaveBeenCalledWith({
-    outputType: "all",
+    ...ANY_SOURCE, outputType: "all",
     labels: [],
     scores: {},
   });
@@ -151,7 +159,7 @@ it("closes without applying when the reader clicks away", async () => {
 it("clears every choice at once", async () => {
   const { user, onApply } = setup(
     {
-      outputType: "tool_call",
+      ...ANY_SOURCE, outputType: "tool_call",
       labels: ["staging"],
       scores: { "ev-1": "failed" },
     },
@@ -164,7 +172,7 @@ it("clears every choice at once", async () => {
   await user.click(applyButton());
 
   expect(onApply).toHaveBeenCalledWith({
-    outputType: "all",
+    ...ANY_SOURCE, outputType: "all",
     labels: [],
     scores: {},
   });
@@ -182,7 +190,7 @@ it("has nothing to clear when nothing is picked", async () => {
 
 it("unticks a label that was already on", async () => {
   const { user, onApply } = setup({
-    outputType: "all",
+    ...ANY_SOURCE, outputType: "all",
     labels: ["staging"],
     scores: {},
   });
@@ -192,7 +200,7 @@ it("unticks a label that was already on", async () => {
   await user.click(applyButton());
 
   expect(onApply).toHaveBeenCalledWith({
-    outputType: "all",
+    ...ANY_SOURCE, outputType: "all",
     labels: [],
     scores: {},
   });
@@ -203,7 +211,7 @@ it("leaves the labels out when the traces carry none", async () => {
 
   await openPanel(user);
 
-  expect(screen.queryByText("Filter by trace labels")).not.toBeInTheDocument();
+  expect(screen.queryByText("Trace labels")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Response" })).toBeInTheDocument();
 });
 
@@ -317,7 +325,7 @@ describe("narrowing by what the evaluators scored", () => {
     await user.click(applyButton());
 
     expect(onApply).toHaveBeenCalledWith({
-      outputType: "all",
+      ...ANY_SOURCE, outputType: "all",
       labels: [],
       scores: { "ev-2": "<=2" },
     });
@@ -340,7 +348,7 @@ describe("narrowing by what the evaluators scored", () => {
     await user.click(applyButton());
 
     expect(onApply).toHaveBeenCalledWith({
-      outputType: "all",
+      ...ANY_SOURCE, outputType: "all",
       labels: [],
       scores: { "ev-1": "passed" },
     });
@@ -348,7 +356,7 @@ describe("narrowing by what the evaluators scored", () => {
 
   it("takes an evaluator out of the filters when it is removed", async () => {
     const { user, onApply } = setup(
-      { outputType: "all", labels: [], scores: { "ev-1": "failed" } },
+      { ...ANY_SOURCE, outputType: "all", labels: [], scores: { "ev-1": "failed" } },
       [],
       EVALUATORS,
     );
@@ -367,7 +375,7 @@ describe("narrowing by what the evaluators scored", () => {
     await user.click(applyButton());
 
     expect(onApply).toHaveBeenCalledWith({
-      outputType: "all",
+      ...ANY_SOURCE, outputType: "all",
       labels: [],
       scores: {},
     });
@@ -402,7 +410,7 @@ describe("narrowing by what the evaluators scored", () => {
   it("counts each evaluator the reader has set a condition on", () => {
     setup(
       {
-        outputType: "response",
+        ...ANY_SOURCE, outputType: "response",
         labels: ["staging"],
         scores: { "ev-1": "failed", "ev-2": "<=2" },
       },
@@ -418,14 +426,14 @@ describe("narrowing by what the evaluators scored", () => {
 
     await openPanel(user);
 
-    expect(screen.queryByText("Filter by scores")).not.toBeInTheDocument();
+    expect(screen.queryByText("Scores")).not.toBeInTheDocument();
   });
 
   it("shows a condition the evaluator no longer offers, rather than a blank box", async () => {
     // Conditions come back from the address bar, where one can name a score
     // this evaluator does not have any more.
     const { user } = setup(
-      { outputType: "all", labels: [], scores: { "ev-1": "<=2" } },
+      { ...ANY_SOURCE, outputType: "all", labels: [], scores: { "ev-1": "<=2" } },
       [],
       EVALUATORS,
     );
@@ -440,7 +448,7 @@ describe("narrowing by what the evaluators scored", () => {
     // Nothing would be on screen to switch it off, so opening the panel drops
     // it and Apply clears it.
     const { user, onApply } = setup(
-      { outputType: "all", labels: [], scores: { "gone-1": "failed" } },
+      { ...ANY_SOURCE, outputType: "all", labels: [], scores: { "gone-1": "failed" } },
       [],
       EVALUATORS,
     );
@@ -451,7 +459,7 @@ describe("narrowing by what the evaluators scored", () => {
     await user.click(applyButton());
 
     expect(onApply).toHaveBeenCalledWith({
-      outputType: "all",
+      ...ANY_SOURCE, outputType: "all",
       labels: [],
       scores: {},
     });
@@ -470,12 +478,13 @@ describe("narrowing by what the evaluators scored", () => {
   });
 });
 
-it("names the output filter after the agent's output", async () => {
+it("heads the panel Filter traces, with a section per filter", async () => {
   const { user } = setup();
   await openPanel(user);
   expect(
-    screen.getByText("Filter by type of agent's output"),
+    screen.getByRole("heading", { name: "Filter traces" }),
   ).toBeInTheDocument();
+  expect(screen.getByText("Agent output")).toBeInTheDocument();
   expect(
     screen.queryByText(
       "Conversations where any of the turns match the filters are shown",
@@ -490,7 +499,7 @@ it("says a conversation matches on any one of its turns", async () => {
   );
   await openPanel(user);
   expect(
-    screen.getByText("Filter by type of agent's output across turns"),
+    screen.getByRole("heading", { name: "Filter conversations" }),
   ).toBeInTheDocument();
   expect(
     screen.getByText(
@@ -581,7 +590,7 @@ it("keeps a conversation picked from the address on offer even when the list lac
 it("leaves the conversation section out when there are no conversation IDs", async () => {
   const { user } = setup();
   await openPanel(user);
-  expect(screen.queryByText("Filter by conversation ID")).not.toBeInTheDocument();
+  expect(screen.queryByText("Conversation ID")).not.toBeInTheDocument();
 });
 
 it("has no conversation ID box on the conversations list", async () => {
@@ -596,5 +605,63 @@ it("has no conversation ID box on the conversations list", async () => {
     />,
   );
   await openPanel(user);
-  expect(screen.queryByText("Filter by conversation ID")).not.toBeInTheDocument();
+  expect(screen.queryByText("Conversation ID")).not.toBeInTheDocument();
+});
+
+it("narrows by source and by user feedback, on Apply", async () => {
+  const user = setupUser();
+  const onApply = jest.fn();
+  render(
+    <TracesFilter value={NONE} labels={[]} onApply={onApply} hasFeedback />,
+  );
+
+  await openPanel(user);
+  expect(screen.getByText("Source")).toBeInTheDocument();
+  expect(screen.getByText("User feedback")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Chat" }));
+  await user.click(screen.getByRole("button", { name: "Wrong" }));
+  expect(applyButton()).toHaveTextContent("Apply (2)");
+  await user.click(applyButton());
+
+  expect(onApply).toHaveBeenCalledWith({
+    ...NONE,
+    source: "chat",
+    feedback: "wrong",
+  });
+});
+
+it("leaves out the user feedback section while no trace carries feedback", async () => {
+  const { user } = setup();
+  await openPanel(user);
+  expect(screen.getByText("Source")).toBeInTheDocument();
+  expect(screen.queryByText("User feedback")).not.toBeInTheDocument();
+});
+
+it("keeps a picked feedback filter on offer, so it can be turned off", async () => {
+  const { user } = setup({ ...NONE, feedback: "correct" });
+  await openPanel(user);
+  expect(screen.getByText("User feedback")).toBeInTheDocument();
+});
+
+it("counts the source and feedback choices on the button", () => {
+  setup({ ...NONE, source: "api", feedback: "any" });
+
+  expect(screen.getByText("2")).toBeInTheDocument();
+});
+
+it("offers the source and feedback filters on the conversations list too", async () => {
+  const user = setupUser();
+  render(
+    <TracesFilter
+      value={NONE}
+      labels={[]}
+      onApply={jest.fn()}
+      forConversations
+      hasFeedback
+    />,
+  );
+  await openPanel(user);
+  for (const name of ["API", "Chat", "Correct", "Wrong", "Any"]) {
+    expect(screen.getByRole("button", { name })).toBeInTheDocument();
+  }
 });

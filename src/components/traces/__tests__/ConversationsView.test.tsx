@@ -81,6 +81,8 @@ const props = {
   agentUuid: "agent-1",
   outputType: "all" as const,
   labels: [] as string[],
+  source: "all" as const,
+  feedback: "all" as const,
   allLabels: [] as string[],
   onFilterChange,
 };
@@ -110,6 +112,8 @@ describe("ConversationsView", () => {
         offset: 0,
         labels: ["vip"],
         outputType: "all",
+        source: "all",
+        feedback: "all",
       }),
     );
   });
@@ -137,16 +141,20 @@ describe("ConversationsView", () => {
 
   it("hands a picked filter back to the tab", async () => {
     const user = setupUser();
-    render(<ConversationsView {...props} />);
+    render(<ConversationsView {...props} hasFeedback />);
     await screen.findAllByText("conv-a");
 
     await user.click(screen.getByRole("button", { name: "Filter traces" }));
     await user.click(screen.getByRole("button", { name: "Response" }));
+    await user.click(screen.getByRole("button", { name: "Chat" }));
+    await user.click(screen.getByRole("button", { name: "Any" }));
     await user.click(screen.getByRole("button", { name: /^Apply/ }));
 
     expect(onFilterChange).toHaveBeenCalledWith({
       outputType: "response",
       labels: [],
+      source: "chat",
+      feedback: "any",
     });
   });
 

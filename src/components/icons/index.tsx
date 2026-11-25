@@ -118,6 +118,17 @@ export function CheckIcon({ className }: IconProps) {
   );
 }
 
+// Dots Icon (three in a row) — a menu of more actions
+export function DotsIcon({ className }: IconProps) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <circle cx="5" cy="12" r="1.75" />
+      <circle cx="12" cy="12" r="1.75" />
+      <circle cx="19" cy="12" r="1.75" />
+    </svg>
+  );
+}
+
 // Copy Icon (two stacked sheets) — duplicate actions
 export function CopyIcon({ className }: IconProps) {
   return (
@@ -643,6 +654,66 @@ export function CodeIcon({ className }: IconProps) {
         strokeLinejoin="round"
         d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"
       />
+    </svg>
+  );
+}
+
+// Chat Icon (a speech bubble, for anything sent from the chat link)
+export function ChatIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path d="M21 12a8 8 0 0 1-11.7 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />
+    </svg>
+  );
+}
+
+// Angle Brackets Icon (for anything sent through the API)
+export function AngleBracketsIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path d="m8 7-5 5 5 5M16 7l5 5-5 5" />
+    </svg>
+  );
+}
+
+// Thumbs Up Icon
+export function ThumbsUpIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path d="M7 10v11M15 5.9 14 10h5.8a2 2 0 0 1 2 2.3l-1.4 7A2 2 0 0 1 18.4 21H7V10l4-8a3 3 0 0 1 4 3.9z" />
+    </svg>
+  );
+}
+
+// Thumbs Down Icon
+export function ThumbsDownIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path d="M17 14V3M9 18.1 10 14H4.2a2 2 0 0 1-2-2.3l1.4-7A2 2 0 0 1 5.6 3H17v11l-4 8a3 3 0 0 1-4-3.9z" />
     </svg>
   );
 }

@@ -1,4 +1,4 @@
-import { formatCost } from "../format";
+import { LIMIT_LABELS, formatCost, kindLabel } from "../format";
 
 describe("formatCost", () => {
   it("says None when nothing in the range carries a cost", () => {
@@ -12,5 +12,14 @@ describe("formatCost", () => {
 
   it("does not round a fraction of a cent down to nothing", () => {
     expect(formatCost(0.0042)).toBe("$0.0042");
+  });
+});
+
+describe("chat link labels", () => {
+  it("names the chat link kind and its daily limit in plain words", () => {
+    expect(kindLabel("chat")).toBe("Message to an agent");
+    expect(LIMIT_LABELS.max_chat_replies_per_day).toBe(
+      "Too many messages to an agent in one day",
+    );
   });
 });
