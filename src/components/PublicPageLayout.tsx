@@ -146,7 +146,8 @@ export function PublicNotFound({
   detail = "The results may have been made private, or the link may be incorrect.",
 }: {
   message?: string;
-  detail?: string;
+  /** A second line under the message; null leaves it out. */
+  detail?: string | null;
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -158,9 +159,11 @@ export function PublicNotFound({
       <p className="text-[15px] font-medium text-foreground">
         {message ?? "This link is not available"}
       </p>
-      <p className="text-[13px] text-muted-foreground text-center max-w-sm">
-        {detail}
-      </p>
+      {detail && (
+        <p className="text-[13px] text-muted-foreground text-center max-w-sm">
+          {detail}
+        </p>
+      )}
     </div>
   );
 }

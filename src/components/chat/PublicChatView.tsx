@@ -155,8 +155,8 @@ export function PublicChatView({ token }: { token: string }) {
     return (
       <PublicPageLayout>
         <PublicNotFound
-          message="This chat is not available"
-          detail="The link may have been turned off, or it may be incorrect"
+          message="You do not have access to this page"
+          detail={null}
         />
       </PublicPageLayout>
     );

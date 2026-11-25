@@ -68,12 +68,13 @@ it("names the tab after the agent", async () => {
   expect(document.title).toBe("Support bot chat");
 });
 
-it("says the link is not available when the token is unknown", async () => {
+it("says there is no access when the token is unknown or the link is off", async () => {
   mockAgent.mockResolvedValue({ ok: false, error: "not_found" });
   render(<PublicChatView token="tok" />);
   expect(
-    await screen.findByText("This chat is not available"),
+    await screen.findByText("You do not have access to this page"),
   ).toBeInTheDocument();
+  expect(screen.queryByText(/The link may have been/)).not.toBeInTheDocument();
 });
 
 it("says the chat could not be opened on any other failure", async () => {
