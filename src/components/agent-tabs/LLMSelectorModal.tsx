@@ -5,6 +5,12 @@ import type { LLMModel, LLMProvider } from "./constants/providers";
 import { ChevronLeftIcon, CloseIcon } from "@/components/icons";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { useOpenRouterModels } from "@/hooks";
+import { useModelAvailability } from "@/hooks/useModelAvailability";
+import {
+  blocksUse,
+  formatRemovalDate,
+  modelProblem,
+} from "@/lib/modelAvailability";
 
 type LLMSelectorModalProps = {
   isOpen: boolean;
@@ -16,6 +22,9 @@ type LLMSelectorModalProps = {
   allowedProviderSlugs?: string[];
   /** Only show models that accept this input modality. */
   requiredInputModality?: "text" | "audio" | "image" | "video" | "file";
+  /** False when the model will be called by someone else's server, such as
+   *  a connection agent's, so the server's privacy setting does not apply. */
+  serverCalls?: boolean;
 };
 
 export function LLMSelectorModal({
@@ -26,11 +35,19 @@ export function LLMSelectorModal({
   availableProviders,
   allowedProviderSlugs,
   requiredInputModality,
+  serverCalls = true,
 }: LLMSelectorModalProps) {
   useHideFloatingButton(isOpen);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const { providers: fetchedProviders, isLoading, error, retry } = useOpenRouterModels();
+  const {
+    providers: fetchedProviders,
+    isLoading,
+    error,
+    retry,
+  } = useOpenRouterModels();
+  // Shares the module cache with the call above, so it never fetches again.
+  const availability = useModelAvailability(serverCalls);
 
   if (!isOpen) return null;
 
@@ -59,6 +76,7 @@ export function LLMSelectorModal({
     .map((provider) => ({
       ...provider,
       models: provider.models.filter((model) => {
+        if (blocksUse(modelProblem(model.id, availability))) return false;
         if (
           requiredInputModality &&
           model.inputModalities &&
@@ -153,19 +171,28 @@ export function LLMSelectorModal({
                 <h3 className="px-4 py-2 text-sm font-medium text-muted-foreground">
                   {provider.name}
                 </h3>
-                {provider.models.map((model) => (
-                  <button
-                    key={model.id}
-                    onClick={() => handleSelect(model)}
-                    className={`w-full px-4 py-3 flex items-center hover:bg-muted/50 transition-colors cursor-pointer ${
-                      selectedLLM?.id === model.id ? "bg-muted/50" : ""
-                    }`}
-                  >
-                    <span className="text-base font-medium text-foreground">
-                      {model.name}
-                    </span>
-                  </button>
-                ))}
+                {provider.models.map((model) => {
+                  const problem = modelProblem(model.id, availability);
+                  return (
+                    <button
+                      key={model.id}
+                      onClick={() => handleSelect(model)}
+                      className={`w-full px-4 py-3 flex items-center gap-2.5 hover:bg-muted/50 transition-colors cursor-pointer ${
+                        selectedLLM?.id === model.id ? "bg-muted/50" : ""
+                      }`}
+                    >
+                      <span className="text-base font-medium text-foreground">
+                        {model.name}
+                      </span>
+                      {problem?.kind === "soon" && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-500/12 text-amber-700 dark:text-amber-300">
+                          Will be removed on{" "}
+                          {formatRemovalDate(problem.expiresOn, true)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             ))
           )}

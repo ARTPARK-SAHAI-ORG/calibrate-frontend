@@ -21,6 +21,14 @@ import { getDefaultHeaders } from "@/lib/api";
 import { BenchmarkResultsDialog } from "./BenchmarkResultsDialog";
 import type { SelectedTest } from "@/components/eval-details/SelectedTestsStrip";
 import { Tooltip } from "@/components/Tooltip";
+import { ModelProblemNote } from "@/components/ModelProblemNote";
+import { useModelAvailability } from "@/hooks/useModelAvailability";
+import {
+  blocksUse,
+  modelProblem,
+  modelProblemBorder,
+  resolveSavedModel,
+} from "@/lib/modelAvailability";
 import {
   CloseIcon,
   ChevronDownIcon,
@@ -115,6 +123,8 @@ export function BenchmarkDialog({
 }: BenchmarkDialogProps) {
   useHideFloatingButton(isOpen);
   const { providers: llmProviders } = useOpenRouterModels();
+  // A connection agent's own server calls the models, with its own keys.
+  const modelAvailability = useModelAvailability(agentType !== "connection");
   const backendAccessToken = useAccessToken();
   const [activeOrgUuid] = useActiveOrgUuid();
   const { organizations, updateOrganization } =
@@ -165,28 +175,21 @@ export function BenchmarkDialog({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
 
-  // `initialModels` names the models an earlier comparison ran, and the list of
-  // models comes from the backend, so an id can only be turned into a model
-  // once that list has arrived. It is filled in once per open: after that the
-  // models on screen are the reader's own choice and are left alone.
+  // `initialModels` names the models an earlier comparison ran. It is filled
+  // in once per open: after that the models on screen are the reader's own
+  // choice and are left alone. Each row is named from the model list when it
+  // is drawn, so a model the list no longer has still shows, by its id.
   const filledInModels = useRef(false);
   useEffect(() => {
     if (!isOpen || filledInModels.current) return;
     if (!initialModels || initialModels.length === 0) return;
-    if (llmProviders.length === 0) return;
     filledInModels.current = true;
-    const byId = new Map(
-      llmProviders.flatMap((p) => p.models).map((m) => [m.id, m] as const),
-    );
     setSelectedModels(
       Array.from(new Set(initialModels))
         .slice(0, maxModels)
-        // A model that has since been retired is no longer in the list. It
-        // still gets a row, named by its id, so the reader can see what the
-        // earlier comparison used and swap it for one that still exists.
-        .map((id) => byId.get(id) ?? { id, name: id }),
+        .map((id) => ({ id, name: id })),
     );
-  }, [isOpen, initialModels, llmProviders]);
+  }, [isOpen, initialModels]);
 
   if (!isOpen) return null;
 
@@ -416,7 +419,11 @@ export function BenchmarkDialog({
     }));
   };
 
-  const chosenModels = selectedModels.filter((m): m is LLMModel => m !== null);
+  // Stored by id until the model list arrives, so the names come from the list.
+  const namedModels = selectedModels.map(
+    (m) => m && resolveSavedModel(m.id, llmProviders),
+  );
+  const chosenModels = namedModels.filter((m): m is LLMModel => m !== null);
   // The same rule `handleRunBenchmark` runs on: a connection agent has to pass
   // a check with each model it has not been verified with yet, so the question
   // says so before the reader agrees to it.
@@ -442,9 +449,24 @@ export function BenchmarkDialog({
   // The chosen models, then one blank row to pick the next in, until five
   // are chosen. Picking a model fills the blank and a new blank appears.
   const rows: (LLMModel | null)[] =
-    selectedModels.length < maxModels
-      ? [...selectedModels, null]
-      : selectedModels;
+    namedModels.length < maxModels ? [...namedModels, null] : namedModels;
+  const rowProblems = rows.map((m) =>
+    modelProblem(m?.id ?? "", modelAvailability),
+  );
+  const hasBlockedModel = rowProblems.some(blocksUse);
+
+  const runButton = (
+    <Button
+      variant="primary"
+      size="md"
+      onClick={() => setConfirmOpen(true)}
+      disabled={!canRunBenchmark || isVerifying || hasBlockedModel}
+      className="flex items-center gap-2"
+    >
+      <PlayIcon className="w-4 h-4" />
+      Run comparison
+    </Button>
+  );
 
   const getModelVerificationBadge = (modelId: string) => {
     if (agentType !== "connection") return null;
@@ -651,10 +673,14 @@ export function BenchmarkDialog({
                   <div className="flex-1 flex items-center gap-2">
                     <button
                       onClick={() => openModelSelector(index)}
-                      className={`flex-1 h-10 px-4 rounded-md text-sm border border-border flex items-center cursor-pointer transition-colors ${
-                        selectedModel
-                          ? "bg-muted font-medium hover:bg-muted/70"
-                          : "border-dashed bg-background hover:bg-muted/50"
+                      className={`flex-1 h-10 px-4 rounded-md text-sm border flex items-center cursor-pointer transition-colors ${
+                        !selectedModel
+                          ? "border-border border-dashed bg-background hover:bg-muted/50"
+                          : `${modelProblemBorder(rowProblems[index])} font-medium ${
+                              blocksUse(rowProblems[index])
+                                ? "bg-red-500/5"
+                                : "bg-muted hover:bg-muted/70"
+                            }`
                       }`}
                     >
                       <span
@@ -721,6 +747,10 @@ export function BenchmarkDialog({
                       )}
                     </ErrorNote>
                   )}
+                <ModelProblemNote
+                  problem={rowProblems[index]}
+                  nextStep="comparison"
+                />
               </div>
             ))}
           </div>
@@ -754,16 +784,16 @@ export function BenchmarkDialog({
               Retry failed
             </button>
           )}
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => setConfirmOpen(true)}
-            disabled={!canRunBenchmark || isVerifying}
-            className="flex items-center gap-2"
-          >
-            <PlayIcon className="w-4 h-4" />
-            Run comparison
-          </Button>
+          {hasBlockedModel ? (
+            <Tooltip
+              content="Remove or replace the model marked in red first"
+              position="top"
+            >
+              {runButton}
+            </Tooltip>
+          ) : (
+            runButton
+          )}
         </div>
       </div>
 
@@ -778,6 +808,7 @@ export function BenchmarkDialog({
           selectedLLM={rows[editingIndex] ?? null}
           onSelect={handleModelSelected}
           availableProviders={getAvailableProviders(editingIndex)}
+          serverCalls={agentType !== "connection"}
         />
       )}
 

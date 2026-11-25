@@ -19,7 +19,6 @@ jest.mock("../../../hooks", () => ({
     !enabled || enabled.has(value.toLowerCase()),
   // Pulled in by the create-evaluator flow behind the Evaluators tab.
   useOpenRouterModels: () => ({ providers: [], isLoading: false }),
-  findModelInProviders: () => null,
 }));
 
 // ─── Missing provider keys ─────────────────────────────────────────────────

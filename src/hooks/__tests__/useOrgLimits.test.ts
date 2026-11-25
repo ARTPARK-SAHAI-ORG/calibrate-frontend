@@ -2,6 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import {
   getOrgLimits,
   useUsesOwnProviderKeys,
+  useUsesOwnProviderKeysIfKnown,
   clearOrgLimitsCache,
 } from "@/hooks/useOrgLimits";
 import { apiGet } from "@/lib/api";
@@ -61,6 +62,30 @@ describe("useUsesOwnProviderKeys", () => {
     await waitFor(() => expect(first.result.current).toBe(true));
     await waitFor(() => expect(second.result.current).toBe(true));
     expect(mockApiGet).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("useUsesOwnProviderKeysIfKnown", () => {
+  beforeEach(() => {
+    mockApiGet.mockReset();
+    localStorage.clear();
+  });
+
+  it("is null until the backend answers, then its answer", async () => {
+    mockApiGet.mockResolvedValue({ uses_own_provider_keys: false });
+    localStorage.setItem("access_token", "token-if-known");
+    const { result } = renderHook(() => useUsesOwnProviderKeysIfKnown());
+    expect(result.current).toBeNull();
+    await waitFor(() => expect(result.current).toBe(false));
+  });
+
+  it("stays null when the request fails", async () => {
+    mockApiGet.mockRejectedValue(new Error("network error"));
+    localStorage.setItem("access_token", "token-if-known-fail");
+    const { result } = renderHook(() => useUsesOwnProviderKeysIfKnown());
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(result.current).toBeNull();
   });
 });
 

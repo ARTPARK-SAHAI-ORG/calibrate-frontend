@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  useAccessToken,
-  useOpenRouterModels,
-  findModelInProviders,
-} from "@/hooks";
+import { useAccessToken, useOpenRouterModels } from "@/hooks";
+import { resolveSavedModel } from "@/lib/modelAvailability";
+import { JUDGE_PROVIDER_SLUGS } from "@/constants/judgeProviders";
 import { reportError } from "@/lib/reportError";
 import { getBackendUrl, getDefaultHeaders } from "@/lib/api";
 import {
@@ -67,17 +65,6 @@ const EVALUATOR_TYPE_TO_DATA_TYPE: Record<EvaluatorType, "text" | "audio"> = {
   conversation: "text",
   "tool-call": "text",
 };
-
-const JUDGE_PROVIDER_SLUGS = [
-  "openai",
-  "anthropic",
-  "google",
-  "meta-llama",
-  "mistralai",
-  "x-ai",
-  "qwen",
-  "moonshotai",
-];
 
 const initialScale = () => [
   { value: 1, name: "", description: "" },
@@ -203,13 +190,10 @@ export function CreateEvaluatorFlow({
           ),
         );
         if (live?.judge_model) {
-          const found =
-            llmProviders.length > 0
-              ? findModelInProviders(llmProviders, live.judge_model)
-              : null;
-          setNewEvaluatorJudgeModel(
-            found ?? { id: live.judge_model, name: live.judge_model },
-          );
+          setNewEvaluatorJudgeModel({
+            id: live.judge_model,
+            name: live.judge_model,
+          });
         }
         if (outputType === "rating" && scale && scale.length >= 2) {
           setNewEvaluatorScale(
@@ -251,15 +235,10 @@ export function CreateEvaluatorFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, onlyUseCase?.value, duplicateOf]);
 
-  // Once OpenRouter providers load, upgrade a stub `{ id, name: id }` judge
-  // model (seeded from the default-prompt response) to the full LLMModel.
-  useEffect(() => {
-    if (!newEvaluatorJudgeModel || llmProviders.length === 0) return;
-    const found = findModelInProviders(llmProviders, newEvaluatorJudgeModel.id);
-    if (found && found.name !== newEvaluatorJudgeModel.name) {
-      setNewEvaluatorJudgeModel(found);
-    }
-  }, [llmProviders, newEvaluatorJudgeModel]);
+  // The name from the model list, once it has loaded.
+  const judgeModel =
+    newEvaluatorJudgeModel &&
+    resolveSavedModel(newEvaluatorJudgeModel.id, llmProviders);
 
   // Lets a create that the name blocked put the cursor back on the box.
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -301,13 +280,10 @@ export function CreateEvaluatorFlow({
       setNewEvaluatorOutputType(data.output_type);
 
       if (data.judge_model) {
-        const found =
-          llmProviders.length > 0
-            ? findModelInProviders(llmProviders, data.judge_model)
-            : null;
-        setNewEvaluatorJudgeModel(
-          found ?? { id: data.judge_model, name: data.judge_model },
-        );
+        setNewEvaluatorJudgeModel({
+          id: data.judge_model,
+          name: data.judge_model,
+        });
       }
 
       if (
@@ -481,7 +457,7 @@ export function CreateEvaluatorFlow({
         evaluatorOutputType={newEvaluatorOutputType}
         evaluatorScale={newEvaluatorScale}
         evaluatorBinaryScale={newEvaluatorBinaryScale}
-        judgeModel={newEvaluatorJudgeModel}
+        judgeModel={judgeModel}
         systemPrompt={newEvaluatorSystemPrompt}
         detectedPromptVariables={detectedPromptVariables}
         variableDescriptions={newEvaluatorVariableDescriptions}
@@ -508,7 +484,7 @@ export function CreateEvaluatorFlow({
       <LLMSelectorModal
         isOpen={llmModalOpen}
         onClose={() => setLlmModalOpen(false)}
-        selectedLLM={newEvaluatorJudgeModel}
+        selectedLLM={judgeModel}
         onSelect={setNewEvaluatorJudgeModel}
         allowedProviderSlugs={JUDGE_PROVIDER_SLUGS}
         requiredInputModality={newEvaluatorType === "tts" ? "audio" : "text"}

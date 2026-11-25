@@ -5,6 +5,8 @@ import { ViewMoreToggle, InfoNote } from "@/components/ui";
 import { getBinaryLabel } from "@/lib/binaryLabels";
 import { ratingRank, scaleBounds } from "@/lib/ratingRank";
 import { RANKS, RatingRankPill } from "./RatingScaleEditor";
+import { ModelProblemNote } from "@/components/ModelProblemNote";
+import type { ModelProblem } from "@/lib/modelAvailability";
 
 // Pixel height used as the collapsed cap for prompt bodies. Matches the
 // max-h-[7.5rem] applied to the <pre> below (7.5rem at 16px root).
@@ -44,6 +46,8 @@ type VersionCardProps = {
    *  the prompt shows straight away, there is no show/hide button, and the
    *  version number and Current pill are left to the list. */
   isSelectedDetail?: boolean;
+  /** Why this version's model cannot be used, or soon will not be. */
+  modelProblem?: ModelProblem | null;
 };
 
 export function VersionCard({
@@ -54,6 +58,7 @@ export function VersionCard({
   isSettingLive,
   onSetLive,
   formatDateTime,
+  modelProblem = null,
   isSelectedDetail = false,
 }: VersionCardProps) {
   const [promptVisible, setPromptVisible] = useState(
@@ -143,6 +148,11 @@ export function VersionCard({
                 <code className="text-sm md:text-base font-mono font-medium text-foreground truncate">
                   {version.judge_model}
                 </code>
+                <ModelProblemNote
+                  problem={modelProblem}
+                  nextStep="newVersion"
+                  className="mt-1"
+                />
               </>
             )}
           </div>

@@ -63,12 +63,12 @@ export function getOrgLimits(
   return cachedPromise;
 }
 
-/** The workspace's limits for rendering. Starts at the default limits and
- *  updates when the backend answers. */
-export function useOrgLimits(): OrgLimits {
+/** The workspace's limits as the backend answered them: null until it has,
+ *  and FALLBACK itself when it could not be asked or did not answer. */
+function useAnsweredOrgLimits(): OrgLimits | null {
   const accessToken = useAccessToken();
   const orgUuid = useOrgUuid();
-  const [limits, setLimits] = useState<OrgLimits>(FALLBACK);
+  const [limits, setLimits] = useState<OrgLimits | null>(null);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -85,6 +85,22 @@ export function useOrgLimits(): OrgLimits {
   }, [accessToken, orgUuid]);
 
   return limits;
+}
+
+/** The workspace's limits for rendering. Starts at the default limits and
+ *  updates when the backend answers. */
+export function useOrgLimits(): OrgLimits {
+  return useAnsweredOrgLimits() ?? FALLBACK;
+}
+
+/** Whether the workspace runs on its own provider keys, or null while that is
+ *  not known: before the backend answers, or when it did not. For a check
+ *  that must not guess, where the default answer would wrongly block. */
+export function useUsesOwnProviderKeysIfKnown(): boolean | null {
+  const limits = useAnsweredOrgLimits();
+  return limits === null || limits === FALLBACK
+    ? null
+    : limits.uses_own_provider_keys;
 }
 
 /** True when the workspace runs on its own provider keys, which lifts the
