@@ -2,7 +2,6 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import {
   useOpenRouterModels,
   OPENROUTER_DISABLED_MESSAGE,
-  findModelInProviders,
 } from "@/hooks/useOpenRouterModels";
 import { getBackendUrl } from "@/lib/api";
 import { reportError } from "@/lib/reportError";
@@ -164,10 +163,22 @@ describe("useOpenRouterModels", () => {
       .mockResolvedValueOnce(makeProvidersResponse({ providers: "all" }))
       .mockResolvedValueOnce(
         makeModelsResponse([
-          { id: "openai/expired", name: "Expired", expiration_date: "2000-01-01" },
-          { id: "openai/future", name: "Future", expiration_date: "2999-01-01" },
+          {
+            id: "openai/expired",
+            name: "Expired",
+            expiration_date: "2000-01-01",
+          },
+          {
+            id: "openai/future",
+            name: "Future",
+            expiration_date: "2999-01-01",
+          },
           { id: "openai/no-date", name: "NoDate" },
-          { id: "openai/bad-date", name: "BadDate", expiration_date: "not-a-date" },
+          {
+            id: "openai/bad-date",
+            name: "BadDate",
+            expiration_date: "not-a-date",
+          },
         ]),
       );
 
@@ -248,12 +259,22 @@ describe("useOpenRouterModels", () => {
   it("reads every model's date into availability, with no privacy list when the server does not ask for one", async () => {
     fetchMock
       .mockResolvedValueOnce(
-        makeProvidersResponse({ providers: [{ slug: "openai", name: "OpenAI" }] }),
+        makeProvidersResponse({
+          providers: [{ slug: "openai", name: "OpenAI" }],
+        }),
       )
       .mockResolvedValueOnce(
         makeModelsResponse([
-          { id: "openai/future", name: "Future", expiration_date: "2999-01-01" },
-          { id: "openai/expired", name: "Expired", expiration_date: "2000-01-01" },
+          {
+            id: "openai/future",
+            name: "Future",
+            expiration_date: "2999-01-01",
+          },
+          {
+            id: "openai/expired",
+            name: "Expired",
+            expiration_date: "2000-01-01",
+          },
           { id: "mistralai/mixtral", name: "Mixtral" },
         ]),
       );
@@ -285,7 +306,9 @@ describe("useOpenRouterModels", () => {
           { id: "openai/b", name: "B" },
         ]),
       )
-      .mockResolvedValueOnce(makeModelsResponse([{ id: "openai/a" }, { id: 7 }]));
+      .mockResolvedValueOnce(
+        makeModelsResponse([{ id: "openai/a" }, { id: 7 }]),
+      );
 
     const { result } = renderHook(() => useOpenRouterModels());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -293,19 +316,29 @@ describe("useOpenRouterModels", () => {
     expect(fetchMock).toHaveBeenLastCalledWith(
       "https://openrouter.ai/api/v1/models?zdr=true",
     );
-    expect([...result.current.availability!.privacyAllowed!]).toEqual(["openai/a"]);
+    expect([...result.current.availability!.privacyAllowed!]).toEqual([
+      "openai/a",
+    ]);
   });
 
   it.each([
-    ["a failed response", () => Promise.resolve(makeModelsResponse([], false, 500))],
-    ["a reply with no list", () => Promise.resolve({ ok: true, json: async () => ({}) } as Response)],
+    [
+      "a failed response",
+      () => Promise.resolve(makeModelsResponse([], false, 500)),
+    ],
+    [
+      "a reply with no list",
+      () => Promise.resolve({ ok: true, json: async () => ({}) } as Response),
+    ],
     ["a network error", () => Promise.reject(new Error("offline"))],
   ])("leaves the privacy list unset after %s", async (_label, zdrReply) => {
     fetchMock
       .mockResolvedValueOnce(
         makeProvidersResponse({ providers: "all", zero_data_retention: true }),
       )
-      .mockResolvedValueOnce(makeModelsResponse([{ id: "openai/a", name: "A" }]))
+      .mockResolvedValueOnce(
+        makeModelsResponse([{ id: "openai/a", name: "A" }]),
+      )
       .mockImplementationOnce(zdrReply);
 
     const { result } = renderHook(() => useOpenRouterModels());
@@ -313,7 +346,9 @@ describe("useOpenRouterModels", () => {
 
     expect(result.current.error).toBeNull();
     expect(result.current.availability!.privacyAllowed).toBeNull();
-    expect(result.current.providers[0].models.map((m) => m.id)).toEqual(["openai/a"]);
+    expect(result.current.providers[0].models.map((m) => m.id)).toEqual([
+      "openai/a",
+    ]);
   });
 
   it("serves from cache without refetching on remount within TTL", async () => {
@@ -448,41 +483,5 @@ describe("useOpenRouterModels", () => {
     } finally {
       jest.useRealTimers();
     }
-  });
-});
-
-describe("findModelInProviders", () => {
-  it("finds a model by id across providers", () => {
-    const providers = [
-      {
-        slug: "openai",
-        name: "OpenAI",
-        models: [{ id: "openai/gpt-4", name: "GPT-4" }],
-      },
-      {
-        slug: "anthropic",
-        name: "Anthropic",
-        models: [{ id: "anthropic/claude-3", name: "Claude 3" }],
-      },
-    ];
-    expect(findModelInProviders(providers, "anthropic/claude-3")).toEqual({
-      id: "anthropic/claude-3",
-      name: "Claude 3",
-    });
-  });
-
-  it("returns null when no provider has the model", () => {
-    const providers = [
-      {
-        slug: "openai",
-        name: "OpenAI",
-        models: [{ id: "openai/gpt-4", name: "GPT-4" }],
-      },
-    ];
-    expect(findModelInProviders(providers, "missing/model")).toBeNull();
-  });
-
-  it("returns null for an empty providers list", () => {
-    expect(findModelInProviders([], "anything")).toBeNull();
   });
 });

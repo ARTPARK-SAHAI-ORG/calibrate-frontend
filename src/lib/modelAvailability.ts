@@ -32,15 +32,32 @@ export function modelProblem(
   if (!availability || !id) return null;
   const model = availability.models.get(id);
   if (!model) return { kind: "retired" };
-  const expires = model.expiresOn ? Date.parse(model.expiresOn) : NaN;
-  if (!Number.isNaN(expires) && expires < now) return { kind: "retired" };
+  if (model.expiresOn && isPastRemovalDate(model.expiresOn, now)) {
+    return { kind: "retired" };
+  }
   if (availability.privacyAllowed && !availability.privacyAllowed.has(id)) {
     return { kind: "privacy" };
   }
-  if (!Number.isNaN(expires)) {
-    return { kind: "soon", expiresOn: model.expiresOn as string };
-  }
+  if (model.expiresOn) return { kind: "soon", expiresOn: model.expiresOn };
   return null;
+}
+
+/** OpenRouter's date is the last day a model is served: it may be removed
+ *  after it. Compared as calendar dates on the reader's own clock, so the
+ *  model is not called gone hours early, or late, by a time zone. A date that
+ *  cannot be read counts as not passed. */
+export function isPastRemovalDate(
+  isoDate: string,
+  now: number = Date.now(),
+): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(isoDate)) return false;
+  const today = new Date(now);
+  const todayIso = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
+  return todayIso > isoDate.slice(0, 10);
 }
 
 /** A problem that stops the model from being used now, rather than a

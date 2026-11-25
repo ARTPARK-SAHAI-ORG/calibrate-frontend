@@ -7,7 +7,7 @@ jest.mock("../useOpenRouterModels", () => ({
 }));
 const mockOwnKeys = jest.fn();
 jest.mock("../useOrgLimits", () => ({
-  useUsesOwnProviderKeys: () => mockOwnKeys(),
+  useUsesOwnProviderKeysIfKnown: () => mockOwnKeys(),
 }));
 
 const availability = {
@@ -37,6 +37,16 @@ describe("useModelAvailability", () => {
     mockModels.mockReturnValue({ availability });
     mockOwnKeys.mockReturnValue(false);
     const { result } = renderHook(() => useModelAvailability(false));
+    expect(result.current).toEqual({
+      models: availability.models,
+      privacyAllowed: null,
+    });
+  });
+
+  it("drops the privacy list while the workspace's keys are not known yet", () => {
+    mockModels.mockReturnValue({ availability });
+    mockOwnKeys.mockReturnValue(null);
+    const { result } = renderHook(() => useModelAvailability());
     expect(result.current).toEqual({
       models: availability.models,
       privacyAllowed: null,

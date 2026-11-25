@@ -13,7 +13,6 @@ jest.mock("../../../hooks", () => ({
       },
     ],
   }),
-  findModelInProviders: () => ({ id: "gpt-4", name: "GPT-4" }),
 }));
 
 jest.mock("../../../lib/reportError", () => ({

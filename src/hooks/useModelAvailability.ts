@@ -2,7 +2,7 @@
 
 import type { ModelAvailability } from "@/lib/modelAvailability";
 import { useOpenRouterModels } from "./useOpenRouterModels";
-import { useUsesOwnProviderKeys } from "./useOrgLimits";
+import { useUsesOwnProviderKeysIfKnown } from "./useOrgLimits";
 
 /** What OpenRouter says about every model, for this workspace. The server's
  *  privacy setting binds only calls made with the server's key, so the privacy
@@ -12,7 +12,11 @@ export function useModelAvailability(
   serverCalls = true,
 ): ModelAvailability | null {
   const { availability } = useOpenRouterModels();
-  const usesOwnKeys = useUsesOwnProviderKeys();
-  if (!availability || (serverCalls && !usesOwnKeys)) return availability;
+  // Only once the workspace is known to be on the server's keys: until then
+  // the privacy list could block models it is free to use.
+  const usesOwnKeys = useUsesOwnProviderKeysIfKnown();
+  if (!availability || (serverCalls && usesOwnKeys === false)) {
+    return availability;
+  }
   return { ...availability, privacyAllowed: null };
 }

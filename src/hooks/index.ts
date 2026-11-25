@@ -1,9 +1,6 @@
 export { useCrudResource, useFetchResource } from "./useCrudResource";
 export { useAccessToken, useAuth } from "./useAccessToken";
-export {
-  useOpenRouterModels,
-  findModelInProviders,
-} from "./useOpenRouterModels";
+export { useOpenRouterModels } from "./useOpenRouterModels";
 export { useEnabledProviders, isProviderEnabled } from "./useEnabledProviders";
 export { useDatasetManagement } from "./useDatasetManagement";
 export { useBulkDeletion } from "./useBulkDeletion";

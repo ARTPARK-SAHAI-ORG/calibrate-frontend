@@ -2,9 +2,15 @@
 import { reportError } from "@/lib/reportError";
 
 import { useState, useEffect, useCallback } from "react";
-import type { LLMProvider, LLMModel } from "@/components/agent-tabs/constants/providers";
+import type {
+  LLMProvider,
+  LLMModel,
+} from "@/components/agent-tabs/constants/providers";
 import { getBackendUrl } from "@/lib/api";
-import type { ModelAvailability } from "@/lib/modelAvailability";
+import {
+  isPastRemovalDate,
+  type ModelAvailability,
+} from "@/lib/modelAvailability";
 
 type ModelsResult = {
   providers: LLMProvider[];
@@ -43,10 +49,10 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   amazon: "Amazon",
   nvidia: "NVIDIA",
   microsoft: "Microsoft",
-  "moonshotai": "MoonshotAI",
+  moonshotai: "MoonshotAI",
   "bytedance-seed": "ByteDance Seed",
   minimax: "MiniMax",
-  "ai21": "AI21",
+  ai21: "AI21",
   inflection: "Inflection",
   ibm: "IBM",
   tencent: "Tencent",
@@ -71,10 +77,7 @@ function getProviderDisplayName(slug: string): string {
 }
 
 function isDeprecated(model: { expiration_date?: string | null }): boolean {
-  if (!model.expiration_date) return false;
-  const ts = Date.parse(model.expiration_date);
-  if (Number.isNaN(ts)) return false;
-  return ts < Date.now();
+  return !!model.expiration_date && isPastRemovalDate(model.expiration_date);
 }
 
 async function fetchAllowedProviders(): Promise<{
@@ -117,7 +120,9 @@ async function fetchAllowedProviders(): Promise<{
  *  list cannot be read, so a failed read never blocks a model. */
 async function fetchPrivacyAllowed(): Promise<Set<string> | null> {
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/models?zdr=true");
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/models?zdr=true",
+    );
     if (!response.ok) return null;
     const json = await response.json();
     if (!Array.isArray(json.data)) return null;
@@ -155,12 +160,14 @@ async function fetchModelsFromOpenRouter(
   const models: ModelAvailability["models"] = new Map();
 
   for (const model of json.data) {
-    if (typeof model.id !== "string" || typeof model.name !== "string") continue;
+    if (typeof model.id !== "string" || typeof model.name !== "string")
+      continue;
     models.set(model.id, { expiresOn: model.expiration_date ?? null });
     if (isDeprecated(model)) continue;
 
     const slashIndex = model.id.indexOf("/");
-    const providerSlug = slashIndex !== -1 ? model.id.slice(0, slashIndex) : "other";
+    const providerSlug =
+      slashIndex !== -1 ? model.id.slice(0, slashIndex) : "other";
 
     if (allowedSlugSet && !allowedSlugSet.has(providerSlug)) continue;
 
@@ -232,12 +239,14 @@ export function useOpenRouterModels(): {
   error: string | null;
   retry: () => void;
 } {
-  const [providers, setProviders] = useState<LLMProvider[]>(cache?.providers ?? []);
+  const [providers, setProviders] = useState<LLMProvider[]>(
+    cache?.providers ?? [],
+  );
   const [availability, setAvailability] = useState<ModelAvailability | null>(
     cache?.availability ?? null,
   );
   const [isLoading, setIsLoading] = useState(
-    !cache || Date.now() - cache.timestamp >= CACHE_TTL_MS
+    !cache || Date.now() - cache.timestamp >= CACHE_TTL_MS,
   );
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -268,7 +277,8 @@ export function useOpenRouterModels(): {
           if (!cancelled) {
             setIsLoading(false);
             const isDisabled =
-              err instanceof Error && err.message === OPENROUTER_DISABLED_MESSAGE;
+              err instanceof Error &&
+              err.message === OPENROUTER_DISABLED_MESSAGE;
             if (isDisabled) {
               cache = null;
               setProviders([]);
@@ -298,15 +308,4 @@ export function useOpenRouterModels(): {
   }, [retryCount]);
 
   return { providers, availability, isLoading, error, retry };
-}
-
-export function findModelInProviders(
-  providers: LLMProvider[],
-  modelId: string
-): LLMModel | null {
-  for (const provider of providers) {
-    const model = provider.models.find((m) => m.id === modelId);
-    if (model) return model;
-  }
-  return null;
 }

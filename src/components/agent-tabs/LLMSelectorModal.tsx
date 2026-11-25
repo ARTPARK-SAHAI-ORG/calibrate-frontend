@@ -9,6 +9,7 @@ import { useModelAvailability } from "@/hooks/useModelAvailability";
 import {
   blocksUse,
   formatRemovalDate,
+  isPastRemovalDate,
   modelProblem,
 } from "@/lib/modelAvailability";
 
@@ -182,13 +183,12 @@ export function LLMSelectorModal({
                     <span className="text-base font-medium text-foreground">
                       {model.name}
                     </span>
-                    {model.expiresOn &&
-                      Date.parse(model.expiresOn) > Date.now() && (
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-500/12 text-amber-700 dark:text-amber-300">
-                          Will be removed on{" "}
-                          {formatRemovalDate(model.expiresOn, true)}
-                        </span>
-                      )}
+                    {model.expiresOn && !isPastRemovalDate(model.expiresOn) && (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-500/12 text-amber-700 dark:text-amber-300">
+                        Will be removed on{" "}
+                        {formatRemovalDate(model.expiresOn, true)}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
