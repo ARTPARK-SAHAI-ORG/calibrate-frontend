@@ -43,7 +43,9 @@ test.describe("Agent chat link (authenticated, real backend)", () => {
 
     try {
       await page.getByRole("button", { name: "Share", exact: true }).click();
-      await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Copy link" }),
+      ).toBeVisible();
       await expect(page.getByRole("link", { name: "Preview" })).toBeVisible();
 
       const link = await page.request.get(
@@ -54,9 +56,7 @@ test.describe("Agent chat link (authenticated, real backend)", () => {
       expect(is_public).toBe(true);
 
       await page.goto(`/public/chat/${share_token}`);
-      await expect(
-        page.getByText(`Send a message to start chatting with ${name}`),
-      ).toBeVisible();
+      await expect(page.getByText(`Talk to ${name}`)).toBeVisible();
       await expect(page).toHaveTitle(`${name} chat`);
 
       await page.getByLabel("Message").fill("When is the next dose due?");
@@ -73,7 +73,9 @@ test.describe("Agent chat link (authenticated, real backend)", () => {
       await expect(
         page.getByLabel("What was wrong with this reply? (optional)"),
       ).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Good reply" })).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "Good reply" }),
+      ).toHaveCount(0);
 
       // The rating and comment are stored on the trace the reply made.
       const traces = await page.request.get(

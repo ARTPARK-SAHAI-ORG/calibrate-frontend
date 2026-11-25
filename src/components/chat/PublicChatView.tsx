@@ -6,10 +6,15 @@ import {
   PublicNotFound,
   PublicPageLayout,
 } from "@/components/PublicPageLayout";
-import { ErrorNote, InfoNote } from "@/components/ui";
+import { EmptyState, ErrorNote, InfoNote } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
-import { SpinnerIcon, ThumbsDownIcon, ThumbsUpIcon } from "@/components/icons";
+import {
+  ChatIcon,
+  SpinnerIcon,
+  ThumbsDownIcon,
+  ThumbsUpIcon,
+} from "@/components/icons";
 import {
   TURN_BUBBLE_CLASS,
   ToolCallCard,
@@ -46,6 +51,13 @@ const BLOCKING = new Set([
   "agent_unavailable",
   "conversation_too_long",
 ]);
+
+/** Ready-made first messages, put in the message box when clicked. */
+const STARTER_MESSAGES = [
+  "Hi, what can you help me with?",
+  "What do you need from me to get started?",
+  "Can you explain how this works?",
+];
 
 const BUTTON_CLASS =
   "h-8 px-3 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0";
@@ -93,6 +105,7 @@ export function PublicChatView({ token }: { token: string }) {
   const [clearing, setClearing] = useState<string | null>(null);
   const [clearBusy, setClearBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const messageRef = useRef<HTMLTextAreaElement>(null);
   // Bumped by New chat, so a reply still on its way to the old chat is dropped.
   const chatRun = useRef(0);
 
@@ -263,9 +276,32 @@ export function PublicChatView({ token }: { token: string }) {
     >
       <div className="flex-1 space-y-4 pb-6">
         {turns.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-12">
-            Send a message to start chatting with {agent.agent_name}
-          </p>
+          <EmptyState
+            className="mt-6"
+            icon={<ChatIcon className="w-6 h-6 text-muted-foreground" />}
+            title={`Talk to ${agent.agent_name}`}
+            description="Send a message the way the people using this agent would. Then rate each reply with 👍 or 👎, and add a comment on what was good or wrong"
+            actions={
+              <div className="flex flex-col gap-2 w-full max-w-md">
+                {STARTER_MESSAGES.map((message) => (
+                  <button
+                    key={message}
+                    type="button"
+                    onClick={() => {
+                      setDraft(message);
+                      messageRef.current?.focus();
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  >
+                    {message}
+                  </button>
+                ))}
+                <p className="text-xs text-muted-foreground text-center mt-1">
+                  Click one to put it in the message box
+                </p>
+              </div>
+            }
+          />
         )}
         {turns.map((turn, i) =>
           turn.role === "user" ? (
@@ -338,6 +374,7 @@ export function PublicChatView({ token }: { token: string }) {
           } ${locked ? "opacity-50" : ""}`}
         >
           <textarea
+            ref={messageRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {

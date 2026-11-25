@@ -41,7 +41,7 @@ async function open(interaction_type = "conversation") {
     data: { agent_name: "Support bot", interaction_type },
   });
   render(<PublicChatView token="tok" />);
-  await screen.findByText("Send a message to start chatting with Support bot");
+  await screen.findByText("Talk to Support bot");
 }
 
 async function sendMessage(user: ReturnType<typeof setupUser>, text = "Hi") {
@@ -448,4 +448,23 @@ it("starts a new chat while a reply is on its way, and drops that reply", async 
 
   await act(async () => answer(reply({ reply: "Late reply" })));
   expect(screen.queryByText("Late reply")).toBeNull();
+});
+
+it("puts a starter message in the message box without sending it", async () => {
+  const user = setupUser();
+  await open();
+  await user.click(
+    screen.getByRole("button", {
+      name: "What do you need from me to get started?",
+    }),
+  );
+  const box = screen.getByLabelText("Message");
+  expect(box).toHaveValue("What do you need from me to get started?");
+  expect(box).toHaveFocus();
+  expect(mockSend).not.toHaveBeenCalled();
+
+  mockSend.mockResolvedValueOnce(reply());
+  await user.keyboard("{Enter}");
+  expect(await screen.findByText("Simulated agent reply.")).toBeInTheDocument();
+  expect(screen.queryByText("Talk to Support bot")).toBeNull();
 });
