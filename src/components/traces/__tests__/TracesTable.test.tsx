@@ -253,7 +253,7 @@ describe("TracesTable", () => {
       .getByText("Input")
       .closest("div[style]") as HTMLElement;
     expect(header.style.gridTemplateColumns).toBe(
-      "40px 72px 400px 400px 10ch 11ch 160px auto",
+      "40px 72px minmax(200px, 1fr) minmax(200px, 1fr) 10ch 11ch 160px 32px",
     );
   });
 
@@ -299,7 +299,7 @@ describe("TracesTable", () => {
       traces: [trace({})],
     });
     // The name plus the arrow that orders the column.
-    const expected = `40px 72px 400px 400px 10ch ${longName.length + 3}ch 160px auto`;
+    const expected = `40px 72px minmax(200px, 1fr) minmax(200px, 1fr) 10ch ${longName.length + 3}ch 160px 32px`;
     const header = screen
       .getByText("Input")
       .closest("div[style]") as HTMLElement;

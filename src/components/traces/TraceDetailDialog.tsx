@@ -31,6 +31,7 @@ import {
   TraceOutput,
   TraceConversation,
   TraceFeedback,
+  TraceScoringIneligibleEvaluator,
   TraceScoringRun,
   TraceSource,
   TraceTurn,
@@ -59,6 +60,8 @@ type TraceDetailDialogProps = {
    *  name the evaluator but not what it judges, so the words come from the
    *  agent's own evaluator list. */
   evaluatorDescriptions?: Record<string, string>;
+  /** The agent's evaluators that cannot score traces, and why. */
+  ineligibleEvaluators?: TraceScoringIneligibleEvaluator[];
   /** Whether this trace is ticked in the list behind the dialog. */
   isSelected?: boolean;
   /** Tick or untick this trace without closing the dialog and going back to
@@ -340,6 +343,7 @@ export function TraceDetailDialog({
   onToggleSelected,
   selectedCount = 0,
   conversation = null,
+  ineligibleEvaluators,
 }: TraceDetailDialogProps) {
   useHideFloatingButton(isOpen);
   // Scores belong to one turn, not the conversation, so none are loaded for it.
@@ -501,10 +505,10 @@ export function TraceDetailDialog({
                 "what did that press do", so it goes away with the trace it
                 was counting. */}
             {onToggleSelected && isSelected && selectedCount > 0 && (
-                <span className="inline-flex items-center h-8 px-2.5 rounded-md border border-border bg-muted/40 text-xs font-medium text-foreground whitespace-nowrap">
-                  {selectedCount} selected
-                </span>
-              )}
+              <span className="inline-flex items-center h-8 px-2.5 rounded-md border border-border bg-muted/40 text-xs font-medium text-foreground whitespace-nowrap">
+                {selectedCount} selected
+              </span>
+            )}
             {onToggleSelected && (
               // Both states are filled so neither reads as switched off, and
               // they are different colours so a glance says which one it is.
@@ -595,6 +599,7 @@ export function TraceDetailDialog({
                   run={visibleRun}
                   error={scoresError}
                   descriptions={evaluatorDescriptions}
+                  ineligible={ineligibleEvaluators}
                 />
               </div>
             )}
@@ -618,6 +623,7 @@ export function TraceDetailDialog({
                     run={visibleRun}
                     error={scoresError}
                     descriptions={evaluatorDescriptions}
+                    ineligible={ineligibleEvaluators}
                   />
                 </div>
               </div>

@@ -293,7 +293,7 @@ function TraceOutputCell({ trace }: { trace: TraceSummary }) {
  */
 // Tailwind only compiles class names it can read in the source, so the column
 // widths are an inline style; everything fixed stays a class.
-const ROW_CLASS = "grid gap-4 px-4 min-w-max";
+const ROW_CLASS = "grid gap-4 px-4";
 
 export function TracesTable({
   traces,
@@ -316,13 +316,22 @@ export function TracesTable({
     .map((column) => `${Math.max(10, column.name.length + 3)}ch`)
     .join(" ");
   const ROW_STYLE = {
-    // Every track is a fixed width, because each row is its own grid: a track
-    // sized to its content would come out different on every row and the
-    // columns would not line up. The table scrolls sideways instead.
-    gridTemplateColumns: `40px 72px 400px 400px${
+    // Each row is its own grid, so no track may be sized to its content: it
+    // would come out different on every row and the columns would not line up.
+    // Input and Output share whatever width is left, so the table fits the
+    // page, and only scrolls sideways once they are down to 200px each.
+    gridTemplateColumns: `40px 72px minmax(200px, 1fr) minmax(200px, 1fr)${
       evaluatorTracks ? ` ${evaluatorTracks}` : ""
-    } 160px auto`,
+    } 160px 32px`,
   };
+  const evaluatorWidths = scoreColumns
+    .map((column) => ` + ${Math.max(10, column.name.length + 3)}ch`)
+    .join("");
+  // The narrowest the rows can get: every track at its smallest, the gaps
+  // between them, and the side padding.
+  const tableMinWidth = `calc(40px + 72px + 400px${evaluatorWidths} + 160px + 32px + ${
+    5 + scoreColumns.length
+  }rem + 2rem)`;
   // Each row's text is a link, so a right-click, middle-click or Cmd-click opens
   // the trace in a new tab, while a plain click opens the window in place. The
   // row keeps its own click for the parts that are not links (the score cells,
@@ -338,96 +347,100 @@ export function TracesTable({
     <>
       {/* Desktop table */}
       <div className="hidden md:block border border-border rounded-xl overflow-x-auto">
-        <div
-          style={ROW_STYLE}
-          className={`${ROW_CLASS} py-2 border-b border-border bg-muted/30 items-center`}
-        >
-          <div className="flex items-center">
-            <SelectCheckbox
-              checked={allSelected}
-              onToggle={onToggleSelectAll}
-              disabled={!hasSelectableItems}
-              label="Select all traces"
-            />
-          </div>
-          <div className="text-sm font-medium text-muted-foreground">
-            Source
-          </div>
-          <div className="text-sm font-medium text-muted-foreground">Input</div>
-          <div className="text-sm font-medium text-muted-foreground">
-            Output
-          </div>
-          {scoreColumns.map((column) => (
-            <ScoreColumnHeading
-              key={column.evaluator_uuid}
-              column={column}
-              sortByEvaluator={sortByEvaluator}
-              sortOrder={sortOrder}
-              onSortByEvaluator={onSortByEvaluator}
-            />
-          ))}
-          <div className="text-sm font-medium text-muted-foreground">
-            Created
-          </div>
-          <div className="w-8" />
-        </div>
-        {traces.map((trace) => {
-          return (
-            <div
-              key={trace.uuid}
-              onClick={() => onOpen(trace.uuid)}
-              style={ROW_STYLE}
-              className={`${ROW_CLASS} border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
-            >
-              <div className="flex items-center">
-                <SelectCheckbox {...checkboxProps(trace)} />
-              </div>
-              <Link
-                {...linkProps(trace.uuid)}
-                className="self-stretch py-2.5 flex items-center"
-              >
-                <TraceSourceLabel source={trace.source} />
-              </Link>
-              <Link
-                {...linkProps(trace.uuid)}
-                className="min-w-0 self-stretch py-2.5 flex items-center gap-2"
-              >
-                <TraceScoreMark trace={trace} />
-                {trace.input_preview && (
-                  <div className="text-sm font-medium text-foreground truncate">
-                    {trace.input_preview}
-                  </div>
-                )}
-              </Link>
-              <Link
-                {...linkProps(trace.uuid)}
-                className="min-w-0 self-stretch py-2.5 flex items-center gap-2"
-              >
-                <FeedbackThumb trace={trace} />
-                <div className="min-w-0 flex-1">
-                  <TraceOutputCell trace={trace} />
-                </div>
-              </Link>
-              <TraceScoreCells
-                trace={trace}
-                columns={scoreColumns}
-                layout="row"
+        <div style={{ minWidth: tableMinWidth }}>
+          <div
+            style={ROW_STYLE}
+            className={`${ROW_CLASS} py-2 border-b border-border bg-muted/30 items-center`}
+          >
+            <div className="flex items-center">
+              <SelectCheckbox
+                checked={allSelected}
+                onToggle={onToggleSelectAll}
+                disabled={!hasSelectableItems}
+                label="Select all traces"
               />
-              <Link
-                {...linkProps(trace.uuid)}
-                className="self-stretch py-2.5 flex items-center text-sm text-muted-foreground whitespace-nowrap"
-              >
-                {formatTraceDate(trace.created_at)}
-              </Link>
-              <div className="flex items-center">
-                <DeleteIconButton
-                  onClick={() => onDelete(trace)}
-                  title="Delete trace"
-                />
-              </div>
             </div>
-          );
-        })}
+            <div className="text-sm font-medium text-muted-foreground">
+              Source
+            </div>
+            <div className="text-sm font-medium text-muted-foreground">
+              Input
+            </div>
+            <div className="text-sm font-medium text-muted-foreground">
+              Output
+            </div>
+            {scoreColumns.map((column) => (
+              <ScoreColumnHeading
+                key={column.evaluator_uuid}
+                column={column}
+                sortByEvaluator={sortByEvaluator}
+                sortOrder={sortOrder}
+                onSortByEvaluator={onSortByEvaluator}
+              />
+            ))}
+            <div className="text-sm font-medium text-muted-foreground">
+              Created
+            </div>
+            <div className="w-8" />
+          </div>
+          {traces.map((trace) => {
+            return (
+              <div
+                key={trace.uuid}
+                onClick={() => onOpen(trace.uuid)}
+                style={ROW_STYLE}
+                className={`${ROW_CLASS} border-b border-border last:border-b-0 hover:bg-muted/20 transition-colors cursor-pointer items-center`}
+              >
+                <div className="flex items-center">
+                  <SelectCheckbox {...checkboxProps(trace)} />
+                </div>
+                <Link
+                  {...linkProps(trace.uuid)}
+                  className="self-stretch py-2.5 flex items-center"
+                >
+                  <TraceSourceLabel source={trace.source} />
+                </Link>
+                <Link
+                  {...linkProps(trace.uuid)}
+                  className="min-w-0 self-stretch py-2.5 flex items-center gap-2"
+                >
+                  <TraceScoreMark trace={trace} />
+                  {trace.input_preview && (
+                    <div className="text-sm font-medium text-foreground truncate">
+                      {trace.input_preview}
+                    </div>
+                  )}
+                </Link>
+                <Link
+                  {...linkProps(trace.uuid)}
+                  className="min-w-0 self-stretch py-2.5 flex items-center gap-2"
+                >
+                  <FeedbackThumb trace={trace} />
+                  <div className="min-w-0 flex-1">
+                    <TraceOutputCell trace={trace} />
+                  </div>
+                </Link>
+                <TraceScoreCells
+                  trace={trace}
+                  columns={scoreColumns}
+                  layout="row"
+                />
+                <Link
+                  {...linkProps(trace.uuid)}
+                  className="self-stretch py-2.5 flex items-center text-sm text-muted-foreground whitespace-nowrap"
+                >
+                  {formatTraceDate(trace.created_at)}
+                </Link>
+                <div className="flex items-center">
+                  <DeleteIconButton
+                    onClick={() => onDelete(trace)}
+                    title="Delete trace"
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Mobile cards */}

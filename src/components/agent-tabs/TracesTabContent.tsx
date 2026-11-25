@@ -637,8 +637,7 @@ export function TracesTabContent({
   const overLimit =
     usage?.max_scored_traces !== null &&
     items.some((t) => t.latest_run_error === "over_limit");
-  const storageFull =
-    usage != null && usage.traces_stored >= usage.max_traces;
+  const storageFull = usage != null && usage.traces_stored >= usage.max_traces;
   const isScoringLive = traceScoring.enabled && !overLimit && !storageFull;
   const chatReplyCap = chatLink?.daily_message_limit ?? null;
   const chatLimitReached =
@@ -1160,6 +1159,7 @@ export function TracesTabContent({
 
       <TraceDetailDialog
         evaluatorDescriptions={evaluatorDescriptions}
+        ineligibleEvaluators={ineligible}
         isOpen={openTraceUuid != null}
         onClose={closeTrace}
         accessToken={accessToken}
@@ -1199,8 +1199,9 @@ export function TracesTabContent({
         traceCount={selectionCount}
         testType={
           everyTraceMatching
-            ? (facets.outputType === "all" ? wholeListKind : facets.outputType) ===
-              "tool_call"
+            ? (facets.outputType === "all"
+                ? wholeListKind
+                : facets.outputType) === "tool_call"
               ? "tool_call"
               : isGeneral
                 ? "general"
