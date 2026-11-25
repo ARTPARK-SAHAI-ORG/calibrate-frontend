@@ -146,7 +146,7 @@ it("shows a spinner while scoring, the reason when it failed, and empty results"
     />,
   );
   expect(
-    screen.getByText("No evaluators could score this trace"),
+    screen.getByText("No evaluator on this agent fits this trace"),
   ).toBeInTheDocument();
   expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
 

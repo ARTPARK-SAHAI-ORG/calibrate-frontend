@@ -36,6 +36,17 @@ type EvaluatorListItem = {
   owner_user_id?: string | null;
 };
 
+function fitsTaskType(
+  evaluatorType: EvaluatorType | undefined,
+  taskType: string,
+): boolean {
+  if (evaluatorType === taskType) return true;
+  return (
+    evaluatorType === "tool-call" &&
+    (taskType === "llm" || taskType === "llm-general")
+  );
+}
+
 function parseApiError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
   const match = err.message.match(/Request failed: \d+ - (.+)$/);
@@ -129,7 +140,7 @@ export function CreateLabellingTaskDialog({
     setSelectedEvaluatorIds((prev) => {
       const next = new Set<string>();
       for (const ev of evaluators) {
-        if (ev.evaluator_type === taskType && prev.has(ev.uuid)) {
+        if (fitsTaskType(ev.evaluator_type, taskType) && prev.has(ev.uuid)) {
           next.add(ev.uuid);
         }
       }
@@ -141,7 +152,7 @@ export function CreateLabellingTaskDialog({
     if (!taskType) return [];
     const q = evaluatorSearch.trim().toLowerCase();
     return evaluators
-      .filter((ev) => ev.evaluator_type === taskType)
+      .filter((ev) => fitsTaskType(ev.evaluator_type, taskType))
       .filter((ev) => (q ? ev.name.toLowerCase().includes(q) : true));
   }, [evaluators, taskType, evaluatorSearch]);
 

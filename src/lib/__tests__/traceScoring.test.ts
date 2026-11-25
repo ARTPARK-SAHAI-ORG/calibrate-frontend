@@ -3,7 +3,20 @@ import {
   isTraceScoringInProgress,
   nothingCanScoreCopy,
   scoringRunErrorCopy,
+  traceRowOutputFacts,
 } from "../traceScoring";
+
+describe("traceRowOutputFacts", () => {
+  it("reads a blank preview as no reply and a missing count as no calls", () => {
+    expect(
+      traceRowOutputFacts({ response_preview: "  ", tool_call_count: 1 }),
+    ).toEqual({ hasResponse: false, hasToolCalls: true });
+    expect(traceRowOutputFacts({ response_preview: "Hi" })).toEqual({
+      hasResponse: true,
+      hasToolCalls: false,
+    });
+  });
+});
 
 describe("isTraceScoringInProgress", () => {
   it("treats waiting and in-flight runs as open", () => {
@@ -23,6 +36,9 @@ describe("copy", () => {
     expect(ineligibleReasonCopy("declares_variables")).toBe(
       "Uses variables, which cannot be filled for a trace automatically",
     );
+    expect(ineligibleReasonCopy("no_judge_prompt")).toBe(
+      "Has no prompt, so only people can answer it",
+    );
     expect(ineligibleReasonCopy("other")).toBe(
       "Cannot score traces for this agent",
     );
@@ -30,7 +46,7 @@ describe("copy", () => {
 
   it("explains skip and failure reasons without averaging", () => {
     expect(scoringRunErrorCopy("no_usable_evaluators")).toBe(
-      "No evaluators could score this trace",
+      "No evaluator on this agent fits this trace",
     );
     expect(scoringRunErrorCopy("unsupported_interaction_type")).toMatch(
       /cannot be scored yet/,
@@ -55,32 +71,47 @@ describe("copy", () => {
 });
 
 describe("nothingCanScoreCopy", () => {
-  it("names variables when that is the only thing in the way", () => {
+  it("says what is wrong and what to add when every evaluator has the same problem", () => {
     expect(
       nothingCanScoreCopy([
         { reason: "declares_variables" },
         { reason: "declares_variables" },
       ]),
     ).toBe(
-      "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically.",
+      "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically. Add an evaluator without variables in the",
+    );
+    expect(nothingCanScoreCopy([{ reason: "wrong_type_for_agent" }])).toBe(
+      "None of the evaluators added to this agent are the kind that can score its traces. Add an evaluator that fits this agent in the",
+    );
+    expect(nothingCanScoreCopy([{ reason: "no_judge_prompt" }])).toBe(
+      "None of the evaluators added to this agent have a prompt, so only people can answer them. Add an evaluator with a prompt in the",
+    );
+    expect(nothingCanScoreCopy([{ reason: "no_live_version" }])).toBe(
+      "None of the evaluators added to this agent have a live version. Add an evaluator with a live version in the",
     );
   });
 
   it("says the agent has no evaluators when the list is empty", () => {
     expect(nothingCanScoreCopy([])).toBe(
-      "This agent has no evaluators, so its traces are not scored.",
+      "This agent has no evaluators, so its traces are not scored. Add one in the",
     );
   });
 
-  it("falls back to a general line when the reasons differ", () => {
+  it("lists each problem when the reasons differ", () => {
     expect(
       nothingCanScoreCopy([
         { reason: "declares_variables" },
-        { reason: "no_live_version" },
+        { reason: "no_judge_prompt" },
+        { reason: "declares_variables" },
       ]),
-    ).toBe("None of this agent's evaluators can score traces.");
-    expect(nothingCanScoreCopy([{ reason: "wrong_type_for_agent" }])).toBe(
-      "None of this agent's evaluators can score traces.",
+    ).toBe(
+      "None of this agent's evaluators can score traces: some use variables, some have no prompt. Add an evaluator that can score traces in the",
+    );
+  });
+
+  it("falls back to a general line for a reason it does not know", () => {
+    expect(nothingCanScoreCopy([{ reason: "something_new" }])).toBe(
+      "None of this agent's evaluators can score traces. Add an evaluator that can score traces in the",
     );
   });
 });

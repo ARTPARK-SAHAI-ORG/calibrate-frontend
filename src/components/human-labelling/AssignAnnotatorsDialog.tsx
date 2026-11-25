@@ -8,6 +8,7 @@ import { CheckCircleIcon, GearIcon, UserIcon } from "@/components/icons";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
 import { apiClient } from "@/lib/api";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import {
   createAnnotator,
   renameAnnotator,
@@ -25,7 +26,20 @@ type TaskEvaluator = {
   name: string;
   description?: string | null;
   evaluator_type?: string | null;
+  is_protected?: boolean;
+  slug?: string | null;
+  source_default_slug?: string | null;
 };
+
+const TOOL_CALL_CORRECTNESS_SLUG = "default-tool-call-correctness";
+
+function isBuiltInToolCallEvaluator(ev: TaskEvaluator): boolean {
+  return (
+    ev.is_protected === true ||
+    ev.slug === TOOL_CALL_CORRECTNESS_SLUG ||
+    ev.source_default_slug === TOOL_CALL_CORRECTNESS_SLUG
+  );
+}
 
 /** Returns a new Set with `id` toggled in or out. */
 function toggleInSet(set: Set<string>, id: string): Set<string> {
@@ -231,21 +245,19 @@ export function AssignAnnotatorsDialog({
 
   // Start with every label picked, and re-seed if the task's labels arrive
   // (or change) while the dialog is open.
-  // Tool call correctness is never a choice. It comes with a tool-call item
-  // and is added by the backend whether or not it is ticked here, so it is
-  // shown as already on when such an item is in the selection, and left out
-  // entirely when none is.
-  const toolCallEvaluators = evaluators.filter(
-    (ev) => ev.evaluator_type === "tool-call",
-  );
-  // The AI-judge labels only apply to an item answered in writing. With no
-  // such item in the selection none of them belong in the picker at all —
-  // this is what was missing before: the full task list showed here no
-  // matter which items were actually chosen.
-  const choosableEvaluators = hasNonToolCallItems
-    ? evaluators.filter((ev) => ev.evaluator_type !== "tool-call")
+  // Tool call correctness is never a choice: a tool-call item has no other
+  // slot for a person's answer, so it is locked on whenever one is chosen.
+  // Every other label is offered only when an item it fits is chosen.
+  const lockedEvaluators = hasToolCallItems
+    ? evaluators.filter(isBuiltInToolCallEvaluator)
     : [];
-  const shownToolCallEvaluators = hasToolCallItems ? toolCallEvaluators : [];
+  const choosableEvaluators = evaluators.filter(
+    (ev) =>
+      !isBuiltInToolCallEvaluator(ev) &&
+      (ev.evaluator_type === "tool-call"
+        ? hasToolCallItems
+        : hasNonToolCallItems),
+  );
 
   const evaluatorIdsKey = choosableEvaluators.map((ev) => ev.uuid).join(",");
   useEffect(() => {
@@ -337,19 +349,32 @@ export function AssignAnnotatorsDialog({
 
   // A task with no labels at all can still be assigned; one with labels needs
   // at least one picked.
-  const evaluatorSelectionValid =
-    choosableEvaluators.length === 0 || pickedEvaluators.size > 0;
+  // Each kind of chosen item needs at least one label that fits it, when the
+  // task has one to offer.
+  const offeredLabels = [...lockedEvaluators, ...choosableEvaluators];
+  const keptLabels = [
+    ...lockedEvaluators,
+    ...choosableEvaluators.filter((ev) => pickedEvaluators.has(ev.uuid)),
+  ];
+  const evaluatorSelectionValid = [
+    { isToolCall: true, chosen: hasToolCallItems },
+    { isToolCall: false, chosen: hasNonToolCallItems },
+  ].every(
+    ({ isToolCall, chosen }) =>
+      !chosen ||
+      !offeredLabels.some((ev) =>
+        evaluatorFitsItem(ev.evaluator_type, isToolCall),
+      ) ||
+      keptLabels.some((ev) => evaluatorFitsItem(ev.evaluator_type, isToolCall)),
+  );
   const allEvaluatorsPicked =
     choosableEvaluators.length > 0 &&
     pickedEvaluators.size === choosableEvaluators.length;
 
   // Only worth showing the column when there is more than one label on
-  // screen in total (choosable ones plus the locked tool-call one). With
-  // just one — a single choosable label, or only the tool-call label because
-  // every chosen item is a tool call — there is nothing to weigh, so the
-  // column is left out, same as the original one-label rule.
+  // screen in total. With just one there is nothing to weigh.
   const totalShownLabels =
-    choosableEvaluators.length + shownToolCallEvaluators.length;
+    choosableEvaluators.length + lockedEvaluators.length;
   const showEvaluatorChoice = totalShownLabels > 1;
 
   const reasoningModeOf = (id: string) => reasoningModes[id] ?? "optional";
@@ -359,7 +384,7 @@ export function AssignAnnotatorsDialog({
   // with one label has no Labels column, and that label is still in here.
   const shownLabels = [
     ...choosableEvaluators.filter((ev) => pickedEvaluators.has(ev.uuid)),
-    ...shownToolCallEvaluators,
+    ...lockedEvaluators,
   ];
 
   const handleConfirm = async () => {
@@ -369,7 +394,7 @@ export function AssignAnnotatorsDialog({
     try {
       const evaluatorIds = [
         ...pickedEvaluators,
-        ...shownToolCallEvaluators.map((ev) => ev.uuid),
+        ...lockedEvaluators.map((ev) => ev.uuid),
       ];
       await onConfirm(Array.from(picked), evaluatorIds, {
         comments_enabled: commentsEnabled,
@@ -730,9 +755,7 @@ export function AssignAnnotatorsDialog({
                       </label>
                     );
                   })}
-                  {/* Always on, never a choice: a tool-call item is answered
-                      by this one and the backend adds it either way. */}
-                  {shownToolCallEvaluators.map((ev) => (
+                  {lockedEvaluators.map((ev) => (
                     <div
                       key={ev.uuid}
                       className="flex items-start gap-3 px-3 py-2 rounded-md border border-border bg-muted/30"
@@ -837,7 +860,7 @@ export function AssignAnnotatorsDialog({
                                   Object.fromEntries(
                                     [
                                       ...choosableEvaluators,
-                                      ...shownToolCallEvaluators,
+                                      ...lockedEvaluators,
                                     ].map((other) => [
                                       other.uuid,
                                       reasoningModeOf(ev.uuid),

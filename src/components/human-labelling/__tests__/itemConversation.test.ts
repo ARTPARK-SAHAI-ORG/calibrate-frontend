@@ -172,11 +172,67 @@ describe("historyToPayloadFields", () => {
     });
   });
 
-  it("keeps a trailing tool-call turn in chat_history", () => {
+  it("saves trailing tool-call turns as actual_tool_calls with their responses", () => {
+    const history: HistoryItem[] = [
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "checking" },
+      {
+        role: "assistant",
+        tool_calls: [
+          {
+            id: "c1",
+            type: "function",
+            function: { name: "lookup", arguments: '{"city":"Pune"}' },
+          },
+        ],
+      },
+      { role: "tool", content: '{"ok":true}', tool_call_id: "c1" },
+      {
+        role: "assistant",
+        tool_calls: [
+          {
+            id: "c2",
+            type: "function",
+            function: { name: "notify", arguments: "{}" },
+          },
+        ],
+      },
+      { role: "tool", content: "sent", tool_call_id: "c2" },
+      { role: "assistant", tool_calls: [{ ...toolCall, id: "c3" }] },
+    ];
+    expect(historyToPayloadFields(history, "llm")).toEqual({
+      chat_history: [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "checking" },
+      ],
+      agent_response: "",
+      actual_tool_calls: [
+        { tool: "lookup", arguments: { city: "Pune" }, output: { ok: true } },
+        { tool: "notify", arguments: {}, output: "sent" },
+        { tool: "lookup", arguments: {} },
+      ],
+    });
+  });
+
+  it("keeps earlier tool calls in chat_history when the agent ends on text", () => {
     const history: HistoryItem[] = [
       { role: "user", content: "hi" },
       { role: "assistant", tool_calls: [toolCall] },
+      { role: "tool", content: "result", tool_call_id: "c1" },
+      { role: "assistant", content: "done" },
     ];
+    const fields = historyToPayloadFields(history, "llm");
+    expect(fields).toEqual({
+      chat_history: history.slice(0, -1),
+      agent_response: "done",
+    });
+    expect("actual_tool_calls" in fields && fields.actual_tool_calls).toBe(
+      undefined,
+    );
+  });
+
+  it("keeps a history that ends on a user turn as it is", () => {
+    const history: HistoryItem[] = [{ role: "user", content: "hi" }];
     expect(historyToPayloadFields(history, "llm")).toEqual({
       chat_history: history,
       agent_response: "",
@@ -185,6 +241,58 @@ describe("historyToPayloadFields", () => {
       chat_history: [],
       agent_response: "",
     });
+  });
+
+  it("round-trips an item whose answer is a tool call", () => {
+    const payload = {
+      chat_history: [{ role: "user", content: "book me a flight" }],
+      agent_response: "",
+      actual_tool_calls: [
+        { tool: "book_flight", arguments: { city: "Pune" }, output: { id: 7 } },
+        { tool: "notify", arguments: {} },
+      ],
+    };
+    const history = payloadToHistory(payload, "llm");
+    expect(history).toEqual([
+      { role: "user", content: "book me a flight" },
+      {
+        role: "assistant",
+        tool_calls: [
+          {
+            id: "actual-call-0",
+            type: "function",
+            function: { name: "book_flight", arguments: '{"city":"Pune"}' },
+          },
+        ],
+      },
+      {
+        role: "tool",
+        content: '{\n  "id": 7\n}',
+        tool_call_id: "actual-call-0",
+      },
+      {
+        role: "assistant",
+        tool_calls: [
+          {
+            id: "actual-call-1",
+            type: "function",
+            function: { name: "notify", arguments: "{}" },
+          },
+        ],
+      },
+    ]);
+    expect(historyToPayloadFields(history, "llm")).toEqual(payload);
+  });
+
+  it("reads a string tool output back as the same string", () => {
+    const payload = {
+      chat_history: [],
+      agent_response: "",
+      actual_tool_calls: [{ tool: "lookup", arguments: {}, output: "plain" }],
+    };
+    expect(
+      historyToPayloadFields(payloadToHistory(payload, "llm"), "llm"),
+    ).toEqual(payload);
   });
 
   it("passes a transcript through with its label and versions", () => {

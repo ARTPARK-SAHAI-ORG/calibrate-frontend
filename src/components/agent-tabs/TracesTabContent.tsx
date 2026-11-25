@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TracesTable } from "@/components/traces/TracesTable";
+import type { TraceScoreColumn } from "@/components/traces/TraceScoringSummary";
 import { TraceDetailDialog } from "@/components/traces/TraceDetailDialog";
 import { TracesEmptyState } from "@/components/traces/TracesEmptyState";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
@@ -17,7 +18,6 @@ import {
   isToolCallOutput,
   type SourceEvaluatorRef,
   type TraceLabellingItem,
-  type TraceOutputFacts,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import {
@@ -56,6 +56,8 @@ import {
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
 import { CONTACT_LINK } from "@/constants/limits";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
+import type { EvaluatorType } from "@/components/EvaluatorPills";
+import { traceRowOutputFacts } from "@/lib/traceScoring";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
@@ -84,16 +86,6 @@ function traceCount(n: number): string {
  * The Monitoring tab on the agent detail page: the production conversations sent
  * in for this agent, one trace per turn. Every call is scoped to `agentUuid`.
  */
-/** The two facts the labelling rule needs, read off a list row. The row
- * carries a preview of the reply and a count of the calls, not the output
- * itself, so this is where that shape is turned into the shared one. */
-function traceRowOutputFacts(trace: TraceSummary): TraceOutputFacts {
-  return {
-    hasResponse: !!trace.response_preview?.trim(),
-    hasToolCalls: trace.tool_call_count > 0,
-  };
-}
-
 export function TracesTabContent({
   agentUuid,
   agentNature = "conversation",
@@ -251,8 +243,8 @@ export function TracesTabContent({
   // A trace either replied or only called a tool, and the two become different
   // kinds of test. One selection makes one kind, so a mix is refused rather
   // than quietly turned into the wrong thing.
-  const toolCallOnlyCount = selectedTraces.filter(
-    (trace) => !trace.response_preview && trace.tool_call_count > 0,
+  const toolCallOnlyCount = selectedTraces.filter((trace) =>
+    isToolCallOutput(traceRowOutputFacts(trace)),
   ).length;
   const isMixedSelection =
     toolCallOnlyCount > 0 && toolCallOnlyCount < selectedTraces.length;
@@ -272,7 +264,8 @@ export function TracesTabContent({
   );
   const labellableUuids = labellableTraces.map((trace) => trace.uuid);
   // A selection that is nothing but tool calls skips the evaluator step: a
-  // person marks each call correct or wrong, so there is no AI judge to pick.
+  // tool-call row is answered only against the tool-call evaluator, so there
+  // is nothing to pick.
   const labellingIsToolCallOnly =
     labellableTraces.length > 0 &&
     labellableTraces.every((trace) =>
@@ -475,29 +468,34 @@ export function TracesTabContent({
   const eligibility = traceScoring.eligibility;
   const nothingCanScore =
     eligibility !== null && eligibility.eligible.length === 0;
+  // What each column's evaluator judges, so a row it does not apply to reads
+  // as empty rather than as waiting. Filled with the descriptions below.
+  const [evaluatorTypes, setEvaluatorTypes] = useState<
+    Record<string, EvaluatorType>
+  >({});
   // One column per evaluator that can score now, plus any that scored a trace
   // on this page, so taking an evaluator off the agent does not hide the
   // scores it already gave.
   const scoreColumns = useMemo(() => {
-    const byId = new Map<string, { evaluator_uuid: string; name: string }>();
-    for (const item of eligibility?.eligible ?? []) {
-      byId.set(item.evaluator_uuid, {
-        evaluator_uuid: item.evaluator_uuid,
-        name: item.name,
+    const byId = new Map<string, TraceScoreColumn>();
+    const add = (evaluator_uuid: string, name: string) => {
+      if (byId.has(evaluator_uuid)) return;
+      byId.set(evaluator_uuid, {
+        evaluator_uuid,
+        name,
+        evaluator_type: evaluatorTypes[evaluator_uuid],
       });
+    };
+    for (const item of eligibility?.eligible ?? []) {
+      add(item.evaluator_uuid, item.name);
     }
     for (const trace of items) {
       for (const result of trace.results ?? []) {
-        if (!byId.has(result.evaluator_uuid)) {
-          byId.set(result.evaluator_uuid, {
-            evaluator_uuid: result.evaluator_uuid,
-            name: result.name,
-          });
-        }
+        add(result.evaluator_uuid, result.name);
       }
     }
     return [...byId.values()];
-  }, [eligibility, items]);
+  }, [eligibility, items, evaluatorTypes]);
   // An evaluator taken off the agent takes its heading away with it, and with
   // no heading there is nothing left on screen to turn its ordering off.
   useEffect(() => {
@@ -562,10 +560,13 @@ export function TracesTabContent({
       .then((list) => {
         if (cancelled) return;
         const byId: Record<string, string> = {};
+        const typeById: Record<string, EvaluatorType> = {};
         for (const item of list) {
           if (item.description) byId[item.uuid] = item.description;
+          if (item.evaluator_type) typeById[item.uuid] = item.evaluator_type;
         }
         setEvaluatorDescriptions(byId);
+        setEvaluatorTypes(typeById);
       })
       .catch((err) => reportError("Error fetching agent evaluators:", err));
     return () => {

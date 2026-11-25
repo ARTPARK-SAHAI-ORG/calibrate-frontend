@@ -706,7 +706,7 @@ it("fetches scores and draws only the latest run in the right column, meta on th
   expect(screen.queryByText("Completed")).not.toBeInTheDocument();
   expect(screen.queryByText(/aaaaaaaa/)).not.toBeInTheDocument();
   expect(
-    screen.queryByText("No evaluators could score this trace"),
+    screen.queryByText("No evaluator on this agent fits this trace"),
   ).not.toBeInTheDocument();
 });
 

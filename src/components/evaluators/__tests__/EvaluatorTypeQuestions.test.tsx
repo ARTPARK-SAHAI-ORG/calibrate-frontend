@@ -158,4 +158,56 @@ describe("EvaluatorTypeQuestions", () => {
     expect(screen.getByText("A single reply")).toBeInTheDocument();
     expect(screen.getByText("The whole conversation")).toBeInTheDocument();
   });
+  it("offers a tool call next to a single reply for a conversation agent", async () => {
+    const user = setupUser();
+    render(<Harness allowed={["llm", "tool-call"]} />);
+    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
+    expect(screen.getByText("A single reply")).toBeInTheDocument();
+    await user.click(screen.getByText("Tool call"));
+    expect(chosen()).toBe("tool-call");
+    await user.click(screen.getByText("A single reply"));
+    expect(chosen()).toBe("llm");
+  });
+
+  it("offers a tool call next to the output for a basic agent", async () => {
+    const user = setupUser();
+    render(<Harness allowed={["llm-general", "tool-call"]} />);
+    expect(screen.queryByText("Basic")).not.toBeInTheDocument();
+    await user.click(screen.getByText("Tool call"));
+    expect(chosen()).toBe("tool-call");
+    await user.click(screen.getByText("The output"));
+    expect(chosen()).toBe("llm-general");
+  });
+
+  it("offers a tool call under both kinds of text when every kind is on offer", async () => {
+    const user = setupUser();
+    render(<Harness allowed={[...ALL, "tool-call"]} />);
+    await user.click(screen.getByText("Text"));
+    await user.click(screen.getByText("Conversation"));
+    expect(screen.getByText("The whole conversation")).toBeInTheDocument();
+    await user.click(screen.getByText("Tool call"));
+    expect(chosen()).toBe("tool-call");
+
+    // Basic now has two answers, so it no longer picks one by itself.
+    await user.click(screen.getByText("Basic"));
+    expect(chosen()).toBe("none");
+    await user.click(screen.getByText("The output"));
+    expect(chosen()).toBe("llm-general");
+    await user.click(screen.getByText("Tool call"));
+    expect(chosen()).toBe("tool-call");
+  });
+
+  it("shows the one card left rather than a blank step", async () => {
+    const user = setupUser();
+    render(<Harness allowed={["tool-call"]} />);
+    await user.click(screen.getByText("Tool call"));
+    expect(chosen()).toBe("tool-call");
+  });
+
+  it("takes a tool call without asking when it is the only text kind", async () => {
+    const user = setupUser();
+    render(<Harness allowed={["tool-call", "stt"]} />);
+    await user.click(screen.getByText("Text"));
+    expect(chosen()).toBe("tool-call");
+  });
 });

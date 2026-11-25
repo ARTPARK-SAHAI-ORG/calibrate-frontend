@@ -63,7 +63,8 @@ jest.mock("../../../lib/tracesApi", () => ({
 // The agent's own evaluators decide whether the attach prompt has anything to
 // ask about, so they are driven from the test rather than the network.
 const fetchAgentEvaluators = jest.fn(
-  async () => [] as { uuid: string; description?: string }[],
+  async () =>
+    [] as { uuid: string; description?: string; evaluator_type?: string }[],
 );
 const addEvaluatorsToAgent = jest.fn(async () => ({}));
 jest.mock("../../../lib/evaluatorApi", () => ({
@@ -1142,6 +1143,47 @@ describe("TracesTabContent", () => {
       );
       // The desktop header and the mobile card both name the column.
       expect(screen.getAllByText("Tone")).toHaveLength(2);
+    });
+
+    it("shows a dash where a column's evaluator does not judge that kind of trace", async () => {
+      fetchAgentEvaluators.mockResolvedValue([
+        { uuid: "ev-1", evaluator_type: "llm" },
+        { uuid: "ev-tc", evaluator_type: "tool-call" },
+      ]);
+      mockUseTraces.mockReturnValue(
+        tracesResult([
+          trace({ latest_run_status: "completed" }),
+          trace({
+            uuid: "trace-2",
+            input_preview: "Book a visit",
+            response_preview: "  ",
+            tool_call_count: 1,
+            latest_run_status: "completed",
+          }),
+        ]),
+      );
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            enabled: true,
+            eligibility: {
+              eligible: [
+                { evaluator_uuid: "ev-1", name: "Tone" },
+                { evaluator_uuid: "ev-tc", name: "Tool call correctness" },
+              ],
+              ineligible: [],
+            },
+          }}
+        />,
+      );
+
+      // Desktop row and mobile card each: the reply row is waiting on Tone
+      // and has a dash for the tool-call column, and the tool-call row the
+      // other way round.
+      await waitFor(() => expect(screen.getAllByText("—")).toHaveLength(4));
+      expect(screen.getAllByText("Not scored yet")).toHaveLength(4);
     });
 
     it("shows no evaluator columns when nothing can score and nothing has been scored", () => {

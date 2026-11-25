@@ -77,6 +77,10 @@ export type BulkContentColumn = {
   ) => { value: unknown } | { error: string };
   // Render the parsed value in the preview grid.
   renderPreview: (value: unknown) => React.ReactNode;
+  // The header may be left out of the CSV and a blank cell adds nothing.
+  optional?: boolean;
+  // A blank cell is allowed on a row that carries tool calls.
+  emptyWithToolCalls?: boolean;
 };
 
 export type BulkSampleRow = {
@@ -268,9 +272,16 @@ export function BulkUploadItemsDialog({
           col,
           key: findHeaderKey(headers, col.headerCandidates),
         }));
-        const missingContent = contentKeys.filter((ck) => !ck.key);
+        const missingContent = contentKeys.filter(
+          (ck) => !ck.key && !ck.col.optional,
+        );
         if (!nameKey || missingContent.length > 0) {
-          const required = ["name", ...contentColumns.map((c) => c.csvColumn)]
+          const required = [
+            "name",
+            ...contentColumns
+              .filter((c) => !c.optional)
+              .map((c) => c.csvColumn),
+          ]
             .map((c) => `"${c}"`)
             .join(", ");
           setParseError(
@@ -346,7 +357,7 @@ export function BulkUploadItemsDialog({
             ? (row[descriptionKey] ?? "").trim()
             : "";
           const contentRaws = contentKeys.map((ck) =>
-            (row[ck.key as string] ?? "").trim(),
+            ck.key ? (row[ck.key] ?? "").trim() : "",
           );
 
           const anyVariableValue = evaluatorsWithVariables.some((e) =>
@@ -368,11 +379,16 @@ export function BulkUploadItemsDialog({
           // item is matched by name rather than rewritten).
           const content: Record<string, unknown> = {};
           let contentError: string | null = null;
+          const blankUnlessToolCalls: BulkContentColumn[] = [];
           for (let c = 0; c < contentColumns.length; c++) {
             const col = contentColumns[c];
             const raw = contentRaws[c];
             if (!raw) {
-              if (uploadAnnotations) continue;
+              if (uploadAnnotations || col.optional) continue;
+              if (col.emptyWithToolCalls) {
+                blankUnlessToolCalls.push(col);
+                continue;
+              }
               contentError = `Row ${i + 1}: "${col.csvColumn}" is required.`;
               break;
             }
@@ -382,6 +398,15 @@ export function BulkUploadItemsDialog({
               break;
             }
             content[col.payloadKey] = parsed.value;
+          }
+          if (!contentError && blankUnlessToolCalls.length > 0) {
+            const actual = content.actual_tool_calls;
+            const hasToolCalls =
+              (Array.isArray(actual) && actual.length > 0) ||
+              Array.isArray(content.expected_tool_calls);
+            if (!hasToolCalls) {
+              contentError = `Row ${i + 1}: "${blankUnlessToolCalls[0].csvColumn}" is required unless the row has tool calls.`;
+            }
           }
           if (contentError) {
             setParseError(contentError);

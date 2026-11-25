@@ -1737,6 +1737,183 @@ describe("AddTestDialog", () => {
     });
   });
 
+  describe("labelItem tool calls", () => {
+    const labelProps = (overrides: Record<string, unknown> = {}) =>
+      baseProps({
+        mode: "labelItem",
+        setItemDescription: jest.fn(),
+        requireAssistantLastMessage: true,
+        testName: "Item",
+        ...overrides,
+      });
+
+    const endsOnToolCall: TestConfig = {
+      history: [
+        { role: "user", content: "Weather in Pune?" },
+        {
+          role: "assistant",
+          tool_calls: [
+            {
+              id: "c1",
+              type: "function",
+              function: { name: "get_weather", arguments: '{"city":"Pune"}' },
+            },
+          ],
+        },
+        { role: "tool", content: '{"temp":30}', tool_call_id: "c1" },
+      ],
+      evaluation: { type: "response" },
+    };
+
+    it("saves a conversation that ends on the agent's tool call", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...labelProps({ onSubmit, initialConfig: endsOnToolCall })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Weather in Pune?")).toBeInTheDocument(),
+      );
+      const pill = screen.getByText("Evaluation target");
+      expect(pill.closest(".border-l-2")).toHaveTextContent("get_weather");
+      expect(
+        screen.getByDisplayValue("Weather in Pune?").closest(".border-l-2"),
+      ).toBeNull();
+      const criteria = screen.queryByPlaceholderText(
+        "Enter value for {{criteria}}",
+      );
+      if (criteria) await user.type(criteria, "Calls the tool");
+      const create = screen.getByRole("button", { name: "Create" });
+      expect(create).toBeEnabled();
+      await user.click(create);
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config] = onSubmit.mock.calls[0];
+      const history = config.history;
+      expect(history[history.length - 2].tool_calls[0].function).toEqual({
+        name: "get_weather",
+        arguments: '{"city":"Pune"}',
+      });
+      expect(history[history.length - 1]).toMatchObject({
+        role: "tool",
+        content: '{"temp":30}',
+      });
+      expect(config.evaluation.tool_calls).toBeUndefined();
+    });
+
+    it("still refuses a conversation that ends on a user message", async () => {
+      render(
+        <ControlledDialog
+          {...labelProps({
+            initialConfig: {
+              history: [{ role: "user", content: "Hi" }],
+              evaluation: { type: "response" },
+            },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Hi")).toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+    });
+
+    it("saves the expected tool calls chosen for the item", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(<ControlledDialog {...labelProps({ onSubmit })} />);
+      expect(screen.getByText("Expected tool calls")).toBeInTheDocument();
+      expect(screen.queryByText("Tools to test")).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Add tool" }));
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Pick get_weather"));
+      await user.type(screen.getByPlaceholderText("Expected value"), "Pune");
+      const textareas = document.querySelectorAll("textarea[data-msg-id]");
+      await user.type(textareas[0], "Weather?");
+      await user.type(textareas[1], "Let me check");
+      const criteria = screen.queryByPlaceholderText(
+        "Enter value for {{criteria}}",
+      );
+      if (criteria) await user.type(criteria, "Calls the tool");
+      await user.click(screen.getByRole("button", { name: "Create" }));
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config] = onSubmit.mock.calls[0];
+      expect(config.evaluation.type).toBe("response");
+      expect(config.evaluation.tool_calls).toEqual([
+        {
+          tool: "get_weather",
+          arguments: { city: { match_type: "exact", value: "Pune" } },
+          accept_any_arguments: false,
+        },
+      ]);
+    });
+
+    it("does not save while an expected parameter is left empty", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(<ControlledDialog {...labelProps({ onSubmit })} />);
+      await user.click(screen.getByRole("button", { name: "Add tool" }));
+      await waitFor(() =>
+        expect(screen.getByText("Pick get_weather")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Pick get_weather"));
+      const textareas = document.querySelectorAll("textarea[data-msg-id]");
+      await user.type(textareas[0], "Weather?");
+      await user.type(textareas[1], "Let me check");
+      const criteria = screen.queryByPlaceholderText(
+        "Enter value for {{criteria}}",
+      );
+      if (criteria) await user.type(criteria, "Calls the tool");
+      await user.click(screen.getByRole("button", { name: "Create" }));
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("loads saved expected tool calls back into the section", async () => {
+      render(
+        <ControlledDialog
+          {...labelProps({
+            isEditing: true,
+            initialConfig: {
+              history: [
+                { role: "user", content: "Weather?" },
+                { role: "assistant", content: "Sunny" },
+              ],
+              evaluation: {
+                type: "response",
+                tool_calls: [
+                  {
+                    tool: "get_weather",
+                    arguments: { city: { match_type: "exact", value: "Pune" } },
+                    accept_any_arguments: false,
+                  },
+                ],
+              },
+            },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("get_weather")).toBeInTheDocument(),
+      );
+      expect(screen.getByDisplayValue("Pune")).toBeInTheDocument();
+    });
+
+    it("shows no expected tool calls section for a conversation item", () => {
+      render(
+        <ControlledDialog
+          {...labelProps({
+            requireAssistantLastMessage: false,
+            allowAgentLastMessage: true,
+          })}
+        />,
+      );
+      expect(screen.queryByText("Expected tool calls")).not.toBeInTheDocument();
+    });
+  });
+
   describe("save-and-run shortcut", () => {
     it("does not render the run button unless showRunAfterSave is set", async () => {
       render(<AddTestDialog {...baseProps({ initialTab: "next-reply" })} />);

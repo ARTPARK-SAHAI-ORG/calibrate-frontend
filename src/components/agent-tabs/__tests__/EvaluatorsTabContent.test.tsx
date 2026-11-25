@@ -485,7 +485,7 @@ describe("EvaluatorsTabContent", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("uses the llm-general use-case type for a general agent", async () => {
+  it("uses the llm-general and tool-call use-case types for a general agent", async () => {
     mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
     mockFetchAllEvaluators.mockResolvedValue([
       evaluator({ uuid: "ev-1" }),
@@ -493,6 +493,16 @@ describe("EvaluatorsTabContent", () => {
         uuid: "ev-2",
         name: "Output check",
         evaluator_type: "llm-general",
+      }),
+      evaluator({
+        uuid: "ev-3",
+        name: "Tool call correctness",
+        evaluator_type: "tool-call",
+      }),
+      evaluator({
+        uuid: "ev-4",
+        name: "Reply check",
+        evaluator_type: "llm",
       }),
     ]);
     const user = setupUser();
@@ -504,21 +514,32 @@ describe("EvaluatorsTabContent", () => {
     await screen.findByText("Follows Refund Policy");
 
     await user.click(screen.getByRole("button", { name: "Create evaluator" }));
-    expect(screen.getByTestId("use-case-types")).toHaveTextContent(
-      "llm-general",
+    expect(screen.getByTestId("use-case-types").textContent).toBe(
+      "llm-general,tool-call",
     );
 
     await user.click(screen.getByRole("button", { name: "Add evaluators" }));
-    // ev-1 is already attached (filtered out); ev-2 is llm-general so it's
-    // the only one offered.
-    expect(screen.getByTestId("available-evaluator-types")).toHaveTextContent(
-      "llm-general",
+    // ev-1 is already attached and ev-4 is for a conversation agent.
+    expect(screen.getByTestId("available-evaluator-types").textContent).toBe(
+      "llm-general,tool-call",
     );
   });
 
-  it("keeps the default (llm) use-case type when agentNature is omitted", async () => {
+  it("keeps the default (llm and tool-call) use-case types when agentNature is omitted", async () => {
     mockFetchAgentEvaluators.mockResolvedValue([evaluator()]);
-    mockFetchAllEvaluators.mockResolvedValue([evaluator({ uuid: "ev-1" })]);
+    mockFetchAllEvaluators.mockResolvedValue([
+      evaluator({ uuid: "ev-1" }),
+      evaluator({
+        uuid: "ev-3",
+        name: "Tool call correctness",
+        evaluator_type: "tool-call",
+      }),
+      evaluator({
+        uuid: "ev-2",
+        name: "Output check",
+        evaluator_type: "llm-general",
+      }),
+    ]);
     const user = setupUser();
 
     render(<EvaluatorsTabContent agentUuid="agent-1" />);
@@ -529,7 +550,14 @@ describe("EvaluatorsTabContent", () => {
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Create evaluator" }));
-    expect(screen.getByTestId("use-case-types")).toHaveTextContent("llm");
+    expect(screen.getByTestId("use-case-types").textContent).toBe(
+      "llm,tool-call",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Add evaluators" }));
+    expect(screen.getByTestId("available-evaluator-types").textContent).toBe(
+      "tool-call",
+    );
   });
   it("shows the app's own hover text on Remove, and none on View", async () => {
     const user = setupUser();

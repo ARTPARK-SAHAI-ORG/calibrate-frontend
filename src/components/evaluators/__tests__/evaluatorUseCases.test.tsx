@@ -7,14 +7,22 @@ import {
 } from "../evaluatorUseCases";
 
 describe("EVALUATOR_USE_CASE_OPTIONS", () => {
-  it("contains the five canonical use cases with expected groups", () => {
+  it("contains the six canonical use cases with expected groups", () => {
     expect(EVALUATOR_USE_CASE_OPTIONS.map((o) => o.value)).toEqual([
       "llm",
       "conversation",
       "llm-general",
+      "tool-call",
       "stt",
       "tts",
     ]);
+    expect(
+      EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "tool-call"),
+    ).toMatchObject({
+      title: "Tool call",
+      description: "Check whether the agent made the right tool calls",
+      group: "text",
+    });
     expect(
       EVALUATOR_USE_CASE_OPTIONS.find((o) => o.value === "llm")?.group,
     ).toBe("conversation");

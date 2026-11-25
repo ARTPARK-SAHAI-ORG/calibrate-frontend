@@ -195,6 +195,96 @@ describe("CreateEvaluatorFlow", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("creates a tool call evaluator from the tool-call default prompt", async () => {
+    const user = setupUser();
+    const onCreated = jest.fn();
+
+    render(
+      <CreateEvaluatorFlow
+        open
+        onClose={jest.fn()}
+        existingEvaluators={[]}
+        onCreated={onCreated}
+        useCaseTypes={["tool-call"]}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("prompt-field")).toHaveTextContent(
+        "Judge the reply",
+      ),
+    );
+    const fetchMock = global.fetch as jest.Mock;
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes("/evaluators/default-prompt?purpose=tool-call"),
+      ),
+    ).toBe(true);
+
+    await user.type(screen.getByLabelText("Name"), "Right tool");
+    await user.click(screen.getByText("Submit create"));
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    const post = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        String(url).endsWith("/evaluators") && init?.method === "POST",
+    );
+    const body = JSON.parse(post![1].body as string);
+    expect(body.evaluator_type).toBe("tool-call");
+    expect(body.data_type).toBe("text");
+  });
+
+  it.each([
+    ["a conversation agent", ["llm", "tool-call"]],
+    ["a basic agent", ["llm-general", "tool-call"]],
+  ] as const)(
+    "offers Tool call in the picker for %s",
+    async (_label, types) => {
+      const user = setupUser();
+      render(
+        <CreateEvaluatorFlow
+          open
+          onClose={jest.fn()}
+          existingEvaluators={[]}
+          onCreated={jest.fn()}
+          useCaseTypes={[...types]}
+        />,
+      );
+
+      expect(screen.getByText("What is this evaluator for?")).toBeInTheDocument();
+      await user.click(screen.getByText("Tool call"));
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+
+      expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
+      const fetchMock = global.fetch as jest.Mock;
+      await waitFor(() =>
+        expect(
+          fetchMock.mock.calls.some(([url]) =>
+            String(url).includes("default-prompt?purpose=tool-call"),
+          ),
+        ).toBe(true),
+      );
+    },
+  );
+
+  it("offers Tool call when every use case is on offer", async () => {
+    const user = setupUser();
+    render(
+      <CreateEvaluatorFlow
+        open
+        onClose={jest.fn()}
+        existingEvaluators={[]}
+        onCreated={jest.fn()}
+      />,
+    );
+
+    await user.click(screen.getByText("Text"));
+    await user.click(screen.getByText("Conversation"));
+    await user.click(screen.getByText("Tool call"));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
+  });
+
   it("leaves the name empty for the reader to fill in", async () => {
     render(
       <CreateEvaluatorFlow

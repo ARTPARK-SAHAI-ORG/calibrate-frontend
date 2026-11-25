@@ -9,7 +9,7 @@ import { normaliseHistoryItem } from "./shared";
 /**
  * Renders the conversation side of a tool-call labelling item (a tool-call
  * item inside an `llm` task): the conversation and the agent's actual output
- * (its tool call, or the text it replied with when it made no call). This is
+ * (the text it replied with, then its tool calls, as the judge reads them). This is
  * the "what happened" pane — the "what was expected" spec is the item's
  * evaluator-equivalent and renders right under this pane, in
  * `ExpectedToolCalls`, so the two can be compared.
@@ -36,23 +36,24 @@ export function ToolCallItemPane({
     }
   }
 
-  const actualToolCalls = Array.isArray(payload.actual_tool_calls)
-    ? (payload.actual_tool_calls as TestCaseHistory["tool_calls"])
-    : undefined;
-  if (actualToolCalls && actualToolCalls.length > 0) {
+  const agentResponse = readTextField(payload.agent_response);
+  if (agentResponse && agentResponse.content.length > 0) {
+    history.push({
+      role: "assistant",
+      ...agentResponse,
+      label: agentResponse.label ?? AGENT_ANSWER,
+    });
+  }
+  const actualToolCalls = (
+    Array.isArray(payload.actual_tool_calls) &&
+    payload.actual_tool_calls.length > 0
+      ? payload.actual_tool_calls
+      : Array.isArray(payload.tool_calls)
+        ? payload.tool_calls
+        : []
+  ) as NonNullable<TestCaseHistory["tool_calls"]>;
+  if (actualToolCalls.length > 0) {
     history.push({ role: "assistant", tool_calls: actualToolCalls });
-  } else {
-    // A failed tool-call test: the agent replied with text instead of
-    // calling a tool. Show that reply so the annotator sees what the agent
-    // actually did.
-    const agentResponse = readTextField(payload.agent_response);
-    if (agentResponse && agentResponse.content.length > 0) {
-      history.push({
-        role: "assistant",
-        ...agentResponse,
-        label: agentResponse.label ?? AGENT_ANSWER,
-      });
-    }
   }
 
   if (history.length === 0) {

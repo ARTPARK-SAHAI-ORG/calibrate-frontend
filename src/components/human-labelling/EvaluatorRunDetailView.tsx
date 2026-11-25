@@ -25,10 +25,7 @@ import {
 } from "@/components/human-labelling/AgreementOverviewTable";
 import { summariseValues } from "@/lib/evaluatorResultStat";
 import { payloadHasVersions, textOf } from "@/lib/messageVersions";
-import {
-  isSkippedRunResult,
-  toolCallNotEvaluatedMessage,
-} from "@/lib/labellingItem";
+import { evaluatorFitsItem, isSkippedRunResult } from "@/lib/labellingItem";
 import {
   ItemPane,
   itemPaneHasOwnPadding,
@@ -61,8 +58,7 @@ export type EvaluatorRunRow = {
   item_id: string;
   evaluator_id: string;
   evaluator_version_id: string;
-  /** `skipped` is set instead of `value` when the AI judge did not run on
-   * this row at all — today, a tool-call row. */
+  /** `skipped` is set instead of `value` on rows an older run did not judge. */
   value: {
     value?: unknown;
     reasoning?: unknown;
@@ -111,6 +107,7 @@ export type JobEvaluator = {
 export type EvaluatorRunItemSnapshot = {
   uuid: string;
   payload: unknown;
+  is_tool_call?: boolean;
   metadata?: MetadataEntry[] | null;
 };
 
@@ -217,6 +214,7 @@ export function snapshotToItem(
     payload: snap.payload,
     created_at: "",
     deleted_at: null,
+    is_tool_call: snap.is_tool_call,
     metadata: snap.metadata,
   };
 }
@@ -433,6 +431,7 @@ export function exportInputCols(
     return ["reference_transcript", "predicted_transcript"];
   if (taskType === "tts") return ["text", "audio_path"];
   if (taskType === "llm") return ["conversation_history", "agent_response"];
+  if (taskType === "llm-general") return ["input", "output"];
   return ["transcript"];
 }
 
@@ -456,6 +455,20 @@ export function serializeMessages(messages: unknown[]): string {
       const content = typeof m.content === "string" ? m.content : "";
       return `${role}: ${content}`;
     })
+    .filter(Boolean)
+    .join("\n");
+}
+
+// The agent's reply followed by its tool calls as JSON, so a verdict on a
+// tool-call row never sits beside an empty cell.
+function replyWithToolCalls(p: Record<string, unknown>, reply: unknown): string {
+  const calls =
+    Array.isArray(p.actual_tool_calls) && p.actual_tool_calls.length > 0
+      ? p.actual_tool_calls
+      : Array.isArray(p.tool_calls)
+        ? p.tool_calls
+        : [];
+  return [textOf(reply), calls.length > 0 ? JSON.stringify(calls) : ""]
     .filter(Boolean)
     .join("\n");
 }
@@ -488,7 +501,10 @@ export function extractPayloadInputValues(
     const history = Array.isArray(p.chat_history)
       ? serializeMessages(p.chat_history)
       : "";
-    return [history, textOf(p.agent_response)];
+    return [history, replyWithToolCalls(p, p.agent_response)];
+  }
+  if (taskType === "llm-general") {
+    return [textOf(p.input), replyWithToolCalls(p, p.output)];
   }
   return [Array.isArray(p.transcript) ? serializeMessages(p.transcript) : ""];
 }
@@ -943,7 +959,7 @@ export function EvaluatorResultsPane({
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {toolCallNotEvaluatedMessage("This item evaluates")}
+                This item was not judged.
               </p>
             </div>
           );
@@ -1840,11 +1856,25 @@ export function EvaluatorRunDetailView({
 
   // An item counts as done as soon as every evaluator has a finished score for
   // it, even while the rest of the run is still going.
-  const itemDone = (itemId: string): boolean => {
+  // An evaluator that does not fit an item is left off it, unless an older
+  // run still recorded a result there.
+  const evaluatorsForItem = (item: Item) => {
+    const rs = runsByItem[item.uuid] ?? [];
+    return detailsEvaluators.filter(
+      (e) =>
+        evaluatorFitsItem(
+          getJobEvaluator(e)?.evaluator_type,
+          item.is_tool_call === true,
+        ) || rs.some((r) => r.evaluator_id === e.evaluator_id),
+    );
+  };
+
+  const itemDone = (item: Item): boolean => {
     if (!job) return false;
-    const rs = runsByItem[itemId] ?? [];
-    if (rs.length === 0 || detailsEvaluators.length === 0) return false;
-    return detailsEvaluators.every((e) =>
+    const rs = runsByItem[item.uuid] ?? [];
+    const evs = evaluatorsForItem(item);
+    if (rs.length === 0 || evs.length === 0) return false;
+    return evs.every((e) =>
       rs.some(
         (r) =>
           r.evaluator_id === e.evaluator_id &&
@@ -1895,7 +1925,7 @@ export function EvaluatorRunDetailView({
       })
     : [];
 
-  const doneCount = itemsForRun.filter((it) => itemDone(it.uuid)).length;
+  const doneCount = itemsForRun.filter((it) => itemDone(it)).length;
   const showDoneCount =
     (job.status === "in_progress" || job.status === "queued") &&
     itemsForRun.length > 0;
@@ -2085,7 +2115,7 @@ export function EvaluatorRunDetailView({
               <div className="md:hidden w-full max-h-32 border-b border-border bg-muted/20 overflow-y-auto">
                 <div className="p-2 grid grid-cols-8 gap-2">
                   {filteredItemsForRun.map((it, i) => {
-                    const done = itemDone(it.uuid);
+                    const done = itemDone(it);
                     const isCurrent = i === safeIndex;
                     const label = originalIndexByUuid.get(it.uuid) ?? i + 1;
                     return (
@@ -2115,7 +2145,7 @@ export function EvaluatorRunDetailView({
                 <div className="absolute inset-0 overflow-y-auto">
                   <div className="p-3 grid grid-cols-1 gap-2">
                     {filteredItemsForRun.map((it, i) => {
-                      const done = itemDone(it.uuid);
+                      const done = itemDone(it);
                       const isCurrent = i === safeIndex;
                       const label = originalIndexByUuid.get(it.uuid) ?? i + 1;
                       return (
@@ -2159,7 +2189,7 @@ export function EvaluatorRunDetailView({
                     showJudgeNote
                     item={currentItem}
                     taskType={task.type}
-                    evaluators={detailsEvaluators}
+                    evaluators={evaluatorsForItem(currentItem)}
                     evaluatorNamesById={evaluatorNamesById}
                     getJobEvaluator={getJobEvaluator}
                     runs={runsByItem[currentItem.uuid] ?? []}

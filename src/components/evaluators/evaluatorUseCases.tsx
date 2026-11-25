@@ -14,9 +14,7 @@ export type EvaluatorUseCaseOption = {
   recommended?: boolean;
 };
 
-// Canonical, ordered list of evaluator use cases. The evaluator picker shows
-// all of these; the labelling-task creator reuses the same list but filters
-// out `tts` (labelling has no text-to-speech tasks). Keep descriptions to one
+// Canonical, ordered list of evaluator use cases. Keep descriptions to one
 // short, plain-language line so the pickers stay scannable for new users.
 export const EVALUATOR_USE_CASE_OPTIONS: EvaluatorUseCaseOption[] = [
   {
@@ -35,6 +33,12 @@ export const EVALUATOR_USE_CASE_OPTIONS: EvaluatorUseCaseOption[] = [
     value: "llm-general",
     title: "Basic",
     description: "Judge the output of an LLM given a text input",
+    group: "text",
+  },
+  {
+    value: "tool-call",
+    title: "Tool call",
+    description: "Check whether the agent made the right tool calls",
     group: "text",
   },
   {
@@ -78,8 +82,6 @@ const TYPE_TONE: Record<EvaluatorType, CardTone> = {
   llm: "orange",
   "llm-general": "teal",
   conversation: "pink",
-  // Never offered in the create flow: it comes with the product. Listed here
-  // only so every type has a colour where one is looked up.
   "tool-call": "amber",
 };
 

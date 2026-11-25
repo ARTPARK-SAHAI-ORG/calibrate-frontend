@@ -61,6 +61,32 @@ describe("ToolCallItemPane", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows both the reply and the tool calls when the agent made both", () => {
+    render(
+      <ToolCallItemPane
+        payload={{
+          chat_history: [{ role: "user", content: "Book a flight" }],
+          agent_response: "One moment",
+          actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
+        }}
+      />,
+    );
+    expect(screen.getByText("One moment")).toBeInTheDocument();
+    expect(screen.getByText("book_flight")).toBeInTheDocument();
+  });
+
+  it("falls back to tool_calls when actual_tool_calls is empty", () => {
+    render(
+      <ToolCallItemPane
+        payload={{
+          actual_tool_calls: [],
+          tool_calls: [{ tool: "book_train", arguments: {} }],
+        }}
+      />,
+    );
+    expect(screen.getByText("book_train")).toBeInTheDocument();
+  });
+
   it("draws the expected tool call under the conversation, headed as the expected answer", () => {
     render(
       <ToolCallItemPane

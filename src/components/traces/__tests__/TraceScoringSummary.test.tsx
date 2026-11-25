@@ -374,3 +374,85 @@ describe("the judge's reasoning", () => {
     expect(screen.getByText("Correct")).toBeInTheDocument();
   });
 });
+
+describe("a column whose evaluator does not judge this kind of trace", () => {
+  const typed = [
+    { evaluator_uuid: "ev-1", name: "Tone", evaluator_type: "llm" as const },
+    {
+      evaluator_uuid: "ev-tc",
+      name: "Tool call correctness",
+      evaluator_type: "tool-call" as const,
+    },
+  ];
+
+  it("shows a dash under the tool-call evaluator for a trace that replied", () => {
+    render(
+      <TraceScoreCells
+        trace={{
+          latest_run_status: "completed",
+          response_preview: "At 14 weeks.",
+          tool_call_count: 1,
+        }}
+        columns={typed}
+        layout="row"
+      />,
+    );
+    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.getByText("Not scored yet")).toBeInTheDocument();
+  });
+
+  it("shows a dash under every other evaluator for a trace that only called a tool, even while scoring runs or after it failed", () => {
+    const { rerender } = render(
+      <TraceScoreCells
+        trace={{
+          latest_run_status: "processing",
+          response_preview: null,
+          tool_call_count: 2,
+        }}
+        columns={typed}
+        layout="card"
+      />,
+    );
+    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.getByText("In progress")).toBeInTheDocument();
+
+    rerender(
+      <TraceScoreCells
+        trace={{
+          latest_run_status: "failed",
+          response_preview: null,
+          tool_call_count: 2,
+        }}
+        columns={typed}
+        layout="card"
+      />,
+    );
+    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.getByText("Could not run")).toBeInTheDocument();
+  });
+
+  it("still shows a score the evaluator did give", () => {
+    render(
+      <TraceScoreCells
+        trace={{
+          latest_run_status: "completed",
+          response_preview: null,
+          tool_call_count: 1,
+          results: [
+            {
+              evaluator_uuid: "ev-1",
+              name: "Tone",
+              output_type: "binary",
+              value: 1,
+              passed: true,
+            },
+          ],
+        }}
+        columns={typed}
+        layout="row"
+      />,
+    );
+    expect(screen.getByText("Correct")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+  });
+});

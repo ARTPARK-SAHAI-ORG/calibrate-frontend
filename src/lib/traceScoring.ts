@@ -1,7 +1,21 @@
+import type { TraceOutputFacts } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import type {
   TraceScoringIneligibleReason,
   TraceScoringStatus,
+  TraceSummary,
 } from "./tracesApi";
+
+/** The two facts the labelling and scoring rules need, read off a list row.
+ * The row carries a preview of the reply and a count of the calls, not the
+ * output itself, so this is where that shape is turned into the shared one. */
+export function traceRowOutputFacts(
+  trace: Partial<Pick<TraceSummary, "response_preview" | "tool_call_count">>,
+): TraceOutputFacts {
+  return {
+    hasResponse: !!trace.response_preview?.trim(),
+    hasToolCalls: (trace.tool_call_count ?? 0) > 0,
+  };
+}
 
 /** A run that is still open and should be refetched. */
 export function isTraceScoringInProgress(
@@ -21,24 +35,63 @@ export function ineligibleReasonCopy(
       return "Has no live version";
     case "declares_variables":
       return "Uses variables, which cannot be filled for a trace automatically";
+    case "no_judge_prompt":
+      return "Has no prompt, so only people can answer it";
     default:
       return "Cannot score traces for this agent";
   }
 }
 
+const NOTHING_CAN_SCORE_BY_REASON: Record<
+  TraceScoringIneligibleReason,
+  { every: string; some: string; fix: string }
+> = {
+  declares_variables: {
+    every:
+      "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically.",
+    some: "some use variables",
+    fix: "Add an evaluator without variables in the",
+  },
+  wrong_type_for_agent: {
+    every:
+      "None of the evaluators added to this agent are the kind that can score its traces.",
+    some: "some are not the kind this agent uses",
+    fix: "Add an evaluator that fits this agent in the",
+  },
+  no_judge_prompt: {
+    every:
+      "None of the evaluators added to this agent have a prompt, so only people can answer them.",
+    some: "some have no prompt",
+    fix: "Add an evaluator with a prompt in the",
+  },
+  no_live_version: {
+    every: "None of the evaluators added to this agent have a live version.",
+    some: "some have no live version",
+    fix: "Add an evaluator with a live version in the",
+  },
+};
+
 /**
- * Why an agent with evaluators still cannot score its traces. The usual cause
- * is variables, which have nowhere to be filled in for a trace, so that case
- * says so plainly rather than leaving the reader to guess.
+ * Why an agent's traces are not being scored, and what to do about it. The
+ * text ends with "in the", because the caller follows it with a link to the
+ * Evaluators tab.
  */
 export function nothingCanScoreCopy(ineligible: { reason: string }[]): string {
   if (ineligible.length === 0) {
-    return "This agent has no evaluators, so its traces are not scored.";
+    return "This agent has no evaluators, so its traces are not scored. Add one in the";
   }
-  if (ineligible.every((item) => item.reason === "declares_variables")) {
-    return "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically.";
+  const reasons = [...new Set(ineligible.map((item) => item.reason))];
+  const known = reasons.flatMap(
+    (reason) =>
+      NOTHING_CAN_SCORE_BY_REASON[reason as TraceScoringIneligibleReason] ?? [],
+  );
+  if (reasons.length === 1 && known.length === 1) {
+    return `${known[0].every} ${known[0].fix}`;
   }
-  return "None of this agent's evaluators can score traces.";
+  const why = known.length
+    ? `None of this agent's evaluators can score traces: ${known.map((copy) => copy.some).join(", ")}.`
+    : "None of this agent's evaluators can score traces.";
+  return `${why} Add an evaluator that can score traces in the`;
 }
 
 /**
@@ -53,7 +106,7 @@ export function scoringRunErrorCopy(error: string | null | undefined): string {
     case "over_limit":
       return "This workspace has reached its limit for scoring traces";
     case "no_usable_evaluators":
-      return "No evaluators could score this trace";
+      return "No evaluator on this agent fits this trace";
     case "scoring_disabled":
       return "Monitoring was turned off before this trace was scored";
     case "unsupported_interaction_type":

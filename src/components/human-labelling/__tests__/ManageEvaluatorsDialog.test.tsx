@@ -208,6 +208,27 @@ describe("ManageEvaluatorsDialog", () => {
     expect(screen.getByText("No matching evaluators.")).toBeInTheDocument();
   });
 
+  it.each([
+    ["llm", true],
+    ["llm-general", true],
+    ["conversation", false],
+    ["stt", false],
+  ] as const)(
+    "offers tool call evaluators on a %s task: %s",
+    async (taskType, shown) => {
+      mockApiClient.mockResolvedValue({
+        items: [
+          ...EVALUATORS,
+          { uuid: "ev-5", name: "Tool call correctness", evaluator_type: "tool-call" },
+          { uuid: "ev-6", name: "Whole chat", evaluator_type: taskType },
+        ],
+      });
+      renderDialog({ taskType, currentEvaluatorIds: [] });
+      await waitFor(() => expect(screen.getByText("Whole chat")).toBeInTheDocument());
+      expect(screen.queryByText("Tool call correctness") !== null).toBe(shown);
+    },
+  );
+
   it("shows a type-specific empty state and a generic one depending on taskType", async () => {
     mockApiClient.mockResolvedValue({ items: [] });
     const { rerender } = renderDialog({ taskType: "llm" });

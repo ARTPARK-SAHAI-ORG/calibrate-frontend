@@ -33,6 +33,17 @@ function parseApiError(err: unknown, fallback: string): string {
   return err.message || fallback;
 }
 
+function fitsTaskType(
+  evaluatorType: EvaluatorType | undefined,
+  taskType: string,
+): boolean {
+  if (evaluatorType === taskType) return true;
+  return (
+    evaluatorType === "tool-call" &&
+    (taskType === "llm" || taskType === "llm-general")
+  );
+}
+
 type ManageEvaluatorsDialogProps = {
   accessToken: string;
   taskUuid: string;
@@ -106,7 +117,9 @@ export function ManageEvaluatorsDialog({
   const filteredEvaluators = useMemo(() => {
     const q = search.trim().toLowerCase();
     return evaluators
-      .filter((ev) => (taskType ? ev.evaluator_type === taskType : true))
+      .filter((ev) =>
+        taskType ? fitsTaskType(ev.evaluator_type, taskType) : true,
+      )
       .filter((ev) => (q ? ev.name.toLowerCase().includes(q) : true));
   }, [evaluators, taskType, search]);
 

@@ -231,6 +231,51 @@ describe("CreateLabellingTaskDialog", () => {
     expect(screen.getByText("No matching evaluators.")).toBeInTheDocument();
   });
 
+  it.each([
+    ["Agent reply", true],
+    ["Basic", true],
+    ["Full conversation", false],
+    ["Speech to Text", false],
+  ])("offers tool call evaluators on a %s task: %s", async (typeTitle, shown) => {
+    const user = setupUser();
+    mockApiClient.mockResolvedValue({
+      items: [
+        ...EVALUATORS,
+        { uuid: "ev-tool", name: "Tool call correctness", evaluator_type: "tool-call" },
+      ],
+    });
+    renderDialog();
+    await goToStep3(user, typeTitle);
+    await waitFor(() =>
+      expect(screen.queryByText("Loading evaluators")).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Tool call correctness") !== null).toBe(shown);
+  });
+
+  it("keeps a chosen tool call evaluator when the task moves from Agent reply to Basic", async () => {
+    const user = setupUser();
+    mockApiClient.mockResolvedValue({
+      items: [
+        ...EVALUATORS,
+        { uuid: "ev-tool", name: "Tool call correctness", evaluator_type: "tool-call" },
+      ],
+    });
+    renderDialog();
+    await goToStep3(user, "Agent reply");
+    await user.click(await screen.findByText("Tool call correctness"));
+    await user.click(screen.getByText("Correctness"));
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByText("Basic"));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    const checked = screen
+      .getAllByRole("checkbox")
+      .filter((box) => (box as HTMLInputElement).checked);
+    expect(checked).toHaveLength(1);
+    expect(checked[0].closest("label")).toHaveTextContent("Tool call correctness");
+  });
+
   it("shows a type-specific empty state when there are no matching evaluators and no search", async () => {
     const user = setupUser();
     mockApiClient.mockResolvedValue({ items: [] });

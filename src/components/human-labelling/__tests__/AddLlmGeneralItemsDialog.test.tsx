@@ -350,6 +350,178 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     ]);
   });
 
+  const BOOK_FLIGHT = {
+    uuid: "t-bf",
+    name: "book_flight",
+    config: {
+      parameters: {
+        properties: { city: { type: "string" } },
+        required: ["city"],
+      },
+    },
+  };
+  const withTools = () => {
+    accessTokenMock.mockReturnValue("tok-123");
+    process.env.NEXT_PUBLIC_BACKEND_URL = "http://backend.test";
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [BOOK_FLIGHT],
+    }) as unknown as typeof fetch;
+  };
+  const expectedSection = () =>
+    screen.getByText("Expected tool calls").closest(".relative") as HTMLElement;
+
+  it("saves expected tool calls apart from the agent's own", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    await user.click(
+      within(expectedSection()).getByRole("button", { name: "Add tool" }),
+    );
+    await user.click(
+      within(expectedSection()).getByRole("button", { name: "Pick book_flight" }),
+    );
+    await user.click(
+      within(expectedSection()).getByRole("button", { name: "+ Add parameter" }),
+    );
+    await user.type(screen.getByPlaceholderText("Parameter name"), "city");
+    await user.type(screen.getByPlaceholderText("Expected value"), "Pune");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    const row = onSubmit.mock.calls[0][0][0];
+    expect(row.output).toBe("Hello");
+    expect(row.toolCalls).toEqual([]);
+    expect(row.expectedToolCalls).toEqual([
+      {
+        tool: "book_flight",
+        arguments: { city: { match_type: "exact", value: "Pune" } },
+        accept_any_arguments: false,
+      },
+    ]);
+  });
+
+  it("saves an expected tool call that accepts any values", async () => {
+    withTools();
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: [
+            {
+              tool: "book_flight",
+              arguments: { city: { match_type: "exact", value: "Pune" } },
+              accept_any_arguments: false,
+            },
+          ],
+        },
+      ],
+    });
+    const label = await screen.findByText(
+      "Accept any values for the parameters",
+    );
+    expect(screen.getByDisplayValue("Pune")).toBeInTheDocument();
+    await user.click(label.previousElementSibling as HTMLElement);
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].expectedToolCalls).toEqual([
+      { tool: "book_flight", arguments: {}, accept_any_arguments: true },
+    ]);
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("loads expected tool calls back on edit and saves them unchanged", async () => {
+    withTools();
+    const user = setupUser();
+    const saved = [
+      {
+        tool: "book_flight",
+        arguments: { city: { match_type: "llm_judge", criteria: "A city in India" } },
+        accept_any_arguments: false,
+      },
+    ];
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+          expectedToolCalls: saved,
+        },
+      ],
+    });
+    expect(await screen.findByDisplayValue("A city in India")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].expectedToolCalls).toEqual(saved);
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "dummy", arguments: { success: true } },
+    ]);
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("does not save while an expected parameter is left empty", async () => {
+    withTools();
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: [
+            { tool: "book_flight", arguments: { city: "" }, accept_any_arguments: false },
+          ],
+        },
+      ],
+    });
+    await screen.findByText("Accept any values for the parameters");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    expect(
+      await screen.findByText(
+        "Complete every highlighted parameter in Expected tool calls.",
+      ),
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("adds a newly created tool to the expected tool calls when made from there", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    await user.click(
+      screen.getByRole("button", { name: "Create tool for expected tool calls" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Finish creating tool" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    const row = onSubmit.mock.calls[0][0][0];
+    expect(row.toolCalls).toEqual([]);
+    expect(row.expectedToolCalls).toEqual([
+      { tool: "book_flight", arguments: {}, accept_any_arguments: false },
+    ]);
+  });
+
   it("keeps the tool list open on Escape pressed inside the tool side panel", async () => {
     const user = setupUser();
     renderDialog({
@@ -823,6 +995,7 @@ describe("AddLlmGeneralItemsDialog", () => {
         inputExtras: {},
         outputExtras: {},
         toolCalls: [],
+        expectedToolCalls: [],
         evaluator_variables: { "ev-1": { topic: "sports", tone: "neutral" } },
         metadata: [],
       },

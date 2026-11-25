@@ -99,11 +99,8 @@ import {
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import {
-  evaluatorsThatCanBeRun,
   itemEditForm,
-  runEvaluatorsDecision,
   toItemDetailItem,
-  toolCallNotEvaluatedMessage,
   llmGeneralDialogRow,
   readEvaluatorVariables,
 } from "@/lib/labellingItem";
@@ -852,13 +849,22 @@ function formatItemUpdatedAt(item: {
   return d.toLocaleString();
 }
 
+function llmGeneralRowWithExpected(item: LabellingItem) {
+  const p = (item.payload ?? {}) as Record<string, unknown>;
+  return {
+    ...llmGeneralDialogRow(item),
+    expectedToolCalls: Array.isArray(p.expected_tool_calls)
+      ? p.expected_tool_calls
+      : [],
+  };
+}
+
 function ItemRowActions({
   itemUuid,
   onDelete,
   onLabel,
   onEdit,
   onEvaluate,
-  evaluateDisabled = false,
   onDuplicate,
 }: {
   itemUuid: string;
@@ -866,9 +872,6 @@ function ItemRowActions({
   onLabel?: (uuid: string) => void;
   onEdit?: (uuid: string) => void;
   onEvaluate?: (uuid: string) => void;
-  /** True on a tool-call row: an AI judge has no wording to read there, so
-   * the button is shown but cannot be pressed. */
-  evaluateDisabled?: boolean;
   onDuplicate?: (uuid: string) => void;
 }) {
   return (
@@ -886,30 +889,16 @@ function ItemRowActions({
           Label
         </button>
       )}
-      {onEvaluate &&
-        (() => {
-          const evaluateButton = (
-            <button
-              type="button"
-              onClick={() => onEvaluate(itemUuid)}
-              disabled={evaluateDisabled}
-              aria-label="Evaluate"
-              className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Evaluate
-            </button>
-          );
-          return evaluateDisabled ? (
-            <Tooltip
-              content={toolCallNotEvaluatedMessage("This item evaluates")}
-              position="top"
-            >
-              {evaluateButton}
-            </Tooltip>
-          ) : (
-            evaluateButton
-          );
-        })()}
+      {onEvaluate && (
+        <button
+          type="button"
+          onClick={() => onEvaluate(itemUuid)}
+          aria-label="Evaluate"
+          className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer"
+        >
+          Evaluate
+        </button>
+      )}
       {onEdit && (
         <button
           type="button"
@@ -1488,23 +1477,7 @@ function LabellingTaskPageInner() {
   // raw count: a count with no usable value behind it (an evaluator missing
   // from the task's own list, or one whose output type is not recorded)
   // formats to nothing, and a card with nothing in it is worse than no card.
-  // Tool call correctness is not judged by a model, so there is nothing to
-  // compare its answers against. It gets no agreement card and is left out
-  // of the note about missing alignment numbers, where it would otherwise
-  // read as an evaluator that failed to run.
-  const toolCallEvaluatorIds = useMemo(
-    () =>
-      new Set(
-        (task?.evaluators ?? [])
-          .filter((e) => e.evaluator_type === "tool-call")
-          .map((e) => e.uuid),
-      ),
-    [task],
-  );
-  const judgedEvaluators = (agreement?.evaluators ?? []).filter(
-    (ev) => !toolCallEvaluatorIds.has(ev.evaluator_id),
-  );
-  const evaluatorsThatRan = judgedEvaluators.filter(
+  const evaluatorsThatRan = (agreement?.evaluators ?? []).filter(
     (ev) => evaluatorResultStats[ev.evaluator_id] != null,
   );
   const evaluatorScoreCards = useMemo(
@@ -1526,7 +1499,7 @@ function LabellingTaskPageInner() {
   // has labelled anything, "no human labels yet" is the truth. When labels do
   // exist, the missing alignment number means the evaluator did not run on the
   // items that were labelled, so say that instead.
-  const anyHumanLabels = judgedEvaluators.some(
+  const anyHumanLabels = (agreement?.evaluators ?? []).some(
     (ev) => (ev.human_result?.count ?? 0) > 0,
   );
   const allEvaluatorsMissing =
@@ -1982,21 +1955,13 @@ function LabellingTaskPageInner() {
   const [runDialogSubmitError, setRunDialogSubmitError] = useState<
     string | null
   >(null);
-  // How many of the chosen rows are tool calls that the AI judges skip. Shown
-  // in the run dialog before the run is confirmed.
-  const [runDialogToolCallSkipCount, setRunDialogToolCallSkipCount] = useState<
-    number | null
-  >(0);
 
   const handleRunEvaluators = (
     target?: string[] | string | { selectAll: true; q?: string },
   ) => {
     if (!accessToken || !uuid || startingRun) return;
-    // Tool call correctness is answered by people, so it is not something a
-    // run can start. A task holding nothing else has no run to offer.
-    const linked = evaluatorsThatCanBeRun(task?.evaluators ?? []);
-    if (linked.length === 0) {
-      toast.error("Link an evaluator that can be run before running.");
+    if ((task?.evaluators ?? []).length === 0) {
+      toast.error("Link an evaluator before running.");
       return;
     }
     if (
@@ -2007,31 +1972,10 @@ function LabellingTaskPageInner() {
     ) {
       setRunDialogItemUuids(null);
       setRunDialogSelectAll({ q: target.q });
-      // Select-all reaches rows beyond the page in hand, so the rows cannot
-      // be counted. The note is still shown, without a number: the backend
-      // leaves those rows out, and refuses a run with nothing else in it.
-      setRunDialogToolCallSkipCount(null);
     } else {
-      const ids = Array.isArray(target) ? target : target ? [target] : null;
-      const decision = runEvaluatorsDecision(
-        (ids ?? []).map(
-          (id) =>
-            items.find((i) => i.uuid === id) ?? {
-              uuid: id,
-              is_tool_call: false,
-            },
-        ),
+      setRunDialogItemUuids(
+        Array.isArray(target) ? target : target ? [target] : null,
       );
-      if (decision.blocked) {
-        toast.error(
-          toolCallNotEvaluatedMessage("The chosen items evaluate"),
-        );
-        return;
-      }
-      setRunDialogToolCallSkipCount(decision.toolCallSkipCount);
-      // Only the rows a run can score are sent. A tool-call row left in would
-      // sit in the finished run with nothing against it.
-      setRunDialogItemUuids(ids ? decision.runnable.map((r) => r.uuid) : null);
       setRunDialogSelectAll(null);
     }
     setRunDialogSubmitError(null);
@@ -2271,7 +2215,13 @@ function LabellingTaskPageInner() {
         payload,
         taskType,
       ),
-      evaluation: { type: "response" as const, criteria: "" },
+      evaluation: {
+        type: "response" as const,
+        criteria: "",
+        ...(Array.isArray(payload.expected_tool_calls)
+          ? { tool_calls: payload.expected_tool_calls }
+          : {}),
+      },
     };
   };
 
@@ -2867,10 +2817,6 @@ function LabellingTaskPageInner() {
                       <span>{humanLabelNote}</span>
                     </div>
                   )}
-                  {/* Every linked evaluator has a row here, the tool-call one
-                      included: its inter-annotator agreement is a real
-                      number even though no evaluator judges it, so this
-                      reads `agreement.evaluators`, not `judgedEvaluators`. */}
                   {hasReliabilityNumber(
                     agreement.human_human,
                     agreement.evaluators ?? [],
@@ -3457,7 +3403,6 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
-                            evaluateDisabled={item.is_tool_call === true}
                           />
                         </div>
                       </Fragment>
@@ -3581,7 +3526,7 @@ function LabellingTaskPageInner() {
                               if (taskType === "llm-general") {
                                 setDuplicateLlmGeneralRows([
                                   {
-                                    ...llmGeneralDialogRow(item),
+                                    ...llmGeneralRowWithExpected(item),
                                     name: `Copy of ${name}`,
                                   },
                                 ]);
@@ -3612,7 +3557,6 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
-                            evaluateDisabled={item.is_tool_call === true}
                           />
                         </div>
                       </Fragment>
@@ -3723,15 +3667,12 @@ function LabellingTaskPageInner() {
           isOpen={runDialogOpen}
           accessToken={accessToken}
           taskUuid={uuid}
-          evaluators={evaluatorsThatCanBeRun(task?.evaluators ?? []).map(
-            (e) => ({
-              uuid: e.uuid,
-              name: e.name,
-            }),
-          )}
+          evaluators={(task?.evaluators ?? []).map((e) => ({
+            uuid: e.uuid,
+            name: e.name,
+          }))}
           submitting={startingRun}
           submitError={runDialogSubmitError}
-          toolCallSkipCount={runDialogToolCallSkipCount}
           onClose={() => {
             if (!startingRun) {
               setRunDialogOpen(false);
@@ -3820,6 +3761,9 @@ function LabellingTaskPageInner() {
                 history,
                 taskType,
               ),
+              expected_tool_calls: config.evaluation.tool_calls?.length
+                ? config.evaluation.tool_calls
+                : undefined,
               evaluator_variables,
             };
 
@@ -3924,6 +3868,9 @@ function LabellingTaskPageInner() {
                 history,
                 taskType,
               ),
+              expected_tool_calls: config.evaluation.tool_calls?.length
+                ? config.evaluation.tool_calls
+                : undefined,
               evaluator_variables,
             };
             setSavingLlmItem(true);
@@ -4266,6 +4213,9 @@ function LabellingTaskPageInner() {
                   ...(r.toolCalls.length > 0
                     ? { actual_tool_calls: r.toolCalls }
                     : {}),
+                  ...(r.expectedToolCalls.length > 0
+                    ? { expected_tool_calls: r.expectedToolCalls }
+                    : {}),
                   ...(Object.keys(r.evaluator_variables).length > 0
                     ? { evaluator_variables: r.evaluator_variables }
                     : {}),
@@ -4294,7 +4244,7 @@ function LabellingTaskPageInner() {
         evaluators={llmGeneralEvaluatorDefs}
         initialRows={items
           .filter((it) => it.uuid === editLlmGeneralSingleItemUuid)
-          .map(llmGeneralDialogRow)}
+          .map(llmGeneralRowWithExpected)}
         onClose={() => {
           editPager.cancel();
           setEditLlmGeneralSingleItemUuid(null);
@@ -4329,6 +4279,9 @@ function LabellingTaskPageInner() {
                         ...(r.toolCalls.length > 0
                           ? { actual_tool_calls: r.toolCalls }
                           : { actual_tool_calls: undefined }),
+                        expected_tool_calls: r.expectedToolCalls.length
+                          ? r.expectedToolCalls
+                          : undefined,
                         evaluator_variables: r.evaluator_variables,
                       },
                       metadata: r.metadata,

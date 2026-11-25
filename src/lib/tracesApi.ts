@@ -100,7 +100,10 @@ export type TraceScoringRun = {
 };
 
 export type TraceScoringIneligibleReason =
-  "wrong_type_for_agent" | "no_live_version" | "declares_variables";
+  | "wrong_type_for_agent"
+  | "no_live_version"
+  | "declares_variables"
+  | "no_judge_prompt";
 
 export type TraceScoringEligibleEvaluator = {
   evaluator_uuid: string;

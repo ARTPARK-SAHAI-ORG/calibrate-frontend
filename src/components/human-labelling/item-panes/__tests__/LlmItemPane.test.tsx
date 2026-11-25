@@ -151,47 +151,6 @@ describe("LlmItemPane", () => {
     expect(screen.getByText("Hello")).toBeInTheDocument();
   });
 
-  it("shows the tool call the agent made as the trailing turn", () => {
-    render(
-      <LlmItemPane
-        payload={{
-          chat_history: [{ role: "user", content: "Book me a flight" }],
-          agent_response: "",
-          actual_tool_calls: [
-            {
-              tool: "book_flight",
-              arguments: { destination: "Delhi" },
-              output: "Booked",
-            },
-          ],
-          expected_tool_calls: [{ tool: "should_not_render", arguments: {} }],
-        }}
-      />,
-    );
-    expect(screen.getByText("Book me a flight")).toBeInTheDocument();
-    expect(screen.getByText("book_flight")).toBeInTheDocument();
-    expect(screen.queryByText("should_not_render")).not.toBeInTheDocument();
-  });
-
-  it("keeps the text reply before the tool calls", () => {
-    render(
-      <LlmItemPane
-        payload={{
-          chat_history: [{ role: "user", content: "Book me a flight" }],
-          agent_response: "One moment",
-          actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
-        }}
-      />,
-    );
-    expect(screen.getByText("One moment")).toBeInTheDocument();
-    expect(screen.getByText("book_flight")).toBeInTheDocument();
-  });
-
-  it("still shows the em-dash placeholder when actual_tool_calls is empty", () => {
-    render(<LlmItemPane payload={{ actual_tool_calls: [] }} />);
-    expect(screen.getByText("—")).toBeInTheDocument();
-  });
-
   it("renders an object agent_response with its text, label and versions", () => {
     render(
       <LlmItemPane

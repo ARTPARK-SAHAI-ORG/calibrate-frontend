@@ -115,6 +115,13 @@ describe("snapshotToItem", () => {
       metadata: undefined,
     });
   });
+
+  it("carries is_tool_call through", () => {
+    expect(
+      snapshotToItem({ uuid: "u1", payload: {}, is_tool_call: true }, "task-1")
+        .is_tool_call,
+    ).toBe(true);
+  });
 });
 
 describe("orderedSnapshotsForRun", () => {
@@ -431,9 +438,11 @@ describe("exportInputCols", () => {
       "agent_response",
     ]);
   });
-  it("returns transcript col for other types", () => {
+  it("returns input and output cols for llm-general", () => {
+    expect(exportInputCols("llm-general")).toEqual(["input", "output"]);
+  });
+  it("returns transcript col for conversation", () => {
     expect(exportInputCols("conversation")).toEqual(["transcript"]);
-    expect(exportInputCols("llm-general")).toEqual(["transcript"]);
   });
 });
 
@@ -514,6 +523,42 @@ describe("extractPayloadInputValues", () => {
         "llm",
       ),
     ).toEqual(["", "hello"]);
+  });
+  it("exports an llm tool-call row's calls as JSON in the output column", () => {
+    const calls = [{ tool: "book_flight", arguments: { to: "Delhi" } }];
+    expect(
+      extractPayloadInputValues(
+        { chat_history: [], agent_response: "", actual_tool_calls: calls },
+        "llm",
+      ),
+    ).toEqual(["", JSON.stringify(calls)]);
+    expect(
+      extractPayloadInputValues(
+        { chat_history: [], actual_tool_calls: [], tool_calls: calls },
+        "llm",
+      ),
+    ).toEqual(["", JSON.stringify(calls)]);
+  });
+  it("exports both the reply and the calls when the agent made both", () => {
+    const calls = [{ tool: "book_flight", arguments: {} }];
+    expect(
+      extractPayloadInputValues(
+        { agent_response: "One moment", actual_tool_calls: calls },
+        "llm",
+      ),
+    ).toEqual(["", `One moment\n${JSON.stringify(calls)}`]);
+  });
+  it("extracts llm-general input and output", () => {
+    expect(
+      extractPayloadInputValues({ input: "q", output: "a" }, "llm-general"),
+    ).toEqual(["q", "a"]);
+    const calls = [{ tool: "lookup", arguments: {} }];
+    expect(
+      extractPayloadInputValues(
+        { input: "q", output: "", actual_tool_calls: calls },
+        "llm-general",
+      ),
+    ).toEqual(["q", JSON.stringify(calls)]);
   });
   it("defaults llm fields when missing/malformed", () => {
     expect(
@@ -1740,6 +1785,96 @@ describe("EvaluatorRunDetailView", () => {
     ).toBeInTheDocument();
   });
 
+  describe("evaluators that fit each item", () => {
+    const toolCallEvaluator: JobEvaluator = {
+      ...evaluatorBinary,
+      uuid: "ev-tc",
+      name: "Tool Judge",
+      evaluator_type: "tool-call",
+      evaluator_version_id: "v-tc-1",
+    };
+    const mixedJob = (runs: EvaluatorRunRow[] = []) =>
+      makeJob({
+        evaluators: [
+          { ...evaluatorBinary, evaluator_type: "llm" },
+          toolCallEvaluator,
+        ],
+        items: [
+          { uuid: "item-1", payload: { name: "Text row" } },
+          { uuid: "item-2", payload: { name: "Call row" }, is_tool_call: true },
+        ],
+        details: { item_ids: ["item-1", "item-2"] },
+        runs,
+      });
+
+    it("shows a text row only the evaluators that fit it", () => {
+      renderOnItems(
+        <EvaluatorRunDetailView
+          job={mixedJob([makeRun({ item_id: "item-1" })])}
+          task={makeTask()}
+          versionLabels={{}}
+        />,
+      );
+      expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+      expect(screen.queryByText("Tool Judge")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("No result recorded for this item."),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows a tool-call row only the tool-call evaluator", () => {
+      renderOnItems(
+        <EvaluatorRunDetailView
+          job={mixedJob()}
+          task={makeTask()}
+          versionLabels={{}}
+        />,
+      );
+      fireEvent.click(screen.getAllByLabelText("Item 2")[0]);
+      expect(screen.getByText("Tool Judge")).toBeInTheDocument();
+      expect(screen.queryByText("Binary Evaluator")).not.toBeInTheDocument();
+    });
+
+    it("counts an item done once the evaluators that fit it have scored it", () => {
+      renderOnItems(
+        <EvaluatorRunDetailView
+          job={mixedJob([
+            makeRun({ item_id: "item-1" }),
+            makeRun({
+              uuid: "run-2",
+              item_id: "item-2",
+              evaluator_id: "ev-tc",
+              evaluator_version_id: "v-tc-1",
+            }),
+          ])}
+          task={makeTask()}
+          versionLabels={{}}
+        />,
+      );
+      expect(
+        screen.getAllByLabelText("Item 1 (completed)").length,
+      ).toBeGreaterThan(0);
+      expect(
+        screen.getAllByLabelText("Item 2 (completed)").length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("keeps an older run's skipped result on a row it does not fit", () => {
+      renderOnItems(
+        <EvaluatorRunDetailView
+          job={mixedJob([
+            makeRun({ item_id: "item-2", value: { skipped: true } }),
+          ])}
+          task={makeTask()}
+          versionLabels={{}}
+        />,
+      );
+      fireEvent.click(screen.getAllByLabelText("Item 2")[0]);
+      expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+      expect(screen.getByText("This item was not judged.")).toBeInTheDocument();
+    });
+  });
+
   it("falls back to task.items via job.details.item_ids when job.items is absent", () => {
     const job = makeJob({
       items: undefined,
@@ -2008,11 +2143,7 @@ describe("EvaluatorResultsPane", () => {
       />,
     );
     expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /This item evaluates one or more tool calls, which only supports human review today\./,
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("This item was not judged.")).toBeInTheDocument();
     expect(
       screen.queryByText("No result recorded for this item."),
     ).not.toBeInTheDocument();

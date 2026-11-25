@@ -7,7 +7,6 @@ import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { apiClient } from "@/lib/api";
 import { liveVersionOf } from "@/lib/evaluatorVersions";
-import { toolCallNotEvaluatedMessage } from "@/lib/labellingItem";
 
 type LinkedEvaluator = { uuid: string; name: string };
 
@@ -60,11 +59,6 @@ type RunEvaluatorsDialogProps = {
   evaluators: LinkedEvaluator[];
   submitting: boolean;
   submitError: string | null;
-  /** How many of the chosen rows are tool calls that a run leaves out.
-   * Above zero, a note says so before the run is started. `null` means some
-   * are, but they cannot be counted: select-all reaches rows beyond the page
-   * in hand, so the note is shown without a number. */
-  toolCallSkipCount?: number | null;
   onClose: () => void;
   onConfirm: (selections: RunEvaluatorsSelection[]) => void | Promise<void>;
 };
@@ -111,7 +105,6 @@ export function RunEvaluatorsDialog({
   evaluators,
   submitting,
   submitError,
-  toolCallSkipCount = 0,
   onClose,
   onConfirm,
 }: RunEvaluatorsDialogProps) {
@@ -421,16 +414,6 @@ export function RunEvaluatorsDialog({
                 );
               })}
             </>
-          )}
-          {toolCallSkipCount !== 0 && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground">
-              {toolCallNotEvaluatedMessage(
-                toolCallSkipCount === null
-                  ? "Any chosen item that evaluates"
-                  : `${toolCallSkipCount} of the chosen items evaluate`,
-                ", so they will be left out of this run",
-              )}
-            </div>
           )}
           {submitError && <p className="text-sm text-red-500">{submitError}</p>}
         </div>

@@ -638,6 +638,8 @@ describe("AssignAnnotatorsDialog", () => {
         isOpen={false}
         accessToken="tok"
         evaluators={evaluators}
+        hasToolCallItems={false}
+        hasNonToolCallItems
         onClose={jest.fn()}
         onConfirm={jest.fn()}
       />,
@@ -647,6 +649,8 @@ describe("AssignAnnotatorsDialog", () => {
         isOpen
         accessToken="tok"
         evaluators={evaluators}
+        hasToolCallItems={false}
+        hasNonToolCallItems
         onClose={jest.fn()}
         onConfirm={jest.fn()}
       />,
@@ -668,6 +672,8 @@ describe("AssignAnnotatorsDialog", () => {
         isOpen={false}
         accessToken="tok"
         evaluators={evaluators}
+        hasToolCallItems={false}
+        hasNonToolCallItems
         onClose={jest.fn()}
         onConfirm={jest.fn()}
       />,
@@ -966,13 +972,19 @@ describe("AssignAnnotatorsDialog", () => {
   });
 });
 
-// Tool call correctness is never a choice: a tool-call item is answered by it
-// and the backend adds it whether or not it is ticked here.
+// The built-in Tool call correctness is never a choice: a tool-call item has
+// no other slot for a person's answer.
 describe("AssignAnnotatorsDialog and the tool call label", () => {
   const TOOL_CALL = {
     uuid: "ev-tool",
     name: "Tool call correctness",
     description: "Did the agent call the right tool",
+    evaluator_type: "tool-call",
+    source_default_slug: "default-tool-call-correctness",
+  };
+  const CUSTOM_TOOL_CALL = {
+    uuid: "ev-custom-tool",
+    name: "Right arguments",
     evaluator_type: "tool-call",
   };
 
@@ -1117,5 +1129,79 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     expect(onConfirm.mock.calls[0][2].evaluator_reasoning_modes).toEqual({
       "ev-tool": "required",
     });
+  });
+
+  it.each([
+    ["is_protected", { is_protected: true }],
+    ["slug", { slug: "default-tool-call-correctness" }],
+  ])("locks the built-in one when it is marked by %s", async (_, mark) => {
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({
+      evaluators: [
+        ...evaluators,
+        { uuid: "ev-tool", name: "Tool call correctness", evaluator_type: "tool-call", ...mark },
+      ],
+      hasToolCallItems: true,
+    });
+    await screen.findByText("Alice");
+    expect(
+      screen.getByRole("checkbox", {
+        name: "Tool call correctness is always included",
+      }),
+    ).toBeDisabled();
+  });
+
+  it("lets a custom tool-call evaluator be unticked like any other label", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog({
+      evaluators: [...evaluators, TOOL_CALL, CUSTOM_TOOL_CALL],
+      hasToolCallItems: true,
+    });
+    await screen.findByText("Alice");
+    const custom = screen.getByRole("checkbox", { name: /Right arguments/ });
+    expect(custom).toBeChecked();
+    expect(custom).toBeEnabled();
+    await user.click(custom);
+    await user.click(screen.getByRole("checkbox", { name: "Alice" }));
+    await user.click(screen.getByRole("button", { name: /Assign/ }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onConfirm.mock.calls[0][1]).toEqual(["ev-1", "ev-2", "ev-tool"]);
+  });
+
+  it("leaves a custom tool-call evaluator out when nothing chosen is a tool call", async () => {
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({
+      evaluators: [...evaluators, CUSTOM_TOOL_CALL],
+      hasToolCallItems: false,
+    });
+    await screen.findByText("Alice");
+    expect(screen.queryByText("Right arguments")).not.toBeInTheDocument();
+  });
+
+  it("needs a label for the written items even when the tool-call one is locked on", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({
+      evaluators: [...evaluators, TOOL_CALL],
+      hasToolCallItems: true,
+    });
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("checkbox", { name: "Alice" }));
+    await user.click(screen.getByRole("checkbox", { name: "Unselect all labels" }));
+    expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
+  });
+
+  it("needs a label for the tool-call items when only custom ones are offered", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({
+      evaluators: [...evaluators, CUSTOM_TOOL_CALL],
+      hasToolCallItems: true,
+    });
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("checkbox", { name: "Alice" }));
+    await user.click(screen.getByRole("checkbox", { name: /Right arguments/ }));
+    expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
   });
 });

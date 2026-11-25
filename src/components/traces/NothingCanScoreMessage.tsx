@@ -16,8 +16,7 @@ export function NothingCanScoreMessage({
 }) {
   return (
     <>
-      {nothingCanScoreCopy(ineligible)} Choose evaluators without variables in
-      the{" "}
+      {nothingCanScoreCopy(ineligible)}{" "}
       <button
         type="button"
         onClick={onGoToEvaluators}

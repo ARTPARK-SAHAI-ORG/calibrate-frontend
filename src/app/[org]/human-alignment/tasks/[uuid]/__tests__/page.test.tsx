@@ -3,13 +3,15 @@
  * chrome is stubbed so only the tab runs.
  */
 import React from "react";
-import { render, screen, within } from "@/test-utils";
+import { render, screen, setupUser, waitFor, within } from "@/test-utils";
+
+let mockSearch = "tab=overview";
 
 jest.mock("next/navigation", () => ({
   __esModule: true,
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn(), prefetch: jest.fn() }),
   usePathname: () => "/human-alignment/tasks/t-1",
-  useSearchParams: () => new URLSearchParams("tab=overview"),
+  useSearchParams: () => new URLSearchParams(mockSearch),
   useParams: () => ({ uuid: "t-1" }),
   redirect: jest.fn(),
   notFound: jest.fn(),
@@ -23,6 +25,29 @@ jest.mock("../../../../../../components/AppLayout", () => ({
 jest.mock("../../../../../../hooks", () => ({
   ...jest.requireActual("../../../../../../hooks"),
   useAccessToken: () => "test-token",
+}));
+
+jest.mock("../../../../../../lib/evalLimit", () => ({
+  overEvalLimit: async () => false,
+}));
+jest.mock("../../../../../../lib/evaluatorRunLimit", () => ({
+  evaluatorRunLimitMessage: async () => null,
+}));
+
+// The item dialogs have their own tests. Here they only hand back what the
+// page passed them, so a test can call their onSubmit directly.
+const mockDialogProps: { llm: any[]; general: any[] } = { llm: [], general: [] };
+jest.mock("../../../../../../components/AddTestDialog", () => ({
+  AddTestDialog: (props: unknown) => {
+    mockDialogProps.llm.push(props);
+    return null;
+  },
+}));
+jest.mock("../../../../../../components/human-labelling/AddLlmGeneralItemsDialog", () => ({
+  AddLlmGeneralItemsDialog: (props: unknown) => {
+    mockDialogProps.general.push(props);
+    return null;
+  },
 }));
 
 // The bulk upload dialogs build sample PDFs; nothing here downloads one.
@@ -66,21 +91,42 @@ const AGREEMENT = {
 };
 
 let mockAgreement: unknown = AGREEMENT;
+let mockTask: unknown = TASK;
+let mockSummary: unknown = {
+  items: [],
+  rows: [],
+  evaluators: [],
+  annotators: [],
+  pagination: { total: 0, limit: 50, offset: 0 },
+};
+const mockApiCalls: { endpoint: string; options?: { method?: string; body?: unknown } }[] = [];
 
 jest.mock("../../../../../../lib/api", () => ({
   ...jest.requireActual("../../../../../../lib/api"),
-  apiClient: (endpoint: string) =>
-    Promise.resolve(
+  apiClient: (endpoint: string, _token: string, options?: { method?: string; body?: unknown }) => {
+    mockApiCalls.push({ endpoint, options });
+    if (options?.method === "POST") return Promise.resolve({ job_uuid: "job-1" });
+    if (endpoint === "/annotation-tasks/t-1/evaluators") {
+      return Promise.resolve(
+        ["ev-1", "ev-tc"].map((uuid) => ({
+          uuid,
+          versions: [{ uuid: `${uuid}-v1`, version_number: 1 }],
+          live_version_id: `${uuid}-v1`,
+        })),
+      );
+    }
+    return Promise.resolve(
       endpoint === "/annotation-tasks/t-1"
-        ? TASK
+        ? mockTask
         : endpoint === "/annotation-tasks/t-1/agreement"
           ? mockAgreement
           : endpoint.startsWith("/annotation-tasks/t-1/summary")
-            ? { items: [], rows: [], evaluators: [], annotators: [], pagination: { total: 0, limit: 50, offset: 0 } }
+            ? mockSummary
             : endpoint === "/annotation-tasks/t-1/evaluator-runs"
               ? { runs: [], evaluators: [] }
               : [],
-    ),
+    );
+  },
 }));
 
 import LabellingTaskPage from "../page";
@@ -143,4 +189,159 @@ it("says what is missing when Score reliability has no number yet", async () => 
     "Evaluator agreement appears once the evaluator's live version is run on items annotators have labelled.",
   );
   mockAgreement = AGREEMENT;
+});
+
+it("sends a tool-call row and every linked evaluator to the run", async () => {
+  const user = setupUser();
+  mockSearch = "tab=items";
+  mockTask = {
+    ...TASK,
+    evaluators: [
+      { uuid: "ev-1", name: "Tone", evaluator_type: "llm", output_type: "binary" },
+      { uuid: "ev-tc", name: "Tool call correctness", evaluator_type: "tool-call", output_type: "binary" },
+    ],
+    items: [
+      {
+        id: 1,
+        uuid: "i-1",
+        task_id: "t-1",
+        payload: {},
+        is_tool_call: true,
+        created_at: "2026-01-01 00:00:00",
+      },
+    ],
+  };
+  mockSummary = {
+    task_id: "t-1",
+    rows: [
+      {
+        item_id: "i-1",
+        payload: {
+          name: "Books a flight",
+          chat_history: [{ role: "user", content: "Book it" }],
+          agent_response: "",
+          actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
+        },
+      },
+    ],
+    evaluators: [],
+    annotators: [],
+    pagination: { total: 1, limit: 50, offset: 0 },
+  };
+  render(<LabellingTaskPage />);
+  const evaluate = await screen.findByRole("button", { name: "Evaluate" });
+  expect(evaluate).toBeEnabled();
+  await user.click(evaluate);
+  const dialog = (await screen.findByText("Run evaluators")).closest(
+    ".fixed",
+  ) as HTMLElement;
+  expect(within(dialog).getByText("Tool call correctness")).toBeInTheDocument();
+  const run = within(dialog).getByRole("button", { name: "Run" });
+  await waitFor(() => expect(run).toBeEnabled());
+  await user.click(run);
+  await waitFor(() =>
+    expect(
+      mockApiCalls.find(
+        (c) => c.endpoint === "/annotation-tasks/t-1/evaluator-runs" && c.options?.method === "POST",
+      ),
+    ).toBeTruthy(),
+  );
+  const post = mockApiCalls.find(
+    (c) => c.endpoint === "/annotation-tasks/t-1/evaluator-runs" && c.options?.method === "POST",
+  )!;
+  expect(post.options?.body).toEqual({
+    evaluators: [
+      { evaluator_id: "ev-1", evaluator_version_id: "ev-1-v1" },
+      { evaluator_id: "ev-tc", evaluator_version_id: "ev-tc-v1" },
+    ],
+    item_ids: ["i-1"],
+  });
+});
+
+function itemsTabWith(type: string, payload: Record<string, unknown>) {
+  mockSearch = "tab=items";
+  mockApiCalls.length = 0;
+  mockTask = { ...TASK, type, items: [] };
+  mockSummary = {
+    task_id: "t-1",
+    rows: [{ item_id: "i-1", payload }],
+    evaluators: [],
+    annotators: [],
+    pagination: { total: 1, limit: 50, offset: 0 },
+  };
+}
+
+const putPayload = () => {
+  const put = mockApiCalls.find(
+    (c) => c.endpoint === "/annotation-tasks/t-1/items" && c.options?.method === "PUT",
+  )!;
+  const body = JSON.parse(JSON.stringify(put.options?.body));
+  return body.updates[0].payload;
+};
+
+it("drops the old tool calls from an llm item edited to end on a text reply", async () => {
+  const user = setupUser();
+  itemsTabWith("llm", {
+    name: "Books a flight",
+    chat_history: [{ role: "user", content: "Book it" }],
+    agent_response: "",
+    actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
+    expected_tool_calls: [{ tool: "book_flight", arguments: {} }],
+  });
+  render(<LabellingTaskPage />);
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  const props = mockDialogProps.llm.filter((p) => p.isEditing).at(-1);
+  expect(props.initialConfig.evaluation.tool_calls).toEqual([
+    { tool: "book_flight", arguments: {} },
+  ]);
+  await props.onSubmit(
+    {
+      history: [
+        { role: "user", content: "Book it" },
+        { role: "assistant", content: "Booked" },
+      ],
+      evaluation: { type: "response" },
+    },
+    [],
+  );
+  const payload = putPayload();
+  expect(payload.agent_response).toBe("Booked");
+  expect(payload).not.toHaveProperty("actual_tool_calls");
+  expect(payload).not.toHaveProperty("expected_tool_calls");
+});
+
+it("drops the old tool calls from an llm-general item when the edit removes them", async () => {
+  const user = setupUser();
+  itemsTabWith("llm-general", {
+    name: "Books a flight",
+    input: "Book it",
+    output: "",
+    actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
+    expected_tool_calls: [{ tool: "book_flight", arguments: {} }],
+  });
+  render(<LabellingTaskPage />);
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  const props = mockDialogProps.general.filter((p) => p.isOpen && p.mode === "edit").at(-1);
+  expect(props.initialRows[0].expectedToolCalls).toEqual([
+    { tool: "book_flight", arguments: {} },
+  ]);
+  await props.onSubmit([
+    {
+      uuid: "i-1",
+      name: "Books a flight",
+      description: "",
+      input: "Book it",
+      output: "Booked",
+      inputExtras: {},
+      outputExtras: {},
+      toolCalls: [],
+      expectedToolCalls: [],
+      evaluator_variables: {},
+      metadata: [],
+    },
+  ]);
+  const payload = putPayload();
+  expect(payload.output).toBe("Booked");
+  expect(payload).not.toHaveProperty("actual_tool_calls");
+  expect(payload).not.toHaveProperty("expected_tool_calls");
 });

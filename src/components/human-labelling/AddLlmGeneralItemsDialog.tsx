@@ -18,6 +18,14 @@ import {
 } from "@/components/ToolPicker";
 import type { AvailableTool } from "@/components/ToolPicker";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
+import {
+  ToolCallExpectationsEditor,
+  selectedToolsHaveInvalidParams,
+  selectedToolsToCalls,
+  toolCallsToSelectedTools,
+  useToolCallExpectations,
+  type ExpectedToolCall,
+} from "@/components/ToolCallExpectationsEditor";
 import { OpenToolButton } from "@/components/tools/OpenToolButton";
 import { mergeFlatParams } from "@/lib/toolEditsInForm";
 import { getDefaultHeaders } from "@/lib/api";
@@ -61,6 +69,8 @@ export type LlmGeneralItemRowSubmission = {
   outputExtras: TurnExtras;
   /** The tool calls the agent made. Empty means the answer was text. */
   toolCalls: { tool: string; arguments: Record<string, unknown> }[];
+  /** The tool calls the agent should have made. Empty means none given. */
+  expectedToolCalls: ExpectedToolCall[];
   evaluator_variables: VarValues;
   metadata: MetadataEntry[];
 };
@@ -185,6 +195,7 @@ type AddLlmGeneralItemsDialogProps = {
     /** The tool calls the agent made, when its answer was a tool call rather
      * than text. Editable under Output. */
     toolCalls?: unknown[];
+    expectedToolCalls?: ExpectedToolCall[];
     varValues?: VarValues;
     metadata?: MetadataEntry[] | null;
   }[];
@@ -268,7 +279,15 @@ export function AddLlmGeneralItemsDialog({
     seedToolCalls(seed?.toolCalls),
   );
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [createToolOpen, setCreateToolOpen] = useState(false);
+  // Which list a tool made in the new-tool flow is added to.
+  const [createToolFor, setCreateToolFor] = useState<
+    "output" | "expected" | null
+  >(null);
+  const expected = useToolCallExpectations();
+  // What the expected tool calls were when the dialog opened, to tell edits
+  // apart from the rows being rebuilt once the tool list arrives.
+  const [expectedBaseline, setExpectedBaseline] = useState("[]");
+  const [expectedAttempted, setExpectedAttempted] = useState(false);
   const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
   const [toolsLoading, setToolsLoading] = useState(false);
   const [varValues, setVarValues] = useState<VarValues>(() =>
@@ -292,6 +311,13 @@ export function AddLlmGeneralItemsDialog({
       setInputExtras(s?.inputExtras ?? {});
       setOutputExtras(s?.outputExtras ?? {});
       setToolCalls(seedToolCalls(s?.toolCalls));
+      const seeded = toolCallsToSelectedTools(
+        s?.expectedToolCalls,
+        availableTools,
+      );
+      expected.setSelectedTools(seeded);
+      setExpectedBaseline(JSON.stringify(selectedToolsToCalls(seeded)));
+      setExpectedAttempted(false);
       setPickerOpen(false);
       setVarValues(seedVarValues(s?.varValues));
       setError(null);
@@ -344,6 +370,21 @@ export function AddLlmGeneralItemsDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, accessToken]);
 
+  // Rows built before the tool list arrived lack each tool's schema, so
+  // rebuild them once it does, unless they were already edited.
+  useEffect(() => {
+    if (availableTools.length === 0) return;
+    const current = JSON.stringify(selectedToolsToCalls(expected.selectedTools));
+    if (current !== expectedBaseline) return;
+    const rebuilt = toolCallsToSelectedTools(
+      JSON.parse(current) as ExpectedToolCall[],
+      availableTools,
+    );
+    expected.setSelectedTools(rebuilt);
+    setExpectedBaseline(JSON.stringify(selectedToolsToCalls(rebuilt)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableTools]);
+
   // Unsaved-changes check: any field differs from what the dialog was seeded
   // with (blank for add, the item's values for edit).
   const baseVarValues = seedVarValues(seed?.varValues);
@@ -365,6 +406,8 @@ export function AddLlmGeneralItemsDialog({
           params,
         })),
       ) ||
+    JSON.stringify(selectedToolsToCalls(expected.selectedTools)) !==
+      expectedBaseline ||
     evaluatorsWithVariables.some((e) =>
       e.variables.some(
         (v) =>
@@ -410,6 +453,7 @@ export function AddLlmGeneralItemsDialog({
     allTools: AvailableTool[],
   ) => {
     setAvailableTools(allTools);
+    expected.applyToolSaved(tool, previousName);
     const fresh = getToolParams(tool);
     setToolCalls((prev) =>
       prev.map((tc) =>
@@ -488,6 +532,11 @@ export function AddLlmGeneralItemsDialog({
 
   const handleSubmit = async () => {
     if (!valid || submitting) return;
+    if (selectedToolsHaveInvalidParams(expected.selectedTools)) {
+      setExpectedAttempted(true);
+      setError("Complete every highlighted parameter in Expected tool calls.");
+      return;
+    }
     const evaluator_variables: VarValues = {};
     for (const e of evaluatorsWithVariables) {
       const evVals: Record<string, string> = {};
@@ -513,6 +562,7 @@ export function AddLlmGeneralItemsDialog({
             tool: tc.tool,
             arguments: paramsToArgs(tc.params),
           })),
+          expectedToolCalls: selectedToolsToCalls(expected.selectedTools),
           evaluator_variables,
           metadata: rowsToMetadata(metadataRows),
         },
@@ -672,7 +722,7 @@ export function AddLlmGeneralItemsDialog({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setCreateToolOpen(true)}
+                    onClick={() => setCreateToolFor("output")}
                     disabled={submitting}
                     className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -852,6 +902,20 @@ export function AddLlmGeneralItemsDialog({
                   </div>
                 ))}
               </div>
+              <div className="shrink-0 max-h-[50%] overflow-y-auto mt-6 pt-6 border-t border-border">
+                <ToolCallExpectationsEditor
+                  editor={expected}
+                  heading="Expected tool calls"
+                  emptyText="Optional. Add the tool calls the agent should have made and the values it should have sent. Evaluators compare the agent's tool calls with these."
+                  availableTools={availableTools}
+                  availableToolsLoading={toolsLoading}
+                  accessToken={accessToken ?? undefined}
+                  onToolSaved={handleToolSaved}
+                  onCreateTool={() => setCreateToolFor("expected")}
+                  showErrors={expectedAttempted}
+                  createToolLabel="Create tool for expected tool calls"
+                />
+              </div>
             </div>
           </div>
 
@@ -948,14 +1012,18 @@ export function AddLlmGeneralItemsDialog({
           workspace's tool list and straight onto the item's output, the
           same as picking an existing one. */}
       <CreateToolFlow
-        isOpen={createToolOpen}
-        onClose={() => setCreateToolOpen(false)}
+        isOpen={createToolFor !== null}
+        onClose={() => setCreateToolFor(null)}
         accessToken={accessToken ?? undefined}
         knownTools={availableTools}
         onCreated={(tool, allTools) => {
-          setCreateToolOpen(false);
           setAvailableTools(allTools);
-          addToolCall(tool.name, getToolParams(tool));
+          if (createToolFor === "expected") {
+            expected.addToolFromSelection(tool);
+          } else {
+            addToolCall(tool.name, getToolParams(tool));
+          }
+          setCreateToolFor(null);
         }}
       />
     </div>
