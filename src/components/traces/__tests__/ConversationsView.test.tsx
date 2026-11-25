@@ -14,9 +14,9 @@ jest.mock("../../../hooks", () => ({
 
 const fetchTraceConversations = jest.fn();
 jest.mock("../../../lib/tracesApi", () => ({
+  ...jest.requireActual("../../../lib/tracesApi"),
   fetchTraceConversations: (...args: unknown[]) =>
     fetchTraceConversations(...args),
-  MAX_TRACES_PAGE_SIZE: 200,
 }));
 
 const reportError = jest.fn();
@@ -166,6 +166,54 @@ describe("ConversationsView", () => {
         expect.objectContaining({ q: "refund", offset: 0 }),
       ),
     );
+  });
+
+  describe("from a later page", () => {
+    /** A long list with the reader already on its second page. */
+    async function onSecondPage() {
+      fetchTraceConversations.mockImplementation(
+        async (_token: string, { offset }: { offset: number }) => ({
+          items: [conversation(`conv-${offset}`)],
+          total: 500,
+          limit: 10,
+          offset,
+        }),
+      );
+      const user = setupUser();
+      const view = render(<ConversationsView {...props} />);
+      await screen.findAllByText("conv-0");
+      await user.click(screen.getByRole("button", { name: /next page/i }));
+      await screen.findAllByText("conv-50");
+      return { user, ...view };
+    }
+    const expectFirstPage = (narrowed: Record<string, unknown>) =>
+      waitFor(() =>
+        expect(fetchTraceConversations).toHaveBeenLastCalledWith(
+          "test-token",
+          expect.objectContaining({ ...narrowed, offset: 0 }),
+        ),
+      );
+
+    it("goes back to the first page on a new search", async () => {
+      const { user } = await onSecondPage();
+      await user.type(
+        screen.getByPlaceholderText("Search conversations"),
+        "refund",
+      );
+      await expectFirstPage({ q: "refund" });
+    });
+
+    it("goes back to the first page on a new output kind", async () => {
+      const { rerender } = await onSecondPage();
+      rerender(<ConversationsView {...props} outputType="response" />);
+      await expectFirstPage({ outputType: "response" });
+    });
+
+    it("goes back to the first page on new labels", async () => {
+      const { rerender } = await onSecondPage();
+      rerender(<ConversationsView {...props} labels={["vip"]} />);
+      await expectFirstPage({ labels: ["vip"] });
+    });
   });
 
   it("says how to get conversations when there are none", async () => {

@@ -2,49 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  TraceFilters,
   TraceScoreAverage,
-  TraceScoreFilters,
   TraceSortOrder,
 } from "@/lib/tracesApi";
 import {
   fetchTraces,
-  traceScoreParams,
-  TraceOutputFilter,
+  NO_TRACE_FACETS,
+  traceFilterKey,
   TraceSummary,
 } from "@/lib/tracesApi";
 import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
 
-/** Shared empty default, so a caller with no labels does not hand the hook a
- *  new array on every render. */
-const EMPTY_LABELS: string[] = [];
-
-/** Same reason as EMPTY_LABELS: a caller filtering by no score must not hand
- *  the hook a new object on every render. */
-const EMPTY_SCORES: TraceScoreFilters = {};
-
-type UseTracesArgs = {
+type UseTracesArgs = TraceFilters & {
   /** Backend JWT; the hook is idle until it's available. */
   accessToken: string | null;
-  /** The agent whose traces to list. */
-  agentId: string;
   pageSize?: number;
-  /** Search text, already debounced by the caller. Blank searches everything. */
-  q?: string;
-  /** Keep only replies or only tool calls. "all" keeps everything. */
-  outputType?: TraceOutputFilter;
-  /** Keep only traces carrying any of these labels. Empty keeps everything. */
-  labels?: string[];
-  /** One condition per evaluator, all of which must hold. Empty keeps
-   *  everything. */
-  scores?: TraceScoreFilters;
   /** Order by this evaluator's score instead of newest first. */
   sortByEvaluator?: string | null;
   /** Which way that order runs. Ignored without `sortByEvaluator`. */
   sortOrder?: TraceSortOrder;
-  /** Keep only the turns of this conversation. */
-  conversationId?: string | null;
   /** When false, skip polling open scoring runs (tab is off screen). */
   poll?: boolean;
 };
@@ -57,24 +36,16 @@ type UseTracesArgs = {
  */
 export function useTraces({
   accessToken,
-  agentId,
   pageSize = 50,
-  q = "",
-  outputType = "all",
-  labels = EMPTY_LABELS,
-  scores = EMPTY_SCORES,
   sortByEvaluator = null,
   sortOrder = "desc",
   poll = true,
-  conversationId = null,
+  ...rest
 }: UseTracesArgs) {
-  // A new array on every render would restart the fetch forever, so the
-  // effects and the fetch key on the labels' text rather than the array.
-  const labelKey = labels.join("\u0000");
-  // Same trick for the score conditions: an object literal from the caller is
-  // new on every render, so the effects key on its text instead. Sorted, so
-  // the same set written in another order is the same key.
-  const scoreKey = traceScoreParams(scores).sort().join("\u0000");
+  const filters = { ...NO_TRACE_FACETS, q: "", ...rest };
+  // A caller's arrays and objects are new on every render and would restart
+  // the fetch forever, so the effects key on this rather than on `filters`.
+  const filterKey = traceFilterKey(filters);
   const [items, setItems] = useState<TraceSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -85,24 +56,14 @@ export function useTraces({
   const [loadedOffset, setLoadedOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // The search text the rows on screen came from. It lags `q` while a new
-  // search loads, and callers need it to tell "this agent has no traces" from
-  // "this search found none".
-  const [loadedQ, setLoadedQ] = useState("");
-  // The output filter the rows on screen came from. Like `loadedQ`, it lags
-  // `outputType` while a new filter loads, because the value in state changes
-  // before the fetch for it resolves.
-  const [loadedOutputType, setLoadedOutputType] =
-    useState<TraceOutputFilter>("all");
-  // The labels the rows on screen came from, lagging `labels` the same way.
-  const [loadedLabels, setLoadedLabels] = useState<string[]>([]);
-  // The score conditions the rows on screen came from, lagging `scores` the
-  // same way, so a caller can tell "this agent has no traces" from "no trace
-  // scored like that".
-  const [loadedScores, setLoadedScores] = useState<TraceScoreFilters>({});
-  const [loadedConversationId, setLoadedConversationId] = useState<
-    string | null
-  >(null);
+  // The filters the rows on screen came from. They lag `filters` while a new
+  // list loads, and callers need them to tell "this agent has no traces" from
+  // "nothing matched".
+  const [loadedFilters, setLoadedFilters] = useState<typeof filters>({
+    ...NO_TRACE_FACETS,
+    q: "",
+    agentId: rest.agentId,
+  });
   // Monotonic id so a slow, superseded response can never clobber the state
   // written by a newer request (filters change mid-flight, rapid paging).
   // Running averages over every matching trace, kept while paging through the
@@ -116,17 +77,7 @@ export function useTraces({
 
   useEffect(() => {
     setOffset(0);
-  }, [
-    agentId,
-    pageSize,
-    q,
-    outputType,
-    labelKey,
-    scoreKey,
-    sortByEvaluator,
-    sortOrder,
-    conversationId,
-  ]);
+  }, [filterKey, pageSize, sortByEvaluator, sortOrder]);
 
   const load = useCallback(
     async (
@@ -146,30 +97,16 @@ export function useTraces({
         setError(null);
       }
       try {
-        // The filters these rows come from. A new combination is worth the
-        // extra pass over every matching trace; a new page of the same one
-        // is not.
-        const filterKey = JSON.stringify([
-          agentId,
-          q,
-          outputType,
-          labelKey,
-          scoreKey,
-          conversationId,
-        ]);
+        // A new combination of filters is worth the extra pass over every
+        // matching trace; a new page of the same one is not.
         const wantAverages =
           withAverages || averagesKeyRef.current !== filterKey;
         const page = await fetchTraces(accessToken, {
+          ...filters,
           limit: pageSize,
           offset: targetOffset,
-          agentId,
-          q,
-          outputType,
-          labels,
-          scores,
           sortByEvaluator,
           sortOrder,
-          conversationId,
           includeScoreAverages: wantAverages,
         });
         if (requestId !== requestIdRef.current) return 0;
@@ -180,11 +117,7 @@ export function useTraces({
           setScoreAverages(page.score_averages ?? []);
         }
         setTotal(nextTotal);
-        setLoadedQ(q);
-        setLoadedOutputType(outputType);
-        setLoadedLabels(labels);
-        setLoadedScores(scores);
-        setLoadedConversationId(conversationId);
+        setLoadedFilters(filters);
         setLoadedOffset(targetOffset);
         return nextTotal;
       } catch (err) {
@@ -204,18 +137,7 @@ export function useTraces({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      accessToken,
-      pageSize,
-      agentId,
-      q,
-      outputType,
-      labelKey,
-      scoreKey,
-      sortByEvaluator,
-      sortOrder,
-      conversationId,
-    ],
+    [accessToken, pageSize, filterKey, sortByEvaluator, sortOrder],
   );
 
   useEffect(() => {
@@ -275,11 +197,7 @@ export function useTraces({
     items,
     scoreAverages,
     total,
-    loadedQ,
-    loadedOutputType,
-    loadedLabels,
-    loadedScores,
-    loadedConversationId,
+    loadedFilters,
     offset,
     setOffset,
     loadedOffset,
