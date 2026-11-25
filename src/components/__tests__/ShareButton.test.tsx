@@ -94,9 +94,7 @@ describe("ShareButton", () => {
     );
     await user.hover(screen.getByRole("button", { name: "Public" }));
     expect(
-      await screen.findByText(
-        "Turn off the link, so nobody can chat with this agent from it",
-      ),
+      await screen.findByText("Turn off the link to chat with this agent"),
     ).toBeInTheDocument();
     await user.hover(screen.getByRole("button", { name: "Copy link" }));
     expect(
@@ -116,9 +114,7 @@ describe("ShareButton", () => {
     );
     await user.hover(screen.getByRole("button", { name: /Share/ }));
     expect(
-      await screen.findByText(
-        "Turn on a link that lets anyone chat with this agent, without signing in",
-      ),
+      await screen.findByText("Let anyone with the link chat with this agent"),
     ).toBeInTheDocument();
   });
 

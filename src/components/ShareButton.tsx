@@ -72,10 +72,8 @@ const HOVER_TEXT: Partial<
   >
 > = {
   "agent-chat": {
-    makePublic:
-      "Turn on a link that lets anyone chat with this agent, without signing in",
-    makePrivate:
-      "Turn off the link, so nobody can chat with this agent from it",
+    makePublic: "Let anyone with the link chat with this agent",
+    makePrivate: "Turn off the link to chat with this agent",
     copy: "Copy the link to chat with the agent and share it with users",
   },
 };
