@@ -79,6 +79,12 @@ it("greys out Preview when there is no link yet, then opens it once public", asy
     json: async () => ({ is_public: false, share_token: null }),
   });
   await user.click(screen.getByRole("button", { name: "Make it private" }));
+  // The window asks first; its own button carries the same words.
+  expect(screen.getByText("Make the chat link private?")).toBeInTheDocument();
+  const [, confirm] = screen.getAllByRole("button", {
+    name: "Make it private",
+  });
+  await user.click(confirm);
   await screen.findByRole("button", { name: /Share/ });
   expect(screen.getByRole("link", { name: "Preview" })).toHaveAttribute(
     "href",

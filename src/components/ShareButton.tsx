@@ -67,6 +67,7 @@ export function publicSharePath(
 /** The Share button's name, its hover text, and for some kinds a window that
  *  says what the link does each time it is turned on. Kinds not listed use the
  *  general words and no window. */
+type ConfirmWords = { title: string; message: string; confirmText: string };
 type ShareWords = {
   share: string;
   /** The button's name while the link is on. */
@@ -74,7 +75,9 @@ type ShareWords = {
   makePublic: string;
   makePrivate: string;
   copy: string;
-  confirmShare?: { title: string; message: string; confirmText: string };
+  /** Windows asked before turning the link on and off. */
+  confirmShare?: ConfirmWords;
+  confirmPrivate?: ConfirmWords;
 };
 const HOVER_TEXT: Partial<Record<ShareableEntityType, ShareWords>> = {
   "agent-chat": {
@@ -88,6 +91,11 @@ const HOVER_TEXT: Partial<Record<ShareableEntityType, ShareWords>> = {
       message:
         "Anyone with the link can chat with this agent. No sign in required.",
       confirmText: "Share link",
+    },
+    confirmPrivate: {
+      title: "Make the chat link private?",
+      message: "Nobody will be able to chat with this agent from the link.",
+      confirmText: "Make it private",
     },
   },
 };
@@ -125,7 +133,8 @@ export function ShareButton({
     initialShareToken,
   );
   const [isLoading, setIsLoading] = useState(false);
-  const [confirmingShare, setConfirmingShare] = useState(false);
+  // Which window is open: the one before turning the link on, or off.
+  const [confirming, setConfirming] = useState<ConfirmWords | null>(null);
   const hoverText = HOVER_TEXT[entityType] ?? DEFAULT_HOVER_TEXT;
 
   // Sync internal state when parent props change (e.g. after polling fetches actual share state)
@@ -195,13 +204,15 @@ export function ShareButton({
         position="bottom"
       >
         <button
-          onClick={() =>
-            // Every time it is turned on: the link address exists from the
-            // start, so there is no telling a first time from a later one.
-            !isPublic && hoverText.confirmShare
-              ? setConfirmingShare(true)
-              : void toggle()
-          }
+          onClick={() => {
+            // Every time, not only the first: the link address exists from
+            // the start, so there is no telling a first time from a later one.
+            const ask = isPublic
+              ? hoverText.confirmPrivate
+              : hoverText.confirmShare;
+            if (ask) setConfirming(ask);
+            else void toggle();
+          }}
           disabled={isLoading || !!disabledReason}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
             isPublic
@@ -316,20 +327,18 @@ export function ShareButton({
 
       {error && <span className="text-[12px] text-red-500">{error}</span>}
 
-      {hoverText.confirmShare && (
-        <ConfirmDialog
-          isOpen={confirmingShare}
-          onClose={() => setConfirmingShare(false)}
-          onConfirm={() => {
-            // The Share button shows its own spinner while the link is made.
-            setConfirmingShare(false);
-            void toggle();
-          }}
-          title={hoverText.confirmShare.title}
-          message={hoverText.confirmShare.message}
-          confirmText={hoverText.confirmShare.confirmText}
-        />
-      )}
+      <ConfirmDialog
+        isOpen={confirming !== null}
+        onClose={() => setConfirming(null)}
+        onConfirm={() => {
+          // The button shows its own spinner while the change is saved.
+          setConfirming(null);
+          void toggle();
+        }}
+        title={confirming?.title ?? ""}
+        message={confirming?.message}
+        confirmText={confirming?.confirmText}
+      />
     </div>
   );
 }

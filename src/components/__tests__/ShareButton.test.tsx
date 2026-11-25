@@ -167,6 +167,37 @@ describe("ShareButton", () => {
     ).toBeInTheDocument();
   });
 
+  it("asks before making a chat link private, and keeps it public on Cancel", async () => {
+    const user = setupUser();
+    mockFetchOnce({ is_public: false, share_token: "tok1" });
+    render(
+      <ShareButton
+        entityType="agent-chat"
+        entityId="a1"
+        accessToken="tok"
+        initialIsPublic={true}
+        initialShareToken="tok1"
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Make it private" }));
+    expect(
+      screen.getByText(
+        "Nobody will be able to chat with this agent from the link.",
+      ),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Make it private" }));
+    const [, confirm] = screen.getAllByRole("button", {
+      name: "Make it private",
+    });
+    await user.click(confirm);
+    expect(
+      await screen.findByRole("button", { name: "Share chat link" }),
+    ).toBeInTheDocument();
+  });
+
   it("toggles from private to public, calling the visibility endpoint and updating state", async () => {
     const user = setupUser();
     mockFetchOnce({ is_public: true, share_token: "newtoken" });
