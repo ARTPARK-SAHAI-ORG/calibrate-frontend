@@ -495,6 +495,17 @@ describe("TracesTabContent", () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
+  it("reads the chat link's daily count again when the list is refreshed", async () => {
+    refetch.mockResolvedValue(false);
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+    await waitFor(() => expect(fetchTraceUsage).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() => expect(fetchTraceUsage).toHaveBeenCalledTimes(2));
+  });
+
   it("reads the labels again when the list is refreshed", async () => {
     refetch.mockResolvedValue(false);
     const user = setupUser();

@@ -599,6 +599,8 @@ export function TracesTabContent({
   // logs the refusal on its own server, and this tab just looks like a quiet
   // day. The scoring limit's own number comes from the same answer.
   const [usage, setUsage] = useState<TraceUsage | null>(null);
+  // Refresh bumps this, since the chat link's count moves during the day.
+  const [usageReads, setUsageReads] = useState(0);
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
@@ -610,7 +612,7 @@ export function TracesTabContent({
     return () => {
       cancelled = true;
     };
-  }, [accessToken, agentUuid]);
+  }, [accessToken, agentUuid, usageReads]);
   // Rows skipped before the workspace's limit was lifted still say over_limit.
   const overLimit =
     usage?.max_scored_traces !== null &&
@@ -632,6 +634,7 @@ export function TracesTabContent({
       // choices are read again with them.
       refetchLabels();
       refetchConversationIds();
+      setUsageReads((n) => n + 1);
       await refetch();
     } finally {
       setIsRefreshing(false);
