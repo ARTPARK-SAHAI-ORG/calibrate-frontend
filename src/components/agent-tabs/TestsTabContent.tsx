@@ -13,7 +13,6 @@ import {
   usePageSize,
 } from "@/hooks";
 import { fetchAgentTestsPage, fetchAllAgentTests } from "@/lib/agentTestsApi";
-import { overEvalLimit } from "@/lib/evalLimit";
 import { ConfirmDialog, ServerPaginatedListBar } from "@/components/ui";
 import {
   SearchModeInput,
@@ -1712,34 +1711,12 @@ export function TestsTabContent({
   // screen rather than a second pair in the selection strip.
   const hasSelection = selectedTestUuids.size > 0 || selectAllMatching;
   const runSelected = async () => {
-    // `selectedTestCount` is already known: check it before resolving the
-    // selection.
-    if (
-      await overEvalLimit(
-        backendAccessToken,
-        selectedTestCount,
-        "tests",
-        "test_run",
-      )
-    ) {
-      return;
-    }
     const { tests, allLinked } = await selectedTestsForAction();
     if (!allLinked && tests.length === 0) return;
     // Asks first, the same as Run all tests; the ticks clear in onRunCreated.
     await confirmTestRun(tests, allLinked, "bulk");
   };
   const compareSelected = async () => {
-    if (
-      await overEvalLimit(
-        backendAccessToken,
-        selectedTestCount,
-        "tests",
-        "model_comparison",
-      )
-    ) {
-      return;
-    }
     const { tests, allLinked } = await selectedTestsForAction();
     if (!allLinked && tests.length === 0) return;
     await openCompare(tests, allLinked);

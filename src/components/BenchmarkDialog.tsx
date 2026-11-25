@@ -14,7 +14,6 @@ import {
   useOrganizations,
 } from "@/hooks";
 import { workspaceRunModelsInParallel } from "@/lib/orgs";
-import { overEvalLimit } from "@/lib/evalLimit";
 import { reportError } from "@/lib/reportError";
 import { parseBackendErrorResponse } from "@/lib/parseBackendError";
 import { friendlyUrlError } from "@/lib/urlErrorMessage";
@@ -758,22 +757,7 @@ export function BenchmarkDialog({
           <Button
             variant="primary"
             size="md"
-            onClick={async () => {
-              // Every test is run once per model — check the moment the
-              // reader tries to run it, before the "are you sure" step,
-              // since both counts are already known here.
-              if (
-                await overEvalLimit(
-                  backendAccessToken,
-                  (benchmarkTestCount ?? 0) * chosenModels.length,
-                  "tests",
-                  "model_comparison",
-                )
-              ) {
-                return;
-              }
-              setConfirmOpen(true);
-            }}
+            onClick={() => setConfirmOpen(true)}
             disabled={!canRunBenchmark || isVerifying}
             className="flex items-center gap-2"
           >

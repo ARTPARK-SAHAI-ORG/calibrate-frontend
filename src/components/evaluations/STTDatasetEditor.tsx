@@ -68,9 +68,6 @@ type Props = {
   datasetName?: string;
   onDatasetNameChange?: (name: string) => void;
   datasetNameInvalid?: boolean;
-  /** Dynamic max rows per eval from backend */
-  /** Null means the workspace has no limit. */
-  maxRowsPerEval?: number | null;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -93,7 +90,6 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
       datasetName = "",
       onDatasetNameChange,
       datasetNameInvalid = false,
-      maxRowsPerEval = LIMITS.DEFAULT_MAX_ROWS_PER_EVAL,
     },
     ref,
   ) {
@@ -202,12 +198,6 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
     // ── Row management ────────────────────────────────────────────────────
 
     const addRow = () => {
-      if (maxRowsPerEval !== null && newRows.length >= maxRowsPerEval) {
-        showLimitToast(
-          `You can only add up to ${maxRowsPerEval} rows at a time.`,
-        );
-        return;
-      }
       const invalid = new Set<string>();
       newRows.forEach((row) => {
         const isBlank = !row.audioFile && !row.text.trim() && !row.s3Path;
@@ -410,12 +400,6 @@ export const STTDatasetEditor = forwardRef<STTDatasetEditorHandle, Props>(
 
         if (dataRows.length === 0) {
           toast.error("No valid data rows found in data.csv");
-          return;
-        }
-        if (maxRowsPerEval !== null && dataRows.length > maxRowsPerEval) {
-          showLimitToast(
-            `You can only upload up to ${maxRowsPerEval} rows at a time.`,
-          );
           return;
         }
 

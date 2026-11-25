@@ -1,5 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import { parseBackendErrorResponse } from "@/lib/parseBackendError";
 
 import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -58,7 +59,6 @@ import {
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 import { useAccessToken, useDialogNavKeys } from "@/hooks";
-import { overEvalLimit } from "@/lib/evalLimit";
 import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
@@ -209,7 +209,10 @@ export function BenchmarkResultsDialog({
     BenchmarkLeaderboardSummaryRow[] | undefined
   >(undefined);
   // Set when the run failed with nothing to show: the box replaces the view.
-  const [error, setError] = useState<{ details: string | null } | null>(null);
+  const [error, setError] = useState<{
+    details: string | null;
+    notStarted?: boolean;
+  } | null>(null);
   const [stoppedEarly, setStoppedEarly] = useState(false);
   // Why the run failed, when it had already finished some tests: those rows
   // are shown as usual with this line in the note above the leaderboard.
@@ -588,25 +591,6 @@ export function BenchmarkResultsDialog({
       return;
     }
 
-    // Every test is run once per model, so the work is tests times models.
-    // Over the limit, the toast says so and we hand the user back to the model
-    // picker (or close, when there is no picker to go back to).
-    // No uuids means every linked test, so count those through `totalTests`.
-    const testCount =
-      testUuids.length > 0 ? testUuids.length : (totalTests ?? 0);
-    if (
-      await overEvalLimit(
-        backendAccessToken,
-        testCount * models.length,
-        "tests",
-        "model_comparison",
-      )
-    ) {
-      setIsInitialLoading(false);
-      (onGoBack ?? onClose)();
-      return;
-    }
-
     try {
       const response = await fetch(
         `${backendUrl}/agent-tests/agent/${agentUuid}/benchmark`,
@@ -627,15 +611,13 @@ export function BenchmarkResultsDialog({
       );
 
       if (!response.ok) {
-        const detail = await response
-          .json()
-          .then((body) => body?.detail)
-          .catch(() => null);
-        throw new Error(
-          typeof detail === "string" && detail
-            ? detail
-            : "Failed to start benchmark",
-        );
+        const message = await parseBackendErrorResponse(response);
+        if (response.status >= 500 || response.status === 422) {
+          reportError("Error starting benchmark:", response.status, message);
+        }
+        setIsInitialLoading(false);
+        setError({ details: message, notStarted: true });
+        return;
       }
 
       const result: BenchmarkStatusResponse = await response.json();
@@ -660,6 +642,7 @@ export function BenchmarkResultsDialog({
       setError({
         details:
           err instanceof Error ? err.message : "Failed to start benchmark",
+        notStarted: true,
       });
     }
   };
@@ -824,7 +807,10 @@ export function BenchmarkResultsDialog({
                 />
               )}
               {!isDone && !isInitialLoading && (
-                <StatusBadge status={taskStatus} showSpinner />
+                <StatusBadge
+                  status={error ? "failed" : taskStatus}
+                  showSpinner
+                />
               )}
             </div>
             {!isInitialLoading && (
@@ -970,7 +956,15 @@ export function BenchmarkResultsDialog({
         {/* Error State */}
         {!isInitialLoading && error && (
           <div className="flex-1 flex items-center justify-center p-4 md:p-6">
-            <RunFailureBox details={error.details} onTryAgain={onGoBack} />
+            <RunFailureBox
+              details={error.details}
+              onTryAgain={onGoBack}
+              sentence={
+                error.notStarted
+                  ? "The model comparison was not started."
+                  : undefined
+              }
+            />
           </div>
         )}
 

@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "@/lib/nav";
 import {
   useAccessToken,
-  useMaxRowsPerEval,
   usePageErrorState,
   useUnsavedChangesPrompt,
 } from "@/hooks";
@@ -68,7 +67,6 @@ export default function DatasetDetailPage() {
 
   const sttEditorRef = useRef<STTDatasetEditorHandle | null>(null);
   const ttsEditorRef = useRef<TTSDatasetEditorHandle | null>(null);
-  const maxRowsPerEval = useMaxRowsPerEval();
 
   useEffect(() => {
     if (dataset) {
@@ -332,7 +330,6 @@ export default function DatasetDetailPage() {
                 onHasPendingChangesChange={setHasPendingChanges}
                 onUnsavedRowCountChange={setUnsavedRowCount}
                 onUploadingChange={setIsUploadingRows}
-                maxRowsPerEval={maxRowsPerEval}
               />
             ) : (
               <TTSDatasetEditor
@@ -343,7 +340,6 @@ export default function DatasetDetailPage() {
                 onDeleteSavedItem={handleDeleteItem}
                 onHasPendingChangesChange={setHasPendingChanges}
                 onUnsavedRowCountChange={setUnsavedRowCount}
-                maxRowsPerEval={maxRowsPerEval}
               />
             )}
           </>

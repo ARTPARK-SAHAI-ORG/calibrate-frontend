@@ -24,7 +24,7 @@ import {
   fetchOrganizationsDedup,
 } from "@/hooks/useOrganizations";
 import { apiClient, apiDelete, apiGet, apiPost, apiPut } from "@/lib/api";
-import { clearOrgLimitsCache } from "@/hooks/useMaxRowsPerEval";
+import { clearOrgLimitsCache } from "@/hooks/useOrgLimits";
 import { clearEnabledProvidersCache } from "@/hooks/useEnabledProviders";
 import {
   ACTIVE_ORG_CHANGED_EVENT,
@@ -53,7 +53,7 @@ jest.mock("../../lib/api", () => ({
   apiPut: jest.fn(),
 }));
 
-jest.mock("../useMaxRowsPerEval", () => ({
+jest.mock("../useOrgLimits", () => ({
   clearOrgLimitsCache: jest.fn(),
 }));
 

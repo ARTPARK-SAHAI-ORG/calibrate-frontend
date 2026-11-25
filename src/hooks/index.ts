@@ -11,12 +11,7 @@ export { useJobDeletion } from "./useJobDeletion";
 export { useAgentDeletion } from "./useAgentDeletion";
 export { useVerifyConnection } from "./useVerifyConnection";
 export type { VerifyConnectionResult } from "./useVerifyConnection";
-export {
-  useMaxRowsPerEval,
-  getMaxRowsPerEval,
-  useUsesOwnProviderKeys,
-  useOrgLimits,
-} from "./useMaxRowsPerEval";
+export { useUsesOwnProviderKeys, useOrgLimits } from "./useOrgLimits";
 export { useIsSuperadmin } from "./useIsSuperadmin";
 export { useTraces } from "./useTraces";
 export { useAgentTraceScoring } from "./useAgentTraceScoring";

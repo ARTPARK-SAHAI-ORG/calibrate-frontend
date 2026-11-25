@@ -22,7 +22,7 @@ import {
   setActiveOrgUuid as persistActiveOrgUuid,
 } from "@/lib/orgs";
 import { useOrgUuid } from "@/lib/nav";
-import { clearOrgLimitsCache } from "./useMaxRowsPerEval";
+import { clearOrgLimitsCache } from "./useOrgLimits";
 import { clearEnabledProvidersCache } from "./useEnabledProviders";
 
 type UseOrganizationsReturn = {

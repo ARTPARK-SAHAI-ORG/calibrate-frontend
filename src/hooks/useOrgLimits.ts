@@ -7,17 +7,14 @@ import { useOrgUuid } from "@/lib/nav";
 import { useAccessToken } from "./useAccessToken";
 import { LIMITS } from "@/constants/limits";
 
-/** The parts of `GET /org-limits/me` the app reads. A null
- *  `max_rows_per_eval` means the workspace has no limit. */
+/** The parts of `GET /org-limits/me` the app reads. */
 export type OrgLimits = {
-  max_rows_per_eval: number | null;
   uses_own_provider_keys: boolean;
   /** Replies one chat link may send a day; null means no limit. */
   max_chat_replies_per_day: number | null;
 };
 
 const FALLBACK: OrgLimits = {
-  max_rows_per_eval: LIMITS.DEFAULT_MAX_ROWS_PER_EVAL,
   uses_own_provider_keys: false,
   max_chat_replies_per_day: LIMITS.DEFAULT_MAX_CHAT_REPLIES_PER_DAY,
 };
@@ -35,9 +32,8 @@ export function clearOrgLimitsCache(): void {
 }
 
 /**
- * The workspace's limits, outside React. Falls back to the default limits when
- * there is no token or the request fails, so a run is never blocked by an
- * unreachable limit.
+ * The workspace's limits, outside React. Falls back to the defaults when there
+ * is no token or the request fails.
  */
 export function getOrgLimits(
   accessToken: string | null | undefined,
@@ -52,11 +48,6 @@ export function getOrgLimits(
   if (!cachedPromise) {
     cachedPromise = apiGet<Partial<OrgLimits>>("/org-limits/me", accessToken)
       .then((data) => ({
-        // Missing means an older backend; null means no limit.
-        max_rows_per_eval:
-          data.max_rows_per_eval === undefined
-            ? LIMITS.DEFAULT_MAX_ROWS_PER_EVAL
-            : data.max_rows_per_eval,
         uses_own_provider_keys: data.uses_own_provider_keys === true,
         max_chat_replies_per_day:
           data.max_chat_replies_per_day === undefined
@@ -70,16 +61,6 @@ export function getOrgLimits(
   }
 
   return cachedPromise;
-}
-
-/**
- * The workspace's max rows per eval, outside React, or null when it has no
- * limit. Every bulk run reads the limit through this.
- */
-export async function getMaxRowsPerEval(
-  accessToken: string | null | undefined,
-): Promise<number | null> {
-  return (await getOrgLimits(accessToken)).max_rows_per_eval;
 }
 
 /** The workspace's limits for rendering. Starts at the default limits and
@@ -104,11 +85,6 @@ export function useOrgLimits(): OrgLimits {
   }, [accessToken, orgUuid]);
 
   return limits;
-}
-
-/** The workspace's max rows per eval, or null when it has no limit. */
-export function useMaxRowsPerEval(): number | null {
-  return useOrgLimits().max_rows_per_eval;
 }
 
 /** True when the workspace runs on its own provider keys, which lifts the

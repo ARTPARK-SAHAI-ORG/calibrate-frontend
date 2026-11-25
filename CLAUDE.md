@@ -200,19 +200,9 @@ Use `useSidebarState()` from `src/lib/sidebar.ts` for the open/closed state — 
 
 ## Limits on bulk runs
 
-Every action that starts a batch of work checks the workspace limit before it sends anything. The limit is one number, `max_rows_per_eval` from `GET /org-limits/me`: `useMaxRowsPerEval()` for rendering, `getMaxRowsPerEval(accessToken)` for everything else (both in `src/hooks/useMaxRowsPerEval.ts`, one cached request per token and workspace, falling back to `LIMITS.DEFAULT_MAX_ROWS_PER_EVAL` when it cannot be read, so a run is never blocked by an unreachable limit). `null` means the workspace has no limit (it uses its own provider keys), and `exceedsEvalLimit` never blocks it. The same request carries `uses_own_provider_keys` (`useUsesOwnProviderKeys()`), which lifts the limits the frontend applies on its own: simulation personas and scenarios, and TTS text length.
+The workspace row limit (`max_rows_per_eval`) is checked by the backend only. Every run endpoint counts the rows it would evaluate (tests, tests times models for a model comparison, labelling items, dataset rows, personas times scenarios for a simulation) and answers 400 with a `detail` sentence when the run is too big. The frontend does not read the limit or count rows itself: it sends the request and shows that `detail` (`parseBackendErrorResponse` / `parseBackendErrorMessage` in `src/lib/parseBackendError.ts`). Do not add a frontend copy of the count; two counts drift apart.
 
-`overEvalLimit(accessToken, count, noun, kind)` in `src/lib/evalLimit.ts` is the check: it reads the limit and, when the run is too big, shows the limit toast with the contact link, records the refusal with `POST /org-limits/hits` (never awaited, so a failed record never blocks anything; `kind` says which kind of run it was, for the Analytics page) and returns true. Call it, do not re-assemble it from `getMaxRowsPerEval` + `exceedsEvalLimit` — that pairing lived inline in nine places before it was pulled into one function.
-
-**The function that creates the run must always hold the check.** That is what catches every way in, including the ones with no button of their own (rerun, a saved dataset). A button may check as well, but only as a courtesy: it saves the reader confirming, or picking models, for a run that cannot start. Never move the check onto a button and out of the function — that is the bug this section exists to prevent.
-
-Where it lives today, and what counts as one unit of work:
-
-- **Test runs** — `startTestRunOrNotify` in `src/lib/testRunApi.ts`, counted in tests. Covers the agent Tests tab and Rerun inside `TestRunnerDialog`.
-- **Model comparisons** — `runBenchmark` in `BenchmarkResultsDialog`, counted as tests times models, since every test is run once per model. Over the limit it hands the reader back to the model picker (`onGoBack`), or closes when there is no picker.
-- **Evaluators over labelling items** — `evaluatorRunLimitMessage` in `src/lib/evaluatorRunLimit.ts`, counted as items times evaluators. Shared by the Run button on a task and Re-run on a finished run; returns the line to show under the button.
-- **Speech evaluations** — `SpeechToTextEvaluation` / `TextToSpeechEvaluation`, counted in rows. The editors already limit rows typed or uploaded; the check before the POST is what catches a saved dataset, which never passed through an editor. Providers do NOT multiply the count here.
-- **Simulations** are picker-only: `LIMITS.SIMULATION_MAX_PERSONAS` / `SIMULATION_MAX_SCENARIOS` are enforced when a persona or scenario is ticked, and launch does not recheck them.
+`GET /org-limits/me` is still read, through `src/hooks/useOrgLimits.ts`, for `max_chat_replies_per_day` (see Talk to agent) and for `uses_own_provider_keys` (`useUsesOwnProviderKeys()`), which lifts the limits the frontend applies on its own: simulation personas and scenarios (`LIMITS.SIMULATION_MAX_PERSONAS` / `SIMULATION_MAX_SCENARIOS`, enforced when one is ticked), and TTS text length.
 
 ## Conventions worth knowing
 
