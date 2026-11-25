@@ -104,7 +104,7 @@ describe("the source and feedback filters", () => {
   it("change the filter key", () => {
     const plain = traceFilterKey({ agentId: "a" });
     expect(traceFilterKey({ agentId: "a", source: "chat" })).not.toBe(plain);
-    expect(traceFilterKey({ agentId: "a", feedback: "none" })).not.toBe(plain);
+    expect(traceFilterKey({ agentId: "a", feedback: "wrong" })).not.toBe(plain);
   });
 });
 
