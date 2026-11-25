@@ -1,5 +1,5 @@
 import { textFieldsToPayload } from "@/components/human-labelling/itemConversation";
-import { agentToolCalls, evaluatorFitsItem, evaluatorTypesForTask, fitsTaskType, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables, selectedTaskItems, storesEmptyToolCallList } from "../labellingItem";
+import { agentToolCalls, evaluatorFitsItem, evaluatorsFittingItems, evaluatorTypesForTask, fitsTaskType, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables, selectedTaskItems, storesEmptyToolCallList } from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
 // field by field, and is_tool_call was left off the list. The dialog then
@@ -219,5 +219,30 @@ describe("selectedTaskItems", () => {
 
   it("keeps only the ticked items otherwise", () => {
     expect(selectedTaskItems(items, { ids: new Set(["b"]) }).map((i) => i.uuid)).toEqual(["b"]);
+  });
+});
+
+describe("evaluatorsFittingItems", () => {
+  const evaluators = [
+    { uuid: "reply", evaluator_type: "llm" },
+    { uuid: "calls", evaluator_type: "tool-call" },
+  ];
+  const offered = (items: { is_tool_call?: boolean }[]) =>
+    evaluatorsFittingItems(evaluators, items).map((e) => e.uuid);
+
+  it("offers every evaluator when there are no items", () => {
+    expect(offered([])).toEqual(["reply", "calls"]);
+  });
+
+  it("offers only the tool call evaluator for tool call items", () => {
+    expect(offered([{ is_tool_call: true }])).toEqual(["calls"]);
+  });
+
+  it("leaves out the tool call evaluator for other items", () => {
+    expect(offered([{ is_tool_call: false }, {}])).toEqual(["reply"]);
+  });
+
+  it("offers both when the items are of both kinds", () => {
+    expect(offered([{ is_tool_call: true }, {}])).toEqual(["reply", "calls"]);
   });
 });

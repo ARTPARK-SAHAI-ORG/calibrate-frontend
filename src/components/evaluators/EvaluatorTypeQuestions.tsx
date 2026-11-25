@@ -170,10 +170,10 @@ export function EvaluatorTypeQuestions({
   const chooseTextKind = (next: TextKind) => {
     if (next === textKind) return;
     setChosen({ medium: "text", textKind: next });
-    const kinds = finalKinds(next);
     // The tool calls are offered under both kinds of text, so that choice
     // stays when the reader moves between them.
     if (value === TOOL_CALL_KIND) return;
+    const kinds = finalKinds(next);
     onChange(kinds.length === 1 ? kinds[0] : null);
   };
 

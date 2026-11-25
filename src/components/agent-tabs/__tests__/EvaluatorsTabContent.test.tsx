@@ -478,7 +478,7 @@ describe("EvaluatorsTabContent", () => {
 
     await screen.findByText("Follows Refund Policy");
     expect(
-      screen.getByText("LLM judges for evaluating the agent’s output"),
+      screen.getByText("LLM judges for evaluating the agent’s output and tool calls"),
     ).toBeInTheDocument();
     expect(
       screen.queryByText(/evaluating the agent.s responses/),
@@ -546,7 +546,7 @@ describe("EvaluatorsTabContent", () => {
 
     await screen.findByText("Follows Refund Policy");
     expect(
-      screen.getByText("LLM judges for evaluating the agent’s responses"),
+      screen.getByText("LLM judges for evaluating the agent’s responses and tool calls"),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Create evaluator" }));

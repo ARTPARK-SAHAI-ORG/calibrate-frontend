@@ -215,6 +215,7 @@ type LabellingTask = {
     name: string;
     description?: string | null;
     slug?: string | null;
+    source_default_slug?: string | null;
     evaluator_type?:
       "llm" | "llm-general" | "stt" | "tts" | "conversation" | "tool-call";
     output_type?: "binary" | "rating" | null;

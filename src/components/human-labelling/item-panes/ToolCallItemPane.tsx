@@ -7,8 +7,6 @@ import { ExpectedToolCalls } from "./ExpectedToolCalls";
 import { agentToolCalls } from "@/lib/labellingItem";
 import { normaliseHistoryItem } from "./shared";
 
-// The agent's output is appended to `history`, not passed as `output`, which
-// would draw pass/fail marks on an item nobody has judged yet.
 const AGENT_ANSWER = "Agent's answer";
 
 export const NO_TOOL_CALL = "The agent made no tool call";
@@ -40,6 +38,8 @@ export function ToolCallItemPane({
     TestCaseHistory["tool_calls"]
   >;
   const hasCalls = actualToolCalls.length > 0;
+  // The agent's output is appended to `history`, not passed as `output`, which
+  // would draw pass/fail marks on an item nobody has judged yet.
   if (hasReply) {
     history.push({
       role: "assistant",
@@ -59,7 +59,7 @@ export function ToolCallItemPane({
     return (
       <div className="space-y-4">
         <div className="border border-border rounded-xl p-4">
-          <p className="text-sm text-muted-foreground">—</p>
+          <p className="text-sm text-muted-foreground">{NO_TOOL_CALL}</p>
         </div>
         <div className="pl-4">
           <ExpectedToolCalls payload={payload} />

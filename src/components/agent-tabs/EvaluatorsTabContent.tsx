@@ -252,7 +252,7 @@ export function EvaluatorsTabContent({
           {/* No heading: the tab strip above already says Evaluators. */}
           <p className="text-sm md:text-base text-muted-foreground">
             LLM judges for evaluating the agent&rsquo;s{" "}
-            {agentNature === "general" ? "output" : "responses"}
+            {agentNature === "general" ? "output" : "responses"} and tool calls
           </p>
           {renderHeaderButtons()}
         </div>
@@ -309,7 +309,8 @@ export function EvaluatorsTabContent({
           </h3>
           <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-md">
             Choose the LLM judges to evaluate the agent&rsquo;s{" "}
-            {agentNature === "general" ? "output" : "responses"}. Add an
+            {agentNature === "general" ? "output" : "responses"} and tool
+            calls. Add an
             existing one from your list of evaluators or create a new one.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">

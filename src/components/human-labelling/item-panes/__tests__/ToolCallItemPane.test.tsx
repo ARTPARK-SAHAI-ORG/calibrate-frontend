@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen } from "@/test-utils";
-import { ToolCallItemPane } from "../ToolCallItemPane";
+import { NO_TOOL_CALL, ToolCallItemPane } from "../ToolCallItemPane";
 
 // jsdom doesn't implement scrollIntoView; TestDetailView (rendered when there
 // is any history/output) calls it in a useEffect.
@@ -9,9 +9,9 @@ beforeAll(() => {
 });
 
 describe("ToolCallItemPane", () => {
-  it("shows a placeholder when there is nothing to render", () => {
+  it("says the agent made no tool call when there is nothing to render", () => {
     render(<ToolCallItemPane payload={{}} />);
-    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.getByText(NO_TOOL_CALL)).toBeInTheDocument();
   });
 
   it("renders the conversation history", () => {
