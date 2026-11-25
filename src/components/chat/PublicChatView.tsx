@@ -25,6 +25,7 @@ import {
   setChatFeedback,
   type ChatAgent,
   type ChatToolCall,
+  type ChatHistoryTurn,
 } from "@/lib/publicChatApi";
 
 const MAX_MESSAGE_LENGTH = 4000;
@@ -61,6 +62,19 @@ type Turn =
       reply: string | null;
       toolCalls: ChatToolCall[];
     };
+
+/** The turns already answered, as the backend reads them. A message still
+ *  waiting on its reply (the one being sent, or one that failed) is left off
+ *  the end. */
+export function chatHistory(turns: Turn[]): ChatHistoryTurn[] {
+  let end = turns.length;
+  while (end > 0 && turns[end - 1].role === "user") end -= 1;
+  return turns.slice(0, end).map((turn) =>
+    turn.role === "user"
+      ? { role: "user", content: turn.text }
+      : { role: "assistant", content: turn.reply, tool_calls: turn.toolCalls },
+  );
+}
 
 type Feedback = {
   /** true for a thumbs up, false for a thumbs down, null for none. */
@@ -156,7 +170,7 @@ export function PublicChatView({ token }: { token: string }) {
     if (!retry) setTurns((t) => [...t, { role: "user", text }]);
     const res = await sendChatMessage(
       token,
-      { conversation_id: conversationId, message: text },
+      { conversation_id: conversationId, message: text, history: chatHistory(turns) },
       accessToken,
     );
     setSending(false);
