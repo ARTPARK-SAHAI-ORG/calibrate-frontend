@@ -116,14 +116,14 @@ export function PublicPageLayout({
               isAuthenticated ? (
                 <Link
                   href="/agents"
-                  className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex items-center h-8 px-4 rounded-lg text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
                 >
                   Go to app
                 </Link>
               ) : (
                 <Link
                   href="/login"
-                  className="inline-flex items-center px-4 py-1.5 rounded-lg text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity"
+                  className="inline-flex items-center h-8 px-4 rounded-lg text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
                 >
                   Sign in
                 </Link>
