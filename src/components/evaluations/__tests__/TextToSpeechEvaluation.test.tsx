@@ -855,7 +855,7 @@ describe("TextToSpeechEvaluation", () => {
       .mockResolvedValueOnce({
         status: 500,
         ok: false,
-        json: async () => ({}),
+        json: async () => ({ detail: "boom" }),
       });
 
     render(
@@ -885,6 +885,7 @@ describe("TextToSpeechEvaluation", () => {
       "Error evaluating:",
       expect.any(Error),
     );
+    expect(mockReportError).toHaveBeenCalledTimes(1);
     expect(onEvaluatingChange).toHaveBeenCalledWith(false);
   });
 

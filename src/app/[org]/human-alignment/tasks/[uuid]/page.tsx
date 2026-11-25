@@ -19,6 +19,7 @@ import {
   useSearchParams,
 } from "@/lib/nav";
 import { toast } from "sonner";
+import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 import {
   AddTestDialog,
   type AttachedEvaluatorInit,
@@ -569,18 +570,7 @@ function buildItemsCsv(
 }
 
 function parseApiError(err: unknown, fallback: string): string {
-  if (!(err instanceof Error)) return fallback;
-  const match = err.message.match(/Request failed: \d+ - (.+)$/);
-  if (match) {
-    try {
-      const parsed = JSON.parse(match[1]);
-      if (parsed && typeof parsed.detail === "string") return parsed.detail;
-    } catch {
-      // not JSON
-    }
-    return match[1];
-  }
-  return err.message || fallback;
+  return parseBackendErrorMessage(err, fallback);
 }
 
 function buildAnnotateUrl(token: string): string {
@@ -1998,7 +1988,7 @@ function LabellingTaskPageInner() {
     number | null
   >(0);
 
-  const handleRunEvaluators = async (
+  const handleRunEvaluators = (
     target?: string[] | string | { selectAll: true; q?: string },
   ) => {
     if (!accessToken || !uuid || startingRun) return;
@@ -2078,9 +2068,9 @@ function LabellingTaskPageInner() {
         `/human-alignment/tasks/${uuid}/evaluator-runs/${result.job_uuid}`,
       );
     } catch (err) {
-      const msg = parseApiError(err, "Failed to start evaluation run");
-      setRunDialogSubmitError(msg);
-      toast.error(msg);
+      setRunDialogSubmitError(
+        parseApiError(err, "Failed to start evaluation run"),
+      );
       setStartingRun(false);
     }
     // Note: we intentionally keep `startingRun=true` on the success path

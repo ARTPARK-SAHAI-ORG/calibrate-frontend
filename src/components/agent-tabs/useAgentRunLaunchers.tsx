@@ -22,7 +22,7 @@ type ComparePreset = {
 /**
  * The two ways a tab starts work on an agent's tests: a plain run and a model
  * comparison. Shared by the Tests tab and the Evaluations tab so both gate the
- * same way (connection check, size limit, turning benchmarking on) and mount
+ * same way (connection check, turning benchmarking on) and mount
  * the same three dialogs.
  */
 export type AgentRunLauncherOptions = {

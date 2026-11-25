@@ -400,7 +400,7 @@ export function TextToSpeechEvaluation({
           reportError("Error evaluating:", new Error(`HTTP ${response.status}`));
         }
         toast.error(
-          await parseBackendErrorResponse(response, "Error evaluating"),
+          await parseBackendErrorResponse(response),
         );
         setIsEvaluating(false);
         return;

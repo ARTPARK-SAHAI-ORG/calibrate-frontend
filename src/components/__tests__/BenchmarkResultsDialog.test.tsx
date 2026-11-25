@@ -200,8 +200,6 @@ jest.mock("../../lib/exportTestResults", () => ({
 }));
 
 const useAccessTokenMock = jest.fn(() => "test-token");
-// The workspace limit on how many tests one run may cover. High by default so
-// the existing runs are never blocked; lowered in the limit test below.
 jest.mock("../../hooks", () => ({
   __esModule: true,
   useAccessToken: () => useAccessTokenMock(),
@@ -653,7 +651,8 @@ describe("BenchmarkResultsDialog", () => {
       expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
     );
     expect(screen.getByText(LIMIT_DETAIL)).toBeInTheDocument();
-    expect(reportError).toHaveBeenCalled();
+    expect(screen.getByTestId("status-badge")).toHaveTextContent("failed");
+    expect(reportError).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(onGoBack).toHaveBeenCalledTimes(1);

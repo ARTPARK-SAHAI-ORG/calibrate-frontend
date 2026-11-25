@@ -16,8 +16,6 @@ export const LIMITS = {
   // Replies one chat link may send a day when the limits API does not say
   DEFAULT_MAX_CHAT_REPLIES_PER_DAY: 200,
 
-  // Fallback when the workspace trace-limit API is unreachable
-
   // Max concurrent S3 uploads when bulk-uploading audio (ZIP import)
   STT_UPLOAD_CONCURRENCY: 8,
 };

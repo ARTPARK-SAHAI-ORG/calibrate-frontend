@@ -1,5 +1,6 @@
 "use client";
 import { reportError } from "@/lib/reportError";
+import { parseBackendErrorResponse } from "@/lib/parseBackendError";
 
 import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -607,15 +608,14 @@ export function BenchmarkResultsDialog({
       );
 
       if (!response.ok) {
-        const detail = await response
-          .json()
-          .then((body) => body?.detail)
-          .catch(() => null);
-        throw new Error(
-          typeof detail === "string" && detail
-            ? detail
-            : "Failed to start benchmark",
-        );
+        setIsInitialLoading(false);
+        setError({
+          details: await parseBackendErrorResponse(
+            response,
+            "Error starting benchmark",
+          ),
+        });
+        return;
       }
 
       const result: BenchmarkStatusResponse = await response.json();
@@ -804,7 +804,7 @@ export function BenchmarkResultsDialog({
                 />
               )}
               {!isDone && !isInitialLoading && (
-                <StatusBadge status={taskStatus} showSpinner />
+                <StatusBadge status={error ? "failed" : taskStatus} showSpinner />
               )}
             </div>
             {!isInitialLoading && (

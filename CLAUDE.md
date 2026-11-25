@@ -200,9 +200,9 @@ Use `useSidebarState()` from `src/lib/sidebar.ts` for the open/closed state — 
 
 ## Limits on bulk runs
 
-The workspace row limit (`max_rows_per_eval`) is checked by the backend only. Every run endpoint counts the rows it would evaluate (tests, tests times models for a model comparison, labelling items, dataset rows) and answers 400 with a `detail` sentence when the run is too big. The frontend does not read the limit or count rows itself: it sends the request and shows that `detail` (`parseBackendErrorResponse` / `parseBackendErrorMessage` in `src/lib/parseBackendError.ts`). Do not add a frontend copy of the count; two counts drift apart.
+The workspace row limit (`max_rows_per_eval`) is checked by the backend only. Every run endpoint counts the rows it would evaluate (tests, tests times models for a model comparison, labelling items, dataset rows, personas times scenarios for a simulation) and answers 400 with a `detail` sentence when the run is too big. The frontend does not read the limit or count rows itself: it sends the request and shows that `detail` (`parseBackendErrorResponse` / `parseBackendErrorMessage` in `src/lib/parseBackendError.ts`). Do not add a frontend copy of the count; two counts drift apart.
 
-`GET /org-limits/me` is still read for `uses_own_provider_keys` (`useUsesOwnProviderKeys()` in `src/hooks/useOrgLimits.ts`), which lifts the limits the frontend applies on its own: simulation personas and scenarios (`LIMITS.SIMULATION_MAX_PERSONAS` / `SIMULATION_MAX_SCENARIOS`, enforced when one is ticked), and TTS text length.
+`GET /org-limits/me` is still read, through `src/hooks/useOrgLimits.ts`, for `max_chat_replies_per_day` (see Talk to agent) and for `uses_own_provider_keys` (`useUsesOwnProviderKeys()`), which lifts the limits the frontend applies on its own: simulation personas and scenarios (`LIMITS.SIMULATION_MAX_PERSONAS` / `SIMULATION_MAX_SCENARIOS`, enforced when one is ticked), and TTS text length.
 
 ## Conventions worth knowing
 
