@@ -169,15 +169,8 @@ function fieldKey(itemId: string, evaluatorId: string): FieldKey {
   return `${itemId}:${evaluatorId}`;
 }
 
-/**
- * The evaluators that apply to one row.
- *
- * A tool-call row is answered by the tool call evaluator alone: the AI judges
- * read a written reply and there is none. Every other row is answered by
- * everything except that one. This is the ONE place the rule lives — the
- * cards on screen, the "is this row finished?" checks and the submit guard
- * all ask here, so they cannot disagree.
- */
+/** The evaluators that apply to one row. The cards, the "is this row
+ * finished?" checks and the submit guard all ask here, so they cannot disagree. */
 function evaluatorsForItem(
   evaluators: Evaluator[],
   item: { is_tool_call?: boolean } | null | undefined,

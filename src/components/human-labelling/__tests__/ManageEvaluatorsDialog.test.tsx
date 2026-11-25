@@ -100,6 +100,24 @@ describe("ManageEvaluatorsDialog", () => {
     mockApiClient.mockResolvedValue({ items: EVALUATORS });
   });
 
+  it("keeps the protected tool call evaluator on the task once it is there", async () => {
+    mockApiClient.mockResolvedValue({
+      items: [
+        ...EVALUATORS,
+        { uuid: "ev-tc", name: "Tool call correctness", evaluator_type: "tool-call", is_protected: true },
+      ],
+    });
+    renderDialog({ currentEvaluatorIds: ["ev-1", "ev-tc"] });
+    await waitForCatalogueLoaded();
+    const box = catalogueCheckbox("Tool call correctness");
+    expect(box).toBeChecked();
+    expect(box).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Remove Tool call correctness" }),
+    ).toBeDisabled();
+    expect(catalogueCheckbox("Correctness")).not.toBeDisabled();
+  });
+
   it("renders with a generic subtitle when no taskType is given, and fetches evaluators", async () => {
     renderDialog();
     expect(screen.getByText("Manage evaluators")).toBeInTheDocument();

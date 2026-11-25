@@ -323,10 +323,7 @@ export function ItemDetailDialog({
     // so different versions of the same evaluator render their own labels.
     const jobEvaluators: JobEvaluator[] = [];
 
-    // The same rule the labelling form uses: a tool-call item is answered by
-    // the tool call evaluator alone, every other item by everything else.
-    // Without this the item view showed columns for evaluators the annotator
-    // was never asked about, always empty.
+    // Only the evaluators the annotator was asked about on this item.
     const isToolCallItem = item.is_tool_call === true;
     const evaluatorApplies = (evaluatorId: string) =>
       evaluatorFitsItem(

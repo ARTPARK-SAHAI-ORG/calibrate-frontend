@@ -17,6 +17,7 @@ type EvaluatorListItem = {
   name: string;
   description?: string;
   evaluator_type?: EvaluatorType;
+  is_protected?: boolean | null;
 };
 
 function parseApiError(err: unknown, fallback: string): string {
@@ -104,6 +105,12 @@ export function ManageEvaluatorsDialog({
     };
   }, [accessToken]);
 
+  // Tool call items are answered only through the protected evaluator, so
+  // once it is on the task it stays.
+  const isLocked = (uuid: string) =>
+    currentEvaluatorIds.includes(uuid) &&
+    evaluators.some((e) => e.uuid === uuid && e.is_protected === true);
+
   const filteredEvaluators = useMemo(() => {
     const q = search.trim().toLowerCase();
     return evaluators
@@ -114,6 +121,7 @@ export function ManageEvaluatorsDialog({
   }, [evaluators, taskType, search]);
 
   const toggle = (uuid: string) => {
+    if (isLocked(uuid)) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(uuid)) next.delete(uuid);
@@ -260,6 +268,7 @@ export function ManageEvaluatorsDialog({
   };
 
   const handleRemoveSelected = (uuid: string) => {
+    if (isLocked(uuid)) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.delete(uuid);
@@ -427,7 +436,8 @@ export function ManageEvaluatorsDialog({
                             type="checkbox"
                             checked={checked}
                             onChange={() => toggle(ev.uuid)}
-                            className="w-4 h-4 cursor-pointer accent-foreground"
+                            disabled={isLocked(ev.uuid)}
+                            className="w-4 h-4 cursor-pointer accent-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                           />
                         </span>
                         <div className="min-w-0 flex-1">
@@ -536,7 +546,7 @@ export function ManageEvaluatorsDialog({
                             type="button"
                             onClick={() => handleRemoveSelected(uuid)}
                             aria-label={`Remove ${ev?.name ?? "evaluator"}`}
-                            disabled={saving}
+                            disabled={saving || isLocked(uuid)}
                             className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <svg

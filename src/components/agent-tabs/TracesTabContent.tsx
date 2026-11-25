@@ -630,7 +630,7 @@ export function TracesTabContent({
     hasToolCallTrace &&
     !!linkedTypes?.includes("tool-call") &&
     !knownScoringTypes.includes("tool-call");
-  const outputsWord = isGeneral ? "outputs" : "replies";
+  const outputsWord = isGeneral ? "outputs" : "responses";
   const onlyToolCallEvaluators =
     knownScoringTypes !== null &&
     knownScoringTypes.length > 0 &&

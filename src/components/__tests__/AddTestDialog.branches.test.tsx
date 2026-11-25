@@ -684,6 +684,43 @@ describe("AddTestDialog — additional branch coverage", () => {
     expect(screen.queryByDisplayValue(/"k"/)).not.toBeInTheDocument();
   });
 
+  it("lays out an item's webhook call the same way when its tool is gone", async () => {
+    (global as any).fetch = mockFetchImpl([]);
+    const initialConfig: TestConfig = {
+      history: [
+        { role: "user", content: "What's the weather?" },
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [
+            {
+              id: "actual-call-0",
+              type: "function",
+              function: {
+                name: "deleted_webhook",
+                arguments: JSON.stringify({
+                  body: { units: "metric" },
+                  headers: { k: "v" },
+                }),
+              },
+            },
+          ],
+        },
+      ],
+      evaluation: { type: "response" },
+    };
+    render(
+      <AddTestDialog
+        {...baseProps({ mode: "labelItem", isEditing: true, initialConfig })}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByDisplayValue("metric")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Body")).toBeInTheDocument();
+    expect(screen.queryByText("headers")).not.toBeInTheDocument();
+  });
+
   describe("chat: adding tool-call messages via the in-chat picker", () => {
     it("adds a structured tool call with parameter inputs and a response box", async () => {
       const user = setupUser();

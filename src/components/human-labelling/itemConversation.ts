@@ -176,7 +176,7 @@ const WEBHOOK_GROUPS = ["body", "query"];
 
 /** True when the arguments hold a webhook's body or query as an object. The
  * dialogs then show only the values inside those, and other keys stay hidden. */
-function hasArgumentGroups(args: Record<string, unknown>): boolean {
+export function hasArgumentGroups(args: Record<string, unknown>): boolean {
   return WEBHOOK_GROUPS.some((k) => isPlainObject(args[k]));
 }
 

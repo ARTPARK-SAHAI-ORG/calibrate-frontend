@@ -61,6 +61,7 @@ export function AddToolCallEvaluatorButton({
   };
 
   const addCreated = async (evaluator: EvaluatorData) => {
+    setLibrary((prev) => [...prev, evaluator]);
     try {
       await add([evaluator.uuid]);
     } catch (err) {

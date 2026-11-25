@@ -46,6 +46,7 @@ import {
   EXPECTED_TOOL_CALLS_HELP,
   actualToolCallsStart,
   argumentRows,
+  hasArgumentGroups,
   gradedAnswerStart,
   paramsToArgs,
   skippedEvaluatorNote,
@@ -576,7 +577,11 @@ export function AddTestDialog({
               const tool = availableTools.find(
                 (t) => t.name === toolCall.function.name,
               );
-              const isWebhook = tool?.config?.type === "webhook";
+              // An item's saved call is laid out the way restoreToolCalls
+              // reads it back, even when its tool is gone from the workspace.
+              const isWebhook =
+                tool?.config?.type === "webhook" ||
+                (isLabelItem && hasArgumentGroups(parsedArgs));
               const isInbuilt = !!INBUILT_TOOLS.find(
                 (t) =>
                   t.id === toolCall.function.name ||

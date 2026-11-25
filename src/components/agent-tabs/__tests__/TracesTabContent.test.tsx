@@ -1607,7 +1607,7 @@ describe("TracesTabContent", () => {
 
     describe("the note about only tool call evaluators", () => {
       const NOTE =
-        "Only tool call evaluators can score this agent's traces, so its replies are not checked.";
+        "Only tool call evaluators can score this agent's traces, so its responses are not checked.";
       const toolCallOnlyPage = () =>
         mockUseTraces.mockReturnValue(
           tracesResult([trace({ response_preview: null, tool_call_count: 1 })]),
@@ -1726,7 +1726,7 @@ describe("TracesTabContent", () => {
         expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument();
       });
 
-      it("says outputs rather than replies on a general agent", async () => {
+      it("says outputs rather than responses on a general agent", async () => {
         fetchHasTraceForReplies.mockResolvedValue(true);
         fetchAgentEvaluators.mockResolvedValue([
           { uuid: "ev-tc", evaluator_type: "tool-call" },

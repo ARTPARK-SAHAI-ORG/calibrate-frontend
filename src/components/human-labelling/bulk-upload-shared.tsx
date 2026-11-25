@@ -1554,7 +1554,9 @@ function parseToolCallsCell(
 function ToolCallsPreview({ calls }: { calls: BulkToolCall[] }) {
   return (
     <div className="max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap">
-      {calls
+      {calls.length === 0
+        ? "No calls"
+        : calls
         .map(
           (c) =>
             `${c.tool}(${
