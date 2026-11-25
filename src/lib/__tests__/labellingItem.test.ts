@@ -1,5 +1,5 @@
 import { textFieldsToPayload } from "@/components/human-labelling/itemConversation";
-import { agentToolCalls, evaluatorFitsItem, evaluatorTypesForTask, fitsTaskType, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables, storesEmptyToolCallList } from "../labellingItem";
+import { agentToolCalls, evaluatorFitsItem, evaluatorTypesForTask, fitsTaskType, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables, selectedTaskItems, storesEmptyToolCallList } from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
 // field by field, and is_tool_call was left off the list. The dialog then
@@ -199,5 +199,25 @@ describe("agentToolCalls", () => {
     expect(agentToolCalls({ tool_calls: calls })).toEqual(calls);
     expect(agentToolCalls({ tool_calls: "x" })).toEqual([]);
     expect(agentToolCalls({})).toEqual([]);
+  });
+});
+
+describe("selectedTaskItems", () => {
+  const items = [
+    { uuid: "a", payload: { name: "Books a Flight" } },
+    { uuid: "b", payload: { name: "Plain reply" } },
+    { uuid: "c", payload: {} },
+  ];
+
+  it("narrows select all by a case-insensitive part of the item name", () => {
+    expect(selectedTaskItems(items, { q: " flight " }).map((i) => i.uuid)).toEqual(["a"]);
+  });
+
+  it("keeps every item for select all with no search", () => {
+    expect(selectedTaskItems(items, { q: "" })).toHaveLength(3);
+  });
+
+  it("keeps only the ticked items otherwise", () => {
+    expect(selectedTaskItems(items, { ids: new Set(["b"]) }).map((i) => i.uuid)).toEqual(["b"]);
   });
 });

@@ -1,3 +1,4 @@
+import type { EvaluatorType } from "@/components/EvaluatorPills";
 import type {
   TraceScoringIneligibleReason,
   TraceScoringStatus,
@@ -42,6 +43,15 @@ export function isToolCallTraceRow(
   return isToolCallOutput(traceRowOutputFacts(trace));
 }
 
+/** The evaluator kind that judges this agent's replies. Full-conversation
+ * evaluators are hidden for now, so a conversation agent uses the next-reply
+ * (`llm`) kind and a general agent the output kind. */
+export function agentTaskType(
+  agentNature: "conversation" | "general",
+): EvaluatorType {
+  return agentNature === "general" ? "llm-general" : "llm";
+}
+
 /** A run that is still open and should be refetched. */
 export function isTraceScoringInProgress(
   status: TraceScoringStatus | null | undefined,
@@ -77,12 +87,9 @@ const NOTHING_CAN_SCORE_BY_REASON: Record<
 
 /** Why a linked evaluator cannot score this agent's traces. */
 export function ineligibleReasonCopy(
-  reason: TraceScoringIneligibleReason | string,
+  reason: TraceScoringIneligibleReason,
 ): string {
-  return (
-    NOTHING_CAN_SCORE_BY_REASON[reason as TraceScoringIneligibleReason]?.one ??
-    "Cannot score traces for this agent"
-  );
+  return NOTHING_CAN_SCORE_BY_REASON[reason].one;
 }
 
 /**

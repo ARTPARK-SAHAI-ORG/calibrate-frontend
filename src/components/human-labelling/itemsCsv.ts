@@ -1,7 +1,7 @@
 import type { ExportColumn } from "@/components/ExportResultsButton";
 import type { MetadataEntry } from "@/components/ui";
 import { textOf } from "@/lib/messageVersions";
-import { actualToolCallsCell, toolCallsCell } from "./toolCallCells";
+import { agentToolCalls } from "@/lib/labellingItem";
 
 // Denormalized one-row-per-(item × linked evaluator) view from
 // /annotation-tasks/{uuid}/summary. `annotators[]` provides the column
@@ -295,16 +295,15 @@ export function buildItemsCsv(
   return { columns, rows };
 }
 
-// Mirrors the backend's select-all rule: a case-insensitive substring of
-// `payload.name`, so the kinds counted here are the items the action reaches.
-export function selectedTaskItems<
-  T extends { uuid: string; payload: unknown },
->(items: T[], pick: { q: string } | { ids: Set<string> }): T[] {
-  if ("ids" in pick) return items.filter((it) => pick.ids.has(it.uuid));
-  const needle = pick.q.trim().toLowerCase();
-  if (!needle) return items;
-  return items.filter((it) => {
-    const name = (it.payload as { name?: unknown } | null)?.name;
-    return typeof name === "string" && name.toLowerCase().includes(needle);
-  });
+// An empty list is kept as `[]`, since on re-upload it still marks a
+// tool-call row.
+export function toolCallsCell(calls: unknown): string {
+  return Array.isArray(calls) ? JSON.stringify(calls) : "";
+}
+
+export function actualToolCallsCell(p: Record<string, unknown>): string {
+  const calls = agentToolCalls(p);
+  return Array.isArray(p.actual_tool_calls) || calls.length > 0
+    ? JSON.stringify(calls)
+    : "";
 }

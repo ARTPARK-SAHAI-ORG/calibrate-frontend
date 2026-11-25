@@ -53,9 +53,6 @@ describe("copy", () => {
     expect(ineligibleReasonCopy("declares_variables")).toBe(
       "Uses variables, which cannot be filled for a trace automatically",
     );
-    expect(ineligibleReasonCopy("other")).toBe(
-      "Cannot score traces for this agent",
-    );
   });
 
   it("explains skip and failure reasons without averaging", () => {

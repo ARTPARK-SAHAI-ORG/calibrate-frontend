@@ -11,6 +11,8 @@ import { normaliseHistoryItem } from "./shared";
 // would draw pass/fail marks on an item nobody has judged yet.
 const AGENT_ANSWER = "Agent's answer";
 
+export const NO_TOOL_CALL = "The agent made no tool call";
+
 export function JudgedTogetherNote() {
   return (
     <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -55,7 +57,7 @@ export function ToolCallItemPane({
   if (!hasReply && !hasCalls && history.length > 0) {
     history.push({
       role: "assistant",
-      content: "The agent made no tool call",
+      content: NO_TOOL_CALL,
       label: AGENT_ANSWER,
     });
   }
@@ -77,7 +79,7 @@ export function ToolCallItemPane({
     <TestDetailView
       history={history}
       passed={true}
-      highlightEvalTarget={hasReply && hasCalls ? 2 : hasReply || hasCalls}
+      highlightEvalTarget={hasReply && hasCalls ? 2 : true}
       afterHistory={
         <>
           {hasReply && hasCalls && <JudgedTogetherNote />}

@@ -70,6 +70,12 @@ jest.mock("../../../../../../components/ExportResultsButton", () => ({
   },
 }));
 
+const mockToastError = jest.fn();
+jest.mock("sonner", () => ({
+  __esModule: true,
+  toast: { error: (...args: unknown[]) => mockToastError(...args), success: jest.fn() },
+}));
+
 // The bulk upload dialogs build sample PDFs; nothing here downloads one.
 jest.mock("jspdf", () => ({ jsPDF: class {} }));
 
@@ -274,6 +280,39 @@ it("offers only the evaluators that fit the chosen rows, and sends them to the r
     evaluators: [{ evaluator_id: "ev-tc", evaluator_version_id: "ev-tc-v1" }],
     item_ids: ["i-1"],
   });
+});
+
+it("says why and keeps Run evaluators closed when no linked evaluator fits the chosen items", async () => {
+  const user = setupUser();
+  mockSearch = "tab=items";
+  mockTask = {
+    ...TASK,
+    evaluators: [{ uuid: "ev-1", name: "Tone", evaluator_type: "llm", output_type: "binary" }],
+    items: [{ id: 1, uuid: "i-1", task_id: "t-1", payload: {}, is_tool_call: true, created_at: "2026-01-01 00:00:00" }],
+  };
+  mockSummary = {
+    task_id: "t-1",
+    rows: [
+      {
+        item_id: "i-1",
+        payload: {
+          name: "Books a flight",
+          chat_history: [{ role: "user", content: "Book it" }],
+          agent_response: "",
+          actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
+        },
+      },
+    ],
+    evaluators: [],
+    annotators: [],
+    pagination: { total: 1, limit: 50, offset: 0 },
+  };
+  render(<LabellingTaskPage />);
+  await user.click(await screen.findByRole("button", { name: "Evaluate" }));
+  expect(mockToastError).toHaveBeenCalledWith(
+    "None of the selected evaluators fit the chosen items. Tool-call items need a tool-call evaluator, and every other item needs an evaluator that is not a tool-call evaluator.",
+  );
+  expect(screen.queryByText("Run evaluators")).not.toBeInTheDocument();
 });
 
 function itemsTabWith(type: string, payload: Record<string, unknown>) {

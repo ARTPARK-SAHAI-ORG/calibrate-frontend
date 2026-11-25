@@ -79,7 +79,11 @@ export type LlmGeneralItemRowSubmission = {
   inputExtras: TurnExtras;
   outputExtras: TurnExtras;
   /** The tool calls the agent made. Empty means the answer was text. */
-  toolCalls: { tool: string; arguments: Record<string, unknown> }[];
+  toolCalls: {
+    tool: string;
+    arguments: Record<string, unknown>;
+    output?: unknown;
+  }[];
   /** The tool calls the agent should have made. Empty means none given. */
   expectedToolCalls: ExpectedToolCall[];
   evaluator_variables: VarValues;

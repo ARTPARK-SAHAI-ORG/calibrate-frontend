@@ -267,6 +267,34 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     ]);
   });
 
+  it("keeps what a stored tool call returned when the item is saved", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [
+            {
+              tool: "dummy",
+              arguments: { success: true },
+              output: { status: "ok" },
+            },
+          ],
+        },
+      ],
+    });
+    await user.type(screen.getByDisplayValue("Item one"), " renamed");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "dummy", arguments: { success: true }, output: { status: "ok" } },
+    ]);
+  });
+
   it("removes a tool call and puts the text box back", async () => {
     const user = setupUser();
     renderDialog({

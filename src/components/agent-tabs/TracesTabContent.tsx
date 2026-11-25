@@ -600,7 +600,8 @@ export function TracesTabContent({
   const hasToolCallTrace =
     hasStoredToolCallTrace || items.some(isToolCallTraceRow);
   const hasReplyTrace =
-    hasStoredReplyTrace || items.some((trace) => !isToolCallTraceRow(trace));
+    hasStoredReplyTrace ||
+    items.some((trace) => traceRowOutputFacts(trace).hasResponse);
   const linkedTypes = evaluatorTypes ? Object.values(evaluatorTypes) : null;
   // The evaluator list and the eligibility are read separately, so one can
   // arrive before the other. Null until both name the same evaluators.

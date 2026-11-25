@@ -14,6 +14,7 @@ import {
 } from "@/components/evaluators/DuplicateEvaluatorButton";
 import { XIcon } from "@/components/icons";
 import { evaluatorTypesForTask, fitsTaskType } from "@/lib/labellingItem";
+import { agentTaskType } from "@/lib/traceScoring";
 import {
   type EvaluatorData,
   fetchAllEvaluators,
@@ -37,13 +38,6 @@ const ADD_BUTTON_CLASS =
   "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-indigo-500/12 border-indigo-500/45 text-indigo-950 dark:text-indigo-100 hover:bg-indigo-500/22 dark:hover:bg-indigo-500/18";
 const CREATE_BUTTON_CLASS =
   "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18";
-
-// Full-conversation evaluators are hidden for now, so a conversation agent
-// lists the next-reply (`llm`) ones and a general agent the output-type ones.
-// Tool call evaluators fit either kind of agent.
-function agentTaskType(agentNature: "conversation" | "general") {
-  return agentNature === "general" ? "llm-general" : "llm";
-}
 
 export function EvaluatorsTabContent({
   agentUuid,

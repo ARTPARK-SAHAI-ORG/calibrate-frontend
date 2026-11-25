@@ -543,6 +543,7 @@ export function AddTestDialog({
           toolParams?: Array<{ name: string; value: string; group?: string }>;
           isWebhook?: boolean;
           isInbuilt?: boolean;
+          isStored?: boolean;
           linkedToolCallId?: string;
           createdAt?: string;
           label?: string;
@@ -593,6 +594,7 @@ export function AddTestDialog({
                 toolParams,
                 isWebhook,
                 isInbuilt,
+                isStored: true,
                 ...(createdAt ? { createdAt } : {}),
               });
             } else {
@@ -764,6 +766,7 @@ export function AddTestDialog({
       toolParams?: Array<{ name: string; value: string; group?: string }>;
       isWebhook?: boolean;
       isInbuilt?: boolean;
+      isStored?: boolean;
       linkedToolCallId?: string; // For tool_response to link back to tool_call
       createdAt?: string;
       label?: string;
@@ -1894,8 +1897,8 @@ export function AddTestDialog({
   // Serialize the form's canonical (would-be-saved) content for the discard
   // guard. Built from the same buildConfig()/buildEvaluatorsPayload() output
   // that submission uses, so it's dirty iff what would be saved differs from
-  // the captured baseline. buildConfig() mints fresh UUIDs for tool_call ids
-  // on every call, so those volatile ids are stripped before comparing.
+  // the captured baseline. buildConfig() gives every tool call except the
+  // agent's own calls at the end a new id each time, so ids are stripped.
   const serializeFormState = (): string => {
     const config = buildConfig();
     const history = (config.history ?? []).map((item) => {
@@ -1938,22 +1941,13 @@ export function AddTestDialog({
 
   // A call the agent really made can carry an empty argument, so the tool
   // calls an item already stores are not required to fill every argument.
-  // The ids match the ones the fill above gives each call.
-  const storedCallIds = new Set(
-    isLabelItem
-      ? (initialConfig?.history ?? []).flatMap((h, index) =>
-          h.role === "assistant" && h.tool_calls?.length
-            ? [h.tool_calls[0].id || `tool-${index}`]
-            : [],
-        )
-      : [],
-  );
-  const mustFillArgs = (id: string) => !storedCallIds.has(id);
+  const mustFillArgs = (m: { isStored?: boolean }) =>
+    !(isLabelItem && m.isStored);
 
   // Helper to check if tool call messages have empty params
   const hasEmptyToolCallParams = () => {
     const toolCallMessages = chatMessages.filter(
-      (m) => m.role === "tool_call" && mustFillArgs(m.id),
+      (m) => m.role === "tool_call" && mustFillArgs(m),
     );
     for (const msg of toolCallMessages) {
       if (msg.toolParams && msg.toolParams.length > 0) {
@@ -2182,13 +2176,11 @@ export function AddTestDialog({
     onNext: showRunUnsavedConfirm || roleChange ? undefined : navNext,
   });
 
-  const trailingToolCallsStart = chatActualCallsStart(chatMessages);
-
   // Only tool-call evaluators score a tool-call item, and only the others score the rest.
   const isToolCallItem =
     showsExpectedToolCalls &&
     (storesEmptyToolCallList ||
-      trailingToolCallsStart >= 0 ||
+      chatActualCallsStart(chatMessages) >= 0 ||
       selectedTools.length > 0);
   const evaluatorFits = (e: { evaluator_type?: string }) =>
     !showsExpectedToolCalls ||
@@ -3341,7 +3333,7 @@ export function AddTestDialog({
                 ) : (
                   <div className="space-y-4">
                     {chatMessages.map((message, index) => {
-                      const mustFill = mustFillArgs(message.id);
+                      const mustFill = mustFillArgs(message);
                       const isEvalTarget =
                         requireAssistantLastMessage &&
                         evalTargetStart >= 0 &&
@@ -4236,7 +4228,7 @@ export function AddTestDialog({
                 }
                 const isLastMessageAgent = isLastMessageInvalid;
                 const tooltipMessage = requireAssistantLastMessage
-                  ? `The conversation history should end with an agent message or an agent tool call, not a user message`
+                  ? "Add the agent's answer at the end of the conversation: a reply, or the tool calls the agent made. Tool calls earlier in the conversation do not count as the agent's answer."
                   : `The conversation history should end with a user message, not an agent message`;
                 const isButtonDisabled =
                   isCreating || isLoading || isLastMessageInvalid;

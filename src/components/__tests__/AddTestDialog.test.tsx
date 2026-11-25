@@ -1813,6 +1813,42 @@ describe("AddTestDialog", () => {
       expect(ids[1]).toBe("actual-call-0");
     });
 
+    it("explains that an earlier tool call is not the agent's answer when there is no reply", async () => {
+      const history = endsOnToolCall.history!;
+      render(
+        <ControlledDialog
+          {...labelProps({
+            initialConfig: {
+              ...endsOnToolCall,
+              history: [
+                history[0],
+                {
+                  role: "assistant",
+                  tool_calls: [
+                    {
+                      id: "c1",
+                      type: "function",
+                      function: { name: "lookup_city", arguments: "{}" },
+                    },
+                  ],
+                },
+                { role: "tool", content: "Pune", tool_call_id: "c1" },
+              ],
+            },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Weather in Pune?")).toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+      expect(
+        screen.getByText(
+          "Add the agent's answer at the end of the conversation: a reply, or the tool calls the agent made. Tool calls earlier in the conversation do not count as the agent's answer.",
+        ),
+      ).toBeInTheDocument();
+    });
+
     it("saves a conversation that ends on the agent's tool call", async () => {
       const user = setupUser();
       const onSubmit = jest.fn();

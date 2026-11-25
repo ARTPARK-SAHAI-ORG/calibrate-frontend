@@ -6,9 +6,9 @@ import {
 } from "@/components/test-results/shared";
 import { readTextField } from "@/lib/messageVersions";
 import { ExpectedToolCalls } from "./ExpectedToolCalls";
-import { agentToolCalls } from "@/lib/labellingItem";
+import { agentToolCalls, isToolCallContent } from "@/lib/labellingItem";
 import { Section } from "./shared";
-import { JudgedTogetherNote } from "./ToolCallItemPane";
+import { JudgedTogetherNote, NO_TOOL_CALL } from "./ToolCallItemPane";
 
 /**
  * Renders a general (non-conversational) "llm-general" evaluation item.
@@ -99,7 +99,9 @@ export function LlmGeneralItemPane({
             </div>
           )}
           {!output && toolCalls.length === 0 && (
-            <p className="text-sm text-muted-foreground">—</p>
+            <p className="text-sm text-muted-foreground">
+              {isToolCallContent(payload) ? NO_TOOL_CALL : "—"}
+            </p>
           )}
         </Section>
       </div>

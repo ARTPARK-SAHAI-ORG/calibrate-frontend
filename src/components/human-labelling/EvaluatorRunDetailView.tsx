@@ -29,7 +29,7 @@ import { evaluatorFitsItem } from "@/lib/labellingItem";
 import {
   actualToolCallsCell,
   toolCallsCell,
-} from "@/components/human-labelling/toolCallCells";
+} from "@/components/human-labelling/itemsCsv";
 import {
   ItemPane,
   itemPaneHasOwnPadding,

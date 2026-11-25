@@ -66,6 +66,31 @@ export function evaluatorFitsItem(
   return (evaluatorType === "tool-call") === isToolCallItem;
 }
 
+// An evaluator is offered when it fits at least one of the items. With no
+// items to check, every evaluator is offered.
+export function evaluatorsFittingItems<
+  E extends { evaluator_type?: string | null },
+>(evaluators: E[], items: { is_tool_call?: boolean }[]): E[] {
+  if (items.length === 0) return evaluators;
+  return evaluators.filter((e) =>
+    items.some((it) => evaluatorFitsItem(e.evaluator_type, it.is_tool_call === true)),
+  );
+}
+
+// Mirrors the backend's select-all rule: a case-insensitive substring of
+// `payload.name`, so the kinds counted here are the items the action reaches.
+export function selectedTaskItems<
+  T extends { uuid: string; payload: unknown },
+>(items: T[], pick: { q: string } | { ids: Set<string> }): T[] {
+  if ("ids" in pick) return items.filter((it) => pick.ids.has(it.uuid));
+  const needle = pick.q.trim().toLowerCase();
+  if (!needle) return items;
+  return items.filter((it) => {
+    const name = (it.payload as { name?: unknown } | null)?.name;
+    return typeof name === "string" && name.toLowerCase().includes(needle);
+  });
+}
+
 export type ItemEditForm = "tts" | "stt" | "llm-general" | "chat";
 
 /** Which edit form opens an item of a task type. `llm` and `conversation`

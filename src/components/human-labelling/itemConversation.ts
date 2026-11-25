@@ -296,26 +296,34 @@ function restoreArguments(
   return changed ? out : previous;
 }
 
+function storedCall(before: unknown[], at: number | undefined) {
+  return at === undefined || before[at] === undefined
+    ? undefined
+    : normalizeToolCall(before[at]);
+}
+
 /** Tool calls back from a dialog that edits argument values as text, after
  * typeArguments. `storedIndex[i]` is the position in `previous` that call i
  * was read from, or undefined for a call added in the dialog. A call read from
- * a stored call gets the stored values back where its text is unchanged, even
- * when its tool was renamed, and an edited stored text value stays text. */
+ * a stored call gets the stored values back where its text is unchanged, and
+ * the stored call's `output`, even when its tool was renamed. An edited stored
+ * text value stays text. */
 export function restoreToolCalls<
   T extends { tool: string; arguments: Record<string, unknown> },
->(next: T[], previous: unknown, storedIndex: (number | undefined)[]): T[] {
+>(
+  next: T[],
+  previous: unknown,
+  storedIndex: (number | undefined)[],
+): (T & { output?: unknown })[] {
   const before = Array.isArray(previous) ? previous : [];
   return next.map((call, i) => {
-    const at = storedIndex[i];
-    const prior =
-      at === undefined || before[at] === undefined
-        ? undefined
-        : normalizeToolCall(before[at]);
+    const prior = storedCall(before, storedIndex[i]);
     return {
       ...call,
       arguments: prior
         ? restoreArguments(call.arguments, prior.args)
         : call.arguments,
+      ...(prior?.output !== undefined ? { output: prior.output } : {}),
     };
   });
 }
@@ -410,36 +418,34 @@ export function historyToPayloadFields(
       };
     }),
   );
-  const restored = restoreToolCalls(
-    read.map(({ tool, arguments: args }) => ({ tool, arguments: args })),
-    before,
-    read.map((r) => r.storedAt),
-  );
-  const calls: ToolCallRecord[] = read.map(({ content, storedAt }, i) => {
-    const prior =
-      storedAt === undefined || before[storedAt] === undefined
-        ? undefined
-        : normalizeToolCall(before[storedAt]);
-    const priorOutput = prior?.output;
-    let output: unknown;
-    if (content !== undefined) {
-      if (priorOutput !== undefined && content === outputText(priorOutput)) {
-        output = priorOutput;
-      } else if (
-        prior &&
-        (priorOutput === undefined || priorOutput === "") &&
-        (content === DEFAULT_STRUCTURED_RESPONSE ||
-          content === DEFAULT_WEBHOOK_RESPONSE)
-      ) {
-        // The dialog filled in its default because no reply was stored.
-        output = priorOutput;
-      } else {
-        output =
-          typeof priorOutput === "string" ? content : parseEdited(content);
+  const calls: ToolCallRecord[] = read.map(
+    ({ tool, arguments: args, content, storedAt }) => {
+      const prior = storedCall(before, storedAt);
+      const priorOutput = prior?.output;
+      let output: unknown;
+      if (content !== undefined) {
+        if (priorOutput !== undefined && content === outputText(priorOutput)) {
+          output = priorOutput;
+        } else if (
+          prior &&
+          (priorOutput === undefined || priorOutput === "") &&
+          (content === DEFAULT_STRUCTURED_RESPONSE ||
+            content === DEFAULT_WEBHOOK_RESPONSE)
+        ) {
+          // The dialog filled in its default because no reply was stored.
+          output = priorOutput;
+        } else {
+          output =
+            typeof priorOutput === "string" ? content : parseEdited(content);
+        }
       }
-    }
-    return { ...restored[i], ...(output !== undefined ? { output } : {}) };
-  });
+      return {
+        tool,
+        arguments: prior ? restoreArguments(args, prior.args) : args,
+        ...(output !== undefined ? { output } : {}),
+      };
+    },
+  );
   return {
     chat_history,
     agent_response,

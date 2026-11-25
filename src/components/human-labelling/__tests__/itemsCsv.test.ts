@@ -1,4 +1,4 @@
-import { buildItemsCsv, selectedTaskItems } from "../itemsCsv";
+import { actualToolCallsCell, buildItemsCsv, toolCallsCell } from "../itemsCsv";
 
 const calls = [{ tool: "book_flight", arguments: { to: "BLR" } }];
 
@@ -30,22 +30,15 @@ it("leaves the tool-call columns out of other task types", () => {
   expect(columns.map((c) => c.key)).not.toContain("actual_tool_calls");
 });
 
-describe("selectedTaskItems", () => {
-  const items = [
-    { uuid: "a", payload: { name: "Books a Flight" } },
-    { uuid: "b", payload: { name: "Plain reply" } },
-    { uuid: "c", payload: {} },
-  ];
+it("writes a tool-call list as JSON, keeps an empty list, and leaves anything else blank", () => {
+  expect(toolCallsCell(calls)).toBe(JSON.stringify(calls));
+  expect(toolCallsCell([])).toBe("[]");
+  expect(toolCallsCell(undefined)).toBe("");
+});
 
-  it("narrows select all by a case-insensitive part of the item name", () => {
-    expect(selectedTaskItems(items, { q: " flight " }).map((i) => i.uuid)).toEqual(["a"]);
-  });
-
-  it("keeps every item for select all with no search", () => {
-    expect(selectedTaskItems(items, { q: "" })).toHaveLength(3);
-  });
-
-  it("keeps only the ticked items otherwise", () => {
-    expect(selectedTaskItems(items, { ids: new Set(["b"]) }).map((i) => i.uuid)).toEqual(["b"]);
-  });
+it("reads the agent's tool calls from actual_tool_calls or a reply-less tool_calls list", () => {
+  expect(actualToolCallsCell({ actual_tool_calls: [] })).toBe("[]");
+  expect(actualToolCallsCell({ tool_calls: calls })).toBe(JSON.stringify(calls));
+  expect(actualToolCallsCell({ agent_response: "Hi", tool_calls: calls })).toBe("");
+  expect(actualToolCallsCell({})).toBe("");
 });

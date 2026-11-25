@@ -1667,6 +1667,23 @@ describe("TracesTabContent", () => {
         expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument();
       });
 
+      it("does not show for a trace on the page with neither a reply nor a tool call", async () => {
+        mockUseTraces.mockReturnValue(
+          tracesResult([trace({ response_preview: "  ", tool_call_count: 0 })]),
+        );
+        fetchAgentEvaluators.mockResolvedValue([
+          { uuid: "ev-tc", evaluator_type: "tool-call" },
+        ]);
+        render(
+          <TracesTabContent {...tabProps} traceScoring={onlyToolCallScores} />,
+        );
+        await waitFor(() =>
+          expect(fetchHasTraceForReplies).toHaveBeenCalled(),
+        );
+        await waitFor(() => expect(fetchAgentEvaluators).toHaveBeenCalled());
+        expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument();
+      });
+
       it("shows when the reply evaluator added to the agent cannot score traces", async () => {
         fetchAgentEvaluators.mockResolvedValue([
           { uuid: "ev-1", evaluator_type: "llm" },

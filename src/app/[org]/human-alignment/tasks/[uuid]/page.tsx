@@ -53,7 +53,6 @@ import { textOf } from "@/lib/messageVersions";
 import {
   buildItemsCsv,
   sanitizeCsvName,
-  selectedTaskItems,
   type SummaryRow,
   type TaskSummaryResponse,
 } from "@/components/human-labelling/itemsCsv";
@@ -106,8 +105,9 @@ import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import {
   agentToolCalls,
-  evaluatorFitsItem,
+  evaluatorsFittingItems,
   itemEditForm,
+  selectedTaskItems,
   toItemDetailItem,
   llmGeneralDialogRow,
   readEvaluatorVariables,
@@ -1698,13 +1698,21 @@ function LabellingTaskPageInner() {
     string | null
   >(null);
   // Empty when the chosen items are not loaded, and then every evaluator is offered.
-  const runDialogItems = selectedTaskItems(
-    task?.items ?? [],
-    runDialogSelectAll
-      ? { q: runDialogSelectAll.q ?? "" }
-      : runDialogItemUuids
-        ? { ids: new Set(runDialogItemUuids) }
-        : { q: "" },
+  const itemsForRun = (
+    selectAll: { q?: string } | null,
+    itemUuids: string[] | null,
+  ) =>
+    selectedTaskItems(
+      task?.items ?? [],
+      selectAll
+        ? { q: selectAll.q ?? "" }
+        : itemUuids
+          ? { ids: new Set(itemUuids) }
+          : { q: "" },
+    );
+  const runDialogEvaluators = evaluatorsFittingItems(
+    task?.evaluators ?? [],
+    itemsForRun(runDialogSelectAll, runDialogItemUuids),
   );
 
   const handleRunEvaluators = (
@@ -1715,20 +1723,33 @@ function LabellingTaskPageInner() {
       toast.error("Link an evaluator before running.");
       return;
     }
-    if (
+    const selectAll =
       target &&
       typeof target === "object" &&
       !Array.isArray(target) &&
       "selectAll" in target
+        ? { q: target.q }
+        : null;
+    const itemUuids = selectAll
+      ? null
+      : Array.isArray(target)
+        ? target
+        : typeof target === "string"
+          ? [target]
+          : null;
+    if (
+      evaluatorsFittingItems(
+        task?.evaluators ?? [],
+        itemsForRun(selectAll, itemUuids),
+      ).length === 0
     ) {
-      setRunDialogItemUuids(null);
-      setRunDialogSelectAll({ q: target.q });
-    } else {
-      setRunDialogItemUuids(
-        Array.isArray(target) ? target : target ? [target] : null,
+      toast.error(
+        "None of the selected evaluators fit the chosen items. Tool-call items need a tool-call evaluator, and every other item needs an evaluator that is not a tool-call evaluator.",
       );
-      setRunDialogSelectAll(null);
+      return;
     }
+    setRunDialogItemUuids(itemUuids);
+    setRunDialogSelectAll(selectAll);
     setRunDialogSubmitError(null);
     setRunDialogOpen(true);
   };
@@ -3410,18 +3431,10 @@ function LabellingTaskPageInner() {
           isOpen={runDialogOpen}
           accessToken={accessToken}
           taskUuid={uuid}
-          evaluators={(task?.evaluators ?? [])
-            .filter(
-              (e) =>
-                runDialogItems.length === 0 ||
-                runDialogItems.some((it) =>
-                  evaluatorFitsItem(e.evaluator_type, it.is_tool_call === true),
-                ),
-            )
-            .map((e) => ({
-              uuid: e.uuid,
-              name: e.name,
-            }))}
+          evaluators={runDialogEvaluators.map((e) => ({
+            uuid: e.uuid,
+            name: e.name,
+          }))}
           submitting={startingRun}
           submitError={runDialogSubmitError}
           onClose={() => {

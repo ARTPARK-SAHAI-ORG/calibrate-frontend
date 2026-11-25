@@ -7,6 +7,7 @@ import { EvaluatorPicker } from "@/components/evaluators/EvaluatorPicker";
 import { LoadingState } from "@/components/ui";
 import { useAgentLlmEvaluators } from "@/hooks/useAgentLlmEvaluators";
 import { reportError } from "@/lib/reportError";
+import { agentTaskType } from "@/lib/traceScoring";
 import {
   convertTracesToTests,
   convertTracesErrorMessage,
@@ -283,7 +284,7 @@ export function ConvertTracesToTestsDialog({
           setCreateFlowOpen(false);
         }}
         // Single type only, so the flow skips the "what is this for?" step.
-        useCaseTypes={agentNature === "general" ? ["llm-general"] : ["llm"]}
+        useCaseTypes={[agentTaskType(agentNature)]}
       />
     </div>
   );

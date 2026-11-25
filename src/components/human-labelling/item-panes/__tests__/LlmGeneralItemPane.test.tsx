@@ -90,6 +90,16 @@ describe("LlmGeneralItemPane", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("says the agent made no tool call on a tool-call item with no output", () => {
+    render(
+      <LlmGeneralItemPane
+        payload={{ input: "Book a flight", output: "", actual_tool_calls: [] }}
+      />,
+    );
+    expect(screen.getByText("The agent made no tool call")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+  });
+
   it("ignores an empty actual_tool_calls list", () => {
     render(
       <LlmGeneralItemPane
