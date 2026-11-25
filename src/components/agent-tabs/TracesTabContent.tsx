@@ -620,7 +620,7 @@ export function TracesTabContent({
   const isScoringLive = traceScoring.enabled && !overLimit && !storageFull;
   const chatReplyCap = usage?.max_chat_replies_per_day ?? null;
   const chatLimitReached =
-    chatReplyCap !== null && (usage?.chat_replies_today ?? 0) >= chatReplyCap;
+    chatReplyCap !== null && usage!.chat_replies_today >= chatReplyCap;
 
   const handleRefresh = async () => {
     // A refresh can bring in traces of the other kind, which the counts read
