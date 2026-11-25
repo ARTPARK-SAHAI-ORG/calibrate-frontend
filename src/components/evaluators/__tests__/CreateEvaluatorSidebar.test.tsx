@@ -2,6 +2,12 @@ import React from "react";
 import { render, screen, setupUser, fireEvent } from "@/test-utils";
 import { CreateEvaluatorSidebar } from "../CreateEvaluatorSidebar";
 import type { LLMModel } from "@/components/agent-tabs/constants/providers";
+import type { ModelAvailability } from "@/lib/modelAvailability";
+
+let mockAvailability: ModelAvailability | null = null;
+jest.mock("../../../hooks/useModelAvailability", () => ({
+  useModelAvailability: () => mockAvailability,
+}));
 
 jest.mock("../RatingScaleEditor", () => ({
   RatingScaleEditor: ({ rows, onChange, description }: any) => (
@@ -460,5 +466,34 @@ describe("CreateEvaluatorSidebar", () => {
     expect(screen.getByText("Creating...")).toBeInTheDocument();
     expect(screen.getByText("Cancel").closest("button")).toBeDisabled();
     expect(screen.getByText("Creating...").closest("button")).toBeDisabled();
+  });
+
+  describe("a judge model that cannot be used", () => {
+    afterEach(() => {
+      mockAvailability = null;
+    });
+
+    it("marks a retired model in red", () => {
+      mockAvailability = { models: new Map(), privacyAllowed: null };
+      renderComponent({ judgeModel });
+      expect(
+        screen.getByText(/This model is no longer available. Pick another one./),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /GPT-4/ }).className).toContain(
+        "border-red-500/60",
+      );
+    });
+
+    it("warns in amber about a model to be removed later", () => {
+      mockAvailability = {
+        models: new Map([["gpt-4", { expiresOn: "2999-01-01" }]]),
+        privacyAllowed: null,
+      };
+      renderComponent({ judgeModel });
+      expect(screen.getByText(/will be removed on/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /GPT-4/ }).className).toContain(
+        "border-amber-500/60",
+      );
+    });
   });
 });

@@ -4,11 +4,14 @@ import { reportError } from "@/lib/reportError";
 import { useState, useEffect, useCallback } from "react";
 import type { LLMProvider, LLMModel } from "@/components/agent-tabs/constants/providers";
 import { getBackendUrl } from "@/lib/api";
+import type { ModelAvailability } from "@/lib/modelAvailability";
 
-type CacheEntry = {
+type ModelsResult = {
   providers: LLMProvider[];
-  timestamp: number;
+  availability: ModelAvailability;
 };
+
+type CacheEntry = ModelsResult & { timestamp: number };
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -18,13 +21,13 @@ export const OPENROUTER_DISABLED_MESSAGE =
 type AllowedProvider = { slug: string; name: string };
 type AllowedProviders = "all" | AllowedProvider[];
 
-type ProvidersResponse =
-  | null
-  | { providers: "all" }
-  | { providers: AllowedProvider[] };
+type ProvidersResponse = null | {
+  providers: "all" | AllowedProvider[];
+  zero_data_retention?: boolean;
+};
 
 let cache: CacheEntry | null = null;
-let inflightPromise: Promise<LLMProvider[]> | null = null;
+let inflightPromise: Promise<ModelsResult> | null = null;
 
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   openai: "OpenAI",
@@ -74,7 +77,10 @@ function isDeprecated(model: { expiration_date?: string | null }): boolean {
   return ts < Date.now();
 }
 
-async function fetchAllowedProviders(): Promise<AllowedProviders> {
+async function fetchAllowedProviders(): Promise<{
+  allowed: AllowedProviders;
+  zdr: boolean;
+}> {
   const backendUrl = getBackendUrl();
   const response = await fetch(`${backendUrl}/openrouter/providers`, {
     headers: { accept: "application/json" },
@@ -91,23 +97,44 @@ async function fetchAllowedProviders(): Promise<AllowedProviders> {
     throw new Error(OPENROUTER_DISABLED_MESSAGE);
   }
 
-  if (json.providers === "all") return "all";
+  const zdr = json.zero_data_retention === true;
+  if (json.providers === "all") return { allowed: "all", zdr };
 
   if (Array.isArray(json.providers)) {
-    return json.providers
+    const allowed = json.providers
       .filter(
         (p): p is AllowedProvider =>
           !!p && typeof p.slug === "string" && typeof p.name === "string",
       )
       .map((p) => ({ slug: p.slug, name: p.name }));
+    return { allowed, zdr };
   }
 
   throw new Error("Unexpected response format from /openrouter/providers");
 }
 
+/** The models with a provider that keeps no copy of the data. Null when the
+ *  list cannot be read, so a failed read never blocks a model. */
+async function fetchPrivacyAllowed(): Promise<Set<string> | null> {
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/models?zdr=true");
+    if (!response.ok) return null;
+    const json = await response.json();
+    if (!Array.isArray(json.data)) return null;
+    return new Set(
+      json.data
+        .map((m: { id?: unknown }) => m.id)
+        .filter((id: unknown): id is string => typeof id === "string"),
+    );
+  } catch {
+    return null;
+  }
+}
+
 async function fetchModelsFromOpenRouter(
   allowed: AllowedProviders,
-): Promise<LLMProvider[]> {
+  zdr: boolean,
+): Promise<ModelsResult> {
   const response = await fetch("https://openrouter.ai/api/v1/models");
   if (!response.ok) throw new Error(`OpenRouter API error: ${response.status}`);
 
@@ -125,9 +152,11 @@ async function fetchModelsFromOpenRouter(
       : new Map(allowed.map((p) => [p.slug, p.name] as const));
 
   const grouped = new Map<string, LLMModel[]>();
+  const models: ModelAvailability["models"] = new Map();
 
   for (const model of json.data) {
     if (typeof model.id !== "string" || typeof model.name !== "string") continue;
+    models.set(model.id, { expiresOn: model.expiration_date ?? null });
     if (isDeprecated(model)) continue;
 
     const slashIndex = model.id.indexOf("/");
@@ -155,30 +184,35 @@ async function fetchModelsFromOpenRouter(
       name: model.name,
       inputModalities,
       outputModalities,
+      ...(model.expiration_date ? { expiresOn: model.expiration_date } : {}),
     });
   }
 
-  return Array.from(grouped.entries())
+  const privacyAllowed = zdr ? await fetchPrivacyAllowed() : null;
+
+  const providers = Array.from(grouped.entries())
     .map(([slug, models]) => ({
       slug,
       name: allowedNameOverrides?.get(slug) ?? getProviderDisplayName(slug),
       models: models.sort((a, b) => a.name.localeCompare(b.name)),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  return { providers, availability: { models, privacyAllowed } };
 }
 
-function getOrFetchProviders(): Promise<LLMProvider[]> {
+function getOrFetchProviders(): Promise<ModelsResult> {
   if (cache && Date.now() - cache.timestamp < CACHE_TTL_MS) {
-    return Promise.resolve(cache.providers);
+    return Promise.resolve(cache);
   }
 
   if (!inflightPromise) {
     inflightPromise = fetchAllowedProviders()
-      .then((allowed) => fetchModelsFromOpenRouter(allowed))
-      .then((providers) => {
-        cache = { providers, timestamp: Date.now() };
+      .then(({ allowed, zdr }) => fetchModelsFromOpenRouter(allowed, zdr))
+      .then((result) => {
+        cache = { ...result, timestamp: Date.now() };
         inflightPromise = null;
-        return providers;
+        return result;
       })
       .catch((err) => {
         inflightPromise = null;
@@ -191,11 +225,17 @@ function getOrFetchProviders(): Promise<LLMProvider[]> {
 
 export function useOpenRouterModels(): {
   providers: LLMProvider[];
+  /** What OpenRouter says about every model; null while loading or when the
+   *  list could not be read. */
+  availability: ModelAvailability | null;
   isLoading: boolean;
   error: string | null;
   retry: () => void;
 } {
   const [providers, setProviders] = useState<LLMProvider[]>(cache?.providers ?? []);
+  const [availability, setAvailability] = useState<ModelAvailability | null>(
+    cache?.availability ?? null,
+  );
   const [isLoading, setIsLoading] = useState(
     !cache || Date.now() - cache.timestamp >= CACHE_TTL_MS
   );
@@ -217,7 +257,8 @@ export function useOpenRouterModels(): {
       getOrFetchProviders()
         .then((result) => {
           if (!cancelled) {
-            setProviders(result);
+            setProviders(result.providers);
+            setAvailability(result.availability);
             setIsLoading(false);
             setError(null);
           }
@@ -232,6 +273,7 @@ export function useOpenRouterModels(): {
               cache = null;
               setProviders([]);
             }
+            setAvailability(null);
             setError(
               isDisabled
                 ? OPENROUTER_DISABLED_MESSAGE
@@ -255,7 +297,7 @@ export function useOpenRouterModels(): {
     };
   }, [retryCount]);
 
-  return { providers, isLoading, error, retry };
+  return { providers, availability, isLoading, error, retry };
 }
 
 export function findModelInProviders(

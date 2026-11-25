@@ -8,6 +8,12 @@ jest.mock("../../../hooks/useOpenRouterModels", () => ({
   useOpenRouterModels: () => mockUseOpenRouterModels(),
 }));
 
+const mockAvailability = jest.fn();
+jest.mock("../../../hooks/useModelAvailability", () => ({
+  __esModule: true,
+  useModelAvailability: (serverCalls: boolean) => mockAvailability(serverCalls),
+}));
+
 import { LLMSelectorModal } from "../LLMSelectorModal";
 
 const providers: LLMProvider[] = [
@@ -34,6 +40,7 @@ const providers: LLMProvider[] = [
 
 describe("LLMSelectorModal", () => {
   beforeEach(() => {
+    mockAvailability.mockReturnValue(null);
     mockUseOpenRouterModels.mockReturnValue({
       providers,
       isLoading: false,
@@ -49,7 +56,7 @@ describe("LLMSelectorModal", () => {
         onClose={jest.fn()}
         selectedLLM={null}
         onSelect={jest.fn()}
-      />
+      />,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -61,7 +68,7 @@ describe("LLMSelectorModal", () => {
         onClose={jest.fn()}
         selectedLLM={null}
         onSelect={jest.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText("OpenAI")).toBeInTheDocument();
@@ -84,7 +91,7 @@ describe("LLMSelectorModal", () => {
             models: [{ id: "google/gemini", name: "Gemini" }],
           },
         ]}
-      />
+      />,
     );
 
     expect(screen.getByText("Google")).toBeInTheDocument();
@@ -100,7 +107,7 @@ describe("LLMSelectorModal", () => {
         selectedLLM={null}
         onSelect={jest.fn()}
         allowedProviderSlugs={["anthropic"]}
-      />
+      />,
     );
 
     expect(screen.getByText("Anthropic")).toBeInTheDocument();
@@ -115,7 +122,7 @@ describe("LLMSelectorModal", () => {
         selectedLLM={null}
         onSelect={jest.fn()}
         requiredInputModality="audio"
-      />
+      />,
     );
 
     expect(screen.getByText("GPT-4o Audio")).toBeInTheDocument();
@@ -133,7 +140,7 @@ describe("LLMSelectorModal", () => {
         onClose={jest.fn()}
         selectedLLM={null}
         onSelect={jest.fn()}
-      />
+      />,
     );
 
     await user.type(screen.getByPlaceholderText("Search LLM"), "claude");
@@ -149,7 +156,7 @@ describe("LLMSelectorModal", () => {
         onClose={jest.fn()}
         selectedLLM={null}
         onSelect={jest.fn()}
-      />
+      />,
     );
 
     await user.type(screen.getByPlaceholderText("Search LLM"), "zzzznotamodel");
@@ -166,12 +173,12 @@ describe("LLMSelectorModal", () => {
         onClose={onClose}
         selectedLLM={null}
         onSelect={onSelect}
-      />
+      />,
     );
 
     await user.click(screen.getByText("Claude"));
     expect(onSelect).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "anthropic/claude" })
+      expect.objectContaining({ id: "anthropic/claude" }),
     );
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -183,11 +190,11 @@ describe("LLMSelectorModal", () => {
         onClose={jest.fn()}
         selectedLLM={{ id: "anthropic/claude", name: "Claude" }}
         onSelect={jest.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText("Claude").closest("button")).toHaveClass(
-      "bg-muted/50"
+      "bg-muted/50",
     );
   });
 
@@ -200,7 +207,7 @@ describe("LLMSelectorModal", () => {
         onClose={onClose}
         selectedLLM={null}
         onSelect={jest.fn()}
-      />
+      />,
     );
 
     const buttons = screen.getAllByRole("button");
@@ -222,7 +229,7 @@ describe("LLMSelectorModal", () => {
         onClose={jest.fn()}
         selectedLLM={null}
         onSelect={jest.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText("Loading models")).toBeInTheDocument();
@@ -244,11 +251,11 @@ describe("LLMSelectorModal", () => {
         onClose={jest.fn()}
         selectedLLM={null}
         onSelect={jest.fn()}
-      />
+      />,
     );
 
     expect(
-      screen.getByText("Failed to load models. Please check your connection.")
+      screen.getByText("Failed to load models. Please check your connection."),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(retry).toHaveBeenCalledTimes(1);
@@ -274,7 +281,7 @@ describe("LLMSelectorModal", () => {
             models: [{ id: "meta/llama-4", name: "Llama 4" }],
           },
         ]}
-      />
+      />,
     );
 
     // Both same-named groups render; keying on the unique slug avoids the
@@ -283,7 +290,7 @@ describe("LLMSelectorModal", () => {
     expect(screen.getByText("Llama 3")).toBeInTheDocument();
     expect(screen.getByText("Llama 4")).toBeInTheDocument();
     const dupKeyWarned = errorSpy.mock.calls.some(
-      (args) => typeof args[0] === "string" && args[0].includes("same key")
+      (args) => typeof args[0] === "string" && args[0].includes("same key"),
     );
     expect(dupKeyWarned).toBe(false);
     errorSpy.mockRestore();
@@ -303,9 +310,61 @@ describe("LLMSelectorModal", () => {
         onClose={jest.fn()}
         selectedLLM={null}
         onSelect={jest.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText("OpenAI")).toBeInTheDocument();
+  });
+
+  it("hides models that cannot be used and marks ones being removed", () => {
+    mockAvailability.mockReturnValue({
+      models: new Map([
+        ["openai/gpt-4o", { expiresOn: "2999-12-11" }],
+        ["openai/gpt-4o-audio", { expiresOn: null }],
+        ["anthropic/claude", { expiresOn: null }],
+      ]),
+      privacyAllowed: new Set(["openai/gpt-4o", "openai/gpt-4o-audio"]),
+    });
+    mockUseOpenRouterModels.mockReturnValue({
+      providers: [
+        {
+          ...providers[0],
+          models: [
+            { ...providers[0].models[0], expiresOn: "2999-12-11" },
+            { ...providers[0].models[1], expiresOn: "2000-01-01" },
+          ],
+        },
+        providers[1],
+      ],
+      isLoading: false,
+      error: null,
+      retry: jest.fn(),
+    });
+    render(
+      <LLMSelectorModal
+        isOpen={true}
+        onClose={jest.fn()}
+        selectedLLM={null}
+        onSelect={jest.fn()}
+      />,
+    );
+    expect(screen.getByText("Will be removed on 11 Dec")).toBeInTheDocument();
+    // A past date gets no pill.
+    expect(screen.getAllByText(/Will be removed on/)).toHaveLength(1);
+    expect(screen.queryByText("Claude")).not.toBeInTheDocument();
+    expect(mockAvailability).toHaveBeenLastCalledWith(true);
+  });
+
+  it("leaves the privacy setting out when someone else's server calls the model", () => {
+    render(
+      <LLMSelectorModal
+        isOpen={true}
+        onClose={jest.fn()}
+        selectedLLM={null}
+        onSelect={jest.fn()}
+        serverCalls={false}
+      />,
+    );
+    expect(mockAvailability).toHaveBeenLastCalledWith(false);
   });
 });

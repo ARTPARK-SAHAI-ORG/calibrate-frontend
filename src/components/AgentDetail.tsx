@@ -37,9 +37,9 @@ import type {
   LLMModel,
   DataExtractionFieldData,
 } from "@/components/agent-tabs";
+import { resolveSavedModel } from "@/lib/modelAvailability";
 import {
   useOpenRouterModels,
-  findModelInProviders,
   useVerifyConnection,
   usePageErrorState,
   useAgentHasRuns,
@@ -565,22 +565,10 @@ export function AgentDetail({
             setTtsProvider(data.config.tts.provider);
           }
           if (data.config.llm?.model) {
-            // Find the matching LLM model from the providers list
-            const modelId = data.config.llm.model;
-            let foundModel: LLMModel | null = null;
-            for (const provider of llmProviders) {
-              const model = provider.models.find((m) => m.id === modelId);
-              if (model) {
-                foundModel = model;
-                break;
-              }
-            }
-            if (foundModel) {
-              setSelectedLLM(foundModel);
-            } else {
-              // If model not found in list, create a basic entry
-              setSelectedLLM({ id: modelId, name: modelId });
-            }
+            setSelectedLLM({
+              id: data.config.llm.model,
+              name: data.config.llm.model,
+            });
           }
           if (data.config.settings?.agent_speaks_first !== undefined) {
             setAgentSpeaksFirst(data.config.settings.agent_speaks_first);
@@ -623,15 +611,6 @@ export function AgentDetail({
       fetchAgent();
     }
   }, [agentUuid, backendAccessToken, resetErrorCode, captureResponse]);
-
-  // When providers load asynchronously, resolve the display name if it was set to the raw ID
-  useEffect(() => {
-    if (!selectedLLM || llmProviders.length === 0) return;
-    const found = findModelInProviders(llmProviders, selectedLLM.id);
-    if (found && found.name !== selectedLLM.name) {
-      setSelectedLLM(found);
-    }
-  }, [llmProviders, selectedLLM]);
 
   // Fetch tools linked to this agent
   useEffect(() => {
@@ -1411,7 +1390,9 @@ export function AgentDetail({
               setSttProvider={setSttProvider}
               ttsProvider={ttsProvider}
               setTtsProvider={setTtsProvider}
-              selectedLLM={selectedLLM}
+              selectedLLM={
+                selectedLLM && resolveSavedModel(selectedLLM.id, llmProviders)
+              }
               setSelectedLLM={setSelectedLLM}
             />
           </div>

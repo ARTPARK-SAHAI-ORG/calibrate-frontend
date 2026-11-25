@@ -37,6 +37,12 @@ jest.mock("../../../../../components/agent-tabs/LLMSelectorModal", () => ({
 jest.mock("../../../../../hooks", () => ({
   ...jest.requireActual("../../../../../hooks"),
   useAccessToken: () => "test-token",
+  // The model list makes requests of its own, which would use up the answers
+  // each test lines up for the page.
+  useOpenRouterModels: () => ({ providers: [], availability: null }),
+}));
+jest.mock("../../../../../hooks/useModelAvailability", () => ({
+  useModelAvailability: () => null,
 }));
 
 const toastError = jest.fn();

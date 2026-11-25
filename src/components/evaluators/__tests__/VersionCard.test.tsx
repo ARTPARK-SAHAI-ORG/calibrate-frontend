@@ -398,4 +398,13 @@ describe("VersionCard", () => {
       expect(pre.className).not.toMatch(/overflow-hidden/);
     });
   });
+
+  it("says under the model when it can no longer be used", () => {
+    setup({ modelProblem: { kind: "retired" } });
+    expect(
+      screen.getByText(
+        /no longer available. Create a new version with another model./,
+      ),
+    ).toBeInTheDocument();
+  });
 });

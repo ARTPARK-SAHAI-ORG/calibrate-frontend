@@ -3,6 +3,7 @@ import { render, screen, setupUser, waitFor, within } from "../../test-utils";
 import { BenchmarkDialog } from "../BenchmarkDialog";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
+import type { ModelAvailability } from "@/lib/modelAvailability";
 
 // ---- Mocks ----
 
@@ -31,6 +32,15 @@ jest.mock("../../hooks", () => ({
     ],
     updateOrganization: mockUpdateOrganization,
   }),
+}));
+
+let mockAvailability: ModelAvailability | null = null;
+const mockServerCalls: boolean[] = [];
+jest.mock("../../hooks/useModelAvailability", () => ({
+  useModelAvailability: (serverCalls: boolean) => {
+    mockServerCalls.push(serverCalls);
+    return mockAvailability;
+  },
 }));
 
 jest.mock("../../lib/reportError", () => ({
@@ -567,12 +577,16 @@ describe("BenchmarkDialog", () => {
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
 
     // Both panels open beside the box, so opening one closes the other.
-    await user.click(screen.getByRole("button", { name: "How to run the models" }));
+    await user.click(
+      screen.getByRole("button", { name: "How to run the models" }),
+    );
     expect(screen.getByLabelText("Sequential")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /see why/i }));
     expect(screen.getByText("connection refused")).toBeInTheDocument();
     expect(screen.queryByLabelText("Sequential")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "How to run the models" }));
+    await user.click(
+      screen.getByRole("button", { name: "How to run the models" }),
+    );
     expect(screen.getByLabelText("Sequential")).toBeInTheDocument();
     expect(screen.queryByText("connection refused")).not.toBeInTheDocument();
   });
@@ -1017,7 +1031,9 @@ describe("BenchmarkDialog", () => {
 
     // The panel starts closed, so the options are not on screen yet.
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "How to run the models" }));
+    await user.click(
+      screen.getByRole("button", { name: "How to run the models" }),
+    );
     expect(screen.getByRole("radio", { name: "Parallel" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "Sequential" })).not.toBeChecked();
     if (pickOrder) {
@@ -1090,8 +1106,81 @@ describe("BenchmarkDialog", () => {
     expect(onCompareTests).toHaveBeenCalledWith(mockTickedTests);
   });
 
+  describe("a chosen model that cannot be used", () => {
+    afterEach(() => {
+      mockAvailability = null;
+    });
+    const props = baseProps({
+      agentType: "agent",
+      initialModels: ["openai/gpt-4o", "openai/gpt-retired"],
+    });
+
+    it("marks a retired model in red and stops the comparison until it is removed", async () => {
+      mockAvailability = {
+        models: new Map([["openai/gpt-4o", { expiresOn: null }]]),
+        privacyAllowed: null,
+      };
+      const user = setupUser();
+      render(<BenchmarkDialog {...props} />);
+
+      const row = await screen.findByRole("button", {
+        name: "openai/gpt-retired",
+      });
+      expect(row.className).toContain("border-red-500/60");
+      expect(
+        screen.getByText(
+          /This model is no longer available. Remove it or pick another one./,
+        ),
+      ).toBeInTheDocument();
+      const run = screen.getByRole("button", { name: /Run comparison/ });
+      expect(run).toBeDisabled();
+      await user.hover(run.parentElement!);
+      expect(
+        await screen.findByText(
+          "Remove or replace the model marked in red first",
+        ),
+      ).toBeInTheDocument();
+
+      await user.click(
+        screen.getAllByRole("button", { name: "Remove model" })[1],
+      );
+      expect(
+        screen.getByRole("button", { name: /Run comparison/ }),
+      ).toBeEnabled();
+    });
+
+    it("leaves the privacy setting out for a connection agent, whose own server calls the models", async () => {
+      mockServerCalls.length = 0;
+      render(<BenchmarkDialog {...props} agentType="connection" />);
+      await screen.findByRole("button", { name: "openai/gpt-retired" });
+      expect(mockServerCalls).toContain(false);
+      expect(mockServerCalls).not.toContain(true);
+    });
+
+    it("only warns in amber about a model to be removed later", async () => {
+      mockAvailability = {
+        models: new Map([
+          ["openai/gpt-4o", { expiresOn: null }],
+          ["openai/gpt-retired", { expiresOn: "2999-01-01" }],
+        ]),
+        privacyAllowed: null,
+      };
+      render(<BenchmarkDialog {...props} />);
+
+      expect(
+        await screen.findByText(/will be removed on 1 January 2999/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "openai/gpt-retired" }).className,
+      ).not.toContain("border-red-500/60");
+      expect(
+        screen.getByRole("button", { name: /Run comparison/ }),
+      ).toBeEnabled();
+    });
+  });
+
   describe("opening with the models a past comparison ran", () => {
-    it("names those models once the model list has arrived", async () => {
+    it("shows those models by id before the model list arrives, then by name", async () => {
       // The list of models comes from the backend, so it is empty on the first
       // render, the way it is in the app.
       mockUseOpenRouterModels.mockReturnValue({ providers: [] });
@@ -1103,7 +1192,8 @@ describe("BenchmarkDialog", () => {
           })}
         />,
       );
-      expect(screen.getAllByText("Select a model")).toHaveLength(1);
+      expect(await screen.findByText("openai/gpt-4o")).toBeInTheDocument();
+      expect(screen.getByText("anthropic/claude-3-haiku")).toBeInTheDocument();
 
       mockUseOpenRouterModels.mockReturnValue({ providers: providersFixture });
       rerender(
@@ -1118,8 +1208,8 @@ describe("BenchmarkDialog", () => {
       expect(await screen.findByText("GPT-4o")).toBeInTheDocument();
       expect(screen.getByText("Claude 3 Haiku")).toBeInTheDocument();
       expect(
-      screen.getAllByRole("button", { name: "Remove model" }),
-    ).toHaveLength(2);
+        screen.getAllByRole("button", { name: "Remove model" }),
+      ).toHaveLength(2);
       expect(screen.getAllByText("Select a model")).toHaveLength(1);
     });
 
@@ -1136,8 +1226,8 @@ describe("BenchmarkDialog", () => {
       expect(await screen.findByText("openai/gpt-retired")).toBeInTheDocument();
       expect(screen.getByText("GPT-4o")).toBeInTheDocument();
       expect(
-      screen.getAllByRole("button", { name: "Remove model" }),
-    ).toHaveLength(2);
+        screen.getAllByRole("button", { name: "Remove model" }),
+      ).toHaveLength(2);
     });
 
     it("ignores a repeated model and stops at five", async () => {
@@ -1161,8 +1251,8 @@ describe("BenchmarkDialog", () => {
       await screen.findByText("GPT-4o");
       // Five rows, so no blank row is left to pick a sixth in.
       expect(
-      screen.getAllByRole("button", { name: "Remove model" }),
-    ).toHaveLength(5);
+        screen.getAllByRole("button", { name: "Remove model" }),
+      ).toHaveLength(5);
       expect(screen.queryByText("Select a model")).not.toBeInTheDocument();
       expect(screen.queryByText("openai/gpt-retired")).not.toBeInTheDocument();
     });
@@ -1193,8 +1283,8 @@ describe("BenchmarkDialog", () => {
       );
       expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
       expect(
-      screen.queryByRole("button", { name: "Remove model" }),
-    ).not.toBeInTheDocument();
+        screen.queryByRole("button", { name: "Remove model" }),
+      ).not.toBeInTheDocument();
     });
 
     it("runs the comparison on the models it opened with", async () => {

@@ -17,6 +17,13 @@ jest.mock("../../../hooks/useOpenRouterModels", () => ({
   }),
 }));
 
+import type { ModelAvailability } from "@/lib/modelAvailability";
+
+let mockAvailability: ModelAvailability | null = null;
+jest.mock("../../../hooks/useModelAvailability", () => ({
+  useModelAvailability: () => mockAvailability,
+}));
+
 import { AgentTabContent } from "../AgentTabContent";
 
 function renderComponent(overrides: Partial<React.ComponentProps<typeof AgentTabContent>> = {}) {
@@ -118,5 +125,48 @@ describe("AgentTabContent", () => {
     expect(
       screen.getByText(/used to determine the persona of the agent/i)
     ).toBeInTheDocument();
+  });
+
+  describe("a saved model that cannot be used", () => {
+    afterEach(() => {
+      mockAvailability = null;
+    });
+    const picker = () => screen.getByRole("button", { name: /GPT-4o|old\/model/ });
+
+    it("shows nothing while the model list is not known", () => {
+      renderComponent({ selectedLLM: { id: "old/model", name: "old/model" } });
+      expect(screen.queryByText(/no longer available/)).not.toBeInTheDocument();
+      expect(picker().className).toContain("border-border");
+    });
+
+    it("marks a retired model in red", () => {
+      mockAvailability = { models: new Map(), privacyAllowed: null };
+      renderComponent({ selectedLLM: { id: "old/model", name: "old/model" } });
+      expect(
+        screen.getByText(/This model is no longer available. Pick another one./),
+      ).toBeInTheDocument();
+      expect(picker().className).toContain("border-red-500/60");
+    });
+
+    it("warns in amber about a model to be removed later", () => {
+      mockAvailability = {
+        models: new Map([["openai/gpt-4o", { expiresOn: "2999-01-01" }]]),
+        privacyAllowed: null,
+      };
+      renderComponent({ selectedLLM: { id: "openai/gpt-4o", name: "GPT-4o" } });
+      expect(
+        screen.getByText(/will be removed on 1 January 2999/),
+      ).toBeInTheDocument();
+      expect(picker().className).toContain("border-amber-500/60");
+    });
+
+    it("shows nothing for a model that is fine", () => {
+      mockAvailability = {
+        models: new Map([["openai/gpt-4o", { expiresOn: null }]]),
+        privacyAllowed: null,
+      };
+      renderComponent({ selectedLLM: { id: "openai/gpt-4o", name: "GPT-4o" } });
+      expect(picker().className).toContain("border-border");
+    });
   });
 });

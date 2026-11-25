@@ -12,7 +12,19 @@ import {
 import { useParams, useRouter, useSearchParams } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
-import { useAccessToken, usePageErrorState } from "@/hooks";
+import {
+  useAccessToken,
+  useOpenRouterModels,
+  usePageErrorState,
+} from "@/hooks";
+import { useModelAvailability } from "@/hooks/useModelAvailability";
+import { ModelProblemNote } from "@/components/ModelProblemNote";
+import {
+  blocksUse,
+  modelProblem,
+  resolveSavedModel,
+} from "@/lib/modelAvailability";
+import { JUDGE_PROVIDER_SLUGS } from "@/constants/judgeProviders";
 import { AppLayout } from "@/components/AppLayout";
 import {
   AgreementTrendChart,
@@ -69,17 +81,6 @@ async function getEvaluatorErrorMessage(
 function isEvaluatorNameConflict(response: Response, message: string): boolean {
   return response.status === 409 && message === "Evaluator name already exists";
 }
-
-const JUDGE_PROVIDER_SLUGS = [
-  "openai",
-  "anthropic",
-  "google",
-  "meta-llama",
-  "mistralai",
-  "x-ai",
-  "qwen",
-  "moonshotai",
-];
 
 type ScaleEntry = {
   value: boolean | number | string;
@@ -230,8 +231,18 @@ function EvaluatorDetailPageInner() {
 
   // New version dialog state
   const [newVersionOpen, setNewVersionOpen] = useState(false);
-  const [newVersionJudgeModel, setNewVersionJudgeModel] =
+  const [savedNewVersionJudgeModel, setNewVersionJudgeModel] =
     useState<LLMModel | null>(null);
+  const { providers: llmProviders } = useOpenRouterModels();
+  const modelAvailability = useModelAvailability();
+  // The name from the model list, once it has loaded.
+  const newVersionJudgeModel =
+    savedNewVersionJudgeModel &&
+    resolveSavedModel(savedNewVersionJudgeModel.id, llmProviders);
+  const newVersionJudgeProblem = modelProblem(
+    newVersionJudgeModel?.id ?? "",
+    modelAvailability,
+  );
   const [newVersionSystemPrompt, setNewVersionSystemPrompt] = useState("");
   const [newVersionScale, setNewVersionScale] = useState<
     { value: number | string; name: string; description: string }[]
@@ -1118,6 +1129,10 @@ function EvaluatorDetailPageInner() {
                       onSetLive={setVersionLive}
                       formatDateTime={formatDateTime}
                       isSelectedDetail
+                      modelProblem={modelProblem(
+                        selectedVersion.judge_model,
+                        modelAvailability,
+                      )}
                     />
                   </div>
                 </div>
@@ -1399,7 +1414,11 @@ function EvaluatorDetailPageInner() {
                         className={`w-full h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent flex items-center justify-between cursor-pointer transition-colors ${
                           newVersionValidated && !newVersionJudgeModel
                             ? "border-red-500"
-                            : "border-border"
+                            : newVersionJudgeProblem
+                              ? blocksUse(newVersionJudgeProblem)
+                                ? "border-red-500/60"
+                                : "border-amber-500/60"
+                              : "border-border"
                         }`}
                       >
                         <span
@@ -1427,6 +1446,11 @@ function EvaluatorDetailPageInner() {
                           />
                         </svg>
                       </button>
+                      <ModelProblemNote
+                        problem={newVersionJudgeProblem}
+                        nextStep="pick"
+                        className="mt-2"
+                      />
                     </div>
                   )}
 

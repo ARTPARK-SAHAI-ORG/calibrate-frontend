@@ -10,7 +10,6 @@ const useAccessTokenMock = jest.fn();
 const usePageErrorStateMock = jest.fn();
 const useVerifyConnectionMock = jest.fn();
 const useOpenRouterModelsMock = jest.fn();
-const findModelInProvidersMock = jest.fn();
 const useAgentHasRunsMock = jest.fn();
 
 jest.mock("../../hooks", () => ({
@@ -19,7 +18,6 @@ jest.mock("../../hooks", () => ({
   usePageErrorState: () => usePageErrorStateMock(),
   useVerifyConnection: () => useVerifyConnectionMock(),
   useOpenRouterModels: () => useOpenRouterModelsMock(),
-  findModelInProviders: (...args: any[]) => findModelInProvidersMock(...args),
   useAgentHasRuns: (...args: any[]) => useAgentHasRunsMock(...args),
   useActiveOrgUuid: () => ["org-1", jest.fn()],
   useOrganizations: () => ({
@@ -43,8 +41,10 @@ jest.mock("../../lib/reportError", () => ({
 // not the internals of each tab.
 jest.mock("../agent-tabs", () => ({
   __esModule: true,
-  AgentTabContent: () => (
-    <div data-testid="agent-tab-content">AgentTabContent</div>
+  AgentTabContent: (props: any) => (
+    <div data-testid="agent-tab-content">
+      AgentTabContent {props.selectedLLM?.name}
+    </div>
   ),
   AgentConnectionTabContent: (props: any) => (
     <div data-testid="connection-tab-content">
@@ -308,7 +308,6 @@ beforeEach(() => {
   usePageErrorStateMock.mockReturnValue({ ...defaultPageErrorState });
   useVerifyConnectionMock.mockReturnValue({ ...defaultVerify });
   useOpenRouterModelsMock.mockReturnValue({ providers: [] });
-  findModelInProvidersMock.mockReturnValue(null);
   useAgentHasRunsMock.mockReturnValue({
     hasRuns: true,
     markHasRuns: jest.fn(),
@@ -1236,11 +1235,7 @@ describe("AgentDetail", () => {
     jest.useRealTimers();
   });
 
-  it("resolves an unresolved LLM model id from providers once they load", async () => {
-    findModelInProvidersMock.mockReturnValue({
-      id: "custom/model",
-      name: "Custom Model",
-    });
+  it("names the saved LLM model from the providers list", async () => {
     useOpenRouterModelsMock.mockReturnValue({
       providers: [
         {
@@ -1257,7 +1252,9 @@ describe("AgentDetail", () => {
     await waitFor(() =>
       expect(screen.getByText("Build Agent")).toBeInTheDocument(),
     );
-    expect(findModelInProvidersMock).toHaveBeenCalled();
+    expect(screen.getByTestId("agent-tab-content")).toHaveTextContent(
+      "Custom Model",
+    );
   });
 
   it("verifies a connection agent via the header Verify button and dialog", async () => {
