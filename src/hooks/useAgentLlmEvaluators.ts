@@ -12,6 +12,7 @@ import {
   EvaluatorData,
 } from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
+import { agentTaskType } from "@/lib/traceScoring";
 
 type UseAgentLlmEvaluatorsArgs = {
   /** The agent whose own evaluators seed the selection. */
@@ -66,7 +67,7 @@ export function useAgentLlmEvaluators({
       setIsLoading(enabled && !accessToken);
       return;
     }
-    const evaluatorType = agentNature === "general" ? "llm-general" : "llm";
+    const evaluatorType = agentTaskType(agentNature);
     const defaultSlug =
       agentNature === "general"
         ? DEFAULT_LLM_GENERAL_SLUG

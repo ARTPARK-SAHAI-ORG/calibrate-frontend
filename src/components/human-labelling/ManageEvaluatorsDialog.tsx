@@ -105,7 +105,7 @@ export function ManageEvaluatorsDialog({
     };
   }, [accessToken]);
 
-  // Tool call items are answered only through the protected evaluator, so
+  // The built-in Tool call correctness evaluator answers tool call items, so
   // once it is on the task it stays.
   const isLocked = (uuid: string) =>
     currentEvaluatorIds.includes(uuid) &&

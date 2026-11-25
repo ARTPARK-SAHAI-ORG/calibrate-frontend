@@ -7,8 +7,13 @@ import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { apiClient } from "@/lib/api";
 import { liveVersionOf } from "@/lib/evaluatorVersions";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 
-type LinkedEvaluator = { uuid: string; name: string };
+type LinkedEvaluator = {
+  uuid: string;
+  name: string;
+  evaluator_type?: string | null;
+};
 
 type EvaluatorVersion = {
   uuid: string;
@@ -57,6 +62,8 @@ type RunEvaluatorsDialogProps = {
    * `GET /annotation-tasks/{taskUuid}/evaluators`. */
   taskUuid: string;
   evaluators: LinkedEvaluator[];
+  /** The items the run is for, to say how many no ticked evaluator fits. */
+  items?: { is_tool_call?: boolean }[];
   submitting: boolean;
   submitError: string | null;
   onClose: () => void;
@@ -103,6 +110,7 @@ export function RunEvaluatorsDialog({
   accessToken,
   taskUuid,
   evaluators,
+  items = [],
   submitting,
   submitError,
   onClose,
@@ -206,6 +214,16 @@ export function RunEvaluatorsDialog({
     for (const e of evaluators) next[e.uuid] = target;
     setPicked(next);
   };
+
+  // The backend leaves these out of the run.
+  const unfittedCount = items.filter(
+    (it) =>
+      !evaluators.some(
+        (e) =>
+          picked[e.uuid] &&
+          evaluatorFitsItem(e.evaluator_type, it.is_tool_call === true),
+      ),
+  ).length;
 
   const handleConfirm = async () => {
     if (pickedCount === 0 || submitting) return;
@@ -414,6 +432,12 @@ export function RunEvaluatorsDialog({
                 );
               })}
             </>
+          )}
+          {pickedCount > 0 && unfittedCount > 0 && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground">
+              {unfittedCount} of the chosen items fit none of the ticked
+              evaluators, so they will be left out of this run
+            </div>
           )}
           {submitError && <p className="text-sm text-red-500">{submitError}</p>}
         </div>

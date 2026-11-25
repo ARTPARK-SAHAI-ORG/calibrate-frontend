@@ -227,6 +227,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     onToggleSelected,
     selectedCount,
     evaluatorDescriptions,
+    ineligibleEvaluators,
     addToolCallEvaluator,
     keysPaused,
   }: {
@@ -241,6 +242,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     onToggleSelected?: () => void;
     selectedCount?: number;
     evaluatorDescriptions?: Record<string, string>;
+    ineligibleEvaluators?: { name: string }[];
     addToolCallEvaluator?: React.ReactNode;
     keysPaused?: boolean;
   }) =>
@@ -250,6 +252,9 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
         <div data-testid="trace-detail-add-tool-call">
           {addToolCallEvaluator}
         </div>
+        <span data-testid="trace-detail-ineligible">
+          {(ineligibleEvaluators ?? []).map((e) => e.name).join(",")}
+        </span>
         <span data-testid="trace-detail-descriptions">
           {Object.entries(evaluatorDescriptions ?? {})
             .map(([uuid, description]) => `${uuid}=${description}`)
@@ -3448,6 +3453,41 @@ describe("TracesTabContent", () => {
       // The selection survives so the reader can try again.
       expect(screen.getByText("Submit for labelling (1)")).toBeInTheDocument();
     });
+  });
+
+  it("lists in the trace window only evaluators that fit that trace", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([
+        trace({ response_preview: null, tool_call_count: 1, input_preview: "Calls" }),
+      ]),
+    );
+    fetchAgentEvaluators.mockResolvedValue([
+      { uuid: "ev-reply", evaluator_type: "llm" },
+      { uuid: "ev-tc", evaluator_type: "tool-call" },
+    ]);
+    render(
+      <TracesTabContent
+        {...tabProps}
+        traceScoring={{
+          ...traceScoring,
+          eligibility: {
+            eligible: [],
+            ineligible: [
+              { evaluator_uuid: "ev-reply", name: "Tone", reason: "declares_variables" },
+              { evaluator_uuid: "ev-tc", name: "Right tool", reason: "no_live_version" },
+            ],
+          },
+        }}
+      />,
+    );
+    await waitFor(() => expect(fetchAgentEvaluators).toHaveBeenCalled());
+    await user.click(screen.getAllByText("Calls")[0]);
+    await waitFor(() =>
+      expect(screen.getByTestId("trace-detail-ineligible")).toHaveTextContent(
+        /^Right tool$/,
+      ),
+    );
   });
 
   it("opens the detail view for the trace that was clicked", async () => {

@@ -781,6 +781,10 @@ describe("typeArguments", () => {
     });
   });
 
+  it("reads a decimal written with extra zeros as a number", () => {
+    expect(typeArguments({ account: "7.50" }, declared)).toEqual({ account: 7.5 });
+  });
+
   it("keeps text a declared number cannot be read as", () => {
     expect(typeArguments({ pin: "abc" }, declared)).toEqual({ pin: "abc" });
   });

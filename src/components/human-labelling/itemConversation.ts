@@ -181,8 +181,8 @@ export function hasArgumentGroups(args: Record<string, unknown>): boolean {
 }
 
 // Text read back as the value it spells when it is valid JSON, so `7` edited
-// to `8` is saved as 8, not "8". A number that would not be written back the
-// same way, such as 20 digits that lose precision, stays text.
+// to `8` is saved as 8, not "8". A whole number too long to keep exactly,
+// such as 20 digits, stays text.
 function parseEdited(text: string): unknown {
   let value: unknown;
   try {
@@ -190,7 +190,9 @@ function parseEdited(text: string): unknown {
   } catch {
     return text;
   }
-  return typeof value === "number" && String(value) !== text.trim()
+  return typeof value === "number" &&
+    Number.isInteger(value) &&
+    !Number.isSafeInteger(value)
     ? text
     : value;
 }

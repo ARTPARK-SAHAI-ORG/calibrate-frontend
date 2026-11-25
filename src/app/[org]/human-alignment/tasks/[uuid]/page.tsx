@@ -106,6 +106,7 @@ import { useSidebarState } from "@/lib/sidebar";
 import {
   agentToolCalls,
   evaluatorsFittingItems,
+  isToolCallContent,
   itemEditForm,
   selectedTaskItems,
   toItemDetailItem,
@@ -1434,6 +1435,7 @@ function LabellingTaskPageInner() {
               task_id: taskSummary.task_id,
               payload: row.payload,
               metadata: row.metadata,
+              is_tool_call: isToolCallContent(row.payload ?? {}),
               created_at: "",
               updated_at: undefined,
               deleted_at: null,
@@ -1716,7 +1718,7 @@ function LabellingTaskPageInner() {
   );
 
   const handleRunEvaluators = (
-    target?: string[] | string | { selectAll: true; q?: string },
+    target?: string[] | { selectAll: true; q?: string },
   ) => {
     if (!accessToken || !uuid || startingRun) return;
     if ((task?.evaluators ?? []).length === 0) {
@@ -1734,9 +1736,7 @@ function LabellingTaskPageInner() {
       ? null
       : Array.isArray(target)
         ? target
-        : typeof target === "string"
-          ? [target]
-          : null;
+        : null;
     if (
       evaluatorsFittingItems(
         task?.evaluators ?? [],
@@ -3434,7 +3434,9 @@ function LabellingTaskPageInner() {
           evaluators={runDialogEvaluators.map((e) => ({
             uuid: e.uuid,
             name: e.name,
+            evaluator_type: e.evaluator_type,
           }))}
+          items={itemsForRun(runDialogSelectAll, runDialogItemUuids)}
           submitting={startingRun}
           submitError={runDialogSubmitError}
           onClose={() => {

@@ -61,6 +61,7 @@ import { ExtendLimitsLink } from "@/constants/limits";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import { isToolCallTraceRow, traceRowOutputFacts } from "@/lib/traceScoring";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
@@ -772,6 +773,16 @@ export function TracesTabContent({
   // The trace on show, so it can be ticked from inside the dialog rather than
   // closing it and finding the row again.
   const openTraceItem = items.find((item) => item.uuid === openTraceUuid);
+  // Only the evaluators that could have scored the open trace's kind of output.
+  const ineligibleForOpenTrace =
+    openTraceItem && evaluatorTypes
+      ? ineligible.filter((item) =>
+          evaluatorFitsItem(
+            evaluatorTypes[item.evaluator_uuid],
+            isToolCallTraceRow(openTraceItem),
+          ),
+        )
+      : ineligible;
   const closeTrace = () => {
     itemPager.cancel();
     setOpenTraceUuid(null);
@@ -1252,7 +1263,7 @@ export function TracesTabContent({
 
       <TraceDetailDialog
         evaluatorDescriptions={evaluatorDescriptions}
-        ineligibleEvaluators={ineligible}
+        ineligibleEvaluators={ineligibleForOpenTrace}
         addToolCallEvaluator={
           missingToolCallEvaluator ? addToolCallEvaluatorButton : undefined
         }
