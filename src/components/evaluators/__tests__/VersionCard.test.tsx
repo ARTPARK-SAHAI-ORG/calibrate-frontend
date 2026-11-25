@@ -403,7 +403,7 @@ describe("VersionCard", () => {
     setup({ modelProblem: { kind: "retired" } });
     expect(
       screen.getByText(
-        /no longer available. Create a new version with another model./,
+        /no longer available. Pick another model./,
       ),
     ).toBeInTheDocument();
   });

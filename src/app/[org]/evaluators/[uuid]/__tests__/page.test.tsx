@@ -388,7 +388,7 @@ describe("a judge model that cannot be used", () => {
     render(<EvaluatorDetailPage />);
     expect(
       await screen.findByText(
-        "This model is no longer available. Create a new version with another model.",
+        "This model is no longer available. Pick another model.",
       ),
     ).toBeInTheDocument();
   });

@@ -5,7 +5,7 @@ import { formatRemovalDate, type ModelProblem } from "@/lib/modelAvailability";
  *  version cannot change its model, and a comparison can drop one. */
 const NEXT_STEP = {
   pick: "Pick another one.",
-  newVersion: "Create a new version with another model.",
+  newVersion: "Pick another model.",
   comparison: "Remove it or pick another one.",
 } as const;
 

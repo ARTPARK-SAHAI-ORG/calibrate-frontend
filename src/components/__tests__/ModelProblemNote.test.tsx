@@ -12,7 +12,7 @@ describe("ModelProblemNote", () => {
 
   it.each([
     ["pick", "Pick another one."],
-    ["newVersion", "Create a new version with another model."],
+    ["newVersion", "Pick another model."],
     ["comparison", "Remove it or pick another one."],
   ] as const)("retired and privacy, %s", (nextStep, step) => {
     const { unmount } = render(
@@ -41,7 +41,7 @@ describe("ModelProblemNote", () => {
       nextStep === "pick"
         ? "Pick another one before then."
         : nextStep === "newVersion"
-          ? "Create a new version with another model."
+          ? "Pick another model."
           : "Remove it or pick another one.";
     expect(
       screen.getByText(`This model will be removed on 11 December 2026. ${step}`),
