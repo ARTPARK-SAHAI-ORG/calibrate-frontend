@@ -86,7 +86,7 @@ const HOVER_TEXT: Partial<Record<ShareableEntityType, ShareWords>> = {
     confirmShare: {
       title: "Share the chat link?",
       message:
-        "Anyone with the link can chat with this agent. They do not need a Calibrate account. Each reply shows up in the Monitoring tab.",
+        "Anyone with the link can chat with this agent. No sign in required.",
       confirmText: "Share link",
     },
   },
