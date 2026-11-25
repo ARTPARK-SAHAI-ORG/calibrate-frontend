@@ -81,7 +81,7 @@ export function PublicPageLayout({
         {(title || pills) && (
           <div className="flex items-center gap-2 truncate max-w-[50%]">
             {title && (
-              <span className="text-[13px] text-muted-foreground truncate">{title}</span>
+              <span className="text-sm font-semibold text-foreground truncate">{title}</span>
             )}
             {pills && (
               <div className="flex items-center gap-1.5 shrink-0">{pills}</div>
