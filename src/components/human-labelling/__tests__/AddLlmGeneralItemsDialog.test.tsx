@@ -1848,6 +1848,15 @@ describe("AddLlmGeneralItemsDialog headings and versions", () => {
     );
   });
 
+  it("turns off the output heading while the output is blank", async () => {
+    const user = setupUser();
+    renderDialog({ mode: "add" });
+    const heading = screen.getByRole("textbox", { name: "Heading for the output" });
+    expect(heading).toBeDisabled();
+    await user.type(screen.getByPlaceholderText("The output the LLM produced"), "Booked");
+    expect(heading).toBeEnabled();
+  });
+
   it("does not step to another item while the remove question is up", async () => {
     const user = setupUser();
     const onNext = jest.fn();

@@ -211,7 +211,7 @@ it("says what is missing when Score reliability has no number yet", async () => 
   mockAgreement = AGREEMENT;
 });
 
-it("sends a tool-call row and every linked evaluator to the run", async () => {
+it("offers only the evaluators that fit the chosen rows, and sends them to the run", async () => {
   const user = setupUser();
   mockSearch = "tab=items";
   mockTask = {
@@ -256,6 +256,7 @@ it("sends a tool-call row and every linked evaluator to the run", async () => {
     ".fixed",
   ) as HTMLElement;
   expect(within(dialog).getByText("Tool call correctness")).toBeInTheDocument();
+  expect(within(dialog).queryByText("Tone")).not.toBeInTheDocument();
   const run = within(dialog).getByRole("button", { name: "Run" });
   await waitFor(() => expect(run).toBeEnabled());
   await user.click(run);
@@ -270,10 +271,7 @@ it("sends a tool-call row and every linked evaluator to the run", async () => {
     (c) => c.endpoint === "/annotation-tasks/t-1/evaluator-runs" && c.options?.method === "POST",
   )!;
   expect(post.options?.body).toEqual({
-    evaluators: [
-      { evaluator_id: "ev-1", evaluator_version_id: "ev-1-v1" },
-      { evaluator_id: "ev-tc", evaluator_version_id: "ev-tc-v1" },
-    ],
+    evaluators: [{ evaluator_id: "ev-tc", evaluator_version_id: "ev-tc-v1" }],
     item_ids: ["i-1"],
   });
 });

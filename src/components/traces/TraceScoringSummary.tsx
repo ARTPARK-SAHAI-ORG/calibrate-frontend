@@ -101,7 +101,6 @@ function ScoreValue({
   const score = trace.results?.find(
     (s) => s.evaluator_uuid === column.evaluator_uuid,
   );
-  if (!score && column.evaluator_type === null) return null;
   if (
     !score &&
     column.evaluator_type &&
@@ -119,6 +118,7 @@ function ScoreValue({
       </span>
     );
   }
+  if (!score && column.evaluator_type === null) return null;
   if (!score) {
     // A trace nothing has tried to score, and a finished run that simply
     // carries no result for this evaluator, are both still waiting on one.

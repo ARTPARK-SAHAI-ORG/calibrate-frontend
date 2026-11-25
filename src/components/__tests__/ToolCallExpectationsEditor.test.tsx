@@ -170,6 +170,40 @@ describe("two expected calls to the same tool", () => {
   });
 });
 
+describe("a stored call that should not be made", () => {
+  it("says it should not have been called", async () => {
+    function Harness() {
+      const editor = useToolCallExpectations();
+      useEffect(() => {
+        editor.reset(
+          toolCallsToSelectedTools(
+            [{ tool: "save", arguments: {}, is_called: false }],
+            [],
+            true,
+          ),
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return (
+        <ToolCallExpectationsEditor
+          editor={editor}
+          heading="Expected tool calls"
+          emptyText="No tools"
+          availableTools={[]}
+          availableToolsLoading={false}
+          onToolSaved={() => {}}
+          onCreateTool={() => {}}
+          showErrors={false}
+        />
+      );
+    }
+    render(<Harness />);
+    expect(
+      await screen.findByLabelText("Expected behaviour"),
+    ).toHaveTextContent("Should not have been called");
+  });
+});
+
 describe("card ids", () => {
   it("never repeat between stored cards and added ones, even for a tool named card", async () => {
     const calls = Array.from({ length: 50 }, () => ({

@@ -29,6 +29,25 @@ describe("ToolCallItemPane", () => {
     expect(screen.getByText("Book a flight")).toBeInTheDocument();
   });
 
+  it("says the agent made no tool call and does not mark an older agent turn", () => {
+    render(
+      <ToolCallItemPane
+        payload={{
+          chat_history: [
+            { role: "user", content: "Hi" },
+            { role: "assistant", content: "Hello, how can I help?" },
+            { role: "user", content: "Book a flight" },
+          ],
+          expected_tool_calls: [{ tool: "book_flight", arguments: {} }],
+          actual_tool_calls: [],
+        }}
+      />,
+    );
+    expect(screen.getByText("The agent made no tool call")).toBeInTheDocument();
+    expect(screen.getByText("Agent's answer")).toBeInTheDocument();
+    expect(screen.queryByText("Evaluation target")).not.toBeInTheDocument();
+  });
+
   it("renders the agent's actual tool call", () => {
     render(
       <ToolCallItemPane

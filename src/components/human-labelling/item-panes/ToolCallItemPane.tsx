@@ -7,16 +7,8 @@ import { ExpectedToolCalls } from "./ExpectedToolCalls";
 import { agentToolCalls } from "@/lib/labellingItem";
 import { normaliseHistoryItem } from "./shared";
 
-/**
- * Renders the conversation side of a tool-call labelling item: the
- * conversation, then what the agent did (its reply if it wrote one, then its
- * tool calls), as the judge reads them. The expected calls render under it in
- * `ExpectedToolCalls`, so the two can be compared.
- *
- * The agent's output is appended to `history` and highlighted with
- * `highlightEvalTarget` rather than passed as `TestDetailView`'s `output`,
- * which would draw pass/fail marks on an item nobody has judged yet.
- */
+// The agent's output is appended to `history`, not passed as `output`, which
+// would draw pass/fail marks on an item nobody has judged yet.
 const AGENT_ANSWER = "Agent's answer";
 
 export function JudgedTogetherNote() {
@@ -60,6 +52,13 @@ export function ToolCallItemPane({
       label: hasReply ? "Agent's tool calls" : AGENT_ANSWER,
     });
   }
+  if (!hasReply && !hasCalls && history.length > 0) {
+    history.push({
+      role: "assistant",
+      content: "The agent made no tool call",
+      label: AGENT_ANSWER,
+    });
+  }
 
   if (history.length === 0) {
     return (
@@ -78,7 +77,7 @@ export function ToolCallItemPane({
     <TestDetailView
       history={history}
       passed={true}
-      highlightEvalTarget={hasReply && hasCalls ? 2 : true}
+      highlightEvalTarget={hasReply && hasCalls ? 2 : hasReply || hasCalls}
       afterHistory={
         <>
           {hasReply && hasCalls && <JudgedTogetherNote />}

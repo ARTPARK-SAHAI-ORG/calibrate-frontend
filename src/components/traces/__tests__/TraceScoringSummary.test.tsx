@@ -461,6 +461,19 @@ describe("a column whose evaluator does not judge this kind of trace", () => {
     expect(container).toHaveTextContent(/^$/);
   });
 
+  it("says a run is in progress even while the agent's evaluators are still loading", () => {
+    render(
+      <TraceScoreCells
+        trace={{ ...reply, latest_run_status: "processing" }}
+        columns={[
+          { evaluator_uuid: "ev-1", name: "Tone", evaluator_type: null },
+        ]}
+        layout="row"
+      />,
+    );
+    expect(screen.getByText("In progress")).toBeInTheDocument();
+  });
+
   it("still shows a score the evaluator did give", () => {
     render(
       <TraceScoreCells

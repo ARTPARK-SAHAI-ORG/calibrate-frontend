@@ -45,6 +45,7 @@ import { parseItemNameConflictFromError } from "./itemNameConflict";
 import {
   argumentRows,
   isPlainObject,
+  paramsToArgs,
   restoreToolCalls,
   skippedEvaluatorNote,
   typeArguments,
@@ -99,21 +100,6 @@ type DraftToolCall = {
 function ungroupParams(params: ToolCallParam[]): ToolCallParam[] {
   if (!params.some((p) => p.group)) return params;
   return argumentRows(paramsToArgs(params), false);
-}
-
-/** The typed-in inputs, back to the arguments the tool call is saved with. */
-function paramsToArgs(params: ToolCallParam[]): Record<string, unknown> {
-  if (!params.some((p) => p.group)) {
-    return Object.fromEntries(
-      params.map((p) => [p.name, p.value]),
-    );
-  }
-  const args: Record<string, Record<string, unknown>> = {};
-  for (const p of params) {
-    const group = p.group ?? "body";
-    args[group] = { ...args[group], [p.name]: p.value };
-  }
-  return args;
 }
 
 let draftIdCounter = 0;
@@ -771,7 +757,7 @@ export function AddLlmGeneralItemsDialog({
                   extras={outputExtras}
                   onChange={setOutputExtras}
                   onPendingChange={setOutputPending}
-                  disabled={submitting}
+                  disabled={submitting || !output.trim()}
                 >
                   <textarea
                     value={output}

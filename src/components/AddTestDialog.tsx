@@ -47,6 +47,7 @@ import {
   actualToolCallsStart,
   argumentRows,
   gradedAnswerStart,
+  paramsToArgs,
   skippedEvaluatorNote,
   typeArguments,
 } from "@/components/human-labelling/itemConversation";
@@ -1780,25 +1781,7 @@ export function AddTestDialog({
           ? message.id
           : generateUUID();
 
-        // Build the arguments object from tool params
-        const argsObj: Record<string, any> = {};
-        if (message.toolParams) {
-          for (const param of message.toolParams) {
-            // For webhook tools, group params by their group (query, body)
-            // Note: Headers are not shown in conversation history UI
-            if (message.isWebhook && param.group) {
-              if (param.group === "body") {
-                if (!argsObj.body) argsObj.body = {};
-                argsObj.body[param.name] = param.value;
-              } else if (param.group === "query") {
-                if (!argsObj.query) argsObj.query = {};
-                argsObj.query[param.name] = param.value;
-              }
-            } else {
-              argsObj[param.name] = param.value;
-            }
-          }
-        }
+        const argsObj = paramsToArgs(message.toolParams ?? []);
 
         const args = keptCallIds.has(message.id)
           ? typeArguments(
@@ -1965,11 +1948,12 @@ export function AddTestDialog({
         )
       : [],
   );
+  const mustFillArgs = (id: string) => !storedCallIds.has(id);
 
   // Helper to check if tool call messages have empty params
   const hasEmptyToolCallParams = () => {
     const toolCallMessages = chatMessages.filter(
-      (m) => m.role === "tool_call" && !storedCallIds.has(m.id),
+      (m) => m.role === "tool_call" && mustFillArgs(m.id),
     );
     for (const msg of toolCallMessages) {
       if (msg.toolParams && msg.toolParams.length > 0) {
@@ -3357,6 +3341,7 @@ export function AddTestDialog({
                 ) : (
                   <div className="space-y-4">
                     {chatMessages.map((message, index) => {
+                      const mustFill = mustFillArgs(message.id);
                       const isEvalTarget =
                         requireAssistantLastMessage &&
                         evalTargetStart >= 0 &&
@@ -3624,9 +3609,7 @@ export function AddTestDialog({
                                                       const showError =
                                                         localValidationAttempted &&
                                                         isEmpty &&
-                                                        !storedCallIds.has(
-                                                          message.id,
-                                                        );
+                                                        mustFill;
                                                       return (
                                                         <div key={idx}>
                                                           <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -3684,9 +3667,7 @@ export function AddTestDialog({
                                                       const showError =
                                                         localValidationAttempted &&
                                                         isEmpty &&
-                                                        !storedCallIds.has(
-                                                          message.id,
-                                                        );
+                                                        mustFill;
                                                       return (
                                                         <div key={idx}>
                                                           <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -3736,9 +3717,7 @@ export function AddTestDialog({
                                                 const showError =
                                                   localValidationAttempted &&
                                                   isEmpty &&
-                                                  !storedCallIds.has(
-                                                    message.id,
-                                                  );
+                                                  mustFill;
                                                 return (
                                                   <div key={idx}>
                                                     <label className="block text-sm font-medium text-foreground mb-1.5">

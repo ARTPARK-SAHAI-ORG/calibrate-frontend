@@ -106,6 +106,7 @@ import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import {
   agentToolCalls,
+  evaluatorFitsItem,
   itemEditForm,
   toItemDetailItem,
   llmGeneralDialogRow,
@@ -1696,6 +1697,15 @@ function LabellingTaskPageInner() {
   const [runDialogSubmitError, setRunDialogSubmitError] = useState<
     string | null
   >(null);
+  // Empty when the chosen items are not loaded, and then every evaluator is offered.
+  const runDialogItems = selectedTaskItems(
+    task?.items ?? [],
+    runDialogSelectAll
+      ? { q: runDialogSelectAll.q ?? "" }
+      : runDialogItemUuids
+        ? { ids: new Set(runDialogItemUuids) }
+        : { q: "" },
+  );
 
   const handleRunEvaluators = (
     target?: string[] | string | { selectAll: true; q?: string },
@@ -3400,10 +3410,18 @@ function LabellingTaskPageInner() {
           isOpen={runDialogOpen}
           accessToken={accessToken}
           taskUuid={uuid}
-          evaluators={(task?.evaluators ?? []).map((e) => ({
-            uuid: e.uuid,
-            name: e.name,
-          }))}
+          evaluators={(task?.evaluators ?? [])
+            .filter(
+              (e) =>
+                runDialogItems.length === 0 ||
+                runDialogItems.some((it) =>
+                  evaluatorFitsItem(e.evaluator_type, it.is_tool_call === true),
+                ),
+            )
+            .map((e) => ({
+              uuid: e.uuid,
+              name: e.name,
+            }))}
           submitting={startingRun}
           submitError={runDialogSubmitError}
           onClose={() => {

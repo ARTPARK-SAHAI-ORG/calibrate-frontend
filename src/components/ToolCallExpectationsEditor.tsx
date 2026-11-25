@@ -89,12 +89,7 @@ const parseArgMatch = (
   criteria: string;
   judgeModel?: string;
 } => {
-  if (
-    v !== null &&
-    typeof v === "object" &&
-    !Array.isArray(v) &&
-    "match_type" in v
-  ) {
+  if (isPlainObject(v) && "match_type" in v) {
     if (v.match_type === "llm_judge") {
       return {
         matchType: "llm_judge",
@@ -960,18 +955,6 @@ export function ToolCallExpectationsEditor({
           );
         }
 
-        // If changing to should-call and params are empty and acceptAny is off
-        if (
-          updates.expectation === "should-call" &&
-          tool.expectation !== "should-call" &&
-          !updatedTool.acceptAnyParameterValues &&
-          updatedTool.expectedParameters.length === 0
-        ) {
-          updatedTool.expectedParameters = defaultSelectedParams(
-            getExpectedParamsForTool(tool.id, tool.name).params,
-          );
-        }
-
         return updatedTool;
       }),
     );
@@ -1690,19 +1673,14 @@ export function ToolCallExpectationsEditor({
                   </button>
                 </div>
 
-                {/* Expectation indicator. The "should not have been
-              called" option is intentionally hidden for now
-              and the dialog assumes "should have been called"
-              on every save (see the tool_calls payload
-              builder below). Rendered as a full-width
-              selected-state pill for visual consistency with
-              the rest of the dialog rather than a real
-              segmented control. */}
+                {/* Shows the stored expectation; it cannot be changed here. */}
                 <div
                   className="w-full py-2.5 rounded-lg border border-border bg-foreground text-background text-sm font-medium text-center"
                   aria-label="Expected behaviour"
                 >
-                  Should have been called
+                  {tool.expectation === "should-not-call"
+                    ? "Should not have been called"
+                    : "Should have been called"}
                 </div>
 
                 {/* Accept any parameter values checkbox - show when "should call" is selected and tool has parameters */}

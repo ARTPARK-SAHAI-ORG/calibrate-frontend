@@ -126,7 +126,7 @@ export const DEFAULT_STRUCTURED_RESPONSE = '{\n  "status": "received"\n}';
 
 // How the item dialogs show a saved argument value in their one-line text
 // box, which drops line breaks, so objects are written on one line.
-export function argumentText(value: unknown): string {
+function argumentText(value: unknown): string {
   if (value === null) return "null";
   if (value === undefined) return "";
   if (typeof value === "object") return JSON.stringify(value);
@@ -153,15 +153,28 @@ export function argumentRows(
   });
 }
 
+/** The typed-in rows, back to the arguments the tool call is saved with. */
+export function paramsToArgs(params: ToolCallParam[]): Record<string, unknown> {
+  if (!params.some((p) => p.group)) {
+    return Object.fromEntries(params.map((p) => [p.name, p.value]));
+  }
+  const args: Record<string, Record<string, unknown>> = {};
+  for (const p of params) {
+    const group = p.group ?? "body";
+    args[group] = { ...args[group], [p.name]: p.value };
+  }
+  return args;
+}
+
 export function isPlainObject(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
 
-export const WEBHOOK_GROUPS = ["body", "query"];
+const WEBHOOK_GROUPS = ["body", "query"];
 
 /** True when the arguments hold a webhook's body or query as an object. The
  * dialogs then show only the values inside those, and other keys stay hidden. */
-export function hasArgumentGroups(args: Record<string, unknown>): boolean {
+function hasArgumentGroups(args: Record<string, unknown>): boolean {
   return WEBHOOK_GROUPS.some((k) => isPlainObject(args[k]));
 }
 
@@ -316,9 +329,6 @@ function storedCallIndex(id: string | undefined): number | undefined {
   return /^\d+$/.test(rest) ? Number(rest) : undefined;
 }
 
-/** A list field on save: the new list when it has entries. An empty list is
- * kept only when the item already stored an empty one, since an empty list
- * still marks a tool-call item. A list emptied by the reader is removed. */
 /** Spread into a saved payload: removes the old `tool_calls` field when its
  * calls were the ones read into the dialog (`shown`), since they are now
  * saved as `actual_tool_calls`. */
@@ -331,6 +341,9 @@ export function clearOldToolCallsField(
     : {};
 }
 
+/** A list field on save: the new list when it has entries. An empty list is
+ * kept only when the item already stored an empty one, since an empty list
+ * still marks a tool-call item. A list emptied in the dialog is removed. */
 export function keepList<T>(previous: unknown, next: T[]): T[] | undefined {
   if (next.length > 0) return next;
   return Array.isArray(previous) && previous.length === 0 ? [] : undefined;
