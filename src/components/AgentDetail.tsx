@@ -7,7 +7,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useRouter } from "@/lib/nav";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
-import { useAccessToken } from "@/hooks";
+import { toast } from "sonner";
+import {
+  useAccessToken,
+  useActiveOrgUuid,
+  useOrgLimits,
+  useOrganizations,
+} from "@/hooks";
+import { workspaceDefaultMessagesPerDay } from "@/lib/orgs";
 import { useAgentTraceScoring } from "@/hooks/useAgentTraceScoring";
 import { configWithTraceScoring, traceScoringEnabled } from "@/lib/tracesApi";
 import {
@@ -311,6 +318,17 @@ export function AgentDetail({
   const [endConversationEnabled, setEndConversationEnabled] = useState(true);
   const [agentSpeaksFirst, setAgentSpeaksFirst] = useState(false);
   const [maxAssistantTurns, setMaxAssistantTurns] = useState<number>(50);
+  // The agent's own limit on chat link messages a day; null until someone
+  // sets one, which leaves the workspace default in charge.
+  const [messagesPerDay, setMessagesPerDay] = useState<number | null>(null);
+  const [activeOrgUuid] = useActiveOrgUuid();
+  const { organizations } = useOrganizations(backendAccessToken);
+  const messagesPerDayMaximum = useOrgLimits().max_chat_replies_per_day;
+  const shownMessagesPerDay =
+    messagesPerDay ??
+    workspaceDefaultMessagesPerDay(
+      organizations.find((org) => org.uuid === activeOrgUuid),
+    );
 
   // Save state
   const [isSaving, setIsSaving] = useState(false);
@@ -564,6 +582,9 @@ export function AgentDetail({
           if (data.config.settings?.max_assistant_turns !== undefined) {
             setMaxAssistantTurns(data.config.settings.max_assistant_turns);
           }
+          if (data.config.talk_to_agent?.messages_per_day !== undefined) {
+            setMessagesPerDay(data.config.talk_to_agent.messages_per_day);
+          }
           if (data.config.system_tools?.end_call !== undefined) {
             setEndConversationEnabled(data.config.system_tools.end_call);
           }
@@ -705,6 +726,26 @@ export function AgentDetail({
       if (!agent) return false;
       const silent = options?.silent === true;
 
+      // Checked here so the backend's refusal is never the first thing seen.
+      const messagesPerDayProblem =
+        messagesPerDay === null
+          ? null
+          : messagesPerDay < 1
+            ? "Messages per day must be at least 1"
+            : messagesPerDayMaximum !== null &&
+                messagesPerDay > messagesPerDayMaximum
+              ? `Messages per day cannot be more than ${messagesPerDayMaximum.toLocaleString("en-US")}, the most your workspace allows`
+              : null;
+      if (messagesPerDayProblem) {
+        if (!silent) toast.error(messagesPerDayProblem);
+        return false;
+      }
+      // Written only once someone has set a number for this agent.
+      const talkToAgent =
+        messagesPerDay === null
+          ? {}
+          : { talk_to_agent: { messages_per_day: messagesPerDay } };
+
       try {
         setIsSaving(true);
         isSavingRef.current = true;
@@ -728,6 +769,7 @@ export function AgentDetail({
                   agent_speaks_first: agentSpeaksFirst,
                   max_assistant_turns: maxAssistantTurns,
                 },
+                ...talkToAgent,
               }
             : {
                 system_prompt: systemPrompt,
@@ -738,6 +780,7 @@ export function AgentDetail({
                   agent_speaks_first: agentSpeaksFirst,
                   max_assistant_turns: maxAssistantTurns,
                 },
+                ...talkToAgent,
                 system_tools: { end_call: endConversationEnabled },
                 data_extraction_fields: dataExtractionFields.map((field) => ({
                   name: field.name,
@@ -831,6 +874,8 @@ export function AgentDetail({
     selectedLLM,
     agentSpeaksFirst,
     maxAssistantTurns,
+    messagesPerDay,
+    messagesPerDayMaximum,
     endConversationEnabled,
     dataExtractionFields,
     connectionUrl,
@@ -1481,6 +1526,9 @@ export function AgentDetail({
               maxAssistantTurns={maxAssistantTurns}
               setMaxAssistantTurns={setMaxAssistantTurns}
               traceScoring={traceScoring}
+              messagesPerDay={shownMessagesPerDay}
+              setMessagesPerDay={setMessagesPerDay}
+              messagesPerDayMaximum={messagesPerDayMaximum}
               onGoToEvaluators={() => performTabSwitch("evaluators")}
             />
           </div>

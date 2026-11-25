@@ -8,17 +8,22 @@ import {
 } from "@/components/PublicPageLayout";
 import { ErrorNote, InfoNote } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
-import { ThumbsDownIcon, ThumbsUpIcon } from "@/components/icons";
+import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import {
+  SpinnerIcon,
+  ThumbsDownIcon,
+  ThumbsUpIcon,
+} from "@/components/icons";
 import {
   TURN_BUBBLE_CLASS,
   ToolCallCard,
 } from "@/components/test-results/shared";
+import { useAuth } from "@/hooks";
 import {
   fetchChatAgent,
   sendChatMessage,
   setChatFeedback,
   type ChatAgent,
-  type ChatRating,
   type ChatToolCall,
 } from "@/lib/publicChatApi";
 
@@ -28,7 +33,6 @@ const MAX_MESSAGE_LENGTH = 4000;
 const SEND_ERRORS: Record<string, string> = {
   not_found: "This chat link is not available",
   daily_limit: "This chat link has reached its limit for today",
-  trace_limit: "This agent cannot take more messages right now",
   agent_failed: "The agent did not reply. Try again",
   agent_unavailable:
     "This agent cannot reply right now. Tell the person who shared this link",
@@ -38,33 +42,46 @@ const FALLBACK_ERROR = "The message could not be sent. Try again";
 
 /** Failures worth sending the same message again for. */
 const RETRYABLE = new Set(["agent_failed", "unknown", "network"]);
+/** Failures after which nothing more can be sent until a new chat. */
+const BLOCKING = new Set([
+  "not_found",
+  "daily_limit",
+  "agent_unavailable",
+  "conversation_too_long",
+]);
+
+const BUTTON_CLASS =
+  "h-8 px-3 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0";
 
 type Turn =
   | { role: "user"; text: string }
   | {
       role: "agent";
-      traceUuid: string;
+      traceUuid: string | null;
       reply: string | null;
       toolCalls: ChatToolCall[];
     };
 
 type Feedback = {
-  rating: ChatRating | null;
-  comment: string;
+  /** true for a thumbs up, false for a thumbs down, null for none. */
+  isCorrect: boolean | null;
+  /** The comment box is open. */
+  open: boolean;
   draft: string;
   saving: boolean;
   failed: boolean;
 };
 
-const EMPTY_FEEDBACK: Feedback = {
-  rating: null,
-  comment: "",
+const NO_FEEDBACK: Feedback = {
+  isCorrect: null,
+  open: false,
   draft: "",
   saving: false,
   failed: false,
 };
 
 export function PublicChatView({ token }: { token: string }) {
+  const { accessToken, isLoading: authLoading } = useAuth();
   const [agent, setAgent] = useState<ChatAgent | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -75,11 +92,15 @@ export function PublicChatView({ token }: { token: string }) {
   const [failedMessage, setFailedMessage] = useState<string | null>(null);
   const [ended, setEnded] = useState(false);
   const [feedback, setFeedback] = useState<Record<string, Feedback>>({});
+  const [clearing, setClearing] = useState<string | null>(null);
+  const [clearBusy, setClearBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
+  // Wait for the login, so a member of the workspace can open a private chat.
   useEffect(() => {
+    if (authLoading) return;
     let cancelled = false;
-    fetchChatAgent(token).then((res) => {
+    fetchChatAgent(token, accessToken).then((res) => {
       if (cancelled) return;
       if (res.ok) setAgent(res.data);
       else setLoadError(res.error);
@@ -87,7 +108,7 @@ export function PublicChatView({ token }: { token: string }) {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, accessToken, authLoading]);
 
   useEffect(() => {
     if (agent) document.title = `${agent.agent_name} chat`;
@@ -95,7 +116,7 @@ export function PublicChatView({ token }: { token: string }) {
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: "end" });
-  }, [turns, sendError]);
+  }, [turns, sendError, sending]);
 
   if (loadError === "not_found") {
     return (
@@ -110,7 +131,9 @@ export function PublicChatView({ token }: { token: string }) {
   if (loadError) {
     return (
       <PublicPageLayout contentClassName="max-w-3xl">
-        <ErrorNote>This chat could not be opened. Reload the page to try again</ErrorNote>
+        <ErrorNote>
+          This chat could not be opened. Reload the page to try again
+        </ErrorNote>
       </PublicPageLayout>
     );
   }
@@ -124,17 +147,18 @@ export function PublicChatView({ token }: { token: string }) {
 
   const tooLong = draft.length > MAX_MESSAGE_LENGTH;
   const locked =
-    ended || sendError === "conversation_too_long" || sendError === "not_found";
-  const canSend = !sending && !locked && draft.trim() !== "" && !tooLong;
+    sending || ended || (sendError !== null && BLOCKING.has(sendError));
+  const canSend = !locked && draft.trim() !== "" && !tooLong;
 
   const send = async (text: string, retry = false) => {
     setSending(true);
     setSendError(null);
     if (!retry) setTurns((t) => [...t, { role: "user", text }]);
-    const res = await sendChatMessage(token, {
-      conversation_id: conversationId,
-      message: text,
-    });
+    const res = await sendChatMessage(
+      token,
+      { conversation_id: conversationId, message: text },
+      accessToken,
+    );
     setSending(false);
     if (!res.ok) {
       setSendError(res.error);
@@ -175,54 +199,66 @@ export function PublicChatView({ token }: { token: string }) {
   const patchFeedback = (traceUuid: string, patch: Partial<Feedback>) =>
     setFeedback((all) => ({
       ...all,
-      [traceUuid]: { ...(all[traceUuid] ?? EMPTY_FEEDBACK), ...patch },
+      [traceUuid]: { ...(all[traceUuid] ?? NO_FEEDBACK), ...patch },
     }));
 
+  /** Saves the thumb, or clears it with `null`. True when it saved. */
   const saveFeedback = async (
     traceUuid: string,
-    rating: ChatRating | null,
-    comment: string,
+    isCorrect: boolean | null,
+    comment: string | null,
   ) => {
     patchFeedback(traceUuid, { saving: true, failed: false });
-    const res = await setChatFeedback(token, traceUuid, {
-      rating,
-      comment: rating && comment.trim() ? comment.trim() : null,
-    });
-    if (!res.ok) {
-      patchFeedback(traceUuid, { saving: false, failed: true });
-      return;
-    }
-    // A comment typed but not saved stays in the box when the thumb changes.
-    patchFeedback(traceUuid, {
-      saving: false,
-      rating,
-      comment: rating ? comment.trim() : "",
-      ...(rating ? {} : { draft: "" }),
-    });
+    const res = await setChatFeedback(
+      token,
+      traceUuid,
+      { is_correct: isCorrect, comment },
+      accessToken,
+    );
+    patchFeedback(traceUuid, { saving: false, failed: !res.ok });
+    return res.ok;
   };
 
-  const clickThumb = (traceUuid: string, rating: ChatRating) => {
-    const current = feedback[traceUuid] ?? EMPTY_FEEDBACK;
-    if (current.rating === rating) void saveFeedback(traceUuid, null, "");
-    else void saveFeedback(traceUuid, rating, current.comment);
+  const pickThumb = async (traceUuid: string, isCorrect: boolean) => {
+    if (await saveFeedback(traceUuid, isCorrect, null)) {
+      patchFeedback(traceUuid, { isCorrect, open: true, draft: "" });
+    }
   };
+
+  const saveComment = async (traceUuid: string) => {
+    const f = feedback[traceUuid] ?? NO_FEEDBACK;
+    if (await saveFeedback(traceUuid, f.isCorrect, f.draft.trim() || null)) {
+      patchFeedback(traceUuid, { open: false });
+    }
+  };
+
+  const clearFeedback = async () => {
+    if (!clearing) return;
+    setClearBusy(true);
+    const ok = await saveFeedback(clearing, null, null);
+    setClearBusy(false);
+    if (ok) patchFeedback(clearing, NO_FEEDBACK);
+    setClearing(null);
+  };
+
+  const clearingThumb =
+    clearing && feedback[clearing]?.isCorrect ? "thumbs up" : "thumbs down";
 
   return (
-    <PublicPageLayout contentClassName="max-w-3xl flex flex-col">
-      <div className="flex items-center justify-between gap-3 mb-6">
-        <h1 className="text-lg md:text-xl font-semibold truncate">
-          {agent.agent_name}
-        </h1>
+    <PublicPageLayout
+      title={agent.agent_name}
+      contentClassName="max-w-3xl flex flex-col"
+      actions={
         <button
           type="button"
           onClick={newChat}
           disabled={sending || turns.length === 0}
-          className="h-8 px-3 rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+          className={BUTTON_CLASS}
         >
           New chat
         </button>
-      </div>
-
+      }
+    >
       <div className="flex-1 space-y-4 pb-6">
         {turns.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-12">
@@ -244,19 +280,28 @@ export function PublicChatView({ token }: { token: string }) {
             <AgentTurn
               key={i}
               turn={turn}
-              feedback={feedback[turn.traceUuid] ?? EMPTY_FEEDBACK}
-              onThumb={(rating) => clickThumb(turn.traceUuid, rating)}
-              onDraft={(text) => patchFeedback(turn.traceUuid, { draft: text })}
-              onSaveComment={() => {
-                const f = feedback[turn.traceUuid];
-                if (f?.rating) void saveFeedback(turn.traceUuid, f.rating, f.draft);
-              }}
+              feedback={
+                (turn.traceUuid && feedback[turn.traceUuid]) || NO_FEEDBACK
+              }
+              onPick={(isCorrect) =>
+                turn.traceUuid && void pickThumb(turn.traceUuid, isCorrect)
+              }
+              onClear={() => turn.traceUuid && setClearing(turn.traceUuid)}
+              onDraft={(text) =>
+                turn.traceUuid && patchFeedback(turn.traceUuid, { draft: text })
+              }
+              onCancel={() =>
+                turn.traceUuid &&
+                patchFeedback(turn.traceUuid, { open: false, draft: "" })
+              }
+              onSave={() => turn.traceUuid && void saveComment(turn.traceUuid)}
             />
           ),
         )}
         {sending && (
-          <p className="text-sm text-muted-foreground">
-            {agent.agent_name} is replying...
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <SpinnerIcon className="w-4 h-4 animate-spin" />
+            The agent is replying
           </p>
         )}
         {sendError && (
@@ -266,7 +311,7 @@ export function PublicChatView({ token }: { token: string }) {
               <button
                 type="button"
                 onClick={() => void send(failedMessage, true)}
-                className="h-7 px-3 rounded-md text-xs font-medium border border-border bg-background text-foreground hover:bg-accent transition-colors cursor-pointer flex-shrink-0"
+                className={BUTTON_CLASS}
               >
                 Retry
               </button>
@@ -274,86 +319,131 @@ export function PublicChatView({ token }: { token: string }) {
           </ErrorNote>
         )}
         {ended && (
-          <InfoNote>
-            The agent ended the conversation
+          <InfoNote className="items-center">
+            <span className="flex-1">The agent ended the conversation</span>
+            <button type="button" onClick={newChat} className={BUTTON_CLASS}>
+              New chat
+            </button>
           </InfoNote>
         )}
         <div ref={endRef} />
       </div>
 
-      <div className="sticky bottom-0 bg-background pt-2 pb-4 border-t border-border">
-        <div className="flex items-end gap-2">
+      <div className="sticky bottom-0 bg-background pt-2 pb-4">
+        <div
+          className={`flex items-end gap-2.5 rounded-xl border p-2 pl-3.5 ${
+            tooLong ? "border-red-500/60" : "border-border"
+          } ${locked ? "opacity-50" : ""}`}
+        >
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing
+              ) {
                 e.preventDefault();
                 submit();
               }
             }}
             disabled={locked}
-            rows={2}
+            rows={1}
             aria-label="Message"
-            placeholder={
-              locked ? "Start a new chat to send more messages" : "Type a message"
-            }
-            className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+            placeholder="Type a message"
+            className="flex-1 resize-none self-center bg-transparent py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
           />
           <button
             type="button"
             onClick={submit}
             disabled={!canSend}
-            className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-10 px-4 rounded-lg text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Send
           </button>
         </div>
         {tooLong && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-            A message can be at most {MAX_MESSAGE_LENGTH.toLocaleString("en-US")}{" "}
-            characters. This one has {draft.length.toLocaleString("en-US")}
+          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+            This message is {draft.length.toLocaleString("en-US")} characters.
+            Shorten it to {MAX_MESSAGE_LENGTH.toLocaleString("en-US")} or fewer
+            to send it
           </p>
         )}
         {agent.interaction_type === "general" && (
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1.5 text-xs text-muted-foreground">
             Each message is answered on its own
           </p>
         )}
       </div>
+
+      <DeleteConfirmationDialog
+        isOpen={clearing !== null}
+        onClose={() => setClearing(null)}
+        onConfirm={() => void clearFeedback()}
+        title="Clear your feedback?"
+        message={`This removes your ${clearingThumb} and your comment from this reply.`}
+        confirmText="Clear feedback"
+        busyText="Clearing..."
+        isDeleting={clearBusy}
+      />
     </PublicPageLayout>
   );
 }
 
+const THUMB_CLASS =
+  "w-8 h-8 flex items-center justify-center rounded-lg border transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
+
 function AgentTurn({
   turn,
   feedback,
-  onThumb,
+  onPick,
+  onClear,
   onDraft,
-  onSaveComment,
+  onCancel,
+  onSave,
 }: {
   turn: Extract<Turn, { role: "agent" }>;
   feedback: Feedback;
-  onThumb: (rating: ChatRating) => void;
+  onPick: (isCorrect: boolean) => void;
+  onClear: () => void;
   onDraft: (text: string) => void;
-  onSaveComment: () => void;
+  onCancel: () => void;
+  onSave: () => void;
 }) {
-  const thumb = (rating: ChatRating) => {
-    const on = feedback.rating === rating;
-    const Icon = rating === "up" ? ThumbsUpIcon : ThumbsDownIcon;
-    const label = rating === "up" ? "Good reply" : "Bad reply";
+  const picked = feedback.isCorrect;
+
+  const thumb = (isCorrect: boolean) => {
+    const Icon = isCorrect ? ThumbsUpIcon : ThumbsDownIcon;
+    const label = isCorrect ? "Good reply" : "Bad reply";
+    if (picked === null) {
+      return (
+        <Tooltip content={label} position="top">
+          <button
+            type="button"
+            aria-label={label}
+            disabled={feedback.saving}
+            onClick={() => onPick(isCorrect)}
+            className={`${THUMB_CLASS} border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted`}
+          >
+            <Icon className="w-4 h-4" />
+          </button>
+        </Tooltip>
+      );
+    }
+    if (picked !== isCorrect) return null;
     return (
-      <Tooltip content={on ? "Clear your rating" : label} position="top">
+      <Tooltip content="Clear your feedback" position="top">
         <button
           type="button"
           aria-label={label}
-          aria-pressed={on}
+          aria-pressed
           disabled={feedback.saving}
-          onClick={() => onThumb(rating)}
-          className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-            on
-              ? "bg-foreground text-background"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          onClick={onClear}
+          className={`${THUMB_CLASS} ${
+            isCorrect
+              ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"
+              : "border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400"
           }`}
         >
           <Icon className="w-4 h-4" />
@@ -363,10 +453,9 @@ function AgentTurn({
   };
 
   return (
-    <div className="space-y-1">
-      <span className="text-sm font-medium text-foreground">Agent</span>
+    <div className="space-y-2 max-w-[88%] md:max-w-[80%]">
       {turn.toolCalls.length > 0 && (
-        <div className="w-[88%] md:w-3/4 flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           {turn.toolCalls.map((tc, i) => (
             <ToolCallCard
               key={i}
@@ -378,44 +467,60 @@ function AgentTurn({
         </div>
       )}
       {turn.reply && (
-        <div className="max-w-[88%] md:max-w-3/4 w-fit">
-          <div className={`${TURN_BUBBLE_CLASS} bg-background`}>
-            <p className="text-sm text-foreground whitespace-pre-wrap">
-              {turn.reply}
-            </p>
-          </div>
+        <div className={`${TURN_BUBBLE_CLASS} bg-background w-fit`}>
+          <p className="text-sm font-medium text-foreground mb-1">Agent</p>
+          <p className="text-sm text-foreground whitespace-pre-wrap">
+            {turn.reply}
+          </p>
         </div>
       )}
-      <div className="flex items-center gap-1 pt-1">
-        {thumb("up")}
-        {thumb("down")}
-        {feedback.failed && (
-          <span className="text-xs text-red-600 dark:text-red-400 ml-2">
-            Your rating could not be saved. Try again
-          </span>
-        )}
-      </div>
-      {feedback.rating && (
-        <div className="max-w-[88%] md:max-w-3/4 flex items-start gap-2 pt-1">
+      {turn.traceUuid && (
+        <div className="flex items-center gap-1">
+          {thumb(true)}
+          {thumb(false)}
+          {feedback.failed && (
+            <span className="text-xs text-red-600 dark:text-red-400 ml-2">
+              Your feedback could not be saved. Try again
+            </span>
+          )}
+        </div>
+      )}
+      {feedback.open && picked !== null && (
+        <div className="w-full md:w-[520px] rounded-xl border border-border p-3 flex flex-col gap-2">
+          <label
+            htmlFor={`comment-${turn.traceUuid}`}
+            className="text-sm font-medium text-foreground"
+          >
+            {picked
+              ? "What was good about this reply? (optional)"
+              : "What was wrong with this reply? (optional)"}
+          </label>
           <textarea
+            id={`comment-${turn.traceUuid}`}
             value={feedback.draft}
             onChange={(e) => onDraft(e.target.value)}
             rows={2}
             maxLength={2000}
-            aria-label="Comment on this reply"
-            placeholder="Add a comment (optional)"
-            className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+            className="resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
           />
-          <button
-            type="button"
-            onClick={onSaveComment}
-            disabled={feedback.saving || feedback.draft.trim() === feedback.comment}
-            className="h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {feedback.draft.trim() === feedback.comment && feedback.comment
-              ? "Saved"
-              : "Save"}
-          </button>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={feedback.saving}
+              className={BUTTON_CLASS}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={feedback.saving}
+              className="h-8 px-3 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {feedback.saving ? "Saving..." : "Save"}
+            </button>
+          </div>
         </div>
       )}
     </div>

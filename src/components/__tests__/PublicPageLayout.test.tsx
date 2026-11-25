@@ -56,6 +56,17 @@ describe("PublicPageLayout", () => {
     expect(screen.getByText("Pill")).toBeInTheDocument();
   });
 
+  it("puts the page's own buttons on the right once mounted", async () => {
+    render(
+      <PublicPageLayout actions={<button type="button">New chat</button>}>
+        <div>content</div>
+      </PublicPageLayout>,
+    );
+    expect(
+      await screen.findByRole("button", { name: "New chat" }),
+    ).toBeInTheDocument();
+  });
+
   it("does not render the title/pills row when neither is provided", () => {
     render(
       <PublicPageLayout>

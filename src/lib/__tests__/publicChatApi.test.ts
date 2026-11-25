@@ -37,7 +37,7 @@ it("reads the agent with no sign-in", async () => {
 it("posts a message and puts feedback", async () => {
   answer(200, {});
   await sendChatMessage("t", { conversation_id: null, message: "hi" });
-  await setChatFeedback("t", "tr", { rating: "up", comment: null });
+  await setChatFeedback("t", "tr", { is_correct: true, comment: null }, "jwt");
   const calls = (global.fetch as jest.Mock).mock.calls;
   expect(calls[0][0]).toBe("https://api.example.com/public/agent-chat/t/messages");
   expect(calls[0][1].method).toBe("POST");
@@ -46,6 +46,9 @@ it("posts a message and puts feedback", async () => {
     "https://api.example.com/public/agent-chat/t/traces/tr/feedback",
   );
   expect(calls[1][1].method).toBe("PUT");
+  expect(JSON.parse(calls[1][1].body)).toEqual({ is_correct: true, comment: null });
+  expect(calls[1][1].headers.Authorization).toBe("Bearer jwt");
+  expect(calls[0][1].headers.Authorization).toBeUndefined();
 });
 
 it.each([

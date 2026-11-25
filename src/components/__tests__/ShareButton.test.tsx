@@ -230,14 +230,14 @@ describe("ShareButton", () => {
         accessToken="tok"
         initialIsPublic={false}
         initialShareToken={null}
-        disabledReason="Check the connection first"
+        disabledReason="Verify your agent connection first"
       />,
     );
     const button = screen.getByRole("button", { name: /Share/ });
     expect(button).toBeDisabled();
     await user.hover(button.parentElement!);
     expect(
-      await screen.findByText("Check the connection first"),
+      await screen.findByText("Verify your agent connection first"),
     ).toBeInTheDocument();
   });
 

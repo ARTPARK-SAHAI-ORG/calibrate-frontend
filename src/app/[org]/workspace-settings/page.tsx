@@ -19,7 +19,7 @@ import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog"
 import { CreateApiKeyDialog } from "@/components/CreateApiKeyDialog";
 import { InviteDialog } from "@/components/workspace/InviteDialog";
 import { RunModelsSection } from "@/components/workspace/RunModelsSection";
-import { ChatLimitSection } from "@/components/workspace/ChatLimitSection";
+import { TalkToAgentSection } from "@/components/workspace/TalkToAgentSection";
 import { ProviderKeysSection } from "@/components/workspace/ProviderKeysSection";
 import { EmptyState, LoadingState } from "@/components/ui/LoadingState";
 import { useSidebarState } from "@/lib/sidebar";
@@ -225,7 +225,7 @@ export default function WorkspaceSettingsPage() {
                   </section>
                 </div>
                 <RunModelsSection org={activeOrg} />
-                <ChatLimitSection org={activeOrg} />
+                <TalkToAgentSection org={activeOrg} />
               </div>
             ) : activeTab === "provider-keys" ? (
               <ProviderKeysSection orgUuid={activeOrg.uuid} />

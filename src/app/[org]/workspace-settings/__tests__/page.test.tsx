@@ -50,7 +50,10 @@ jest.mock("../../../../hooks", () => ({
     createApiKey: jest.fn(),
     revokeApiKey: jest.fn(),
   }),
-  useOrgLimits: () => ({ uses_own_provider_keys: false }),
+  useOrgLimits: () => ({
+    uses_own_provider_keys: false,
+    max_chat_replies_per_day: null,
+  }),
   seedOrgsCache: jest.fn(),
 }));
 

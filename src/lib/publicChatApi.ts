@@ -15,15 +15,15 @@ export type ChatToolCall = {
 
 export type ChatReply = {
   conversation_id: string;
-  trace_uuid: string;
+  /** null when the workspace has no room left to keep the reply. */
+  trace_uuid: string | null;
   reply: string | null;
   tool_calls: ChatToolCall[];
   ended: boolean;
 };
 
-export type ChatRating = "up" | "down";
-
-export type ChatFeedback = { rating: ChatRating | null; comment: string | null };
+/** true for a thumbs up, false for a thumbs down, null for none. */
+export type ChatFeedback = { is_correct: boolean | null; comment: string | null };
 
 /** `error` is the backend's code (`not_found`, `daily_limit`, ...), or
  *  `unknown` when the failure carried none, `network` when nothing answered. */
@@ -42,7 +42,7 @@ function errorCode(status: number, text: string): string {
 
 async function call<T>(
   path: string,
-  init?: { method?: string; body?: unknown },
+  init: { method?: string; body?: unknown; accessToken?: string | null },
 ): Promise<ChatResult<T>> {
   try {
     const res = await publicFetch<T>(path, init);
@@ -57,24 +57,32 @@ async function call<T>(
 const base = (token: string) =>
   `/public/agent-chat/${encodeURIComponent(token)}`;
 
-export function fetchChatAgent(token: string) {
-  return call<ChatAgent>(base(token));
+/** `accessToken` is the reader's own login, when they have one: it lets a
+ *  member of the agent's workspace open the chat while it is private. */
+export function fetchChatAgent(token: string, accessToken?: string | null) {
+  return call<ChatAgent>(base(token), { accessToken });
 }
 
 export function sendChatMessage(
   token: string,
   body: { conversation_id: string | null; message: string },
+  accessToken?: string | null,
 ) {
-  return call<ChatReply>(`${base(token)}/messages`, { method: "POST", body });
+  return call<ChatReply>(`${base(token)}/messages`, {
+    method: "POST",
+    body,
+    accessToken,
+  });
 }
 
 export function setChatFeedback(
   token: string,
   traceUuid: string,
   body: ChatFeedback,
+  accessToken?: string | null,
 ) {
   return call<ChatFeedback>(
     `${base(token)}/traces/${encodeURIComponent(traceUuid)}/feedback`,
-    { method: "PUT", body },
+    { method: "PUT", body, accessToken },
   );
 }

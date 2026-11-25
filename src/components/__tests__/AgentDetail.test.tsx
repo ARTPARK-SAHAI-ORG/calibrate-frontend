@@ -1,7 +1,10 @@
 import React from "react";
 import { render, screen, setupUser, waitFor, act } from "@/test-utils";
 import { signOut } from "next-auth/react";
+import { toast } from "sonner";
 import { AgentDetail } from "../AgentDetail";
+
+jest.mock("sonner", () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
 
 const useAccessTokenMock = jest.fn();
 const usePageErrorStateMock = jest.fn();
@@ -18,6 +21,16 @@ jest.mock("../../hooks", () => ({
   useOpenRouterModels: () => useOpenRouterModelsMock(),
   findModelInProviders: (...args: any[]) => findModelInProvidersMock(...args),
   useAgentHasRuns: (...args: any[]) => useAgentHasRunsMock(...args),
+  useActiveOrgUuid: () => ["org-1", jest.fn()],
+  useOrganizations: () => ({
+    organizations: [
+      {
+        uuid: "org-1",
+        settings: { talk_to_agent: { default_messages_per_day: 120 } },
+      },
+    ],
+  }),
+  useOrgLimits: () => ({ max_chat_replies_per_day: 300 }),
 }));
 
 jest.mock("../../lib/reportError", () => ({
@@ -144,6 +157,10 @@ jest.mock("../agent-tabs", () => ({
   SettingsTabContent: (props: any) => (
     <div data-testid="settings-tab-content">
       SettingsTabContent-{props.traceScoring?.enabled ? "scoring" : "off"}
+      <span data-testid="messages-per-day">{props.messagesPerDay}</span>
+      <button onClick={() => props.setMessagesPerDay(301)}>set 301</button>
+      <button onClick={() => props.setMessagesPerDay(0)}>set 0</button>
+      <button onClick={() => props.setMessagesPerDay(250)}>set 250</button>
     </div>
   ),
 }));
@@ -1021,6 +1038,85 @@ describe("AgentDetail", () => {
     await waitFor(() =>
       expect(screen.getByText("Saved successfully")).toBeInTheDocument(),
     );
+  });
+
+  describe("messages per day", () => {
+    const lastPutBody = () => {
+      const put = (global.fetch as jest.Mock).mock.calls
+        .filter(([, init]) => init?.method === "PUT")
+        .at(-1);
+      return put ? JSON.parse(put[1].body) : null;
+    };
+
+    it("shows the workspace default and leaves it out of the save until changed", async () => {
+      mockFetchSequenceForAgent(buildAgent);
+      const user = setupUser();
+      render(<AgentDetail agentUuid={buildAgent.uuid} />);
+      await waitFor(() =>
+        expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Settings"));
+      expect(screen.getByTestId("messages-per-day")).toHaveTextContent("120");
+
+      await clickLastSaveButton(user);
+      await waitFor(() => expect(lastPutBody()).not.toBeNull());
+      expect(lastPutBody().config.talk_to_agent).toBeUndefined();
+
+      await user.click(screen.getByText("set 250"));
+      expect(screen.getByTestId("messages-per-day")).toHaveTextContent("250");
+      await clickLastSaveButton(user);
+      await waitFor(() =>
+        expect(lastPutBody().config.talk_to_agent).toEqual({
+          messages_per_day: 250,
+        }),
+      );
+    });
+
+    it("loads the agent's own number and saves it with a connection agent too", async () => {
+      mockFetchSequenceForAgent({
+        ...connectionAgent,
+        config: {
+          ...connectionAgent.config,
+          talk_to_agent: { messages_per_day: 40 },
+        },
+      });
+      const user = setupUser();
+      render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+      await waitFor(() =>
+        expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Settings"));
+      expect(screen.getByTestId("messages-per-day")).toHaveTextContent("40");
+      await clickLastSaveButton(user);
+      await waitFor(() =>
+        expect(lastPutBody().config.talk_to_agent).toEqual({
+          messages_per_day: 40,
+        }),
+      );
+    });
+
+    it("refuses to save a number above the maximum or below 1, and says why", async () => {
+      mockFetchSequenceForAgent(buildAgent);
+      const user = setupUser();
+      render(<AgentDetail agentUuid={buildAgent.uuid} />);
+      await waitFor(() =>
+        expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Settings"));
+
+      await user.click(screen.getByText("set 301"));
+      await clickLastSaveButton(user);
+      expect(toast.error).toHaveBeenCalledWith(
+        "Messages per day cannot be more than 300, the most your workspace allows",
+      );
+
+      await user.click(screen.getByText("set 0"));
+      await clickLastSaveButton(user);
+      expect(toast.error).toHaveBeenCalledWith(
+        "Messages per day must be at least 1",
+      );
+      expect(lastPutBody()).toBeNull();
+    });
   });
 
   it("saves via Cmd+S / Ctrl+S and ignores plain S", async () => {

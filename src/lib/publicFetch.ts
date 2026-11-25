@@ -6,18 +6,22 @@ export type PublicFetchResult<T> =
 
 /**
  * A request to a public backend route, for pages opened from a link with no
- * sign-in. It sends no token and never signs anyone out, unlike `apiClient`,
- * and hands back the status and body of a failure for the page to read.
+ * sign-in. It never signs anyone out, unlike `apiClient`, and hands back the
+ * status and body of a failure for the page to read. `accessToken`, when the
+ * reader happens to be signed in, lets the backend show them more.
  */
 export async function publicFetch<T>(
   path: string,
-  init?: { method?: string; body?: unknown },
+  init?: { method?: string; body?: unknown; accessToken?: string | null },
 ): Promise<PublicFetchResult<T>> {
   const res = await fetch(`${getBackendUrl()}${path}`, {
     method: init?.method ?? "GET",
     headers: {
       accept: "application/json",
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.accessToken
+        ? { Authorization: `Bearer ${init.accessToken}` }
+        : {}),
     },
     body: init?.body ? JSON.stringify(init.body) : undefined,
   });

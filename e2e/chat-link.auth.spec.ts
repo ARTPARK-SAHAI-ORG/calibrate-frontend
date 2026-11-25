@@ -42,7 +42,6 @@ test.describe("Agent chat link (authenticated, real backend)", () => {
     );
 
     try {
-      await expect(page.getByRole("button", { name: "Preview" })).toBeDisabled();
       await page.getByRole("button", { name: "Share", exact: true }).click();
       await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
       await expect(page.getByRole("link", { name: "Preview" })).toBeVisible();
@@ -55,7 +54,9 @@ test.describe("Agent chat link (authenticated, real backend)", () => {
       expect(is_public).toBe(true);
 
       await page.goto(`/public/chat/${share_token}`);
-      await expect(page.getByRole("heading", { name })).toBeVisible();
+      await expect(
+        page.getByText(`Send a message to start chatting with ${name}`),
+      ).toBeVisible();
       await expect(page).toHaveTitle(`${name} chat`);
 
       await page.getByLabel("Message").fill("When is the next dose due?");
@@ -66,10 +67,13 @@ test.describe("Agent chat link (authenticated, real backend)", () => {
 
       await page.getByRole("button", { name: "Bad reply" }).click();
       await page
-        .getByLabel("Comment on this reply")
+        .getByLabel("What was wrong with this reply? (optional)")
         .fill("It did not answer the question");
       await page.getByRole("button", { name: "Save", exact: true }).click();
-      await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
+      await expect(
+        page.getByLabel("What was wrong with this reply? (optional)"),
+      ).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Good reply" })).toHaveCount(0);
 
       // The rating and comment are stored on the trace the reply made.
       const traces = await page.request.get(
@@ -78,7 +82,7 @@ test.describe("Agent chat link (authenticated, real backend)", () => {
       );
       const [trace] = (await traces.json()).items;
       expect(trace.feedback).toMatchObject({
-        rating: "down",
+        is_correct: false,
         comment: "It did not answer the question",
       });
     } finally {

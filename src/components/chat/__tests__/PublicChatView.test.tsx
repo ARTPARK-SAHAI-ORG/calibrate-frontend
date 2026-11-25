@@ -34,7 +34,7 @@ async function open(interaction_type = "conversation") {
     data: { agent_name: "Support bot", interaction_type },
   });
   render(<PublicChatView token="tok" />);
-  await screen.findByRole("heading", { name: "Support bot" });
+  await screen.findByText("Send a message to start chatting with Support bot");
 }
 
 async function sendMessage(user: ReturnType<typeof setupUser>, text = "Hi") {
@@ -84,16 +84,18 @@ it("sends on Enter, shows the reply and carries the conversation on", async () =
   await sendMessage(user, "Hello");
   expect(await screen.findByText("Simulated agent reply.")).toBeInTheDocument();
   expect(screen.getByText("Hello")).toBeInTheDocument();
-  expect(mockSend).toHaveBeenCalledWith("tok", {
-    conversation_id: null,
-    message: "Hello",
-  });
+  expect(mockSend).toHaveBeenCalledWith(
+    "tok",
+    { conversation_id: null, message: "Hello" },
+    null,
+  );
   await sendMessage(user, "Again");
   await waitFor(() =>
-    expect(mockSend).toHaveBeenLastCalledWith("tok", {
-      conversation_id: "c1",
-      message: "Again",
-    }),
+    expect(mockSend).toHaveBeenLastCalledWith(
+      "tok",
+      { conversation_id: "c1", message: "Again" },
+      null,
+    ),
   );
 });
 
@@ -114,7 +116,9 @@ it("refuses a message over 4,000 characters and says why", async () => {
   });
   expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
   expect(
-    screen.getByText(/at most 4,000 characters. This one has 4,001/),
+    screen.getByText(
+      "This message is 4,001 characters. Shorten it to 4,000 or fewer to send it",
+    ),
   ).toBeInTheDocument();
 });
 
@@ -142,17 +146,17 @@ it("retries the same message when the agent did not reply", async () => {
   mockSend.mockResolvedValueOnce(reply());
   await user.click(screen.getByRole("button", { name: "Retry" }));
   expect(await screen.findByText("Simulated agent reply.")).toBeInTheDocument();
-  expect(mockSend).toHaveBeenLastCalledWith("tok", {
-    conversation_id: null,
-    message: "Hello",
-  });
+  expect(mockSend).toHaveBeenLastCalledWith(
+    "tok",
+    { conversation_id: null, message: "Hello" },
+    null,
+  );
   // The message is shown once, not once per try.
   expect(screen.getAllByText("Hello")).toHaveLength(1);
 });
 
 it.each([
   ["daily_limit", "This chat link has reached its limit for today"],
-  ["trace_limit", "This agent cannot take more messages right now"],
   [
     "agent_unavailable",
     "This agent cannot reply right now. Tell the person who shared this link",
@@ -176,7 +180,7 @@ it("locks the box when the chat is too long until a new chat", async () => {
   ).toBeInTheDocument();
   expect(screen.getByLabelText("Message")).toBeDisabled();
   expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
-  await user.click(screen.getByRole("button", { name: "New chat" }));
+  await user.click(screen.getAllByRole("button", { name: "New chat" })[0]);
   expect(screen.getByLabelText("Message")).toBeEnabled();
   expect(screen.queryByText("Hi")).toBeNull();
 });
@@ -190,15 +194,16 @@ it("locks the box once the agent ends the conversation", async () => {
     await screen.findByText("The agent ended the conversation"),
   ).toBeInTheDocument();
   expect(screen.getByLabelText("Message")).toBeDisabled();
-  await user.click(screen.getByRole("button", { name: "New chat" }));
+  await user.click(screen.getAllByRole("button", { name: "New chat" })[0]);
   expect(screen.getByLabelText("Message")).toBeEnabled();
   mockSend.mockResolvedValue(reply());
   await sendMessage(user);
   await waitFor(() =>
-    expect(mockSend).toHaveBeenLastCalledWith("tok", {
-      conversation_id: null,
-      message: "Hi",
-    }),
+    expect(mockSend).toHaveBeenLastCalledWith(
+      "tok",
+      { conversation_id: null, message: "Hi" },
+      null,
+    ),
   );
 });
 
@@ -213,29 +218,6 @@ it("locks the box once the link is no longer available", async () => {
   expect(screen.getByLabelText("Message")).toBeDisabled();
 });
 
-it("keeps a typed comment when the thumb changes before it is saved", async () => {
-  const user = setupUser();
-  await open();
-  mockSend.mockResolvedValue(reply());
-  await sendMessage(user);
-  await screen.findByText("Simulated agent reply.");
-  await user.click(screen.getByRole("button", { name: "Bad reply" }));
-  await user.type(
-    await screen.findByLabelText("Comment on this reply"),
-    "Too short",
-  );
-  await user.click(screen.getByRole("button", { name: "Good reply" }));
-  await waitFor(() =>
-    expect(mockFeedback).toHaveBeenLastCalledWith("tok", "t1", {
-      rating: "up",
-      comment: null,
-    }),
-  );
-  expect(screen.getByLabelText("Comment on this reply")).toHaveValue(
-    "Too short",
-  );
-});
-
 it("says a basic agent answers each message on its own", async () => {
   await open("general");
   expect(
@@ -243,54 +225,170 @@ it("says a basic agent answers each message on its own", async () => {
   ).toBeInTheDocument();
 });
 
-it("saves a thumb at once, then an optional comment, and clears on a second click", async () => {
+it("does not offer thumbs on a reply the workspace had no room to keep", async () => {
   const user = setupUser();
+  await open();
+  mockSend.mockResolvedValue(reply({ trace_uuid: null }));
+  await sendMessage(user);
+  await screen.findByText("Simulated agent reply.");
+  expect(screen.queryByRole("button", { name: "Good reply" })).toBeNull();
+});
+
+it("shows the agent is replying and locks the box until it answers", async () => {
+  const user = setupUser();
+  await open();
+  let answer: (v: unknown) => void = () => {};
+  mockSend.mockReturnValue(new Promise((r) => (answer = r)));
+  await sendMessage(user);
+  expect(screen.getByText("The agent is replying")).toBeInTheDocument();
+  expect(screen.getByLabelText("Message")).toBeDisabled();
+  answer(reply());
+  expect(await screen.findByText("Simulated agent reply.")).toBeInTheDocument();
+  expect(screen.getByLabelText("Message")).toBeEnabled();
+});
+
+async function replied(user: ReturnType<typeof setupUser>) {
   await open();
   mockSend.mockResolvedValue(reply());
   await sendMessage(user);
   await screen.findByText("Simulated agent reply.");
+}
+
+it("saves a thumbs down at once, then the comment, and keeps only that thumb", async () => {
+  const user = setupUser();
+  await replied(user);
 
   await user.click(screen.getByRole("button", { name: "Bad reply" }));
-  expect(mockFeedback).toHaveBeenLastCalledWith("tok", "t1", {
-    rating: "down",
-    comment: null,
-  });
-  const box = await screen.findByLabelText("Comment on this reply");
+  expect(mockFeedback).toHaveBeenLastCalledWith(
+    "tok",
+    "t1",
+    { is_correct: false, comment: null },
+    null,
+  );
+  const box = await screen.findByLabelText(
+    "What was wrong with this reply? (optional)",
+  );
+  expect(screen.queryByRole("button", { name: "Good reply" })).toBeNull();
   await user.type(box, "Too short");
   await user.click(screen.getByRole("button", { name: "Save" }));
-  expect(mockFeedback).toHaveBeenLastCalledWith("tok", "t1", {
-    rating: "down",
-    comment: "Too short",
-  });
-  expect(await screen.findByRole("button", { name: "Saved" })).toBeDisabled();
-
-  // Switching thumbs keeps the comment.
-  await user.click(screen.getByRole("button", { name: "Good reply" }));
-  expect(mockFeedback).toHaveBeenLastCalledWith("tok", "t1", {
-    rating: "up",
-    comment: "Too short",
-  });
-
-  await user.click(screen.getByRole("button", { name: "Good reply" }));
-  expect(mockFeedback).toHaveBeenLastCalledWith("tok", "t1", {
-    rating: null,
-    comment: null,
-  });
-  await waitFor(() =>
-    expect(screen.queryByLabelText("Comment on this reply")).toBeNull(),
+  expect(mockFeedback).toHaveBeenLastCalledWith(
+    "tok",
+    "t1",
+    { is_correct: false, comment: "Too short" },
+    null,
+  );
+  await waitFor(() => expect(screen.queryByRole("textbox", { name: /wrong/ })).toBeNull());
+  expect(screen.queryByText("Too short")).toBeNull();
+  expect(screen.getByRole("button", { name: "Bad reply" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
   );
 });
 
-it("says when a rating could not be saved", async () => {
+it("asks what was good after a thumbs up, and Cancel keeps the thumb", async () => {
   const user = setupUser();
-  await open();
-  mockSend.mockResolvedValue(reply());
-  await sendMessage(user);
-  await screen.findByText("Simulated agent reply.");
+  await replied(user);
+  await user.click(screen.getByRole("button", { name: "Good reply" }));
+  expect(mockFeedback).toHaveBeenLastCalledWith(
+    "tok",
+    "t1",
+    { is_correct: true, comment: null },
+    null,
+  );
+  await screen.findByLabelText("What was good about this reply? (optional)");
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(
+    screen.queryByLabelText("What was good about this reply? (optional)"),
+  ).toBeNull();
+  expect(mockFeedback).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: "Good reply" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
+
+it("asks before clearing a picked thumb, and clears it on confirm", async () => {
+  const user = setupUser();
+  await replied(user);
+  await user.click(screen.getByRole("button", { name: "Bad reply" }));
+  await user.click(await screen.findByRole("button", { name: "Cancel" }));
+
+  await user.click(screen.getByRole("button", { name: "Bad reply" }));
+  expect(screen.getByText("Clear your feedback?")).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      "This removes your thumbs down and your comment from this reply.",
+    ),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(screen.queryByText("Clear your feedback?")).toBeNull();
+  expect(mockFeedback).toHaveBeenCalledTimes(1);
+
+  await user.click(screen.getByRole("button", { name: "Bad reply" }));
+  await user.click(screen.getByRole("button", { name: "Clear feedback" }));
+  expect(mockFeedback).toHaveBeenLastCalledWith(
+    "tok",
+    "t1",
+    { is_correct: null, comment: null },
+    null,
+  );
+  await waitFor(() =>
+    expect(screen.queryByText("Clear your feedback?")).toBeNull(),
+  );
+  expect(screen.getByRole("button", { name: "Good reply" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Bad reply" })).not.toHaveAttribute(
+    "aria-pressed",
+  );
+});
+
+it("names a thumbs up in the clear question", async () => {
+  const user = setupUser();
+  await replied(user);
+  await user.click(screen.getByRole("button", { name: "Good reply" }));
+  await user.click(await screen.findByRole("button", { name: "Cancel" }));
+  await user.click(screen.getByRole("button", { name: "Good reply" }));
+  expect(
+    screen.getByText(
+      "This removes your thumbs up and your comment from this reply.",
+    ),
+  ).toBeInTheDocument();
+});
+
+it("says when feedback could not be saved and leaves the thumbs as they were", async () => {
+  const user = setupUser();
+  await replied(user);
   mockFeedback.mockResolvedValueOnce({ ok: false, error: "network" });
   await user.click(screen.getByRole("button", { name: "Good reply" }));
   expect(
-    await screen.findByText("Your rating could not be saved. Try again"),
+    await screen.findByText("Your feedback could not be saved. Try again"),
   ).toBeInTheDocument();
-  expect(screen.queryByLabelText("Comment on this reply")).toBeNull();
+  expect(screen.getByRole("button", { name: "Bad reply" })).toBeInTheDocument();
+});
+
+it("sends the signed-in login so a member can open a private chat", async () => {
+  localStorage.setItem("access_token", "member-jwt");
+  try {
+    const user = setupUser();
+    await replied(user);
+    expect(mockAgent).toHaveBeenCalledWith("tok", "member-jwt");
+    expect(mockSend).toHaveBeenLastCalledWith(
+      "tok",
+      { conversation_id: null, message: "Hi" },
+      "member-jwt",
+    );
+  } finally {
+    localStorage.removeItem("access_token");
+  }
+});
+
+it("starts a new chat from the ended note", async () => {
+  const user = setupUser();
+  await open();
+  mockSend.mockResolvedValue(reply({ ended: true }));
+  await sendMessage(user);
+  await screen.findByText("The agent ended the conversation");
+  const buttons = screen.getAllByRole("button", { name: "New chat" });
+  await user.click(buttons[buttons.length - 1]);
+  expect(screen.queryByText("The agent ended the conversation")).toBeNull();
+  expect(screen.getByLabelText("Message")).toBeEnabled();
 });

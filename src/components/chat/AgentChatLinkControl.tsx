@@ -61,9 +61,14 @@ export function AgentChatLinkControl({
 
   if (!link || !accessToken) return null;
 
-  const previewUrl =
-    link.is_public && link.share_token
-      ? publicSharePath("agent-chat", link.share_token)
+  const unverified = !link.connection_verified;
+  const previewUrl = link.share_token
+    ? publicSharePath("agent-chat", link.share_token)
+    : null;
+  const previewOff = unverified
+    ? "Verify your agent connection first"
+    : !previewUrl
+      ? "Make it public to preview"
       : null;
 
   return (
@@ -75,30 +80,17 @@ export function AgentChatLinkControl({
         initialIsPublic={link.is_public}
         initialShareToken={link.share_token}
         onChange={(is_public, share_token) =>
-          setLink((l) => l && { ...l, is_public, share_token })
+          setLink((l) => l && { ...l, is_public, share_token: share_token ?? l.share_token })
         }
         disabledReason={
           // A link already public can still be made private.
-          !link.connection_verified && !link.is_public
-            ? "Check the connection first"
+          unverified && !link.is_public
+            ? "Verify your agent connection first"
             : undefined
         }
       />
-      <Tooltip
-        content={previewUrl ? "Open the chat page" : "Make it public to preview"}
-        position="bottom"
-      >
-        {previewUrl ? (
-          <a
-            href={previewUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`${PREVIEW_CLASS} hover:bg-pink-500/26 dark:hover:bg-pink-500/20 cursor-pointer`}
-          >
-            <OpenIcon />
-            Preview
-          </a>
-        ) : (
+      {previewOff ? (
+        <Tooltip content={previewOff} position="bottom">
           <button
             type="button"
             disabled
@@ -107,8 +99,18 @@ export function AgentChatLinkControl({
             <OpenIcon />
             Preview
           </button>
-        )}
-      </Tooltip>
+        </Tooltip>
+      ) : (
+        <a
+          href={previewUrl!}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${PREVIEW_CLASS} hover:bg-pink-500/26 dark:hover:bg-pink-500/20 cursor-pointer`}
+        >
+          <OpenIcon />
+          Preview
+        </a>
+      )}
     </div>
   );
 }

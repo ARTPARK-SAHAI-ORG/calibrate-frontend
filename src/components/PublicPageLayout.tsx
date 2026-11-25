@@ -8,6 +8,8 @@ interface PublicPageLayoutProps {
   children: React.ReactNode;
   title?: string;
   pills?: React.ReactNode;
+  /** Buttons for this page, on the right before the theme toggle. */
+  actions?: React.ReactNode;
   contentClassName?: string;
 }
 
@@ -35,6 +37,7 @@ export function PublicPageLayout({
   children,
   title,
   pills,
+  actions,
   contentClassName = "max-w-7xl",
 }: PublicPageLayoutProps) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -88,6 +91,7 @@ export function PublicPageLayout({
         {/* Right side: theme toggle + auth link — only after mount */}
         {mounted && (
           <div className="flex items-center gap-2 shrink-0">
+            {actions}
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
