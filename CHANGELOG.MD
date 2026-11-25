@@ -1,5 +1,6 @@
 ## November 2026
 
+- When a speech-to-text or text-to-speech run is refused because it is too big, the app now shows the reason, and test runs show the reason instead of a general failure message ([#867](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/867))
 - The grey text in the Custom fields section is now darker and easier to read on an agent's Connection tab, when writing a test and before checking a connection ([#871](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/871))
 - The descriptions on an agent's Connection tab are now in darker text that is easier to read ([#870](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/870))
 - When traces are added to tests, you now see a message on screen if some of the new tests have no evaluator or were not added to the agent's Tests tab ([#853](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/853))
