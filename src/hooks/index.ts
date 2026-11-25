@@ -15,6 +15,7 @@ export {
   useMaxRowsPerEval,
   getMaxRowsPerEval,
   useUsesOwnProviderKeys,
+  useOrgLimits,
 } from "./useMaxRowsPerEval";
 export { useIsSuperadmin } from "./useIsSuperadmin";
 export { useTraces } from "./useTraces";

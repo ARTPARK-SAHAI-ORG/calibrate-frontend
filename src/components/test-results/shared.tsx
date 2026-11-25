@@ -898,7 +898,7 @@ export const TEXT_FIELD_COLOR_CLASS = {
 export const PILL_CLASS =
   "inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-medium";
 
-const TURN_BUBBLE_CLASS =
+export const TURN_BUBBLE_CLASS =
   "px-3 md:px-4 py-2.5 md:py-3 rounded-xl border border-border";
 
 export function TurnVersionBubbles({

@@ -193,6 +193,54 @@ describe("ShareButton", () => {
     );
   });
 
+  it("turns an agent's chat link on, builds the chat address and reports the change", async () => {
+    const user = setupUser();
+    const onChange = jest.fn();
+    mockFetchOnce({ is_public: true, share_token: "ct" });
+    render(
+      <ShareButton
+        entityType="agent-chat"
+        entityId="a1"
+        accessToken="tok"
+        initialIsPublic={false}
+        initialShareToken={null}
+        onChange={onChange}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /Share/ }));
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenCalledWith(
+        "https://api.example.com/agents/a1/chat-link/visibility",
+        expect.anything(),
+      ),
+    );
+    expect(onChange).toHaveBeenCalledWith(true, "ct");
+    await user.click(await screen.findByRole("button", { name: /Copy link/ }));
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      `${window.location.origin}/public/chat/ct`,
+    );
+  });
+
+  it("greys out the toggle and says why when given a reason", async () => {
+    const user = setupUser();
+    render(
+      <ShareButton
+        entityType="agent-chat"
+        entityId="a1"
+        accessToken="tok"
+        initialIsPublic={false}
+        initialShareToken={null}
+        disabledReason="Check the connection first"
+      />,
+    );
+    const button = screen.getByRole("button", { name: /Share/ });
+    expect(button).toBeDisabled();
+    await user.hover(button.parentElement!);
+    expect(
+      await screen.findByText("Check the connection first"),
+    ).toBeInTheDocument();
+  });
+
   it("shows an error message when the PATCH response is not ok", async () => {
     const user = setupUser();
     mockFetchOnce({}, false);

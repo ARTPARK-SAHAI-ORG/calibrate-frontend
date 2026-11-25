@@ -77,6 +77,11 @@ export type OrganizationSettings = {
      *  agents you connect, whose own server answers each call. */
     run_models_in_parallel?: boolean;
   };
+  chat_link?: {
+    /** Whether a workspace on its own provider keys still keeps the daily
+     *  limit on chat link replies. The backend default is true. */
+    limit_with_own_keys?: boolean;
+  };
 };
 
 export type Organization = {
@@ -99,6 +104,14 @@ export function workspaceRunModelsInParallel(
   org: Organization | undefined,
 ): boolean | undefined {
   return org?.settings?.model_benchmarking?.run_models_in_parallel;
+}
+
+/** Whether this workspace keeps the daily chat link limit while it uses its
+ *  own provider keys. Unknown reads as true, the backend's default. */
+export function workspaceChatLimitWithOwnKeys(
+  org: Organization | undefined,
+): boolean {
+  return org?.settings?.chat_link?.limit_with_own_keys ?? true;
 }
 
 export type OrganizationMember = {

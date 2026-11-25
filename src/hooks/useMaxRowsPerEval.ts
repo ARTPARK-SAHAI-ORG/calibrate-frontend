@@ -12,11 +12,14 @@ import { LIMITS } from "@/constants/limits";
 export type OrgLimits = {
   max_rows_per_eval: number | null;
   uses_own_provider_keys: boolean;
+  /** Replies one chat link may send a day; null means no limit. */
+  max_chat_replies_per_day: number | null;
 };
 
 const FALLBACK: OrgLimits = {
   max_rows_per_eval: LIMITS.DEFAULT_MAX_ROWS_PER_EVAL,
   uses_own_provider_keys: false,
+  max_chat_replies_per_day: LIMITS.DEFAULT_MAX_CHAT_REPLIES_PER_DAY,
 };
 
 // One request per signed-in user and workspace, shared by every caller.
@@ -55,6 +58,10 @@ export function getOrgLimits(
             ? LIMITS.DEFAULT_MAX_ROWS_PER_EVAL
             : data.max_rows_per_eval,
         uses_own_provider_keys: data.uses_own_provider_keys === true,
+        max_chat_replies_per_day:
+          data.max_chat_replies_per_day === undefined
+            ? LIMITS.DEFAULT_MAX_CHAT_REPLIES_PER_DAY
+            : data.max_chat_replies_per_day,
       }))
       .catch(() => {
         cachedPromise = null;

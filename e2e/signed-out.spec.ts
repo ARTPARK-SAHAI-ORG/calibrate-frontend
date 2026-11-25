@@ -55,6 +55,12 @@ test.describe("Signed out", () => {
     await expect(page).toHaveURL("/public/test-run/not-a-real-token");
   });
 
+  test("an agent's chat link opens without signing in", async ({ page }) => {
+    await page.goto("/public/chat/not-a-real-token");
+
+    await expect(page).toHaveURL("/public/chat/not-a-real-token");
+  });
+
   test("an invite link opens without signing in", async ({ page }) => {
     // The token is not a real one, so the page cannot read the workspace name
     // without a backend. What matters here is that it is never sent to sign in.
