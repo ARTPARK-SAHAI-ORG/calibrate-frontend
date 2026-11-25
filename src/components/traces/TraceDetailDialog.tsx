@@ -1,5 +1,6 @@
 "use client";
 
+import { StoppedEarlyNote } from "@/components/chat/StoppedEarlyNote";
 import React, { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Link } from "@/lib/nav";
@@ -439,10 +440,12 @@ export function TraceDetailDialog({
     [trace],
   );
   // A whole conversation is read back without any one turn's feedback.
-  const feedbackLine =
-    !isConversation && trace?.feedback ? (
-      <TraceFeedbackLine feedback={trace.feedback} />
-    ) : null;
+  const feedbackLine = isConversation ? null : (
+    <>
+      {trace?.output?.stopped_early && <StoppedEarlyNote />}
+      {trace?.feedback && <TraceFeedbackLine feedback={trace.feedback} />}
+    </>
+  );
   // The heading shortens a long trace id with an ellipsis, so the whole id goes
   // in hover text only when it has been cut short.
   const headingText = conversation

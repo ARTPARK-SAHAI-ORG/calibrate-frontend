@@ -19,6 +19,7 @@ import {
   ToolCallCard,
 } from "@/components/test-results/shared";
 import { useAuth } from "@/hooks";
+import { StoppedEarlyNote } from "@/components/chat/StoppedEarlyNote";
 import {
   fetchChatAgent,
   sendChatMessage,
@@ -60,6 +61,7 @@ type Turn =
       traceUuid: string | null;
       reply: string | null;
       toolCalls: ChatToolCall[];
+      stoppedEarly?: boolean;
     };
 
 type Feedback = {
@@ -174,6 +176,7 @@ export function PublicChatView({ token }: { token: string }) {
         traceUuid: res.data.trace_uuid,
         reply: res.data.reply,
         toolCalls: res.data.tool_calls ?? [],
+        stoppedEarly: res.data.stopped_early,
       },
     ]);
     if (res.data.ended) setEnded(true);
@@ -474,6 +477,7 @@ function AgentTurn({
           </p>
         </div>
       )}
+      {turn.stoppedEarly && <StoppedEarlyNote />}
       {turn.traceUuid && (
         <div className="flex items-center gap-1">
           {thumb(true)}

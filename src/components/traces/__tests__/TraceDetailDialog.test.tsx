@@ -1241,3 +1241,25 @@ it("puts the feedback under the output of a basic agent's trace", async () => {
     screen.getByRole("img", { name: "Thumbs down, with a comment" }),
   ).toBeInTheDocument();
 });
+
+it("says when the agent was stopped after too many tool calls, and only then", async () => {
+  mockFetchTrace.mockResolvedValue({
+    ...detail,
+    source: "chat",
+    output: { ...detail.output, stopped_early: true },
+  });
+  const { unmount } = render(
+    <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+  );
+  expect(
+    await screen.findByText(/stopped after using tools too many times in a row/),
+  ).toBeInTheDocument();
+  unmount();
+
+  mockFetchTrace.mockResolvedValue({ ...detail, source: "chat" });
+  render(
+    <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+  );
+  expect(await screen.findByText("Source")).toBeInTheDocument();
+  expect(screen.queryByText(/stopped after using tools/)).not.toBeInTheDocument();
+});

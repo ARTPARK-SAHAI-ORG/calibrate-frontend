@@ -24,6 +24,8 @@ export type TraceToolCall = {
 export type TraceOutput = {
   response?: string | null;
   tool_calls?: TraceToolCall[] | null;
+  /** True when the agent kept calling tools until it was stopped, unreplied. */
+  stopped_early?: boolean | null;
 };
 
 

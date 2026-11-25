@@ -20,6 +20,8 @@ export type ChatReply = {
   reply: string | null;
   tool_calls: ChatToolCall[];
   ended: boolean;
+  /** True when the agent kept calling tools until it was stopped, unreplied. */
+  stopped_early?: boolean;
 };
 
 /** true for a thumbs up, false for a thumbs down, null for none. */
@@ -81,7 +83,7 @@ export function setChatFeedback(
   body: ChatFeedback,
   accessToken?: string | null,
 ) {
-  return call<ChatFeedback>(
+  return call<{ feedback: unknown }>(
     `${base(token)}/traces/${encodeURIComponent(traceUuid)}/feedback`,
     { method: "PUT", body, accessToken },
   );

@@ -392,3 +392,17 @@ it("starts a new chat from the ended note", async () => {
   expect(screen.queryByText("The agent ended the conversation")).toBeNull();
   expect(screen.getByLabelText("Message")).toBeEnabled();
 });
+
+it("says when the agent was stopped after too many tool calls", async () => {
+  const user = setupUser();
+  await open();
+  mockSend.mockResolvedValueOnce(reply({ reply: null, stopped_early: true }));
+  await sendMessage(user, "Book it");
+  expect(
+    await screen.findByText(/stopped after using tools too many times in a row/),
+  ).toBeInTheDocument();
+  mockSend.mockResolvedValueOnce(reply());
+  await sendMessage(user, "Again");
+  expect(await screen.findByText("Simulated agent reply.")).toBeInTheDocument();
+  expect(screen.getAllByText(/stopped after using tools/)).toHaveLength(1);
+});
