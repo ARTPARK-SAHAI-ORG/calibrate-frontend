@@ -110,10 +110,31 @@ function ScoreColumnHeading({
   );
 }
 
-/** Where a trace came from, on every row: the chat link or the API. */
-function TraceSourceCell({ trace }: { trace: TraceSummary }) {
-  const chat = trace.source === "chat";
+/** Where a trace came from: "Chat" or "API" in the table, and as a small
+ *  tag reading "Chat link" or "API" in the trace window. */
+export function TraceSourceLabel({
+  source,
+  tag = false,
+}: {
+  source?: TraceSource;
+  tag?: boolean;
+}) {
+  const chat = source === "chat";
   const Icon = chat ? ChatIcon : AngleBracketsIcon;
+  if (tag) {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${
+          chat
+            ? "bg-sky-500/15 text-sky-800 dark:text-sky-200"
+            : "bg-muted text-muted-foreground"
+        }`}
+      >
+        <Icon className="w-3 h-3" />
+        {chat ? "Chat link" : "API"}
+      </span>
+    );
+  }
   return (
     <span
       className={`inline-flex items-center gap-1.5 text-sm whitespace-nowrap ${
@@ -126,33 +147,9 @@ function TraceSourceCell({ trace }: { trace: TraceSummary }) {
   );
 }
 
-/** Where a trace came from as a small tag, for the trace window. */
-export function TraceSourceChip({ source }: { source: TraceSource }) {
-  const chat = source === "chat";
-  const Icon = chat ? ChatIcon : AngleBracketsIcon;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${
-        chat
-          ? "bg-sky-500/15 text-sky-800 dark:text-sky-200"
-          : "bg-muted text-muted-foreground"
-      }`}
-    >
-      <Icon className="w-3 h-3" />
-      {chat ? "Chat link" : "API"}
-    </span>
-  );
-}
-
 /** The thumb left on a reply in the chat link, green up or red down, with a
  *  dot at its corner when a comment came with it. */
-export function TraceFeedbackThumb({
-  feedback,
-  className = "w-4 h-4",
-}: {
-  feedback: TraceFeedback;
-  className?: string;
-}) {
+export function TraceFeedbackThumb({ feedback }: { feedback: TraceFeedback }) {
   const up = feedback.is_correct;
   const Icon = up ? ThumbsUpIcon : ThumbsDownIcon;
   const color = up
@@ -167,7 +164,7 @@ export function TraceFeedbackThumb({
       aria-label={label}
       className={`relative inline-flex flex-shrink-0 ${color}`}
     >
-      <Icon className={className} />
+      <Icon className="w-4 h-4" />
       {feedback.comment && (
         <span className="absolute -top-0.5 -right-1 w-[7px] h-[7px] rounded-full bg-current ring-[1.5px] ring-background" />
       )}
@@ -389,7 +386,7 @@ export function TracesTable({
                 {...linkProps(trace.uuid)}
                 className="self-stretch py-2.5 flex items-center"
               >
-                <TraceSourceCell trace={trace} />
+                <TraceSourceLabel source={trace.source} />
               </Link>
               <Link
                 {...linkProps(trace.uuid)}
@@ -471,7 +468,7 @@ export function TracesTable({
                 layout="card"
               />
               <div className="flex items-center gap-3 mt-2">
-                <TraceSourceCell trace={trace} />
+                <TraceSourceLabel source={trace.source} />
                 <Link
                   {...linkProps(trace.uuid)}
                   className="text-xs text-muted-foreground"

@@ -40,7 +40,7 @@ import { reportError } from "@/lib/reportError";
 import {
   formatTraceDate,
   TraceFeedbackThumb,
-  TraceSourceChip,
+  TraceSourceLabel,
 } from "./TracesTable";
 import { TraceScorePanel } from "./TraceScorePanel";
 
@@ -177,7 +177,9 @@ export function toTestCaseOutput(
 function TraceFeedbackLine({ feedback }: { feedback: TraceFeedback }) {
   return (
     <div className="mt-2 flex items-start gap-2 text-sm text-foreground">
-      <TraceFeedbackThumb feedback={feedback} className="w-4 h-4 mt-0.5" />
+      <span className="mt-0.5 flex">
+        <TraceFeedbackThumb feedback={feedback} />
+      </span>
       {feedback.comment && (
         <span className="whitespace-pre-wrap break-words">
           {feedback.comment}
@@ -293,7 +295,7 @@ function TraceMetaPanel({
           <span className="block text-sm font-semibold text-foreground mb-1">
             Source
           </span>
-          <TraceSourceChip source={source} />
+          <TraceSourceLabel source={source} tag />
         </div>
       )}
       {tags.length > 0 && (

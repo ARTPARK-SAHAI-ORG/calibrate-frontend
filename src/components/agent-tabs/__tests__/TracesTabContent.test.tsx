@@ -1507,6 +1507,20 @@ describe("TracesTabContent", () => {
     expect(screen.queryByText("User feedback")).not.toBeInTheDocument();
   });
 
+  it("offers the user feedback filter when a row on the page carries feedback", async () => {
+    mockUseTraces.mockReturnValue(
+      tracesResult([
+        trace({ feedback: { is_correct: true, comment: null, at: "2026-07-20" } }),
+      ]),
+    );
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getByRole("button", { name: "Filter traces" }));
+
+    expect(screen.getByText("User feedback")).toBeInTheDocument();
+  });
+
   it("hands the conversations whether any trace carries feedback", async () => {
     fetchHasTraceFeedback.mockResolvedValue(true);
     window.history.replaceState(null, "", "/?view=conversations");

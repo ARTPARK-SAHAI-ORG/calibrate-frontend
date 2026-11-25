@@ -629,6 +629,9 @@ export function TracesTabContent({
       cancelled = true;
     };
   }, [accessToken, agentUuid, usageReads]);
+  // A row on the page with feedback counts too, so feedback that arrives
+  // while the tab is open shows the section without a Refresh.
+  const anyFeedback = hasFeedback || items.some((t) => t.feedback);
   // Rows skipped before the workspace's limit was lifted still say over_limit.
   const overLimit =
     usage?.max_scored_traces !== null &&
@@ -818,7 +821,7 @@ export function TracesTabContent({
           source={facets.source}
           feedback={facets.feedback}
           allLabels={allLabels}
-          hasFeedback={hasFeedback}
+          hasFeedback={anyFeedback}
           onFilterChange={(next) => setView(next)}
         />
       </div>
@@ -921,7 +924,7 @@ export function TracesTabContent({
             labels={allLabels}
             scoreEvaluators={scoreFilterEvaluators}
             conversationIds={conversationIds}
-            hasFeedback={hasFeedback}
+            hasFeedback={anyFeedback}
             onApply={(next) =>
               setView({
                 ...next,
