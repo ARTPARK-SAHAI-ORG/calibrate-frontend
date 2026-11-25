@@ -11,6 +11,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import {
   ChatIcon,
+  InfoIcon,
   SpinnerIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
@@ -279,10 +280,12 @@ export function PublicChatView({ token }: { token: string }) {
           <EmptyState
             className="mt-6"
             icon={<ChatIcon className="w-6 h-6 text-muted-foreground" />}
-            title={`Talk to ${agent.agent_name}`}
-            description="Send a message the way the people using this agent would"
+            title="Talk to the agent"
             actions={
               <div className="flex flex-col gap-2 w-full max-w-md">
+                <p className="text-sm font-medium text-foreground">
+                  Here are a few examples
+                </p>
                 {STARTER_MESSAGES.map((message) => (
                   <button
                     key={message}
@@ -296,7 +299,8 @@ export function PublicChatView({ token }: { token: string }) {
                     {message}
                   </button>
                 ))}
-                <p className="text-sm text-foreground text-center mt-1">
+                <p className="flex items-center justify-center gap-1.5 text-sm text-foreground mt-1">
+                  <InfoIcon className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
                   Click one to put it in the message box
                 </p>
               </div>

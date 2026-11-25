@@ -41,7 +41,7 @@ async function open(interaction_type = "conversation") {
     data: { agent_name: "Support bot", interaction_type },
   });
   render(<PublicChatView token="tok" />);
-  await screen.findByText("Talk to Support bot");
+  await screen.findByText("Talk to the agent");
 }
 
 async function sendMessage(user: ReturnType<typeof setupUser>, text = "Hi") {
@@ -458,6 +458,8 @@ it("puts a starter message in the message box without sending it", async () => {
       name: "What do you need from me to get started?",
     }),
   );
+  expect(screen.getByText("Here are a few examples")).toBeInTheDocument();
+  expect(screen.getByText("Click one to put it in the message box")).toBeInTheDocument();
   const box = screen.getByLabelText("Message");
   expect(box).toHaveValue("What do you need from me to get started?");
   expect(box).toHaveFocus();
@@ -466,5 +468,5 @@ it("puts a starter message in the message box without sending it", async () => {
   mockSend.mockResolvedValueOnce(reply());
   await user.keyboard("{Enter}");
   expect(await screen.findByText("Simulated agent reply.")).toBeInTheDocument();
-  expect(screen.queryByText("Talk to Support bot")).toBeNull();
+  expect(screen.queryByText("Talk to the agent")).toBeNull();
 });

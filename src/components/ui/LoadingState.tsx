@@ -119,7 +119,7 @@ export function NotFoundState({
 type EmptyStateProps = {
   icon: React.ReactNode;
   title: string;
-  description: React.ReactNode;
+  description?: React.ReactNode;
   action?: {
     label: string;
     onClick: () => void;
@@ -150,9 +150,13 @@ export function EmptyState({
       <h3 className="text-lg font-semibold text-foreground mb-1 text-center">
         {title}
       </h3>
-      <p className="text-base text-foreground mb-4 text-center">
-        {description}
-      </p>
+      {description ? (
+        <p className="text-base text-foreground mb-4 text-center">
+          {description}
+        </p>
+      ) : (
+        <div className="mb-4" />
+      )}
       {actions}
       {!actions && action && (
         <button

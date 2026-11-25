@@ -56,7 +56,7 @@ test.describe("Agent chat link (authenticated, real backend)", () => {
       expect(is_public).toBe(true);
 
       await page.goto(`/public/chat/${share_token}`);
-      await expect(page.getByText(`Talk to ${name}`)).toBeVisible();
+      await expect(page.getByText("Talk to the agent")).toBeVisible();
       await expect(page).toHaveTitle(`${name} chat`);
 
       await page.getByLabel("Message").fill("When is the next dose due?");
