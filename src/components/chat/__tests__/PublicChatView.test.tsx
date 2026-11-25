@@ -542,7 +542,7 @@ it("shows the saved comment from an icon beside the thumb, and none without a co
   );
   await user.click(screen.getByRole("button", { name: "Save" }));
 
-  const icon = await screen.findByRole("button", { name: "Your comment" });
+  const icon = await screen.findByRole("button", { name: "Edit your comment" });
   await user.hover(icon);
   expect(await screen.findByText("Wrong clinic hours")).toBeInTheDocument();
 
@@ -551,8 +551,34 @@ it("shows the saved comment from an icon beside the thumb, and none without a co
   const goods = await screen.findAllByRole("button", { name: "Good reply" });
   await user.click(goods[goods.length - 1]);
   await user.click(await screen.findByRole("button", { name: "Save" }));
-  expect(screen.getAllByRole("button", { name: "Your comment" })).toHaveLength(
-    1,
+  expect(
+    screen.getAllByRole("button", { name: "Edit your comment" }),
+  ).toHaveLength(1);
+});
+
+it("opens the saved comment in the comment box to edit it", async () => {
+  const user = setupUser();
+  await replied(user);
+  mockFeedback.mockResolvedValue({ ok: true, data: { feedback: null } });
+  await user.click(screen.getByRole("button", { name: "Bad reply" }));
+  await user.type(
+    await screen.findByRole("textbox", { name: /What was wrong/ }),
+    "Wrong hours",
+  );
+  await user.click(screen.getByRole("button", { name: "Save" }));
+
+  await user.click(
+    await screen.findByRole("button", { name: "Edit your comment" }),
+  );
+  const box = screen.getByRole("textbox", { name: /What was wrong/ });
+  expect(box).toHaveValue("Wrong hours");
+  await user.type(box, " on Sunday");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(mockFeedback).toHaveBeenLastCalledWith(
+    "tok",
+    "t1",
+    { is_correct: false, comment: "Wrong hours on Sunday" },
+    null,
   );
 });
 
@@ -567,7 +593,7 @@ it("switches to the other thumb after asking once", async () => {
   expect(
     screen.getByText("Your previous feedback will be erased and replaced"),
   ).toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Replace feedback" }));
+  await user.click(screen.getByRole("button", { name: "Confirm" }));
 
   expect(mockFeedback).toHaveBeenLastCalledWith(
     "tok",

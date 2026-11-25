@@ -373,6 +373,10 @@ export function PublicChatView({ token }: { token: string }) {
                 setReplacing({ traceUuid: turn.traceUuid, isCorrect })
               }
               onClear={() => turn.traceUuid && setClearing(turn.traceUuid)}
+              onEditComment={(comment) =>
+                turn.traceUuid &&
+                patchFeedback(turn.traceUuid, { open: true, draft: comment })
+              }
               onDraft={(text) =>
                 turn.traceUuid && patchFeedback(turn.traceUuid, { draft: text })
               }
@@ -482,7 +486,7 @@ export function PublicChatView({ token }: { token: string }) {
         onConfirm={() => void replaceFeedback()}
         title="Replace your feedback?"
         message="Your previous feedback will be erased and replaced"
-        confirmText="Replace feedback"
+        confirmText="Confirm"
         busyText="Replacing..."
         isDeleting={replaceBusy}
       />
@@ -509,6 +513,7 @@ function AgentTurn({
   onPick,
   onSwitch,
   onClear,
+  onEditComment,
   onDraft,
   onCancel,
   onSave,
@@ -519,6 +524,8 @@ function AgentTurn({
   /** The other thumb, once one is picked: replaces it after asking. */
   onSwitch: (isCorrect: boolean) => void;
   onClear: () => void;
+  /** Opens the comment box with the saved comment in it. */
+  onEditComment: (comment: string) => void;
   onDraft: (text: string) => void;
   onCancel: () => void;
   onSave: () => void;
@@ -608,7 +615,8 @@ function AgentTurn({
             <Tooltip content={feedback.comment} position="top">
               <button
                 type="button"
-                aria-label="Your comment"
+                aria-label="Edit your comment"
+                onClick={() => onEditComment(feedback.comment ?? "")}
                 className={`${THUMB_CLASS} border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted`}
               >
                 <ChatIcon className="w-4 h-4" />
