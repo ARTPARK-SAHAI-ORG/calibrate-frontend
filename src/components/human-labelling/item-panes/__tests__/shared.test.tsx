@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen } from "@/test-utils";
-import { Section, ChatMessage, normaliseHistoryItem } from "../shared";
+import { Section, ChatMessage, agentToolCalls, normaliseHistoryItem } from "../shared";
 
 describe("Section", () => {
   it("renders title, subtitle, and children", () => {
@@ -112,5 +112,18 @@ describe("normaliseHistoryItem", () => {
       versions: { Hindi: 5 },
     });
     expect(turn).toEqual({ role: "user", content: "Hi" });
+  });
+});
+
+describe("agentToolCalls", () => {
+  const calls = [{ tool: "a", arguments: {} }];
+  it("uses actual_tool_calls whenever it is a list, even an empty one", () => {
+    expect(agentToolCalls({ actual_tool_calls: calls, tool_calls: [] })).toEqual(calls);
+    expect(agentToolCalls({ actual_tool_calls: [], tool_calls: calls })).toEqual([]);
+  });
+  it("falls back to tool_calls, and to nothing", () => {
+    expect(agentToolCalls({ tool_calls: calls })).toEqual(calls);
+    expect(agentToolCalls({ tool_calls: "x" })).toEqual([]);
+    expect(agentToolCalls({})).toEqual([]);
   });
 });

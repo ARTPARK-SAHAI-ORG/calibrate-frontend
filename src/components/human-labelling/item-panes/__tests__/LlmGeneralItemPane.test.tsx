@@ -89,6 +89,19 @@ describe("LlmGeneralItemPane", () => {
     expect(screen.getByText("Item payload")).toBeInTheDocument();
   });
 
+  it("shows tool_calls when the item has no actual_tool_calls", () => {
+    render(
+      <LlmGeneralItemPane
+        payload={{
+          input: "Book it",
+          output: "",
+          tool_calls: [{ tool: "book_train", arguments: {} }],
+        }}
+      />,
+    );
+    expect(screen.getByText("book_train")).toBeInTheDocument();
+  });
+
   const versioned = {
     input: {
       content: "Summarise this",

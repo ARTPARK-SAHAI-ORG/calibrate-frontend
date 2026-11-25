@@ -47,6 +47,7 @@ import {
 import { sampleItem } from "@/components/human-labelling/sampleItem";
 import {
   historyToPayloadFields,
+  keepList,
   payloadToHistory,
   textFieldsToPayload,
 } from "@/components/human-labelling/itemConversation";
@@ -847,6 +848,31 @@ function formatItemUpdatedAt(item: {
   const d = parseBackendTime(raw);
   if (isNaN(d.getTime())) return "—";
   return d.toLocaleString();
+}
+
+function buildInitialConfig(
+  payload: Record<string, unknown> | null,
+  taskType: string | undefined,
+): TestConfig | undefined {
+  if (!payload) return undefined;
+  return {
+    history: payloadToHistory(payload, taskType),
+    evaluation: {
+      type: "response" as const,
+      criteria: "",
+      ...(Array.isArray(payload.expected_tool_calls)
+        ? { tool_calls: payload.expected_tool_calls }
+        : {}),
+    },
+  };
+}
+
+/** `expected_tool_calls` as saved from the item dialog's config. */
+function expectedToolCallsField(
+  config: TestConfig,
+  previous?: Record<string, unknown>,
+) {
+  return keepList(previous?.expected_tool_calls, config.evaluation.tool_calls ?? []);
 }
 
 function llmGeneralRowWithExpected(item: LabellingItem) {
@@ -2206,24 +2232,16 @@ function LabellingTaskPageInner() {
     ? buildInitialEvaluators(readEvaluatorVariables(duplicateSourcePayload))
     : buildInitialEvaluators({});
 
-  const buildInitialConfig = (
-    payload: Record<string, unknown> | null,
-  ): TestConfig | undefined => {
-    if (!payload) return undefined;
-    return {
-      history: payloadToHistory(
-        payload,
-        taskType,
-      ),
-      evaluation: {
-        type: "response" as const,
-        criteria: "",
-        ...(Array.isArray(payload.expected_tool_calls)
-          ? { tool_calls: payload.expected_tool_calls }
-          : {}),
-      },
-    };
-  };
+  // Kept as the same object for as long as the same item is open: the dialog
+  // refills its form whenever this changes, which would wipe what was typed.
+  const editingInitialConfig = useMemo(
+    () => buildInitialConfig(editingPayload, taskType),
+    [editingPayload, taskType],
+  );
+  const addItemInitialConfig = useMemo(
+    () => buildInitialConfig(duplicateSourcePayload, taskType),
+    [duplicateSourcePayload, taskType],
+  );
 
   const openItemEdit = (uuid: string) => {
     const form = itemEditForm(taskType);
@@ -2261,8 +2279,6 @@ function LabellingTaskPageInner() {
     position: editPager.position,
   };
 
-  const editingInitialConfig = buildInitialConfig(editingPayload);
-  const addItemInitialConfig = buildInitialConfig(duplicateSourcePayload);
 
   // Sync the name field whenever a different item is opened for edit.
   useEffect(() => {
@@ -3760,10 +3776,12 @@ function LabellingTaskPageInner() {
               ...historyToPayloadFields(
                 history,
                 taskType,
+                duplicateSourcePayload ?? undefined,
               ),
-              expected_tool_calls: config.evaluation.tool_calls?.length
-                ? config.evaluation.tool_calls
-                : undefined,
+              expected_tool_calls: expectedToolCallsField(
+                config,
+                duplicateSourcePayload ?? undefined,
+              ),
               evaluator_variables,
             };
 
@@ -3864,13 +3882,11 @@ function LabellingTaskPageInner() {
               ...existingPayload,
               name: editLlmItemName.trim(),
               ...descriptionField,
-              ...historyToPayloadFields(
-                history,
-                taskType,
+              ...historyToPayloadFields(history, taskType, existingPayload),
+              expected_tool_calls: expectedToolCallsField(
+                config,
+                existingPayload,
               ),
-              expected_tool_calls: config.evaluation.tool_calls?.length
-                ? config.evaluation.tool_calls
-                : undefined,
               evaluator_variables,
             };
             setSavingLlmItem(true);
@@ -3995,6 +4011,7 @@ function LabellingTaskPageInner() {
             uuid: e.uuid,
             name: e.name,
             slug: e.slug ?? null,
+            evaluator_type: e.evaluator_type,
             variables: e.variables ?? [],
             output_type: e.output_type ?? null,
             scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
@@ -4273,15 +4290,14 @@ function LabellingTaskPageInner() {
                         name: r.name,
                         description: r.description,
                         ...textFieldsToPayload(r),
-                        // Only a real call goes on the item. An empty list
-                        // would make every screen read a plain text answer as
-                        // a tool call, so the key is dropped instead.
-                        ...(r.toolCalls.length > 0
-                          ? { actual_tool_calls: r.toolCalls }
-                          : { actual_tool_calls: undefined }),
-                        expected_tool_calls: r.expectedToolCalls.length
-                          ? r.expectedToolCalls
-                          : undefined,
+                        actual_tool_calls: keepList(
+                          existing.actual_tool_calls,
+                          r.toolCalls,
+                        ),
+                        expected_tool_calls: keepList(
+                          existing.expected_tool_calls,
+                          r.expectedToolCalls,
+                        ),
                         evaluator_variables: r.evaluator_variables,
                       },
                       metadata: r.metadata,
@@ -4307,6 +4323,7 @@ function LabellingTaskPageInner() {
             uuid: e.uuid,
             name: e.name,
             slug: e.slug ?? null,
+            evaluator_type: e.evaluator_type,
             variables: e.variables ?? [],
             output_type: e.output_type ?? null,
             scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
@@ -4331,20 +4348,21 @@ function LabellingTaskPageInner() {
           isOpen={assignOpen}
           accessToken={accessToken}
           evaluators={task?.evaluators ?? []}
-          // Select-all can reach items beyond the page in hand, so this is
-          // read off the ones loaded. Getting it wrong only changes whether
-          // the row is drawn: the backend adds the evaluator to a tool-call
-          // item either way.
-          hasToolCallItems={(task?.items ?? []).some(
-            (it) =>
-              it.is_tool_call === true &&
-              (selectAllTotal || selectedItemIds.has(it.uuid)),
-          )}
-          hasNonToolCallItems={(task?.items ?? []).some(
-            (it) =>
-              it.is_tool_call !== true &&
-              (selectAllTotal || selectedItemIds.has(it.uuid)),
-          )}
+          // Select-all reaches items beyond the loaded page, so it counts as
+          // holding both kinds. That puts the tool-call evaluator on the job,
+          // which a tool-call item needs before its labelling can finish.
+          hasToolCallItems={
+            selectAllTotal ||
+            (task?.items ?? []).some(
+              (it) => it.is_tool_call === true && selectedItemIds.has(it.uuid),
+            )
+          }
+          hasNonToolCallItems={
+            selectAllTotal ||
+            (task?.items ?? []).some(
+              (it) => it.is_tool_call !== true && selectedItemIds.has(it.uuid),
+            )
+          }
           onClose={() => setAssignOpen(false)}
           onConfirm={handleAssignAnnotators}
         />

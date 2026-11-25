@@ -36,7 +36,17 @@ jest.mock("../../../../../../lib/evaluatorRunLimit", () => ({
 
 // The item dialogs have their own tests. Here they only hand back what the
 // page passed them, so a test can call their onSubmit directly.
-const mockDialogProps: { llm: any[]; general: any[] } = { llm: [], general: [] };
+const mockDialogProps: { llm: any[]; general: any[]; assign: any[] } = {
+  llm: [],
+  general: [],
+  assign: [],
+};
+jest.mock("../../../../../../components/human-labelling/AssignAnnotatorsDialog", () => ({
+  AssignAnnotatorsDialog: (props: unknown) => {
+    mockDialogProps.assign.push(props);
+    return null;
+  },
+}));
 jest.mock("../../../../../../components/AddTestDialog", () => ({
   AddTestDialog: (props: unknown) => {
     mockDialogProps.llm.push(props);
@@ -344,4 +354,54 @@ it("drops the old tool calls from an llm-general item when the edit removes them
   expect(payload.output).toBe("Booked");
   expect(payload).not.toHaveProperty("actual_tool_calls");
   expect(payload).not.toHaveProperty("expected_tool_calls");
+});
+
+it("keeps an empty tool-call list the llm-general item already had", async () => {
+  const user = setupUser();
+  itemsTabWith("llm-general", {
+    name: "Answers in words",
+    input: "Book it",
+    output: "I cannot",
+    actual_tool_calls: [],
+    expected_tool_calls: [],
+  });
+  render(<LabellingTaskPage />);
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  const props = mockDialogProps.general.filter((p) => p.isOpen && p.mode === "edit").at(-1);
+  await props.onSubmit([
+    {
+      uuid: "i-1",
+      name: "Answers in words",
+      description: "",
+      input: "Book it",
+      output: "I cannot",
+      inputExtras: {},
+      outputExtras: {},
+      toolCalls: [],
+      expectedToolCalls: [],
+      evaluator_variables: {},
+      metadata: [],
+    },
+  ]);
+  const payload = putPayload();
+  expect(payload.actual_tool_calls).toEqual([]);
+  expect(payload.expected_tool_calls).toEqual([]);
+});
+
+it("counts select all as holding tool-call items when assigning labelling", async () => {
+  const user = setupUser();
+  itemsTabWith("llm", {
+    name: "Plain reply",
+    chat_history: [{ role: "user", content: "Hi" }],
+    agent_response: "Hello",
+  });
+  mockSummary = { ...(mockSummary as object), pagination: { total: 5, limit: 50, offset: 0 } };
+  render(<LabellingTaskPage />);
+  await screen.findByRole("button", { name: "Edit" });
+  await user.click(screen.getAllByLabelText("Select all")[0]);
+  await user.click(screen.getByRole("button", { name: "Select all 5 items" }));
+  await user.click(screen.getByRole("button", { name: "Label selected" }));
+  const props = mockDialogProps.assign.filter((p) => p.isOpen).at(-1);
+  expect(props.hasToolCallItems).toBe(true);
+  expect(props.hasNonToolCallItems).toBe(true);
 });

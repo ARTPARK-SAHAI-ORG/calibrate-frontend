@@ -16,18 +16,22 @@ type TextKind = "conversation" | "single";
 /** The audio kinds, in the order they are offered. */
 const VOICE_KINDS: EvaluatorType[] = ["stt", "tts"];
 
+/** The kinds the last question can offer, once text is chosen. */
+type TextEvaluatorType = "llm" | "conversation" | "llm-general" | "tool-call";
+
 /** The text kinds that sit inside a conversation, in the order offered. */
-const CONVERSATION_KINDS: EvaluatorType[] = ["llm", "conversation"];
+const CONVERSATION_KINDS: TextEvaluatorType[] = ["llm", "conversation"];
 
 /** The one text kind with no conversation behind it. */
-const SINGLE_KIND: EvaluatorType = "llm-general";
+const SINGLE_KIND: TextEvaluatorType = "llm-general";
 
 /** Judges tool calls, so it fits both a conversation and a single response. */
-const TOOL_CALL_KIND: EvaluatorType = "tool-call";
+const TOOL_CALL_KIND: TextEvaluatorType = "tool-call";
 
 /** The last question's cards. The colours differ from every card above them. */
-const FINAL_CARDS: Partial<
-  Record<EvaluatorType, { title: string; description: string; tone: CardTone }>
+const FINAL_CARDS: Record<
+  TextEvaluatorType,
+  { title: string; description: string; tone: CardTone }
 > = {
   llm: {
     title: "A single reply",
@@ -45,7 +49,7 @@ const FINAL_CARDS: Partial<
     tone: "orange",
   },
   "tool-call": {
-    title: "Tool call",
+    title: "The tool calls",
     description: "Check whether the agent made the right tool calls",
     tone: "blue",
   },
@@ -63,7 +67,7 @@ function answersFor(value: EvaluatorType | null): {
     return { medium: "voice", textKind: null };
   }
   if (value === SINGLE_KIND) return { medium: "text", textKind: "single" };
-  if (value && [...CONVERSATION_KINDS, TOOL_CALL_KIND].includes(value)) {
+  if (value === "llm" || value === "conversation" || value === TOOL_CALL_KIND) {
     return { medium: "text", textKind: "conversation" };
   }
   return { medium: null, textKind: null };
@@ -103,8 +107,8 @@ function Question({
  *
  * `allowed` is the kinds the screen may offer. A question with only one
  * possible answer is never asked: that answer is taken as given. So a screen
- * offering all five asks three questions, and one offering a reply in a
- * conversation or a single response asks one.
+ * offering every kind asks text or voice, then up to two more questions, and
+ * one offering a reply in a conversation and the tool calls asks one.
  */
 export function EvaluatorTypeQuestions({
   allowed,
@@ -122,7 +126,7 @@ export function EvaluatorTypeQuestions({
   const hasToolCall = permitted.has(TOOL_CALL_KIND);
   const textPossible = conversationKinds.length > 0 || hasSingle || hasToolCall;
   // The answers left once the reader has said what kind of text it is.
-  const finalKinds = (kind: TextKind): EvaluatorType[] => [
+  const finalKinds = (kind: TextKind): TextEvaluatorType[] => [
     ...(kind === "single"
       ? hasSingle
         ? [SINGLE_KIND]
@@ -171,6 +175,9 @@ export function EvaluatorTypeQuestions({
     if (next === textKind) return;
     setChosen({ medium: "text", textKind: next });
     const kinds = finalKinds(next);
+    // The tool calls are offered under both kinds of text, so that choice
+    // stays when the reader moves between them.
+    if (value === TOOL_CALL_KIND && kinds.includes(TOOL_CALL_KIND)) return;
     onChange(kinds.length === 1 ? kinds[0] : null);
   };
 
@@ -248,7 +255,7 @@ export function EvaluatorTypeQuestions({
           (forcedMedium && forcedTextKind)) && (
           <Question>
             {finalKinds(textKind).map((kind) => {
-              const card = FINAL_CARDS[kind]!;
+              const card = FINAL_CARDS[kind];
               return (
                 <ChoiceCard
                   key={kind}

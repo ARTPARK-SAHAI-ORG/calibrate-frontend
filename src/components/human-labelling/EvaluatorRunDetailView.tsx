@@ -26,6 +26,7 @@ import {
 import { summariseValues } from "@/lib/evaluatorResultStat";
 import { payloadHasVersions, textOf } from "@/lib/messageVersions";
 import { evaluatorFitsItem, isSkippedRunResult } from "@/lib/labellingItem";
+import { agentToolCalls } from "@/components/human-labelling/item-panes/shared";
 import {
   ItemPane,
   itemPaneHasOwnPadding,
@@ -430,8 +431,10 @@ export function exportInputCols(
   if (taskType === "stt")
     return ["reference_transcript", "predicted_transcript"];
   if (taskType === "tts") return ["text", "audio_path"];
-  if (taskType === "llm") return ["conversation_history", "agent_response"];
-  if (taskType === "llm-general") return ["input", "output"];
+  if (taskType === "llm")
+    return ["conversation_history", "agent_response", "expected_tool_calls"];
+  if (taskType === "llm-general")
+    return ["input", "output", "expected_tool_calls"];
   return ["transcript"];
 }
 
@@ -462,15 +465,16 @@ export function serializeMessages(messages: unknown[]): string {
 // The agent's reply followed by its tool calls as JSON, so a verdict on a
 // tool-call row never sits beside an empty cell.
 function replyWithToolCalls(p: Record<string, unknown>, reply: unknown): string {
-  const calls =
-    Array.isArray(p.actual_tool_calls) && p.actual_tool_calls.length > 0
-      ? p.actual_tool_calls
-      : Array.isArray(p.tool_calls)
-        ? p.tool_calls
-        : [];
+  const calls = agentToolCalls(p);
   return [textOf(reply), calls.length > 0 ? JSON.stringify(calls) : ""]
     .filter(Boolean)
     .join("\n");
+}
+
+function expectedToolCallsCell(p: Record<string, unknown>): string {
+  return Array.isArray(p.expected_tool_calls) && p.expected_tool_calls.length > 0
+    ? JSON.stringify(p.expected_tool_calls)
+    : "";
 }
 
 export function extractPayloadInputValues(
@@ -501,10 +505,18 @@ export function extractPayloadInputValues(
     const history = Array.isArray(p.chat_history)
       ? serializeMessages(p.chat_history)
       : "";
-    return [history, replyWithToolCalls(p, p.agent_response)];
+    return [
+      history,
+      replyWithToolCalls(p, p.agent_response),
+      expectedToolCallsCell(p),
+    ];
   }
   if (taskType === "llm-general") {
-    return [textOf(p.input), replyWithToolCalls(p, p.output)];
+    return [
+      textOf(p.input),
+      replyWithToolCalls(p, p.output),
+      expectedToolCallsCell(p),
+    ];
   }
   return [Array.isArray(p.transcript) ? serializeMessages(p.transcript) : ""];
 }
@@ -1854,20 +1866,22 @@ export function EvaluatorRunDetailView({
     return m;
   }, [job]);
 
-  // An item counts as done as soon as every evaluator has a finished score for
-  // it, even while the rest of the run is still going.
-  // An evaluator that does not fit an item is left off it, unless an older
-  // run still recorded a result there.
+  // An evaluator shows on an item it fits, and on any item where the run
+  // recorded a result for it. One whose type is unknown, such as a deleted
+  // evaluator, shows only where it has a result.
   const evaluatorsForItem = (item: Item) => {
     const rs = runsByItem[item.uuid] ?? [];
-    return detailsEvaluators.filter(
-      (e) =>
-        evaluatorFitsItem(
-          getJobEvaluator(e)?.evaluator_type,
-          item.is_tool_call === true,
-        ) || rs.some((r) => r.evaluator_id === e.evaluator_id),
-    );
+    return detailsEvaluators.filter((e) => {
+      const type = getJobEvaluator(e)?.evaluator_type;
+      return (
+        (type != null && evaluatorFitsItem(type, item.is_tool_call === true)) ||
+        rs.some((r) => r.evaluator_id === e.evaluator_id)
+      );
+    });
   };
+
+  // An item counts as done as soon as every evaluator on it has a finished
+  // score, even while the rest of the run is still going.
 
   const itemDone = (item: Item): boolean => {
     if (!job) return false;

@@ -33,6 +33,7 @@ import {
   useAnnotatedItemsCheck,
   useAnnotators,
   useTaskItems,
+  isToolCallContent,
 } from "./bulk-upload-shared";
 
 export type EvaluatorVariableDef = {
@@ -49,6 +50,9 @@ export type BulkLinkedEvaluator = {
   output_type: "binary" | "rating" | null;
   scale_min: number | null;
   scale_max: number | null;
+  // Only a "tool-call" evaluator scores a tool call row, and only the others
+  // score the rest, so a variable is required only on rows its evaluator scores.
+  evaluator_type?: string | null;
 };
 
 // Describes one item-content column (the parts that differ between task types,
@@ -399,12 +403,13 @@ export function BulkUploadItemsDialog({
             }
             content[col.payloadKey] = parsed.value;
           }
+          const toolCallRow = isToolCallContent(content);
           if (!contentError && blankUnlessToolCalls.length > 0) {
-            const actual = content.actual_tool_calls;
-            const hasToolCalls =
-              (Array.isArray(actual) && actual.length > 0) ||
-              Array.isArray(content.expected_tool_calls);
-            if (!hasToolCalls) {
+            if (toolCallRow) {
+              for (const col of blankUnlessToolCalls) {
+                content[col.payloadKey] = "";
+              }
+            } else {
               contentError = `Row ${i + 1}: "${blankUnlessToolCalls[0].csvColumn}" is required unless the row has tool calls.`;
             }
           }
@@ -424,7 +429,11 @@ export function BulkUploadItemsDialog({
                 // Same reason as the content columns above: a blank cell in
                 // the downloaded file means the item never carried a value
                 // for this variable, so it is left out instead of failing.
-                if (uploadAnnotations) continue;
+                if (
+                  uploadAnnotations ||
+                  toolCallRow !== (e.evaluator_type === "tool-call")
+                )
+                  continue;
                 rowError = `Row ${i + 1}: missing value for "${variableColumnName(
                   e.name,
                   slot.varName,

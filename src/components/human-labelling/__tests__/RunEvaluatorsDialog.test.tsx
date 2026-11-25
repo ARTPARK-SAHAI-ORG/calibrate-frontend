@@ -57,11 +57,27 @@ describe("RunEvaluatorsDialog", () => {
     mockedApiClient.mockReset();
   });
 
-  it("shows no note about tool calls", async () => {
-    mockedApiClient.mockResolvedValue(detailResponse);
-    renderDialog();
-    expect(await screen.findByText("Relevance")).toBeInTheDocument();
-    expect(screen.queryByText(/tool call/i)).not.toBeInTheDocument();
+  it("offers a tool-call evaluator and runs it like any other", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue([
+      ...detailResponse,
+      {
+        uuid: "ev-tool",
+        live_version_id: "vt-live",
+        live_version_index: 0,
+        versions: [{ uuid: "vt-live", version_number: 1 }],
+      },
+    ]);
+    const onConfirm = jest.fn();
+    renderDialog({
+      evaluators: [...evaluators, { uuid: "ev-tool", name: "Right tool" }],
+      onConfirm,
+    });
+    expect(await screen.findByText("Right tool")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Run" }));
+    expect(
+      onConfirm.mock.calls[0][0].map((s: { evaluator_id: string }) => s.evaluator_id),
+    ).toContain("ev-tool");
   });
 
   it("does not repeat an evaluator's name the row shows in full", async () => {

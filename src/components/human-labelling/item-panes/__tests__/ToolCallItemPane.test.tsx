@@ -61,7 +61,7 @@ describe("ToolCallItemPane", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows both the reply and the tool calls when the agent made both", () => {
+  it("labels the reply and the calls apart and says the evaluator reads both", () => {
     render(
       <ToolCallItemPane
         payload={{
@@ -73,15 +73,30 @@ describe("ToolCallItemPane", () => {
     );
     expect(screen.getByText("One moment")).toBeInTheDocument();
     expect(screen.getByText("book_flight")).toBeInTheDocument();
+    expect(screen.getByText("Agent's reply")).toBeInTheDocument();
+    expect(screen.getByText("Agent's tool calls")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The evaluator reads the agent's reply and its tool calls together",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Evaluation target")).toHaveLength(2);
   });
 
-  it("falls back to tool_calls when actual_tool_calls is empty", () => {
+  it("labels a lone reply as the agent's answer, with no note", () => {
     render(
       <ToolCallItemPane
-        payload={{
-          actual_tool_calls: [],
-          tool_calls: [{ tool: "book_train", arguments: {} }],
-        }}
+        payload={{ actual_tool_calls: [], agent_response: "No tool needed" }}
+      />,
+    );
+    expect(screen.getByText("Agent's answer")).toBeInTheDocument();
+    expect(screen.queryByText(/reads the agent's reply/)).not.toBeInTheDocument();
+  });
+
+  it("reads tool_calls only when actual_tool_calls is not a list", () => {
+    render(
+      <ToolCallItemPane
+        payload={{ tool_calls: [{ tool: "book_train", arguments: {} }] }}
       />,
     );
     expect(screen.getByText("book_train")).toBeInTheDocument();

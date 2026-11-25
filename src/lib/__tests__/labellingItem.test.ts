@@ -1,5 +1,5 @@
 import { textFieldsToPayload } from "@/components/human-labelling/itemConversation";
-import { evaluatorFitsItem, isSkippedRunResult, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables } from "../labellingItem";
+import { evaluatorFitsItem, evaluatorTypesForTask, fitsTaskType, isSkippedRunResult, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables } from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
 // field by field, and is_tool_call was left off the list. The dialog then
@@ -147,5 +147,28 @@ describe("readEvaluatorVariables", () => {
   it("returns nothing for a missing payload or a malformed value", () => {
     expect(readEvaluatorVariables(null)).toEqual({});
     expect(readEvaluatorVariables({ evaluator_variables: [] })).toEqual({});
+  });
+});
+
+describe("evaluatorTypesForTask", () => {
+  it("adds the tool-call kind to llm and llm-general tasks only", () => {
+    expect(evaluatorTypesForTask("llm")).toEqual(["llm", "tool-call"]);
+    expect(evaluatorTypesForTask("llm-general")).toEqual([
+      "llm-general",
+      "tool-call",
+    ]);
+    expect(evaluatorTypesForTask("conversation")).toEqual(["conversation"]);
+    expect(evaluatorTypesForTask("stt")).toEqual(["stt"]);
+  });
+});
+
+describe("fitsTaskType", () => {
+  it("lets a tool-call evaluator onto llm and llm-general tasks", () => {
+    expect(fitsTaskType("llm", "llm")).toBe(true);
+    expect(fitsTaskType("tool-call", "llm")).toBe(true);
+    expect(fitsTaskType("tool-call", "llm-general")).toBe(true);
+    expect(fitsTaskType("tool-call", "conversation")).toBe(false);
+    expect(fitsTaskType("llm", "llm-general")).toBe(false);
+    expect(fitsTaskType(undefined, "llm")).toBe(false);
   });
 });

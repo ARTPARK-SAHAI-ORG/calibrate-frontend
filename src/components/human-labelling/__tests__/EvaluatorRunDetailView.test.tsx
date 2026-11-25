@@ -436,10 +436,15 @@ describe("exportInputCols", () => {
     expect(exportInputCols("llm")).toEqual([
       "conversation_history",
       "agent_response",
+      "expected_tool_calls",
     ]);
   });
   it("returns input and output cols for llm-general", () => {
-    expect(exportInputCols("llm-general")).toEqual(["input", "output"]);
+    expect(exportInputCols("llm-general")).toEqual([
+      "input",
+      "output",
+      "expected_tool_calls",
+    ]);
   });
   it("returns transcript col for conversation", () => {
     expect(exportInputCols("conversation")).toEqual(["transcript"]);
@@ -507,7 +512,7 @@ describe("extractPayloadInputValues", () => {
       },
       "llm",
     );
-    expect(out).toEqual(["user: hi", "hello"]);
+    expect(out).toEqual(["user: hi", "hello", ""]);
   });
   it("exports the default text of a reply stored with versions", () => {
     expect(
@@ -522,22 +527,34 @@ describe("extractPayloadInputValues", () => {
         },
         "llm",
       ),
-    ).toEqual(["", "hello"]);
+    ).toEqual(["", "hello", ""]);
   });
-  it("exports an llm tool-call row's calls as JSON in the output column", () => {
+  it("exports an llm tool-call row's calls and the expected calls", () => {
     const calls = [{ tool: "book_flight", arguments: { to: "Delhi" } }];
+    const expected = [{ tool: "book_flight", arguments: { to: "Goa" } }];
     expect(
       extractPayloadInputValues(
-        { chat_history: [], agent_response: "", actual_tool_calls: calls },
+        {
+          chat_history: [],
+          agent_response: "",
+          actual_tool_calls: calls,
+          expected_tool_calls: expected,
+        },
         "llm",
       ),
-    ).toEqual(["", JSON.stringify(calls)]);
+    ).toEqual(["", JSON.stringify(calls), JSON.stringify(expected)]);
+  });
+  it("reads tool_calls only when actual_tool_calls is not a list", () => {
+    const calls = [{ tool: "book_flight", arguments: {} }];
+    expect(
+      extractPayloadInputValues({ tool_calls: calls }, "llm")[1],
+    ).toBe(JSON.stringify(calls));
     expect(
       extractPayloadInputValues(
-        { chat_history: [], actual_tool_calls: [], tool_calls: calls },
+        { actual_tool_calls: [], tool_calls: calls },
         "llm",
-      ),
-    ).toEqual(["", JSON.stringify(calls)]);
+      )[1],
+    ).toBe("");
   });
   it("exports both the reply and the calls when the agent made both", () => {
     const calls = [{ tool: "book_flight", arguments: {} }];
@@ -546,24 +563,24 @@ describe("extractPayloadInputValues", () => {
         { agent_response: "One moment", actual_tool_calls: calls },
         "llm",
       ),
-    ).toEqual(["", `One moment\n${JSON.stringify(calls)}`]);
+    ).toEqual(["", `One moment\n${JSON.stringify(calls)}`, ""]);
   });
-  it("extracts llm-general input and output", () => {
+  it("extracts llm-general input, output and expected calls", () => {
     expect(
       extractPayloadInputValues({ input: "q", output: "a" }, "llm-general"),
-    ).toEqual(["q", "a"]);
+    ).toEqual(["q", "a", ""]);
     const calls = [{ tool: "lookup", arguments: {} }];
     expect(
       extractPayloadInputValues(
-        { input: "q", output: "", actual_tool_calls: calls },
+        { input: "q", output: "", tool_calls: calls, expected_tool_calls: calls },
         "llm-general",
       ),
-    ).toEqual(["q", JSON.stringify(calls)]);
+    ).toEqual(["q", JSON.stringify(calls), JSON.stringify(calls)]);
   });
   it("defaults llm fields when missing/malformed", () => {
     expect(
       extractPayloadInputValues({ chat_history: "not-array" }, "llm"),
-    ).toEqual(["", ""]);
+    ).toEqual(["", "", ""]);
   });
   it("extracts a serialized transcript for conversation/other types", () => {
     const out = extractPayloadInputValues(
@@ -730,6 +747,7 @@ const evaluatorBinary: JobEvaluator = {
   uuid: "ev-bin",
   name: "Binary Evaluator",
   description: "Checks correctness",
+  evaluator_type: "llm",
   output_type: "binary",
   evaluator_version_id: "v-bin-1",
   version_number: 1,
@@ -743,6 +761,7 @@ const evaluatorRating: JobEvaluator = {
   uuid: "ev-rate",
   name: "Rating Evaluator",
   description: "Rates quality",
+  evaluator_type: "llm",
   output_type: "rating",
   evaluator_version_id: "v-rate-1",
   version_number: 1,
@@ -1857,6 +1876,41 @@ describe("EvaluatorRunDetailView", () => {
       expect(
         screen.getAllByLabelText("Item 2 (completed)").length,
       ).toBeGreaterThan(0);
+    });
+
+    it("shows a deleted evaluator only on items it has a result for", () => {
+      renderOnItems(
+        <EvaluatorRunDetailView
+          job={makeJob({
+            evaluators: [
+              { ...evaluatorBinary, evaluator_type: "llm" },
+              { ...toolCallEvaluator, evaluator_type: null as unknown as undefined },
+            ],
+            items: [
+              { uuid: "item-1", payload: { name: "Text row" } },
+              { uuid: "item-2", payload: { name: "Other row" } },
+            ],
+            details: { item_ids: ["item-1", "item-2"] },
+            runs: [
+              makeRun({ item_id: "item-1" }),
+              makeRun({
+                uuid: "run-2",
+                item_id: "item-2",
+                evaluator_id: "ev-tc",
+                evaluator_version_id: "v-tc-1",
+              }),
+            ],
+          })}
+          task={makeTask()}
+          versionLabels={{}}
+        />,
+      );
+      expect(screen.queryByText("Tool Judge")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("No result recorded for this item."),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getAllByLabelText(/^Item 2/)[0]);
+      expect(screen.getByText("Tool Judge")).toBeInTheDocument();
     });
 
     it("keeps an older run's skipped result on a row it does not fit", () => {

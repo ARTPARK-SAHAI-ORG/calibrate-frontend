@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { publicFetch } from "@/lib/publicFetch";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
@@ -181,9 +182,8 @@ function evaluatorsForItem(
   evaluators: Evaluator[],
   item: { is_tool_call?: boolean } | null | undefined,
 ): Evaluator[] {
-  const wantToolCall = item?.is_tool_call === true;
-  return evaluators.filter(
-    (ev) => (ev.evaluator_type === "tool-call") === wantToolCall,
+  return evaluators.filter((ev) =>
+    evaluatorFitsItem(ev.evaluator_type, item?.is_tool_call === true),
   );
 }
 

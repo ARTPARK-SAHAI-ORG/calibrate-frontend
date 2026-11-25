@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { Tooltip } from "@/components/Tooltip";
 import { DialogNavHeader } from "@/components/ui";
 import { useDialogNavKeys } from "@/hooks";
@@ -328,9 +329,10 @@ export function ItemDetailDialog({
     // was never asked about, always empty.
     const isToolCallItem = item.is_tool_call === true;
     const evaluatorApplies = (evaluatorId: string) =>
-      (summaryEvaluatorByUuid.get(evaluatorId)?.evaluator_type ===
-        "tool-call") ===
-      isToolCallItem;
+      evaluatorFitsItem(
+        summaryEvaluatorByUuid.get(evaluatorId)?.evaluator_type,
+        isToolCallItem,
+      );
 
     for (const row of summary.rows) {
       if (!evaluatorApplies(row.evaluator_id)) continue;

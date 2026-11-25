@@ -15,7 +15,6 @@ import { TraceScoringChip } from "@/components/traces/TraceScoringChip";
 import {
   AddRunToLabellingTaskDialog,
   isLabellableOutput,
-  isToolCallOutput,
   type SourceEvaluatorRef,
   type TraceLabellingItem,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
@@ -57,7 +56,7 @@ import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
 import { CONTACT_LINK } from "@/constants/limits";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
-import { traceRowOutputFacts } from "@/lib/traceScoring";
+import { isToolCallOutput, traceRowOutputFacts } from "@/lib/traceScoring";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
@@ -473,6 +472,7 @@ export function TracesTabContent({
   const [evaluatorTypes, setEvaluatorTypes] = useState<
     Record<string, EvaluatorType>
   >({});
+  const [evaluatorTypesLoading, setEvaluatorTypesLoading] = useState(true);
   // One column per evaluator that can score now, plus any that scored a trace
   // on this page, so taking an evaluator off the agent does not hide the
   // scores it already gave.
@@ -483,7 +483,9 @@ export function TracesTabContent({
       byId.set(evaluator_uuid, {
         evaluator_uuid,
         name,
-        evaluator_type: evaluatorTypes[evaluator_uuid],
+        evaluator_type:
+          evaluatorTypes[evaluator_uuid] ??
+          (evaluatorTypesLoading ? null : undefined),
       });
     };
     for (const item of eligibility?.eligible ?? []) {
@@ -495,7 +497,7 @@ export function TracesTabContent({
       }
     }
     return [...byId.values()];
-  }, [eligibility, items, evaluatorTypes]);
+  }, [eligibility, items, evaluatorTypes, evaluatorTypesLoading]);
   // An evaluator taken off the agent takes its heading away with it, and with
   // no heading there is nothing left on screen to turn its ordering off.
   useEffect(() => {
@@ -553,9 +555,13 @@ export function TracesTabContent({
   const [evaluatorDescriptions, setEvaluatorDescriptions] = useState<
     Record<string, string>
   >({});
+  // Read again each time the tab comes back on screen, the same moment the
+  // scoring eligibility is read again, so an evaluator linked meanwhile has a
+  // type for its column.
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || !isActive) return;
     let cancelled = false;
+    setEvaluatorTypesLoading(true);
     fetchAgentEvaluators(agentUuid, accessToken)
       .then((list) => {
         if (cancelled) return;
@@ -568,11 +574,14 @@ export function TracesTabContent({
         setEvaluatorDescriptions(byId);
         setEvaluatorTypes(typeById);
       })
-      .catch((err) => reportError("Error fetching agent evaluators:", err));
+      .catch((err) => reportError("Error fetching agent evaluators:", err))
+      .finally(() => {
+        if (!cancelled) setEvaluatorTypesLoading(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, [agentUuid, accessToken]);
+  }, [agentUuid, accessToken, isActive]);
 
   // The backend's own averages over every matching trace, not the page.
   const scoreCards = useMemo(

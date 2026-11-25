@@ -4,22 +4,17 @@ import {
 } from "@/components/test-results/shared";
 import { readTextField } from "@/lib/messageVersions";
 import { ExpectedToolCalls } from "./ExpectedToolCalls";
-import { normaliseHistoryItem } from "./shared";
+import { agentToolCalls, normaliseHistoryItem } from "./shared";
 
 /**
- * Renders the conversation side of a tool-call labelling item (a tool-call
- * item inside an `llm` task): the conversation and the agent's actual output
- * (the text it replied with, then its tool calls, as the judge reads them). This is
- * the "what happened" pane — the "what was expected" spec is the item's
- * evaluator-equivalent and renders right under this pane, in
+ * Renders the conversation side of a tool-call labelling item: the
+ * conversation, then what the agent did (its reply if it wrote one, then its
+ * tool calls), as the judge reads them. The expected calls render under it in
  * `ExpectedToolCalls`, so the two can be compared.
  *
- * Follows the exact same pattern as `LlmItemPane`: the agent's actual output
- * is appended to `history` as its own trailing turn and highlighted with
- * `highlightEvalTarget`, instead of being passed through `TestDetailView`'s
- * separate `output` prop — that prop draws test-run pass/fail chrome (a
- * colored bar, a check or cross) that a labelling item, which nobody has
- * judged yet, should never show.
+ * The agent's output is appended to `history` and highlighted with
+ * `highlightEvalTarget` rather than passed as `TestDetailView`'s `output`,
+ * which would draw pass/fail marks on an item nobody has judged yet.
  */
 const AGENT_ANSWER = "Agent's answer";
 
@@ -37,22 +32,19 @@ export function ToolCallItemPane({
   }
 
   const agentResponse = readTextField(payload.agent_response);
-  if (agentResponse && agentResponse.content.length > 0) {
+  const hasReply = !!agentResponse && agentResponse.content.length > 0;
+  const actualToolCalls = agentToolCalls(payload) as NonNullable<
+    TestCaseHistory["tool_calls"]
+  >;
+  const hasCalls = actualToolCalls.length > 0;
+  if (agentResponse && hasReply) {
     history.push({
       role: "assistant",
       ...agentResponse,
-      label: agentResponse.label ?? AGENT_ANSWER,
+      label: agentResponse.label ?? (hasCalls ? "Agent's reply" : AGENT_ANSWER),
     });
   }
-  const actualToolCalls = (
-    Array.isArray(payload.actual_tool_calls) &&
-    payload.actual_tool_calls.length > 0
-      ? payload.actual_tool_calls
-      : Array.isArray(payload.tool_calls)
-        ? payload.tool_calls
-        : []
-  ) as NonNullable<TestCaseHistory["tool_calls"]>;
-  if (actualToolCalls.length > 0) {
+  if (hasCalls) {
     history.push({ role: "assistant", tool_calls: actualToolCalls });
   }
 
@@ -74,8 +66,18 @@ export function ToolCallItemPane({
       history={history}
       passed={true}
       highlightEvalTarget
-      toolCallLabel={AGENT_ANSWER}
-      afterHistory={<ExpectedToolCalls payload={payload} />}
+      toolCallLabel={hasReply ? "Agent's tool calls" : AGENT_ANSWER}
+      afterHistory={
+        <>
+          {hasReply && hasCalls && (
+            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              The evaluator reads the agent&apos;s reply and its tool calls
+              together
+            </div>
+          )}
+          <ExpectedToolCalls payload={payload} />
+        </>
+      }
     />
   );
 }

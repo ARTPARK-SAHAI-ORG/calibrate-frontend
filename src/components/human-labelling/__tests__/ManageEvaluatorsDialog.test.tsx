@@ -127,9 +127,9 @@ describe("ManageEvaluatorsDialog", () => {
     await waitForCatalogueLoaded();
 
     await user.click(screen.getByRole("button", { name: "New evaluator" }));
-    // The task judges one kind of thing, so the flow is told which.
-    expect(screen.getByTestId("create-evaluator-types")).toHaveTextContent(
-      "llm",
+    // Any row of an llm task can be a tool call, so both kinds are offered.
+    expect(screen.getByTestId("create-evaluator-types").textContent).toBe(
+      "llm,tool-call",
     );
 
     await user.click(screen.getByRole("button", { name: "finish creating" }));
@@ -138,6 +138,17 @@ describe("ManageEvaluatorsDialog", () => {
     // Two were already chosen, and the new one joins them.
     expect(screen.getByText("3 selected")).toBeInTheDocument();
     expect(screen.getAllByText("Made just now").length).toBeGreaterThan(0);
+  });
+
+  it("offers only the task's own kind when creating on an stt task", async () => {
+    const user = setupUser();
+    renderDialog({ taskType: "stt" });
+    await waitFor(() => expect(screen.getByText("WER")).toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "New evaluator" }));
+    expect(screen.getByTestId("create-evaluator-types").textContent).toBe(
+      "stt",
+    );
   });
 
   it("stays open while the new evaluator form is clicked", async () => {

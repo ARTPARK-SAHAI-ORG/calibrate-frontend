@@ -57,8 +57,7 @@ export function payloadToHistory(
     if (output !== undefined) {
       history.push({
         role: "tool",
-        content:
-          typeof output === "string" ? output : JSON.stringify(output, null, 2),
+        content: outputText(output),
         tool_call_id: id,
       });
     }
@@ -74,13 +73,90 @@ function parseToolOutput(content: string): unknown {
   }
 }
 
-/** The stored fields for the dialog's history. For an llm item a trailing
- * plain assistant reply becomes `agent_response`. Trailing tool-call turns
- * (with their responses) after the last text become `actual_tool_calls`,
- * with an empty `agent_response`. */
+function outputText(output: unknown): string {
+  return typeof output === "string" ? output : JSON.stringify(output, null, 2);
+}
+
+// The responses the item dialog fills in for a tool call that has none.
+export const DEFAULT_WEBHOOK_RESPONSE =
+  '{\n  "status": "success",\n  "response": {}\n}';
+export const DEFAULT_STRUCTURED_RESPONSE = '{\n  "status": "received"\n}';
+
+// How the item dialog shows a saved argument value in its text box.
+function argumentText(value: unknown): string {
+  if (value === null) return "null";
+  if (value === undefined) return "";
+  if (typeof value === "object") return JSON.stringify(value, null, 2);
+  return String(value);
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+/** The dialog edits argument values as text, so a value it shows unchanged is
+ * put back as the original value. Returns `previous` itself when nothing was
+ * changed, which also keeps keys the dialog does not show. */
+function restoreArguments(
+  next: Record<string, unknown>,
+  previous: Record<string, unknown>,
+  text: (value: unknown) => string = argumentText,
+): Record<string, unknown> {
+  let changed = Object.keys(next).some((k) => !(k in previous));
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(next)) {
+    const before = previous[k];
+    if (v === before) {
+      out[k] = before;
+    } else if (isPlainObject(v) && isPlainObject(before)) {
+      out[k] = restoreArguments(v, before, text);
+      if (out[k] !== before) changed = true;
+    } else if (typeof v === "string" && v === text(before)) {
+      out[k] = before;
+    } else {
+      out[k] = v;
+      changed = true;
+    }
+  }
+  return changed ? out : previous;
+}
+
+/** Tool calls back from a dialog that edits argument values as text: each
+ * call that still names the same tool as the stored call in its place gets
+ * the stored values back where its text is unchanged. `text` is how that
+ * dialog writes a value into its box. */
+export function restoreToolCalls<
+  T extends { tool: string; arguments: Record<string, unknown> },
+>(next: T[], previous: unknown, text?: (value: unknown) => string): T[] {
+  const before = Array.isArray(previous) ? previous : [];
+  return next.map((call, i) => {
+    if (before[i] === undefined) return call;
+    const prior = normalizeToolCall(before[i]);
+    if (prior.toolName !== call.tool) return call;
+    return {
+      ...call,
+      arguments: restoreArguments(call.arguments, prior.args, text),
+    };
+  });
+}
+
+/** A list field on save: the new list when it has entries. An empty list is
+ * kept only when the item already stored an empty one, since an empty list
+ * still marks a tool-call item. A list emptied by the reader is removed. */
+export function keepList<T>(previous: unknown, next: T[]): T[] | undefined {
+  if (next.length > 0) return next;
+  return Array.isArray(previous) && previous.length === 0 ? [] : undefined;
+}
+
+/** The stored fields for the dialog's history. For an llm item, trailing
+ * tool-call turns (with their responses) become `actual_tool_calls`, and an
+ * agent text reply at the end, or just before those turns, becomes
+ * `agent_response`. `previous` is the item being edited: values the dialog
+ * shows unchanged are saved exactly as they were. */
 export function historyToPayloadFields(
   history: HistoryItem[],
   taskType: string | undefined,
+  previous?: Record<string, unknown>,
 ):
   | { transcript: HistoryItem[] }
   | {
@@ -93,22 +169,11 @@ export function historyToPayloadFields(
     h.role === "assistant" &&
     Array.isArray(h.tool_calls) &&
     h.tool_calls.length > 0;
-  const last = history[history.length - 1];
-  if (
-    last &&
-    last.role === "assistant" &&
-    !isCall(last) &&
-    typeof last.content === "string"
-  ) {
-    return {
-      chat_history: history.slice(0, -1),
-      agent_response: writeTextField(last.content, {
-        label: last.label,
-        versions: last.versions,
-      }),
-      actual_tool_calls: undefined,
-    };
-  }
+  const isReply = (h: HistoryItem | undefined) =>
+    !!h &&
+    h.role === "assistant" &&
+    !isCall(h) &&
+    typeof h.content === "string";
   let start = history.length;
   while (
     start > 0 &&
@@ -117,32 +182,84 @@ export function historyToPayloadFields(
     start -= 1;
   }
   const trailing = history.slice(start);
-  if (!trailing.some(isCall)) {
-    return {
-      chat_history: history,
-      agent_response: "",
-      actual_tool_calls: undefined,
-    };
-  }
-  const actual_tool_calls = trailing.filter(isCall).flatMap((turn) =>
-    (turn.tool_calls ?? []).map((call) => {
-      const { args } = normalizeToolCall(call);
-      const response = trailing.find(
-        (t) => t.role === "tool" && t.tool_call_id === call.id,
-      );
-      return {
-        tool: call.function.name,
-        arguments: args,
-        ...(typeof response?.content === "string"
-          ? { output: parseToolOutput(response.content) }
-          : {}),
-      };
-    }),
+  const hasCalls = trailing.some(isCall);
+  const replyIndex = hasCalls
+    ? isReply(history[start - 1])
+      ? start - 1
+      : -1
+    : isReply(history[history.length - 1])
+      ? history.length - 1
+      : -1;
+  const reply = replyIndex >= 0 ? history[replyIndex] : undefined;
+  const chat_history = history.slice(
+    0,
+    replyIndex >= 0 ? replyIndex : hasCalls ? start : history.length,
   );
+  const agent_response = reply
+    ? writeTextField(reply.content as string, {
+        label: reply.label,
+        versions: reply.versions,
+      })
+    : "";
+  const before = Array.isArray(previous?.actual_tool_calls)
+    ? (previous.actual_tool_calls as unknown[])
+    : [];
+  const calls: ToolCallRecord[] = hasCalls
+    ? trailing
+        .filter(isCall)
+        .flatMap((turn) =>
+          (turn.tool_calls ?? []).map((call) => {
+            const { args } = normalizeToolCall(call);
+            const response = trailing.find(
+              (t) => t.role === "tool" && t.tool_call_id === call.id,
+            );
+            return {
+              tool: call.function.name,
+              arguments: args as Record<string, unknown>,
+              content:
+                typeof response?.content === "string"
+                  ? response.content
+                  : undefined,
+            };
+          }),
+        )
+        .map(({ tool, arguments: args, content }, i) => {
+          const prior = before[i];
+          const same =
+            prior !== undefined && normalizeToolCall(prior).toolName === tool;
+          const priorOutput = same
+            ? normalizeToolCall(prior).output
+            : undefined;
+          const restored = same
+            ? restoreArguments(args, normalizeToolCall(prior).args)
+            : args;
+          let output: unknown;
+          if (content !== undefined) {
+            if (
+              priorOutput !== undefined &&
+              content === outputText(priorOutput)
+            ) {
+              output = priorOutput;
+            } else if (!(
+              same &&
+              priorOutput === undefined &&
+              (content === DEFAULT_STRUCTURED_RESPONSE ||
+                content === DEFAULT_WEBHOOK_RESPONSE)
+            )) {
+              output = parseToolOutput(content);
+            }
+          }
+          return {
+            tool,
+            arguments: restored,
+            ...(output !== undefined ? { output } : {}),
+          };
+        })
+    : [];
   return {
-    chat_history: history.slice(0, start),
-    agent_response: "",
-    actual_tool_calls,
+    chat_history,
+    agent_response,
+    actual_tool_calls: keepList(previous?.actual_tool_calls, calls),
   };
 }
 

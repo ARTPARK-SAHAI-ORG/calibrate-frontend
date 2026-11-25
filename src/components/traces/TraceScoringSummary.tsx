@@ -5,20 +5,21 @@ import { RunStateMark } from "@/components/ui";
 import { SpinnerIcon } from "@/components/icons";
 import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
 import {
+  isToolCallOutput,
   isTraceScoringInProgress,
   scoringRunErrorCopy,
   traceRowOutputFacts,
 } from "@/lib/traceScoring";
 import type { TraceSummary } from "@/lib/tracesApi";
 import { defaultBinaryLabel } from "@/lib/binaryLabels";
-import { isToolCallOutput } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 
 export type TraceScoreColumn = {
   evaluator_uuid: string;
   name: string;
-  /** Unknown means the column is treated as applying to every row. */
-  evaluator_type?: EvaluatorType;
+  /** Null while the agent's evaluators are still loading, so the cell waits.
+   * Undefined means unknown, and the column applies to every row. */
+  evaluator_type?: EvaluatorType | null;
 };
 
 // A tool-call evaluator scores only traces that just called a tool, and every
@@ -40,9 +41,12 @@ const COULD_NOT_RUN = (
 type Props = {
   trace: Pick<
     TraceSummary,
-    "latest_run_status" | "latest_run_error" | "results"
-  > &
-    Partial<Pick<TraceSummary, "response_preview" | "tool_call_count">>;
+    | "latest_run_status"
+    | "latest_run_error"
+    | "results"
+    | "response_preview"
+    | "tool_call_count"
+  >;
   columns: TraceScoreColumn[];
   /** "row" is one grid cell per evaluator; "card" is a labelled block each. */
   layout: "row" | "card";
@@ -97,6 +101,7 @@ function ScoreValue({
   const score = trace.results?.find(
     (s) => s.evaluator_uuid === column.evaluator_uuid,
   );
+  if (!score && column.evaluator_type === null) return null;
   if (
     !score &&
     column.evaluator_type &&

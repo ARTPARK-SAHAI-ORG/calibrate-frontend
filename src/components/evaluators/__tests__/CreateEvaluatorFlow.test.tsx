@@ -252,7 +252,7 @@ describe("CreateEvaluatorFlow", () => {
       );
 
       expect(screen.getByText("What is this evaluator for?")).toBeInTheDocument();
-      await user.click(screen.getByText("Tool call"));
+      await user.click(screen.getByText("The tool calls"));
       await user.click(screen.getByRole("button", { name: "Continue" }));
 
       expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
@@ -280,7 +280,7 @@ describe("CreateEvaluatorFlow", () => {
 
     await user.click(screen.getByText("Text"));
     await user.click(screen.getByText("Conversation"));
-    await user.click(screen.getByText("Tool call"));
+    await user.click(screen.getByText("The tool calls"));
     await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
   });

@@ -1,6 +1,9 @@
 import { render, screen, setupUser } from "@/test-utils";
 import { TraceScoreCells, TraceScoreMark } from "../TraceScoringSummary";
 
+// A trace that replied, which every evaluator without a type applies to.
+const reply = { response_preview: "At 14 weeks.", tool_call_count: 0 };
+
 const columns = [
   { evaluator_uuid: "ev-1", name: "Tone" },
   { evaluator_uuid: "ev-2", name: "Accuracy" },
@@ -9,7 +12,7 @@ const columns = [
 it("renders nothing when there are no evaluator columns", () => {
   const { container } = render(
     <TraceScoreCells
-      trace={{ latest_run_status: "completed" }}
+      trace={{ ...reply, latest_run_status: "completed" }}
       columns={[]}
       layout="row"
     />,
@@ -18,7 +21,7 @@ it("renders nothing when there are no evaluator columns", () => {
 });
 
 it("shows a dash per column when this trace has never been scored", () => {
-  render(<TraceScoreCells trace={{}} columns={columns} layout="row" />);
+  render(<TraceScoreCells trace={reply} columns={columns} layout="row" />);
   expect(screen.getAllByText("Not scored yet")).toHaveLength(2);
 });
 
@@ -26,6 +29,7 @@ it("shows the verdict for a yes-or-no evaluator and the score for a rating one",
   render(
     <TraceScoreCells
       trace={{
+        ...reply,
         latest_run_status: "completed",
         results: [
           {
@@ -57,6 +61,7 @@ it("shows a dash for an evaluator the completed run has no score for", () => {
   render(
     <TraceScoreCells
       trace={{
+        ...reply,
         latest_run_status: "completed",
         results: [
           {
@@ -80,6 +85,7 @@ it("labels each evaluator on a mobile card", () => {
   render(
     <TraceScoreCells
       trace={{
+        ...reply,
         latest_run_status: "completed",
         results: [
           {
@@ -163,7 +169,9 @@ describe("TraceScoreMark", () => {
     expect(mark.className).toContain("shrink-0");
     const spinner = mark.querySelector("svg");
     expect(spinner?.getAttribute("class")).toContain("text-amber-500");
-    expect(spinner?.getAttribute("class")).not.toContain("text-muted-foreground");
+    expect(spinner?.getAttribute("class")).not.toContain(
+      "text-muted-foreground",
+    );
   });
 
   it("draws nothing for a trace nothing has tried to score", () => {
@@ -176,7 +184,7 @@ describe("a run that has not finished", () => {
   it("says so in every column while the trace waits and while it is scored", () => {
     const { rerender } = render(
       <TraceScoreCells
-        trace={{ latest_run_status: "pending" }}
+        trace={{ ...reply, latest_run_status: "pending" }}
         columns={columns}
         layout="row"
       />,
@@ -189,6 +197,7 @@ describe("a run that has not finished", () => {
     rerender(
       <TraceScoreCells
         trace={{
+          ...reply,
           latest_run_status: "processing",
           results: [
             {
@@ -214,6 +223,7 @@ describe("a run that could not be run", () => {
     render(
       <TraceScoreCells
         trace={{
+          ...reply,
           latest_run_status: "failed",
           latest_run_error: "scoring_disabled",
         }}
@@ -228,7 +238,11 @@ describe("a run that could not be run", () => {
   it("says so in every column when the run was skipped", () => {
     render(
       <TraceScoreCells
-        trace={{ latest_run_status: "skipped", latest_run_error: "over_limit" }}
+        trace={{
+          ...reply,
+          latest_run_status: "skipped",
+          latest_run_error: "over_limit",
+        }}
         columns={columns}
         layout="row"
       />,
@@ -239,7 +253,7 @@ describe("a run that could not be run", () => {
   it("labels each column on a mobile card too", () => {
     render(
       <TraceScoreCells
-        trace={{ latest_run_status: "failed" }}
+        trace={{ ...reply, latest_run_status: "failed" }}
         columns={columns}
         layout="card"
       />,
@@ -253,6 +267,7 @@ describe("a run that could not be run", () => {
     render(
       <TraceScoreCells
         trace={{
+          ...reply,
           latest_run_status: "completed",
           results: [
             {
@@ -275,7 +290,7 @@ describe("a run that could not be run", () => {
   it("still says a run in progress is in progress", () => {
     const { rerender } = render(
       <TraceScoreCells
-        trace={{ latest_run_status: "pending" }}
+        trace={{ ...reply, latest_run_status: "pending" }}
         columns={columns}
         layout="row"
       />,
@@ -284,7 +299,7 @@ describe("a run that could not be run", () => {
     expect(screen.queryByText("Could not run")).not.toBeInTheDocument();
     rerender(
       <TraceScoreCells
-        trace={{ latest_run_status: "processing" }}
+        trace={{ ...reply, latest_run_status: "processing" }}
         columns={columns}
         layout="row"
       />,
@@ -299,6 +314,7 @@ describe("a rating evaluator", () => {
     render(
       <TraceScoreCells
         trace={{
+          ...reply,
           latest_run_status: "completed",
           results: [
             {
@@ -323,6 +339,7 @@ describe("a rating evaluator", () => {
 describe("the judge's reasoning", () => {
   function withReasoning(reasoning: string | null) {
     return {
+      ...reply,
       latest_run_status: "completed" as const,
       results: [
         {
@@ -429,6 +446,19 @@ describe("a column whose evaluator does not judge this kind of trace", () => {
     );
     expect(screen.getByText("—")).toBeInTheDocument();
     expect(screen.getByText("Could not run")).toBeInTheDocument();
+  });
+
+  it("leaves the cell empty while the agent's evaluators are still loading", () => {
+    const { container } = render(
+      <TraceScoreCells
+        trace={{ ...reply, latest_run_status: "completed" }}
+        columns={[
+          { evaluator_uuid: "ev-1", name: "Tone", evaluator_type: null },
+        ]}
+        layout="row"
+      />,
+    );
+    expect(container).toHaveTextContent(/^$/);
   });
 
   it("still shows a score the evaluator did give", () => {

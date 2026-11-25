@@ -1,19 +1,37 @@
-import type { TraceOutputFacts } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import type {
   TraceScoringIneligibleReason,
   TraceScoringStatus,
   TraceSummary,
 } from "./tracesApi";
 
+/** The only two things about a trace's output that decide how it is labelled.
+ * The traces list has them as a preview and a count, the labelling dialog has
+ * them as the fetched output; both boil down to the same pair. */
+export type TraceOutputFacts = {
+  hasResponse: boolean;
+  hasToolCalls: boolean;
+};
+
+/** True when the output is a tool call and nothing else. Such a trace is built
+ * as a tool-call item (a person marks it correct or wrong) rather than a
+ * response item. A trace that also replied is a response item, and its call
+ * rides along in the conversation. */
+export function isToolCallOutput({
+  hasResponse,
+  hasToolCalls,
+}: TraceOutputFacts): boolean {
+  return !hasResponse && hasToolCalls;
+}
+
 /** The two facts the labelling and scoring rules need, read off a list row.
  * The row carries a preview of the reply and a count of the calls, not the
  * output itself, so this is where that shape is turned into the shared one. */
 export function traceRowOutputFacts(
-  trace: Partial<Pick<TraceSummary, "response_preview" | "tool_call_count">>,
+  trace: Pick<TraceSummary, "response_preview" | "tool_call_count">,
 ): TraceOutputFacts {
   return {
     hasResponse: !!trace.response_preview?.trim(),
-    hasToolCalls: (trace.tool_call_count ?? 0) > 0,
+    hasToolCalls: trace.tool_call_count > 0,
   };
 }
 

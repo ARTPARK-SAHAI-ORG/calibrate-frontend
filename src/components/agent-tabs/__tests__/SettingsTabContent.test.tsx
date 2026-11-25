@@ -253,7 +253,9 @@ describe("SettingsTabContent", () => {
     const validEvaluators = screen.getByText("valid evaluators");
     await user.hover(validEvaluators);
     expect(
-      await screen.findByText("Evaluators that fit this agent, have a prompt, and use no variables"),
+      await screen.findByText(
+        "Evaluators that fit this agent, have a prompt and a live version, and use no variables",
+      ),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Evaluators tab" }));

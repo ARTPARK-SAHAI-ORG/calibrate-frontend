@@ -252,6 +252,23 @@ describe("CreateLabellingTaskDialog", () => {
     expect(screen.queryByText("Tool call correctness") !== null).toBe(shown);
   });
 
+  it.each([
+    ["Agent reply", "A single reply"],
+    ["Basic", "The output"],
+  ])(
+    "offers the tool calls when creating an evaluator on a %s task",
+    async (typeTitle, ownKind) => {
+      const user = setupUser();
+      renderDialog();
+      await goToStep3(user, typeTitle);
+      await user.click(screen.getByRole("button", { name: "New evaluator" }));
+
+      expect(screen.getByText("What is this evaluator for?")).toBeInTheDocument();
+      expect(screen.getByText(ownKind)).toBeInTheDocument();
+      expect(screen.getByText("The tool calls")).toBeInTheDocument();
+    },
+  );
+
   it("keeps a chosen tool call evaluator when the task moves from Agent reply to Basic", async () => {
     const user = setupUser();
     mockApiClient.mockResolvedValue({

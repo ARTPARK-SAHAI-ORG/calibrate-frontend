@@ -231,5 +231,11 @@ describe("BulkUploadLlmItemsDialog", () => {
       cols.find((c: any) => c.payloadKey === "actual_tool_calls")
         .guidelineDescription,
     ).toContain('"agent_response" can be left empty');
+    for (const c of cols.filter((c: any) => c.payloadKey.endsWith("_tool_calls"))) {
+      expect(c.guidelineDescription).toContain(
+        "Only tool call evaluators score a tool call row",
+      );
+      expect(c.headerCandidates).toEqual([c.payloadKey]);
+    }
   });
 });

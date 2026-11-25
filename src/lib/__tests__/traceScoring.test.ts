@@ -7,11 +7,13 @@ import {
 } from "../traceScoring";
 
 describe("traceRowOutputFacts", () => {
-  it("reads a blank preview as no reply and a missing count as no calls", () => {
+  it("reads a blank preview as no reply and a zero count as no calls", () => {
     expect(
       traceRowOutputFacts({ response_preview: "  ", tool_call_count: 1 }),
     ).toEqual({ hasResponse: false, hasToolCalls: true });
-    expect(traceRowOutputFacts({ response_preview: "Hi" })).toEqual({
+    expect(
+      traceRowOutputFacts({ response_preview: "Hi", tool_call_count: 0 }),
+    ).toEqual({
       hasResponse: true,
       hasToolCalls: false,
     });
@@ -63,9 +65,7 @@ describe("copy", () => {
     );
     // The backend's trace_deleted and agent_deleted cannot reach a reader, so
     // they take the general line.
-    expect(scoringRunErrorCopy("trace_deleted")).toBe(
-      "Scoring did not finish",
-    );
+    expect(scoringRunErrorCopy("trace_deleted")).toBe("Scoring did not finish");
     expect(scoringRunErrorCopy("unknown-code")).toBe("Scoring did not finish");
   });
 });

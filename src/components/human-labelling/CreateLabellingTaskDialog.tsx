@@ -10,6 +10,7 @@ import {
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { EvaluatorTypeQuestions } from "@/components/evaluators/EvaluatorTypeQuestions";
 import { apiClient, unwrapList } from "@/lib/api";
+import { evaluatorTypesForTask, fitsTaskType } from "@/lib/labellingItem";
 import { readNameConflictFromError } from "@/lib/parseBackendError";
 
 // Labelling tasks support every evaluator use case.
@@ -35,17 +36,6 @@ type EvaluatorListItem = {
   evaluator_type?: EvaluatorType;
   owner_user_id?: string | null;
 };
-
-function fitsTaskType(
-  evaluatorType: EvaluatorType | undefined,
-  taskType: string,
-): boolean {
-  if (evaluatorType === taskType) return true;
-  return (
-    evaluatorType === "tool-call" &&
-    (taskType === "llm" || taskType === "llm-general")
-  );
-}
 
 function parseApiError(err: unknown, fallback: string): string {
   if (!(err instanceof Error)) return fallback;
@@ -497,18 +487,21 @@ export function CreateLabellingTaskDialog({
         </div>
       </div>
 
-      {/* One kind is already chosen, so this opens straight on the form for
-          that kind rather than asking again. */}
+      {/* Offers the task's own kind, plus the tool calls on an llm or
+          llm-general task. */}
       {taskType && (
         <CreateEvaluatorFlow
           open={createFlowOpen}
           onClose={() => setCreateFlowOpen(false)}
           existingEvaluators={evaluators}
-          useCaseTypes={[taskType]}
+          useCaseTypes={evaluatorTypesForTask(taskType)}
           onCreated={(created) => {
             setCreateFlowOpen(false);
             setEvaluators((prev) => [
-              { ...created, evaluator_type: taskType },
+              {
+                ...created,
+                evaluator_type: created.evaluator_type ?? taskType,
+              },
               ...prev,
             ]);
             // Made for this task, so it starts ticked.

@@ -41,6 +41,7 @@ import {
   type MetadataRow,
 } from "./MetadataFieldsEditor";
 import { parseItemNameConflictFromError } from "./itemNameConflict";
+import { restoreToolCalls } from "./itemConversation";
 import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
@@ -315,7 +316,7 @@ export function AddLlmGeneralItemsDialog({
         s?.expectedToolCalls,
         availableTools,
       );
-      expected.setSelectedTools(seeded);
+      expected.reset(seeded);
       setExpectedBaseline(JSON.stringify(selectedToolsToCalls(seeded)));
       setExpectedAttempted(false);
       setPickerOpen(false);
@@ -374,12 +375,9 @@ export function AddLlmGeneralItemsDialog({
   // rebuild them once it does, unless they were already edited.
   useEffect(() => {
     if (availableTools.length === 0) return;
-    const current = JSON.stringify(selectedToolsToCalls(expected.selectedTools));
-    if (current !== expectedBaseline) return;
-    const rebuilt = toolCallsToSelectedTools(
-      JSON.parse(current) as ExpectedToolCall[],
-      availableTools,
-    );
+    const calls = selectedToolsToCalls(expected.selectedTools);
+    if (JSON.stringify(calls) !== expectedBaseline) return;
+    const rebuilt = toolCallsToSelectedTools(calls, availableTools);
     expected.setSelectedTools(rebuilt);
     setExpectedBaseline(JSON.stringify(selectedToolsToCalls(rebuilt)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -558,10 +556,14 @@ export function AddLlmGeneralItemsDialog({
           output: output.trim(),
           inputExtras,
           outputExtras: toolCalls.length > 0 ? {} : outputExtras,
-          toolCalls: toolCalls.map((tc) => ({
-            tool: tc.tool,
-            arguments: paramsToArgs(tc.params),
-          })),
+          toolCalls: restoreToolCalls(
+            toolCalls.map((tc) => ({
+              tool: tc.tool,
+              arguments: paramsToArgs(tc.params),
+            })),
+            seed?.toolCalls,
+            argValueToText,
+          ),
           expectedToolCalls: selectedToolsToCalls(expected.selectedTools),
           evaluator_variables,
           metadata: rowsToMetadata(metadataRows),
@@ -906,7 +908,7 @@ export function AddLlmGeneralItemsDialog({
                 <ToolCallExpectationsEditor
                   editor={expected}
                   heading="Expected tool calls"
-                  emptyText="Optional. Add the tool calls the agent should have made and the values it should have sent. Evaluators compare the agent's tool calls with these."
+                  emptyText="Optional. Add the tool calls the agent should have made and the values it should have sent. Once you add one, this item is scored only by tool call evaluators, which compare the agent's tool calls with these."
                   availableTools={availableTools}
                   availableToolsLoading={toolsLoading}
                   accessToken={accessToken ?? undefined}

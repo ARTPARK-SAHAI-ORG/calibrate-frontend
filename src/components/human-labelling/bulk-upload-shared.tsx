@@ -1490,6 +1490,22 @@ export type BulkToolCall = {
   accept_any_arguments?: boolean;
 };
 
+const TOOL_CALL_KEYS = ["tool", "arguments", "output", "accept_any_arguments"];
+const MAX_TOOL_NAME_CHARS = 255;
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+// The backend treats an item with either list, even an empty one, as a tool
+// call that only tool-call evaluators score.
+export function isToolCallContent(content: Record<string, unknown>): boolean {
+  return (
+    Array.isArray(content.actual_tool_calls) ||
+    Array.isArray(content.expected_tool_calls)
+  );
+}
+
 function parseToolCallsCell(
   raw: string,
   rowIndex: number,
@@ -1503,20 +1519,44 @@ function parseToolCallsCell(
       error: `Row ${rowIndex + 1}: "${column}" must be valid JSON. Wrap the JSON in double quotes and escape inner double quotes by doubling them.`,
     };
   }
-  const valid =
-    Array.isArray(calls) &&
-    calls.every(
+  if (
+    !Array.isArray(calls) ||
+    !calls.every(
       (c) =>
-        c &&
-        typeof c === "object" &&
-        !Array.isArray(c) &&
-        typeof (c as BulkToolCall).tool === "string" &&
-        (c as BulkToolCall).tool.trim() !== "",
-    );
-  if (!valid) {
+        isPlainObject(c) && typeof c.tool === "string" && c.tool.trim() !== "",
+    )
+  ) {
     return {
       error: `Row ${rowIndex + 1}: "${column}" must be an array of objects, each with a non-empty "tool" name.`,
     };
+  }
+  for (let k = 0; k < calls.length; k++) {
+    const call = calls[k] as Record<string, unknown>;
+    const where = `Row ${rowIndex + 1}: call ${k + 1} in "${column}"`;
+    const unknownKey = Object.keys(call).find(
+      (key) => !TOOL_CALL_KEYS.includes(key),
+    );
+    if (unknownKey) {
+      return {
+        error: `${where} has a field that is not allowed: "${unknownKey}". A call can only have "tool", "arguments", "output" and "accept_any_arguments".`,
+      };
+    }
+    if ((call.tool as string).length > MAX_TOOL_NAME_CHARS) {
+      return {
+        error: `${where} has a "tool" name longer than ${MAX_TOOL_NAME_CHARS} characters.`,
+      };
+    }
+    if (call.arguments != null && !isPlainObject(call.arguments)) {
+      return { error: `${where} has "arguments" that is not a JSON object.` };
+    }
+    if (
+      call.accept_any_arguments != null &&
+      typeof call.accept_any_arguments !== "boolean"
+    ) {
+      return {
+        error: `${where} has "accept_any_arguments" that is not true or false.`,
+      };
+    }
   }
   return { value: calls as BulkToolCall[] };
 }
@@ -1540,12 +1580,12 @@ const TOOL_CALLS_EXAMPLE = `[
 // The two optional tool-call columns shared by the llm and llm-general
 // uploads. `replyColumn` is the reply that may be left empty when they are set.
 export function toolCallColumns(replyColumn: string): BulkContentColumn[] {
-  const emptyReply = `When this is filled in, "${replyColumn}" can be left empty.`;
+  const emptyReply = `Filling in this column or the other tool call column, even with an empty list [], makes the row a tool call row. Only tool call evaluators score a tool call row, and "${replyColumn}" can be left empty on it.`;
   return [
     {
       payloadKey: "actual_tool_calls",
       csvColumn: "actual_tool_calls",
-      headerCandidates: ["actual_tool_calls", "tool_calls"],
+      headerCandidates: ["actual_tool_calls"],
       previewLabel: "Tool calls made",
       previewWidth: "minmax(120px, 200px)",
       guidelineDescription: `(optional) A JSON array of the tool calls the agent made. Each call is an object with a "tool" field naming the tool and, if the tool takes any, an "arguments" object. ${emptyReply}`,

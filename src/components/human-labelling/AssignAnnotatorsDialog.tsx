@@ -161,17 +161,15 @@ function SettingChoice<T extends string>({
 type AssignAnnotatorsDialogProps = {
   isOpen: boolean;
   accessToken: string;
-  /** Evaluators linked to the task — the pool the job can show in labelling. */
+  /** Evaluators linked to the task, the pool the job can show in labelling. */
   evaluators: TaskEvaluator[];
-  /** True when at least one of the chosen items is answered by a tool call.
-   * Tool call correctness is then shown ticked and cannot be unticked, since
-   * such an item is always answered by it. With no such item it is not shown
-   * at all. */
+  /** True when at least one of the chosen items is a tool call. The built-in
+   * Tool call correctness is then shown ticked and cannot be unticked, and
+   * custom tool-call labels are offered. */
   hasToolCallItems: boolean;
-  /** True when at least one of the chosen items is answered by written text
-   * rather than a tool call. The AI-judge labels only apply to such an item,
-   * so with none chosen they are left out entirely — there is nothing for
-   * them to judge. */
+  /** True when at least one of the chosen items is answered in writing rather
+   * than by a tool call. Labels that are not tool-call labels are offered only
+   * then. */
   hasNonToolCallItems: boolean;
   onClose: () => void;
   /** The evaluators to show in the created labelling jobs. */
@@ -243,8 +241,6 @@ export function AssignAnnotatorsDialog({
     };
   }, [isOpen, accessToken]);
 
-  // Start with every label picked, and re-seed if the task's labels arrive
-  // (or change) while the dialog is open.
   // Tool call correctness is never a choice: a tool-call item has no other
   // slot for a person's answer, so it is locked on whenever one is chosen.
   // Every other label is offered only when an item it fits is chosen.
@@ -259,6 +255,8 @@ export function AssignAnnotatorsDialog({
         : hasNonToolCallItems),
   );
 
+  // Start with every label picked, and re-seed if the task's labels arrive
+  // (or change) while the dialog is open.
   const evaluatorIdsKey = choosableEvaluators.map((ev) => ev.uuid).join(",");
   useEffect(() => {
     if (!isOpen) return;
@@ -347,8 +345,6 @@ export function AssignAnnotatorsDialog({
   const toggleEvaluator = (id: string) =>
     setPickedEvaluators((prev) => toggleInSet(prev, id));
 
-  // A task with no labels at all can still be assigned; one with labels needs
-  // at least one picked.
   // Each kind of chosen item needs at least one label that fits it, when the
   // task has one to offer.
   const offeredLabels = [...lockedEvaluators, ...choosableEvaluators];

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/lib/nav";
 import { apiClient, unwrapList } from "@/lib/api";
 import { reportError } from "@/lib/reportError";
+import { isToolCallOutput, type TraceOutputFacts } from "@/lib/traceScoring";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import type { TestCaseResult } from "@/components/TestRunnerDialog";
 import type { BenchmarkModelResult } from "@/components/eval-details";
@@ -169,24 +170,7 @@ export function targetTaskTypeForSource(
   }
 }
 
-/** The only two things about a trace's output that decide how it is labelled.
- * The traces list has them as a preview and a count, this dialog has them as
- * the fetched output; both boil down to the same pair. */
-export type TraceOutputFacts = {
-  hasResponse: boolean;
-  hasToolCalls: boolean;
-};
-
-/** True when the output is a tool call and nothing else. Such a trace is built
- * as a tool-call item (a person marks it correct or wrong) rather than a
- * response item. A trace that also replied is a response item, and its call
- * rides along in the conversation. */
-export function isToolCallOutput({
-  hasResponse,
-  hasToolCalls,
-}: TraceOutputFacts): boolean {
-  return !hasResponse && hasToolCalls;
-}
+export { isToolCallOutput };
 
 /** Whether a trace can be labelled at all. It can if it either replied or
  * called a tool; both become items in the same task. A trace that did neither

@@ -39,6 +39,10 @@ import { OpenToolButton } from "@/components/tools/OpenToolButton";
 import { applyToolEditToMessages } from "@/lib/toolEditsInForm";
 import { CreateToolFlow } from "@/components/tools/CreateToolFlow";
 import {
+  DEFAULT_STRUCTURED_RESPONSE,
+  DEFAULT_WEBHOOK_RESPONSE,
+} from "@/components/human-labelling/itemConversation";
+import {
   ToolCallExpectationsEditor,
   selectedToolsHaveInvalidParams,
   selectedToolsToCalls,
@@ -71,12 +75,8 @@ import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewM
 
 // Default tool-response payloads shown in the Tool Response box. Webhook
 // tools require a body, so the default mimics a successful HTTP response;
-// structured-output tools default to a minimal acknowledgement. Hoisted to
-// constants so the value is identical across the load-synthesis path, the
-// "add tool call" path, and the textarea placeholder.
-const DEFAULT_WEBHOOK_RESPONSE =
-  '{\n  "status": "success",\n  "response": {}\n}';
-const DEFAULT_STRUCTURED_RESPONSE = '{\n  "status": "received"\n}';
+// structured-output tools default to a minimal acknowledgement. Shared with
+// the labelling item save, which leaves out a response that is only this.
 const RESPONSE_PLACEHOLDER = `// any valid JSON value\n${DEFAULT_WEBHOOK_RESPONSE}`;
 
 export type TestConfig = {
@@ -1755,7 +1755,6 @@ export function AddTestDialog({
     });
   };
 
-  const selectedToolCalls = () => selectedToolsToCalls(selectedTools);
 
   // Build the config object for API submission
   const buildConfig = (): TestConfig => {
@@ -1862,7 +1861,7 @@ export function AddTestDialog({
         // the API always receives a positive should-call payload.
         evaluation = {
           type: "tool_call",
-          tool_calls: selectedToolCalls(),
+          tool_calls: selectedToolsToCalls(selectedTools),
         };
       } else {
         // No tool selected - test that no tool is called
@@ -1881,7 +1880,7 @@ export function AddTestDialog({
       evaluation = {
         type: activeTab === "conversation" ? "conversation" : "response",
         ...(showsExpectedToolCalls && selectedTools.length > 0
-          ? { tool_calls: selectedToolCalls() }
+          ? { tool_calls: selectedToolsToCalls(selectedTools) }
           : {}),
       };
     }
@@ -1981,7 +1980,7 @@ export function AddTestDialog({
     const invalid = selectedToolsHaveInvalidParams(selectedTools);
     if (invalid) {
       setToolValidationError(
-        "Please complete every highlighted parameter — booleans need true or false, and numbers must be valid.",
+        "Please complete every highlighted parameter. Booleans need true or false, and numbers must be valid.",
       );
     }
     return invalid;
@@ -2190,7 +2189,8 @@ export function AddTestDialog({
   });
 
   // Where the graded answer starts: the agent's last message, or the run of
-  // tool calls (with their responses) it ended on. -1 when there is neither.
+  // tool calls (with their responses) it ended on, together with the message
+  // just before them when that is the agent's. -1 when there is neither.
   const evalTargetStartIndex = () => {
     let start = chatMessages.length;
     while (
@@ -2201,7 +2201,7 @@ export function AddTestDialog({
       start -= 1;
     }
     if (chatMessages.slice(start).some((m) => m.role === "tool_call")) {
-      return start;
+      return chatMessages[start - 1]?.role === "agent" ? start - 1 : start;
     }
     return chatMessages[chatMessages.length - 1]?.role === "agent"
       ? chatMessages.length - 1
@@ -3090,7 +3090,7 @@ export function AddTestDialog({
                         <ToolCallExpectationsEditor
                           editor={toolExpectations}
                           heading="Expected tool calls"
-                          emptyText="Optional. Add the tool calls the agent should have made and the values it should have sent. Evaluators compare the agent's tool calls with these."
+                          emptyText="Optional. Add the tool calls the agent should have made and the values it should have sent. Once you add one, this item is scored only by tool call evaluators, which compare the agent's tool calls with these."
                           availableTools={availableTools}
                           availableToolsLoading={availableToolsLoading}
                           accessToken={backendAccessToken ?? undefined}
@@ -3177,7 +3177,7 @@ export function AddTestDialog({
                   </svg>
                   <p className="text-sm text-foreground leading-relaxed">
                     {requireAssistantLastMessage
-                      ? "Your evaluators read this whole conversation and score only the agent's final answer, highlighted below. That is the agent's last message, or the tool calls it made after the last user message."
+                      ? "Your evaluators read this whole conversation and score only the agent's final answer, highlighted below. That is the agent's last message, together with any tool calls it made at the end."
                       : activeTab === "conversation"
                         ? "Given the conversation history, the agent's response is added to the conversation and the full updated conversation is graded using the evaluators added to the test"
                         : activeTab === "tool-invocation"

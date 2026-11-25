@@ -10,6 +10,7 @@ import {
   type EvaluatorType,
 } from "@/components/EvaluatorPills";
 import { apiClient, unwrapList } from "@/lib/api";
+import { evaluatorTypesForTask, fitsTaskType } from "@/lib/labellingItem";
 
 type EvaluatorListItem = {
   uuid: string;
@@ -31,17 +32,6 @@ function parseApiError(err: unknown, fallback: string): string {
     return match[1];
   }
   return err.message || fallback;
-}
-
-function fitsTaskType(
-  evaluatorType: EvaluatorType | undefined,
-  taskType: string,
-): boolean {
-  if (evaluatorType === taskType) return true;
-  return (
-    evaluatorType === "tool-call" &&
-    (taskType === "llm" || taskType === "llm-general")
-  );
 }
 
 type ManageEvaluatorsDialogProps = {
@@ -616,12 +606,11 @@ export function ManageEvaluatorsDialog({
         open={createFlowOpen}
         onClose={() => setCreateFlowOpen(false)}
         existingEvaluators={evaluators}
-        // A task judges one kind of thing, so the flow skips asking what for.
-        useCaseTypes={taskType ? [taskType] : undefined}
+        useCaseTypes={taskType ? evaluatorTypesForTask(taskType) : undefined}
         onCreated={(created) => {
           setCreateFlowOpen(false);
           setEvaluators((prev) => [
-            { ...created, evaluator_type: taskType ?? created.evaluator_type },
+            { ...created, evaluator_type: created.evaluator_type ?? taskType },
             ...prev,
           ]);
           // Made for this task, so it starts ticked and joins the order.

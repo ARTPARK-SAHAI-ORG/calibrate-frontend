@@ -738,7 +738,18 @@ export function useToolCallExpectations() {
     }
   };
 
+  // Fresh rows with every view closed, for a dialog opened again.
+  const reset = (tools: SelectedToolConfig[]) => {
+    setSelectedTools(tools);
+    setToolDropdownOpen(false);
+    setJsonModeToolIds(new Set());
+    setToolJsonText({});
+    setToolJsonError({});
+    setCollapsedParamIds(new Set());
+  };
+
   return {
+    reset,
     selectedTools,
     setSelectedTools,
     toolDropdownOpen,

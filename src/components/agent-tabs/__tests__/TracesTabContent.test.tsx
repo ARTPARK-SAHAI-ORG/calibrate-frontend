@@ -607,7 +607,9 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByRole("button", { name: "Conversations" }));
 
     expect(screen.getByTestId("conversations-view")).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText("Search traces")).not.toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("Search traces"),
+    ).not.toBeInTheDocument();
     // The trace list is off screen, so it stops asking for new traces.
     expect(lastTracesArgs().poll).toBe(false);
     expect(new URLSearchParams(window.location.search).get("view")).toBe(
@@ -1184,6 +1186,80 @@ describe("TracesTabContent", () => {
       // other way round.
       await waitFor(() => expect(screen.getAllByText("—")).toHaveLength(4));
       expect(screen.getAllByText("Not scored yet")).toHaveLength(4);
+    });
+
+    it("leaves the evaluator cells empty until the agent's evaluators have loaded", async () => {
+      let finish: (
+        list: { uuid: string; evaluator_type?: string }[],
+      ) => void = () => {};
+      fetchAgentEvaluators.mockReturnValue(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      );
+      mockUseTraces.mockReturnValue(
+        tracesResult([trace({ latest_run_status: "completed" })]),
+      );
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, enabled: true }}
+        />,
+      );
+      expect(screen.getAllByText("Tone")).toHaveLength(2);
+      expect(screen.queryByText("Not scored yet")).not.toBeInTheDocument();
+
+      await act(async () => finish([{ uuid: "ev-1", evaluator_type: "llm" }]));
+      expect(screen.getAllByText("Not scored yet")).toHaveLength(2);
+    });
+
+    it("reads the evaluator kinds again when the tab comes back on screen", async () => {
+      fetchAgentEvaluators.mockResolvedValue([
+        { uuid: "ev-1", evaluator_type: "llm" },
+      ]);
+      mockUseTraces.mockReturnValue(
+        tracesResult([trace({ latest_run_status: "completed" })]),
+      );
+      const scoringOn = { ...traceScoring, enabled: true };
+      const { rerender } = render(
+        <TracesTabContent {...tabProps} traceScoring={scoringOn} />,
+      );
+      await waitFor(() =>
+        expect(screen.getAllByText("Not scored yet")).toHaveLength(2),
+      );
+
+      // On the Evaluators tab the tool-call evaluator is linked.
+      rerender(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={scoringOn}
+          isActive={false}
+        />,
+      );
+      fetchAgentEvaluators.mockResolvedValue([
+        { uuid: "ev-1", evaluator_type: "llm" },
+        { uuid: "ev-tc", evaluator_type: "tool-call" },
+      ]);
+      rerender(
+        <TracesTabContent
+          {...tabProps}
+          isActive
+          traceScoring={{
+            ...scoringOn,
+            eligibility: {
+              eligible: [
+                { evaluator_uuid: "ev-1", name: "Tone" },
+                { evaluator_uuid: "ev-tc", name: "Tool call correctness" },
+              ],
+              ineligible: [],
+            },
+          }}
+        />,
+      );
+
+      await waitFor(() => expect(screen.getAllByText("—")).toHaveLength(2));
+      expect(screen.getAllByText("Not scored yet")).toHaveLength(2);
+      expect(fetchAgentEvaluators).toHaveBeenCalledTimes(2);
     });
 
     it("shows no evaluator columns when nothing can score and nothing has been scored", () => {

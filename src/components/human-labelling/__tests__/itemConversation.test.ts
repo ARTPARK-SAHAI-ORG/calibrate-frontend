@@ -1,5 +1,9 @@
 import {
+  DEFAULT_STRUCTURED_RESPONSE,
+  DEFAULT_WEBHOOK_RESPONSE,
   historyToPayloadFields,
+  keepList,
+  restoreToolCalls,
   payloadToHistory,
   textFieldsToPayload,
   type HistoryItem,
@@ -172,7 +176,7 @@ describe("historyToPayloadFields", () => {
     });
   });
 
-  it("saves trailing tool-call turns as actual_tool_calls with their responses", () => {
+  it("saves trailing tool-call turns as actual_tool_calls, with the reply just before them as agent_response", () => {
     const history: HistoryItem[] = [
       { role: "user", content: "hi" },
       { role: "assistant", content: "checking" },
@@ -201,11 +205,8 @@ describe("historyToPayloadFields", () => {
       { role: "assistant", tool_calls: [{ ...toolCall, id: "c3" }] },
     ];
     expect(historyToPayloadFields(history, "llm")).toEqual({
-      chat_history: [
-        { role: "user", content: "hi" },
-        { role: "assistant", content: "checking" },
-      ],
-      agent_response: "",
+      chat_history: [{ role: "user", content: "hi" }],
+      agent_response: "checking",
       actual_tool_calls: [
         { tool: "lookup", arguments: { city: "Pune" }, output: { ok: true } },
         { tool: "notify", arguments: {}, output: "sent" },
@@ -324,5 +325,178 @@ describe("textFieldsToPayload", () => {
       input: { content: "Summarise", label: "English", versions: { Hindi: "सार" } },
       output: "A summary",
     });
+  });
+});
+
+// What the item dialog sends back for a history it was given and not edited:
+// every argument value becomes the text shown in its box, and a call with no
+// response gets the default response box filled in.
+function throughTheDialog(history: HistoryItem[]): HistoryItem[] {
+  const text = (v: unknown) =>
+    v === null
+      ? "null"
+      : typeof v === "object"
+        ? JSON.stringify(v, null, 2)
+        : String(v);
+  const out: HistoryItem[] = [];
+  history.forEach((turn, i) => {
+    if (!turn.tool_calls) {
+      out.push(turn);
+      return;
+    }
+    const call = turn.tool_calls[0];
+    const args = JSON.parse(call.function.arguments);
+    const asText = (obj: Record<string, unknown>): Record<string, unknown> =>
+      Object.fromEntries(
+        Object.entries(obj)
+          .filter(([k]) => k !== "headers")
+          .map(([k, v]) =>
+            (k === "body" || k === "query") && v && typeof v === "object"
+              ? [k, asText(v as Record<string, unknown>)]
+              : [k, text(v)],
+          ),
+      );
+    out.push({
+      ...turn,
+      tool_calls: [
+        { ...call, function: { ...call.function, arguments: JSON.stringify(asText(args)) } },
+      ],
+    });
+    if (history[i + 1]?.role !== "tool") {
+      out.push({
+        role: "tool",
+        content: args.body ? DEFAULT_WEBHOOK_RESPONSE : DEFAULT_STRUCTURED_RESPONSE,
+        tool_call_id: call.id,
+      });
+    }
+  });
+  return out;
+}
+
+describe("saving an item opened in the dialog", () => {
+  const payload = {
+    chat_history: [{ role: "user", content: "book it" }],
+    agent_response: "On it",
+    actual_tool_calls: [
+      {
+        tool: "book_flight",
+        arguments: { seats: 3, refundable: false, route: { from: "BLR" }, note: null },
+      },
+      {
+        tool: "notify",
+        arguments: { body: { id: 7 }, query: { q: "x" }, headers: { k: "v" } },
+      },
+      { tool: "lookup", arguments: { city: "Pune" }, output: { temp: 30 } },
+    ],
+  };
+
+  it("saves the stored tool calls exactly when nothing was changed", () => {
+    const history = throughTheDialog(payloadToHistory(payload, "llm"));
+    expect(historyToPayloadFields(history, "llm", payload)).toEqual(payload);
+  });
+
+  it("keeps an edited value as typed and the rest as stored", () => {
+    const history = throughTheDialog(payloadToHistory(payload, "llm"));
+    const edited = history.map((t) =>
+      t.tool_calls?.[0].function.name === "book_flight"
+        ? {
+            ...t,
+            tool_calls: [
+              {
+                ...t.tool_calls[0],
+                function: {
+                  name: "book_flight",
+                  arguments: JSON.stringify({
+                    ...JSON.parse(t.tool_calls[0].function.arguments),
+                    seats: "4",
+                  }),
+                },
+              },
+            ],
+          }
+        : t,
+    );
+    const fields = historyToPayloadFields(edited, "llm", payload) as {
+      actual_tool_calls: { arguments: Record<string, unknown> }[];
+    };
+    expect(fields.actual_tool_calls[0].arguments).toEqual({
+      seats: "4",
+      refundable: false,
+      route: { from: "BLR" },
+      note: null,
+    });
+  });
+
+  it("keeps the text reply of an item that also has tool calls", () => {
+    const fields = historyToPayloadFields(
+      payloadToHistory(payload, "llm"),
+      "llm",
+      payload,
+    );
+    expect(fields).toMatchObject({
+      chat_history: payload.chat_history,
+      agent_response: "On it",
+    });
+  });
+
+  it("keeps a stored empty tool-call list and drops one the reader emptied", () => {
+    const empty = {
+      chat_history: [{ role: "user", content: "hi" }],
+      agent_response: "hello",
+      actual_tool_calls: [],
+    };
+    expect(
+      historyToPayloadFields(payloadToHistory(empty, "llm"), "llm", empty),
+    ).toEqual(empty);
+    const cleared = historyToPayloadFields(
+      [
+        { role: "user", content: "book it" },
+        { role: "assistant", content: "Booked" },
+      ],
+      "llm",
+      payload,
+    );
+    expect(cleared).toEqual({
+      chat_history: [{ role: "user", content: "book it" }],
+      agent_response: "Booked",
+    });
+    expect("actual_tool_calls" in cleared && cleared.actual_tool_calls).toBe(
+      undefined,
+    );
+  });
+});
+
+describe("keepList", () => {
+  it("keeps entries, keeps a stored empty list, and leaves out the rest", () => {
+    expect(keepList(undefined, [1])).toEqual([1]);
+    expect(keepList([], [])).toEqual([]);
+    expect(keepList([1], [])).toBeUndefined();
+    expect(keepList(undefined, [])).toBeUndefined();
+  });
+});
+
+describe("restoreToolCalls", () => {
+  it("puts back stored values whose text is unchanged, for the same tool only", () => {
+    const text = (v: unknown) =>
+      typeof v === "string" ? v : v == null ? "" : JSON.stringify(v);
+    const stored = [
+      { tool: "a", arguments: { n: 3, ok: true } },
+      { tool: "b", arguments: { n: 3 } },
+    ];
+    expect(
+      restoreToolCalls(
+        [
+          { tool: "a", arguments: { n: "3", ok: true } },
+          { tool: "c", arguments: { n: "3" } },
+          { tool: "d", arguments: {} },
+        ],
+        stored,
+        text,
+      ),
+    ).toEqual([
+      { tool: "a", arguments: { n: 3, ok: true } },
+      { tool: "c", arguments: { n: "3" } },
+      { tool: "d", arguments: {} },
+    ]);
   });
 });

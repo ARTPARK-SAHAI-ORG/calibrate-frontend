@@ -1021,14 +1021,17 @@ export function TestDetailView({
     return m;
   }, [history]);
 
-  const evalTargetIndex = highlightEvalTarget
+  // The agent's final answer can be a reply followed by tool calls, which the
+  // judge reads together, so every assistant turn in the final run is marked.
+  const evalTargetStart = highlightEvalTarget
     ? (() => {
-        for (let i = history.length - 1; i >= 0; i--) {
-          if (history[i].role === "assistant") return i;
-        }
-        return -1;
+        let last = history.length - 1;
+        while (last >= 0 && history[last].role !== "assistant") last--;
+        let start = last;
+        while (start > 0 && history[start - 1].role === "assistant") start--;
+        return { start, last };
       })()
-    : -1;
+    : { start: -1, last: -1 };
 
   // Auto-scroll to the most recent message whenever the list grows or
   // changes. The sentinel sits after the output section so the last
@@ -1148,7 +1151,10 @@ export function TestDetailView({
           ) : (
             <div className="space-y-4">
               {history.map((message, index) => {
-                const isEvalTarget = index === evalTargetIndex;
+                const isEvalTarget =
+                  index >= evalTargetStart.start &&
+                  index <= evalTargetStart.last &&
+                  evalTargetStart.start >= 0;
                 const turnLabel = readTurnExtras(message).label;
                 const timestamp = formatTurnTimestamp(message.created_at);
                 // Tool-response entries are surfaced inline on their parent

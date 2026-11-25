@@ -163,7 +163,7 @@ describe("EvaluatorTypeQuestions", () => {
     render(<Harness allowed={["llm", "tool-call"]} />);
     expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
     expect(screen.getByText("A single reply")).toBeInTheDocument();
-    await user.click(screen.getByText("Tool call"));
+    await user.click(screen.getByText("The tool calls"));
     expect(chosen()).toBe("tool-call");
     await user.click(screen.getByText("A single reply"));
     expect(chosen()).toBe("llm");
@@ -173,7 +173,7 @@ describe("EvaluatorTypeQuestions", () => {
     const user = setupUser();
     render(<Harness allowed={["llm-general", "tool-call"]} />);
     expect(screen.queryByText("Basic")).not.toBeInTheDocument();
-    await user.click(screen.getByText("Tool call"));
+    await user.click(screen.getByText("The tool calls"));
     expect(chosen()).toBe("tool-call");
     await user.click(screen.getByText("The output"));
     expect(chosen()).toBe("llm-general");
@@ -185,22 +185,26 @@ describe("EvaluatorTypeQuestions", () => {
     await user.click(screen.getByText("Text"));
     await user.click(screen.getByText("Conversation"));
     expect(screen.getByText("The whole conversation")).toBeInTheDocument();
-    await user.click(screen.getByText("Tool call"));
+    await user.click(screen.getByText("The tool calls"));
     expect(chosen()).toBe("tool-call");
 
-    // Basic now has two answers, so it no longer picks one by itself.
+    // The tool calls are offered under Basic too, so the choice stays.
     await user.click(screen.getByText("Basic"));
-    expect(chosen()).toBe("none");
+    expect(chosen()).toBe("tool-call");
     await user.click(screen.getByText("The output"));
     expect(chosen()).toBe("llm-general");
-    await user.click(screen.getByText("Tool call"));
-    expect(chosen()).toBe("tool-call");
+
+    // Basic now has two answers, so moving to it from another choice asks.
+    await user.click(screen.getByText("Conversation"));
+    await user.click(screen.getByText("A single reply"));
+    await user.click(screen.getByText("Basic"));
+    expect(chosen()).toBe("none");
   });
 
   it("shows the one card left rather than a blank step", async () => {
     const user = setupUser();
     render(<Harness allowed={["tool-call"]} />);
-    await user.click(screen.getByText("Tool call"));
+    await user.click(screen.getByText("The tool calls"));
     expect(chosen()).toBe("tool-call");
   });
 

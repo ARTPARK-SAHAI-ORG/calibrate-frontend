@@ -522,6 +522,51 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     ]);
   });
 
+  it("saves the agent's stored tool call exactly when it was not changed", async () => {
+    const user = setupUser();
+    const stored = [
+      {
+        tool: "dummy",
+        arguments: { seats: 3, ok: false, route: { from: "BLR" }, note: null, city: "Pune" },
+      },
+    ];
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "", toolCalls: stored },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual(stored);
+  });
+
+  it("opens again with the expected tool calls' JSON view closed", async () => {
+    const user = setupUser();
+    const props = {
+      onClose: jest.fn(),
+      onSubmit: jest.fn(),
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: [{ tool: "book_flight", arguments: { city: "Pune" } }],
+        },
+      ],
+    };
+    const { rerender } = render(<AddLlmGeneralItemsDialog isOpen {...props} />);
+    await user.click(
+      within(expectedSection()).getByRole("button", { name: "JSON" }),
+    );
+    expect(screen.getByDisplayValue(/"city"/)).toBeInTheDocument();
+    rerender(<AddLlmGeneralItemsDialog isOpen={false} {...props} />);
+    rerender(<AddLlmGeneralItemsDialog isOpen {...props} />);
+    expect(screen.queryByDisplayValue(/"city"/)).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue("Pune")).toBeInTheDocument();
+  });
+
   it("keeps the tool list open on Escape pressed inside the tool side panel", async () => {
     const user = setupUser();
     renderDialog({

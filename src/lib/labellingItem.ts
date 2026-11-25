@@ -6,6 +6,7 @@
 // inline in sits outside what the coverage setup measures, and dropping a
 // field silently here is exactly the bug that made the dialog draw every
 // evaluator on a tool-call item instead of just Tool call correctness.
+import type { EvaluatorType } from "@/components/EvaluatorPills";
 import type { MetadataEntry } from "@/components/ui";
 import { readTurnExtras, textOf, type TurnExtras } from "@/lib/messageVersions";
 
@@ -33,6 +34,26 @@ export function toItemDetailItem(
     is_tool_call: match.is_tool_call,
     metadata: match.metadata,
   };
+}
+
+// The evaluator kinds a labelling task of this type can use. Any row of an
+// `llm` or `llm-general` task can be a tool call, so those also take the
+// tool-call kind.
+export function evaluatorTypesForTask(
+  taskType: EvaluatorType,
+): EvaluatorType[] {
+  return taskType === "llm" || taskType === "llm-general"
+    ? [taskType, "tool-call"]
+    : [taskType];
+}
+
+export function fitsTaskType(
+  evaluatorType: EvaluatorType | undefined,
+  taskType: EvaluatorType,
+): boolean {
+  return (
+    !!evaluatorType && evaluatorTypesForTask(taskType).includes(evaluatorType)
+  );
 }
 
 // A tool-call evaluator judges only tool-call rows, and every other evaluator

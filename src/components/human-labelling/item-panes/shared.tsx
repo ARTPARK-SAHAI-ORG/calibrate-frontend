@@ -104,3 +104,12 @@ export function normaliseHistoryItem(raw: unknown): TestCaseHistory | null {
   }
   return null;
 }
+
+/** The tool calls the agent made: `actual_tool_calls` whenever it is a list,
+ * even an empty one, else `tool_calls`. The backend judge reads the same. */
+export function agentToolCalls(payload: Record<string, unknown>): unknown[] {
+  const calls = Array.isArray(payload.actual_tool_calls)
+    ? payload.actual_tool_calls
+    : payload.tool_calls;
+  return Array.isArray(calls) ? calls : [];
+}
