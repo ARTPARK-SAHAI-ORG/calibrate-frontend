@@ -1371,9 +1371,14 @@ describe("TracesTabContent", () => {
         expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument();
       });
 
-      it("hands the trace window the same button", async () => {
+      it("hands the trace window the same button while no tool call evaluator is added", async () => {
+        fetchTraces.mockResolvedValue({ items: [], total: 1, limit: 1, offset: 0 });
+        fetchAgentEvaluators.mockResolvedValue([
+          { uuid: "ev-1", evaluator_type: "llm" },
+        ]);
         const user = setupUser();
         render(<TracesTabContent {...tabProps} />);
+        await screen.findByText(new RegExp(NOTE));
         await user.click(
           screen.getAllByText("When is the next vaccination?")[0],
         );
@@ -1383,6 +1388,25 @@ describe("TracesTabContent", () => {
             { name: "Add a tool call evaluator" },
           ),
         ).toBeInTheDocument();
+      });
+
+      it("hands the trace window no button once a tool call evaluator is added", async () => {
+        fetchTraces.mockResolvedValue({ items: [], total: 1, limit: 1, offset: 0 });
+        fetchAgentEvaluators.mockResolvedValue([
+          { uuid: "ev-tc", evaluator_type: "tool-call" },
+        ]);
+        const user = setupUser();
+        render(<TracesTabContent {...tabProps} />);
+        await waitFor(() => expect(fetchAgentEvaluators).toHaveBeenCalled());
+        await user.click(
+          screen.getAllByText("When is the next vaccination?")[0],
+        );
+        expect(
+          within(screen.getByTestId("trace-detail-add-tool-call")).queryByRole(
+            "button",
+            { name: "Add a tool call evaluator" },
+          ),
+        ).not.toBeInTheDocument();
       });
     });
 

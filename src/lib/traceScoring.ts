@@ -129,7 +129,7 @@ export function scoringRunErrorCopy(error: string | null | undefined): string {
     case "over_limit":
       return "This workspace has reached its limit for scoring traces";
     case "no_tool_call_evaluator":
-      return "No tool call evaluator is added to this agent";
+      return "No tool call evaluator was added to this agent when this trace arrived";
     case "no_usable_evaluators":
       return "No evaluator on this agent fits this trace";
     case "scoring_disabled":

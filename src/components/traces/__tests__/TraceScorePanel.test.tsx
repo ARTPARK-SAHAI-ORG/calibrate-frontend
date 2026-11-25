@@ -285,3 +285,23 @@ it("says the agent has no tool call evaluator and offers the button to add one",
     screen.getByRole("button", { name: "Add a tool call evaluator" }),
   ).toBeInTheDocument();
 });
+
+it("says the trace was skipped before a tool call evaluator was added, with no button, once the agent has one", () => {
+  render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r10",
+        status: "skipped",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "no_tool_call_evaluator",
+        results: [],
+      }}
+    />,
+  );
+  expect(document.body).toHaveTextContent(
+    "No tool call evaluator was added to this agent when this trace arrived",
+  );
+  expect(
+    screen.queryByRole("button", { name: "Add a tool call evaluator" }),
+  ).not.toBeInTheDocument();
+});

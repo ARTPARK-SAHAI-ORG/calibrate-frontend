@@ -1228,7 +1228,9 @@ export function TracesTabContent({
       <TraceDetailDialog
         evaluatorDescriptions={evaluatorDescriptions}
         ineligibleEvaluators={ineligible}
-        addToolCallEvaluator={addToolCallEvaluatorButton}
+        addToolCallEvaluator={
+          missingToolCallEvaluator ? addToolCallEvaluatorButton : undefined
+        }
         isOpen={openTraceUuid != null}
         onClose={closeTrace}
         accessToken={accessToken}
