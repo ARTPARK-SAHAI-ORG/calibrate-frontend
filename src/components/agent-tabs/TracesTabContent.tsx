@@ -1206,8 +1206,8 @@ export function TracesTabContent({
               onClick: onViewTests,
             },
           });
-          // Tests that will not run, or that no agent lists. These stay until
-          // the reader closes them, since the tests look fine everywhere else.
+          // Saved tests with no evaluator, or not added to the agent's Tests
+          // tab. These stay until the reader closes them.
           for (const warning of result.warnings ?? []) {
             toast.warning(warning, { duration: Infinity });
           }
