@@ -5,6 +5,7 @@ import { SegmentedFilter, InfoNote } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { useDismissOnOutside } from "@/hooks/useDismissOnOutside";
+import { useKeepInView } from "@/hooks/useKeepInView";
 import {
   ChevronDownIcon,
   FilterIcon,
@@ -163,6 +164,8 @@ export function TracesFilter({
   hasFeedback?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const shift = useKeepInView(panelRef, open);
   const [draft, setDraft] = useState<TracesFilterValue>(value);
   const [labelSearch, setLabelSearch] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
@@ -269,7 +272,10 @@ export function TracesFilter({
         // ponytail: positioned against the button, not portalled. It opens
         // downward from a toolbar at the top of the tab, so there is room.
         // Switch to a portal if it ever gets clipped.
-        <div className="absolute left-0 top-full mt-2 z-30 w-max min-w-[min(30rem,calc(100vw-2rem))] max-w-[min(44rem,calc(100vw-2rem))] rounded-lg border border-border bg-background shadow-lg p-5">
+        <div
+          ref={panelRef}
+          style={{ transform: `translateX(${shift}px)` }}
+          className="absolute left-0 top-full mt-2 z-30 w-max min-w-[min(30rem,calc(100vw-2rem))] max-w-[min(44rem,calc(100vw-2rem))] rounded-lg border border-border bg-background shadow-lg p-5">
           <h3 className="text-base font-semibold text-foreground mb-4">
             {forConversations ? "Filter conversations" : "Filter traces"}
           </h3>

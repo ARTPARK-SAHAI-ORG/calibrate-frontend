@@ -53,3 +53,4 @@ export { useResizableWidth } from "./useResizableWidth";
 export { useSavedColumnWidth } from "./useSavedColumnWidth";
 export { useUnsavedChangesPrompt } from "./useUnsavedChangesPrompt";
 export { useDismissOnOutside } from "./useDismissOnOutside";
+export { useKeepInView } from "./useKeepInView";

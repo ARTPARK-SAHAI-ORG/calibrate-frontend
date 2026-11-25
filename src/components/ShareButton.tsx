@@ -159,7 +159,7 @@ export function ShareButton({
         <button
           onClick={toggle}
           disabled={isLoading || !!disabledReason}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap transition-colors border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
             isPublic
               ? "bg-sky-500/18 border-sky-500/50 text-sky-900 dark:text-sky-100 hover:bg-sky-500/30 dark:hover:bg-sky-500/25"
               : "bg-violet-500/14 border-violet-500/45 text-violet-900 dark:text-violet-200 hover:bg-violet-500/26 dark:hover:bg-violet-500/20"
@@ -225,7 +225,7 @@ export function ShareButton({
         <Tooltip content="Copy public link" position="top">
           <button
             onClick={copyLink}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap border transition-colors cursor-pointer ${
               copied
                 ? "bg-emerald-500/15 border-emerald-500/45 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-500/25 dark:hover:bg-emerald-500/20"
                 : "bg-amber-500/16 border-amber-500/50 text-amber-950 dark:text-amber-100 hover:bg-amber-500/28 dark:hover:bg-amber-500/22"

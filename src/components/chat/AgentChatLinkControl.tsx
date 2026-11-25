@@ -14,7 +14,7 @@ type ChatLink = {
 };
 
 const PREVIEW_CLASS =
-  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors bg-pink-500/14 border-pink-500/45 text-pink-900 dark:text-pink-200";
+  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap border transition-colors bg-pink-500/14 border-pink-500/45 text-pink-900 dark:text-pink-200";
 
 function OpenIcon() {
   return (
