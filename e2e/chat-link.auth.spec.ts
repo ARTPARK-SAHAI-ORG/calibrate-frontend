@@ -45,7 +45,7 @@ test.describe("Agent chat link (authenticated, real backend)", () => {
       await page
         .getByRole("button", { name: "Share chat link", exact: true })
         .click();
-      await page.getByRole("button", { name: "Create link" }).click();
+      await page.getByRole("button", { name: "Share link" }).click();
       await expect(
         page.getByRole("button", { name: "Copy link" }),
       ).toBeVisible();

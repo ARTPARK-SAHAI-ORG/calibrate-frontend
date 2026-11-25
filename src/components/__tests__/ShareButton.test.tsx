@@ -120,7 +120,7 @@ describe("ShareButton", () => {
     ).toBeInTheDocument();
   });
 
-  it("asks before making a chat link for the first time, and not after", async () => {
+  it("asks before turning the chat link on, and does nothing on Cancel", async () => {
     const user = setupUser();
     mockFetchOnce({ is_public: true, share_token: "tok1" });
     render(
@@ -133,20 +133,20 @@ describe("ShareButton", () => {
       />,
     );
     await user.click(screen.getByRole("button", { name: "Share chat link" }));
-    expect(screen.getByText("Create a chat link?")).toBeInTheDocument();
+    expect(screen.getByText("Share the chat link?")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByText("Create a chat link?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Share the chat link?")).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Share chat link" }));
-    await user.click(screen.getByRole("button", { name: "Create link" }));
+    await user.click(screen.getByRole("button", { name: "Share link" }));
     expect(
       await screen.findByRole("button", { name: "Make it private" }),
     ).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("turns a chat link that already exists back on without asking", async () => {
+  it("asks again each time the chat link is turned on, though its address already exists", async () => {
     const user = setupUser();
     mockFetchOnce({ is_public: true, share_token: "tok1" });
     render(
@@ -159,7 +159,9 @@ describe("ShareButton", () => {
       />,
     );
     await user.click(screen.getByRole("button", { name: "Share chat link" }));
-    expect(screen.queryByText("Create a chat link?")).not.toBeInTheDocument();
+    expect(screen.getByText("Share the chat link?")).toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Share link" }));
     expect(
       await screen.findByRole("button", { name: "Make it private" }),
     ).toBeInTheDocument();
@@ -303,7 +305,7 @@ describe("ShareButton", () => {
       />,
     );
     await user.click(screen.getByRole("button", { name: /Share/ }));
-    await user.click(screen.getByRole("button", { name: "Create link" }));
+    await user.click(screen.getByRole("button", { name: "Share link" }));
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(
         "https://api.example.com/agents/a1/chat-link/visibility",
