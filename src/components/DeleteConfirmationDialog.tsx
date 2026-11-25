@@ -17,6 +17,9 @@ type DeleteConfirmationDialogProps = {
   confirmText?: string;
   cancelText?: string;
   isDeleting?: boolean;
+  /** The confirm button's words while it works, when adding "ing" to
+   *  `confirmText` would not read right. */
+  busyText?: string;
   /** Optional content rendered between the message and the action row
    * (e.g. a "permanently delete" checkbox). */
   extraContent?: React.ReactNode;
@@ -31,6 +34,7 @@ export function DeleteConfirmationDialog({
   confirmText = "Remove",
   cancelText = "Cancel",
   isDeleting = false,
+  busyText,
   extraContent,
 }: DeleteConfirmationDialogProps) {
   // Hide the floating "Talk to Us" button when this dialog is open
@@ -89,7 +93,7 @@ export function DeleteConfirmationDialog({
               </svg>
             )}
             {isDeleting
-              ? `${confirmText.replace(/e$/, "")}ing...`
+              ? (busyText ?? `${confirmText.replace(/e$/, "")}ing...`)
               : confirmText}
           </button>
         </div>

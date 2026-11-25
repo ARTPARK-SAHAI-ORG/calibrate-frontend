@@ -44,6 +44,9 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={setAgentSpeaksFirst}
         maxAssistantTurns={5}
         setMaxAssistantTurns={jest.fn()}
+        messagesPerDay={200}
+        setMessagesPerDay={jest.fn()}
+        messagesPerDayMaximum={300}
         traceScoring={scoring()}
         onGoToEvaluators={jest.fn()}
       />,
@@ -63,6 +66,9 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={setAgentSpeaksFirst}
         maxAssistantTurns={5}
         setMaxAssistantTurns={jest.fn()}
+        messagesPerDay={200}
+        setMessagesPerDay={jest.fn()}
+        messagesPerDayMaximum={300}
         traceScoring={scoring()}
         onGoToEvaluators={jest.fn()}
       />,
@@ -81,6 +87,9 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={jest.fn()}
         maxAssistantTurns={5}
         setMaxAssistantTurns={setMaxAssistantTurns}
+        messagesPerDay={200}
+        setMessagesPerDay={jest.fn()}
+        messagesPerDayMaximum={300}
         traceScoring={scoring()}
         onGoToEvaluators={jest.fn()}
       />,
@@ -99,6 +108,9 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={jest.fn()}
         maxAssistantTurns={5}
         setMaxAssistantTurns={setMaxAssistantTurns}
+        messagesPerDay={200}
+        setMessagesPerDay={jest.fn()}
+        messagesPerDayMaximum={300}
         traceScoring={scoring()}
         onGoToEvaluators={jest.fn()}
       />,
@@ -118,6 +130,9 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={jest.fn()}
         maxAssistantTurns={5}
         setMaxAssistantTurns={setMaxAssistantTurns}
+        messagesPerDay={200}
+        setMessagesPerDay={jest.fn()}
+        messagesPerDayMaximum={300}
         traceScoring={scoring()}
         onGoToEvaluators={jest.fn()}
       />,
@@ -135,6 +150,9 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={jest.fn()}
         maxAssistantTurns={5}
         setMaxAssistantTurns={jest.fn()}
+        messagesPerDay={200}
+        setMessagesPerDay={jest.fn()}
+        messagesPerDayMaximum={300}
         traceScoring={scoring()}
         onGoToEvaluators={jest.fn()}
       />,
@@ -151,6 +169,9 @@ describe("SettingsTabContent", () => {
         setAgentSpeaksFirst={jest.fn()}
         maxAssistantTurns={5}
         setMaxAssistantTurns={jest.fn()}
+        messagesPerDay={200}
+        setMessagesPerDay={jest.fn()}
+        messagesPerDayMaximum={300}
         traceScoring={controls}
         onGoToEvaluators={onGoToEvaluators}
       />,
@@ -303,5 +324,50 @@ describe("SettingsTabContent", () => {
       heading.compareDocumentPosition(switchEl) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  describe("Talk to agent", () => {
+    const renderCard = (messagesPerDay: number, maximum: number | null) => {
+      const setMessagesPerDay = jest.fn();
+      render(
+        <SettingsTabContent
+          agentSpeaksFirst={false}
+          setAgentSpeaksFirst={jest.fn()}
+          maxAssistantTurns={5}
+          setMaxAssistantTurns={jest.fn()}
+          traceScoring={scoring()}
+          messagesPerDay={messagesPerDay}
+          setMessagesPerDay={setMessagesPerDay}
+          messagesPerDayMaximum={maximum}
+          onGoToEvaluators={jest.fn()}
+        />,
+      );
+      return { setMessagesPerDay, box: screen.getByLabelText("Messages per day") };
+    };
+
+    it("shows the number and passes every whole number typed, including 0", () => {
+      const { setMessagesPerDay, box } = renderCard(200, 300);
+      expect(box).toHaveValue(200);
+      expect(screen.getByText("Talk to agent")).toBeInTheDocument();
+      fireEvent.change(box, { target: { value: "0" } });
+      expect(setMessagesPerDay).toHaveBeenCalledWith(0);
+      setMessagesPerDay.mockClear();
+      fireEvent.change(box, { target: { value: "" } });
+      expect(setMessagesPerDay).not.toHaveBeenCalled();
+    });
+
+    it("marks a number above the maximum", () => {
+      const { box } = renderCard(301, 300);
+      expect(box.className).toContain("border-red-500/60");
+      expect(
+        screen.getByText(/This is more than your workspace allows/),
+      ).toBeInTheDocument();
+    });
+
+    it("never marks a number when the workspace has no maximum", () => {
+      const { box } = renderCard(5000, null);
+      expect(box.className).not.toContain("border-red-500/60");
+      expect(screen.queryByText(/This is more than/)).toBeNull();
+    });
   });
 });

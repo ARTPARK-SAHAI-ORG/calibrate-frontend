@@ -36,7 +36,17 @@ it("previews a public chat page in a new tab", async () => {
   expect(mockGet).toHaveBeenCalledWith("/agents/a1/chat-link", "tok");
 });
 
-it("greys out Preview until the chat is public, then opens it", async () => {
+it("previews a private chat too, since members are let in", async () => {
+  mockGet.mockResolvedValue(link({ share_token: "abc" }));
+  render(<AgentChatLinkControl agentUuid="a1" connectionUnverified={false} />);
+  expect(await screen.findByRole("link", { name: "Preview" })).toHaveAttribute(
+    "href",
+    "/public/chat/abc",
+  );
+  expect(screen.getByRole("button", { name: /Share/ })).toBeEnabled();
+});
+
+it("greys out Preview when there is no link yet, then opens it once public", async () => {
   const user = setupUser();
   mockGet.mockResolvedValue(link());
   render(<AgentChatLinkControl agentUuid="a1" connectionUnverified={false} />);
@@ -56,12 +66,33 @@ it("greys out Preview until the chat is public, then opens it", async () => {
     "href",
     "/public/chat/new",
   );
+
+  // Making it private again keeps the preview working.
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ is_public: false, share_token: null }),
+  });
+  await user.click(screen.getByRole("button", { name: /Public/ }));
+  await screen.findByRole("button", { name: /Share/ });
+  expect(screen.getByRole("link", { name: "Preview" })).toHaveAttribute(
+    "href",
+    "/public/chat/new",
+  );
 });
 
-it("cannot be made public until the connection is checked", async () => {
-  mockGet.mockResolvedValue(link({ connection_verified: false }));
+it("greys out Share and Preview until the connection is verified", async () => {
+  const user = setupUser();
+  mockGet.mockResolvedValue(
+    link({ connection_verified: false, share_token: "abc" }),
+  );
   render(<AgentChatLinkControl agentUuid="a1" connectionUnverified />);
   expect(await screen.findByRole("button", { name: /Share/ })).toBeDisabled();
+  const preview = screen.getByRole("button", { name: "Preview" });
+  expect(preview).toBeDisabled();
+  await user.hover(preview.parentElement!);
+  expect(
+    await screen.findByText("Verify your agent connection first"),
+  ).toBeInTheDocument();
 });
 
 it("can still be made private when the connection stopped being checked", async () => {
