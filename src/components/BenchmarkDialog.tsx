@@ -420,9 +420,10 @@ export function BenchmarkDialog({
   };
 
   // Stored by id until the model list arrives, so the names come from the list.
-  const chosenModels = selectedModels
-    .filter((m): m is LLMModel => m !== null)
-    .map((m) => resolveSavedModel(m.id, llmProviders));
+  const namedModels = selectedModels.map(
+    (m) => m && resolveSavedModel(m.id, llmProviders),
+  );
+  const chosenModels = namedModels.filter((m): m is LLMModel => m !== null);
   // The same rule `handleRunBenchmark` runs on: a connection agent has to pass
   // a check with each model it has not been verified with yet, so the question
   // says so before the reader agrees to it.
@@ -447,11 +448,8 @@ export function BenchmarkDialog({
     agentType === "connection" && selectedModels.some((m) => m !== null);
   // The chosen models, then one blank row to pick the next in, until five
   // are chosen. Picking a model fills the blank and a new blank appears.
-  const rows: (LLMModel | null)[] = (
-    selectedModels.length < maxModels
-      ? [...selectedModels, null]
-      : selectedModels
-  ).map((m) => m && resolveSavedModel(m.id, llmProviders));
+  const rows: (LLMModel | null)[] =
+    namedModels.length < maxModels ? [...namedModels, null] : namedModels;
   const rowProblems = rows.map((m) =>
     modelProblem(m?.id ?? "", modelAvailability),
   );
