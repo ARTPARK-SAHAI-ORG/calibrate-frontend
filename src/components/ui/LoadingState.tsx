@@ -150,7 +150,7 @@ export function EmptyState({
       <h3 className="text-lg font-semibold text-foreground mb-1 text-center">
         {title}
       </h3>
-      <p className="text-base text-muted-foreground mb-4 text-center">
+      <p className="text-base text-foreground mb-4 text-center">
         {description}
       </p>
       {actions}

@@ -291,12 +291,12 @@ export function PublicChatView({ token }: { token: string }) {
                       setDraft(message);
                       messageRef.current?.focus();
                     }}
-                    className="w-full text-left px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                    className="w-full text-left px-3 py-2 rounded-md border border-blue-500/40 bg-blue-500/10 text-sm font-medium text-blue-900 dark:text-blue-200 hover:bg-blue-500/20 transition-colors cursor-pointer"
                   >
                     {message}
                   </button>
                 ))}
-                <p className="text-xs text-muted-foreground text-center mt-1">
+                <p className="text-sm text-foreground text-center mt-1">
                   Click one to put it in the message box
                 </p>
               </div>
