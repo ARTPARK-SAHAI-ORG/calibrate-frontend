@@ -1206,11 +1206,6 @@ export function TracesTabContent({
               onClick: onViewTests,
             },
           });
-          // Tests that will not run, or that no agent lists. These stay until
-          // the reader closes them, since the tests look fine everywhere else.
-          for (const warning of result.warnings ?? []) {
-            toast.warning(warning, { duration: Infinity });
-          }
           offerAgentDefaults(evaluatorsUsed, (isOne) =>
             created === 1
               ? `The test you just added uses ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`

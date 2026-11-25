@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within, setupUser } from "@/test-utils";
 jest.mock("sonner", () => ({
-  toast: { error: jest.fn(), success: jest.fn(), warning: jest.fn() },
+  toast: { error: jest.fn(), success: jest.fn() },
 }));
 import { toast } from "sonner";
 import { TracesTabContent } from "../TracesTabContent";
@@ -246,7 +246,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     } | null;
     agentNature?: string;
     onConverted: (
-      result: { created: number; test_uuids: string[]; warnings?: string[] },
+      result: { created: number; test_uuids: string[] },
       evaluatorsUsed?: { uuid: string; name: string }[],
     ) => void;
   }) =>
@@ -284,18 +284,6 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
           }
         >
           finish adding with a new evaluator
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            onConverted({
-              created: 2,
-              test_uuids: ["t1", "t2"],
-              warnings: ["1 of 2 tests will not run"],
-            })
-          }
-        >
-          finish adding with a warning
         </button>
       </div>
     ) : null,
@@ -1912,19 +1900,6 @@ describe("TracesTabContent", () => {
       expect.anything(),
     );
     expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
-  });
-
-  it("keeps a warning from adding tests on screen until it is closed", async () => {
-    const user = setupUser();
-    render(<TracesTabContent {...tabProps} />);
-
-    await user.click(screen.getAllByLabelText("Select trace")[0]);
-    await user.click(screen.getByText("Add to tests (1)"));
-    await user.click(screen.getByText("finish adding with a warning"));
-
-    expect(toast.warning).toHaveBeenCalledWith("1 of 2 tests will not run", {
-      duration: Infinity,
-    });
   });
 
   it("offers to attach an evaluator the agent does not have after adding tests", async () => {
