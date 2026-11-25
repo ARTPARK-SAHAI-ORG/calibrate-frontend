@@ -62,6 +62,12 @@ it("greys out Preview when there is no link yet, then opens it once public", asy
     json: async () => ({ is_public: true, share_token: "new" }),
   });
   await user.click(screen.getByRole("button", { name: /Share/ }));
+  // No link yet, so the window says what the link does before making it.
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(
+    screen.getByText(/anyone can open to chat with this agent/),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Create link" }));
   expect(await screen.findByRole("link", { name: "Preview" })).toHaveAttribute(
     "href",
     "/public/chat/new",

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { copyToClipboard } from "@/lib/clipboard";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 export type ShareableEntityType =
   | "stt"
@@ -63,21 +64,32 @@ export function publicSharePath(
   return `/public/${PUBLIC_PATHS[entityType]}/${shareToken}`;
 }
 
-/** Hover text that says what each button does for this kind of link. Kinds
- *  not listed use the general words. */
-const HOVER_TEXT: Partial<
-  Record<
-    ShareableEntityType,
-    { makePublic: string; makePrivate: string; copy: string }
-  >
-> = {
+/** The Share button's name, its hover text, and for some kinds a window that
+ *  says what the link does before it is first made. Kinds not listed use the
+ *  general words and no window. */
+type ShareWords = {
+  share: string;
+  makePublic: string;
+  makePrivate: string;
+  copy: string;
+  firstShare?: { title: string; message: string; confirmText: string };
+};
+const HOVER_TEXT: Partial<Record<ShareableEntityType, ShareWords>> = {
   "agent-chat": {
+    share: "Share chat link",
     makePublic: "Create a link anyone can use to chat with this agent",
-    makePrivate: "Turn off the link to chat with this agent",
+    makePrivate: "Make it private",
     copy: "Copy the link to chat with the agent and share it with users",
+    firstShare: {
+      title: "Create a chat link?",
+      message:
+        "This creates a link anyone can open to chat with this agent. They do not need a Calibrate account. Each reply shows up in the Monitoring tab.",
+      confirmText: "Create link",
+    },
   },
 };
-const DEFAULT_HOVER_TEXT = {
+const DEFAULT_HOVER_TEXT: ShareWords = {
+  share: "Share",
   makePublic: "Make this publicly shareable",
   makePrivate: "Make this private",
   copy: "Copy public link",
@@ -109,6 +121,7 @@ export function ShareButton({
     initialShareToken,
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [confirmingFirstShare, setConfirmingFirstShare] = useState(false);
   const hoverText = HOVER_TEXT[entityType] ?? DEFAULT_HOVER_TEXT;
 
   // Sync internal state when parent props change (e.g. after polling fetches actual share state)
@@ -178,7 +191,13 @@ export function ShareButton({
         position="bottom"
       >
         <button
-          onClick={toggle}
+          onClick={() =>
+            // Only before a link has ever been made: turning one back on
+            // reuses the same link, which the reader has already seen.
+            !isPublic && !shareToken && hoverText.firstShare
+              ? setConfirmingFirstShare(true)
+              : void toggle()
+          }
           disabled={isLoading || !!disabledReason}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
             isPublic
@@ -237,7 +256,7 @@ export function ShareButton({
               />
             </svg>
           )}
-          {isPublic ? "Public" : "Share"}
+          {isPublic ? "Public" : hoverText.share}
         </button>
       </Tooltip>
 
@@ -292,6 +311,21 @@ export function ShareButton({
       )}
 
       {error && <span className="text-[12px] text-red-500">{error}</span>}
+
+      {hoverText.firstShare && (
+        <ConfirmDialog
+          isOpen={confirmingFirstShare}
+          onClose={() => setConfirmingFirstShare(false)}
+          onConfirm={() => {
+            // The Share button shows its own spinner while the link is made.
+            setConfirmingFirstShare(false);
+            void toggle();
+          }}
+          title={hoverText.firstShare.title}
+          message={hoverText.firstShare.message}
+          confirmText={hoverText.firstShare.confirmText}
+        />
+      )}
     </div>
   );
 }

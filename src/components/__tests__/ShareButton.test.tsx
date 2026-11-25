@@ -93,9 +93,7 @@ describe("ShareButton", () => {
       />,
     );
     await user.hover(screen.getByRole("button", { name: "Public" }));
-    expect(
-      await screen.findByText("Turn off the link to chat with this agent"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Make it private")).toBeInTheDocument();
     await user.hover(screen.getByRole("button", { name: "Copy link" }));
     expect(
       await screen.findByText(
@@ -112,11 +110,56 @@ describe("ShareButton", () => {
         initialShareToken={null}
       />,
     );
-    await user.hover(screen.getByRole("button", { name: /Share/ }));
+    await user.hover(screen.getByRole("button", { name: "Share chat link" }));
     expect(
       await screen.findByText(
         "Create a link anyone can use to chat with this agent",
       ),
+    ).toBeInTheDocument();
+  });
+
+  it("asks before making a chat link for the first time, and not after", async () => {
+    const user = setupUser();
+    mockFetchOnce({ is_public: true, share_token: "tok1" });
+    render(
+      <ShareButton
+        entityType="agent-chat"
+        entityId="a1"
+        accessToken="tok"
+        initialIsPublic={false}
+        initialShareToken={null}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Share chat link" }));
+    expect(screen.getByText("Create a chat link?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText("Create a chat link?")).not.toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Share chat link" }));
+    await user.click(screen.getByRole("button", { name: "Create link" }));
+    expect(
+      await screen.findByRole("button", { name: "Public" }),
+    ).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("turns a chat link that already exists back on without asking", async () => {
+    const user = setupUser();
+    mockFetchOnce({ is_public: true, share_token: "tok1" });
+    render(
+      <ShareButton
+        entityType="agent-chat"
+        entityId="a1"
+        accessToken="tok"
+        initialIsPublic={false}
+        initialShareToken="tok1"
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Share chat link" }));
+    expect(screen.queryByText("Create a chat link?")).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Public" }),
     ).toBeInTheDocument();
   });
 
@@ -258,6 +301,7 @@ describe("ShareButton", () => {
       />,
     );
     await user.click(screen.getByRole("button", { name: /Share/ }));
+    await user.click(screen.getByRole("button", { name: "Create link" }));
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(
         "https://api.example.com/agents/a1/chat-link/visibility",
