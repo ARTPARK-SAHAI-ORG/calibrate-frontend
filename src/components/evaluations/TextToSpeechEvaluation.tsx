@@ -396,6 +396,9 @@ export function TextToSpeechEvaluation({
       }
 
       if (!response.ok) {
+        if (response.status >= 500) {
+          reportError("Error evaluating:", new Error(`HTTP ${response.status}`));
+        }
         toast.error(
           await parseBackendErrorResponse(response, "Error evaluating"),
         );

@@ -881,6 +881,10 @@ describe("TextToSpeechEvaluation", () => {
         "Something went wrong on our end. Please try again in a moment.",
       ),
     );
+    expect(mockReportError).toHaveBeenCalledWith(
+      "Error evaluating:",
+      expect.any(Error),
+    );
     expect(onEvaluatingChange).toHaveBeenCalledWith(false);
   });
 

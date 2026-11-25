@@ -176,12 +176,12 @@ export async function startTestRunOrNotify(
       await signOut({ callbackUrl: loginPathAfterSignOut() });
       return null;
     }
+    if (error instanceof RunNotStartedError) {
+      toast.error(error.message);
+      return null;
+    }
     reportError("Error starting test run:", error);
-    toast.error(
-      error instanceof RunNotStartedError
-        ? error.message
-        : "Could not start the test run. Please try again.",
-    );
+    toast.error("Could not start the test run. Please try again.");
     return null;
   }
 }

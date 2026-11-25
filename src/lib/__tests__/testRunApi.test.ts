@@ -1,5 +1,6 @@
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
+import { reportError } from "../reportError";
 import {
   abortRun,
   abortRunOrNotify,
@@ -136,6 +137,7 @@ describe("testRunApi", () => {
         startTestRunOrNotify(BACKEND_URL, TOKEN, "agent-1", null),
       ).resolves.toBeNull();
       expect(toast.error).toHaveBeenCalledWith(detail);
+      expect(reportError).not.toHaveBeenCalled();
     });
 
     it("shows an error toast and returns null on any other failure", async () => {
