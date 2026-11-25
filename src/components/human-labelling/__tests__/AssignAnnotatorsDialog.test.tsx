@@ -1172,6 +1172,20 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
   });
 
+  it("lets a custom tool-call evaluator be unticked when no tool-call item is known to be chosen", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({
+      evaluators: [...evaluators, CUSTOM_TOOL_CALL],
+      hasToolCallItems: true,
+      itemKindsPresent: { toolCall: false, other: true },
+    });
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("checkbox", { name: "Alice" }));
+    await user.click(screen.getByRole("checkbox", { name: /Right arguments/ }));
+    expect(screen.getByRole("button", { name: /Assign/ })).toBeEnabled();
+  });
+
   it("needs a label for the tool-call items when only custom ones are offered", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValue(annotators);

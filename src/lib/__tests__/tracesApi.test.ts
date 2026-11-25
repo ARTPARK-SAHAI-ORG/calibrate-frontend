@@ -9,8 +9,7 @@ import {
   setAgentTraceScoring,
   configWithTraceScoring,
   fetchTraceUsage,
-  fetchHasToolCallTrace,
-  fetchHasTraceFeedback,
+  fetchHasTrace,
   convertTracesToTests,
   selectAllBody,
   traceFilterKey,
@@ -401,39 +400,36 @@ describe("fetchTraceUsage", () => {
   });
 });
 
-describe("fetchHasTraceFeedback", () => {
+describe("fetchHasTrace", () => {
   it("asks for one trace with any feedback, and says whether there is one", async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 3, limit: 1, offset: 0 });
 
-    await expect(fetchHasTraceFeedback("tok", "ag-1")).resolves.toBe(true);
+    await expect(
+      fetchHasTrace("tok", "ag-1", { feedback: "any" }),
+    ).resolves.toBe(true);
     const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
     expect(query.get("agent_id")).toBe("ag-1");
     expect(query.get("feedback")).toBe("any");
     expect(query.get("limit")).toBe("1");
   });
 
-  it("says no when none of the agent's traces carries feedback", async () => {
-    mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 1, offset: 0 });
-
-    await expect(fetchHasTraceFeedback("tok", "ag-1")).resolves.toBe(false);
-  });
-});
-
-describe("fetchHasToolCallTrace", () => {
-  it("asks for one trace that only called a tool, and says whether there is one", async () => {
+  it("asks for one trace that only called a tool", async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 2, limit: 1, offset: 0 });
 
-    await expect(fetchHasToolCallTrace("tok", "ag-1")).resolves.toBe(true);
+    await expect(
+      fetchHasTrace("tok", "ag-1", { outputType: "tool_call" }),
+    ).resolves.toBe(true);
     const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
-    expect(query.get("agent_id")).toBe("ag-1");
     expect(query.get("output_type")).toBe("tool_call");
-    expect(query.get("limit")).toBe("1");
+    expect(query.get("feedback")).toBeNull();
   });
 
-  it("says no when none of the agent's traces only called a tool", async () => {
+  it("says no when none of the agent's traces matches", async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 0, limit: 1, offset: 0 });
 
-    await expect(fetchHasToolCallTrace("tok", "ag-1")).resolves.toBe(false);
+    await expect(
+      fetchHasTrace("tok", "ag-1", { feedback: "any" }),
+    ).resolves.toBe(false);
   });
 });
 

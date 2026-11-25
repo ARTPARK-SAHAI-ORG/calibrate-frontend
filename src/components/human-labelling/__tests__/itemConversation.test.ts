@@ -316,6 +316,19 @@ describe("historyToPayloadFields", () => {
     });
   });
 
+  it("leaves calls under tool_calls alone on an item with a text reply", () => {
+    const payload = {
+      chat_history: [{ role: "user", content: "hi" }],
+      agent_response: "Hello",
+      tool_calls: [{ tool: "lookup", arguments: { n: 3 } }],
+    };
+    const history = payloadToHistory(payload, "llm");
+    expect(history.some((t) => t.tool_calls)).toBe(false);
+    const fields = historyToPayloadFields(history, "llm", payload);
+    expect(fields).not.toHaveProperty("tool_calls");
+    expect(fields).not.toHaveProperty("actual_tool_calls", expect.anything());
+  });
+
   it("reads a string tool output back as the same string", () => {
     const payload = {
       chat_history: [],
@@ -367,7 +380,7 @@ function throughTheDialog(history: HistoryItem[]): HistoryItem[] {
     v === null
       ? "null"
       : typeof v === "object"
-        ? JSON.stringify(v, null, 2)
+        ? JSON.stringify(v)
         : String(v);
   const out: HistoryItem[] = [];
   history.forEach((turn, i) => {
@@ -451,7 +464,7 @@ describe("saving an item opened in the dialog", () => {
       actual_tool_calls: { arguments: Record<string, unknown> }[];
     };
     expect(fields.actual_tool_calls[0].arguments).toEqual({
-      seats: "4",
+      seats: 4,
       refundable: false,
       route: { from: "BLR" },
       note: null,

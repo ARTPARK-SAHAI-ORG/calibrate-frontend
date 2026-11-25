@@ -436,6 +436,7 @@ describe("exportInputCols", () => {
     expect(exportInputCols("llm")).toEqual([
       "conversation_history",
       "agent_response",
+      "actual_tool_calls",
       "expected_tool_calls",
     ]);
   });
@@ -443,6 +444,7 @@ describe("exportInputCols", () => {
     expect(exportInputCols("llm-general")).toEqual([
       "input",
       "output",
+      "actual_tool_calls",
       "expected_tool_calls",
     ]);
   });
@@ -512,7 +514,7 @@ describe("extractPayloadInputValues", () => {
       },
       "llm",
     );
-    expect(out).toEqual(["user: hi", "hello", ""]);
+    expect(out).toEqual(["user: hi", "hello", "", ""]);
   });
   it("exports the default text of a reply stored with versions", () => {
     expect(
@@ -527,7 +529,7 @@ describe("extractPayloadInputValues", () => {
         },
         "llm",
       ),
-    ).toEqual(["", "hello", ""]);
+    ).toEqual(["", "hello", "", ""]);
   });
   it("exports an llm tool-call row's calls and the expected calls", () => {
     const calls = [{ tool: "book_flight", arguments: { to: "Delhi" } }];
@@ -542,45 +544,53 @@ describe("extractPayloadInputValues", () => {
         },
         "llm",
       ),
-    ).toEqual(["", JSON.stringify(calls), JSON.stringify(expected)]);
+    ).toEqual(["", "", JSON.stringify(calls), JSON.stringify(expected)]);
   });
   it("reads tool_calls only when actual_tool_calls is not a list", () => {
     const calls = [{ tool: "book_flight", arguments: {} }];
     expect(
-      extractPayloadInputValues({ tool_calls: calls }, "llm")[1],
+      extractPayloadInputValues({ tool_calls: calls }, "llm")[2],
     ).toBe(JSON.stringify(calls));
     expect(
       extractPayloadInputValues(
         { actual_tool_calls: [], tool_calls: calls },
         "llm",
-      )[1],
-    ).toBe("");
+      )[2],
+    ).toBe("[]");
   });
-  it("exports both the reply and the calls when the agent made both", () => {
+  it("exports the reply and the calls in separate columns", () => {
     const calls = [{ tool: "book_flight", arguments: {} }];
     expect(
       extractPayloadInputValues(
         { agent_response: "One moment", actual_tool_calls: calls },
         "llm",
       ),
-    ).toEqual(["", `One moment\n${JSON.stringify(calls)}`, ""]);
+    ).toEqual(["", "One moment", JSON.stringify(calls), ""]);
+  });
+  it("keeps an empty list of calls as [] so the row stays a tool-call row", () => {
+    expect(
+      extractPayloadInputValues(
+        { agent_response: "", actual_tool_calls: [], expected_tool_calls: [] },
+        "llm",
+      ),
+    ).toEqual(["", "", "[]", "[]"]);
   });
   it("extracts llm-general input, output and expected calls", () => {
     expect(
       extractPayloadInputValues({ input: "q", output: "a" }, "llm-general"),
-    ).toEqual(["q", "a", ""]);
+    ).toEqual(["q", "a", "", ""]);
     const calls = [{ tool: "lookup", arguments: {} }];
     expect(
       extractPayloadInputValues(
         { input: "q", output: "", tool_calls: calls, expected_tool_calls: calls },
         "llm-general",
       ),
-    ).toEqual(["q", JSON.stringify(calls), JSON.stringify(calls)]);
+    ).toEqual(["q", "", JSON.stringify(calls), JSON.stringify(calls)]);
   });
   it("defaults llm fields when missing/malformed", () => {
     expect(
       extractPayloadInputValues({ chat_history: "not-array" }, "llm"),
-    ).toEqual(["", "", ""]);
+    ).toEqual(["", "", "", ""]);
   });
   it("extracts a serialized transcript for conversation/other types", () => {
     const out = extractPayloadInputValues(

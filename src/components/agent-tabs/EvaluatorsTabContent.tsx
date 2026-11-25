@@ -13,7 +13,7 @@ import {
   EVALUATOR_CARD_BUTTON_CLASS,
 } from "@/components/evaluators/DuplicateEvaluatorButton";
 import { XIcon } from "@/components/icons";
-import { evaluatorTypesForTask } from "@/lib/labellingItem";
+import { evaluatorTypesForTask, fitsTaskType } from "@/lib/labellingItem";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import {
   type EvaluatorData,
@@ -42,12 +42,14 @@ const CREATE_BUTTON_CLASS =
 // Full-conversation evaluators are hidden for now, so a conversation agent
 // lists the next-reply (`llm`) ones and a general agent the output-type ones.
 // Tool call evaluators fit either kind of agent.
+function agentTaskType(agentNature: "conversation" | "general") {
+  return agentNature === "general" ? "llm-general" : "llm";
+}
+
 function agentEvaluatorTypes(
   agentNature: "conversation" | "general",
 ): EvaluatorType[] {
-  return evaluatorTypesForTask(
-    agentNature === "general" ? "llm-general" : "llm",
-  );
+  return evaluatorTypesForTask(agentTaskType(agentNature));
 }
 
 export function EvaluatorsTabContent({
@@ -215,12 +217,10 @@ export function EvaluatorsTabContent({
 
   // Library minus already-attached — what the Add dialog can offer.
   const attachedUuids = new Set(attachedEvaluators.map((e) => e.uuid));
-  const evaluatorTypes = new Set(agentEvaluatorTypes(agentNature));
   const availableEvaluators = allEvaluators.filter(
     (e) =>
       !attachedUuids.has(e.uuid) &&
-      e.evaluator_type != null &&
-      evaluatorTypes.has(e.evaluator_type),
+      fitsTaskType(e.evaluator_type ?? undefined, agentTaskType(agentNature)),
   );
 
   const deleteDialogTitle =

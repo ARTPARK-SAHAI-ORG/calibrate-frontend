@@ -432,9 +432,14 @@ export function exportInputCols(
     return ["reference_transcript", "predicted_transcript"];
   if (taskType === "tts") return ["text", "audio_path"];
   if (taskType === "llm")
-    return ["conversation_history", "agent_response", "expected_tool_calls"];
+    return [
+      "conversation_history",
+      "agent_response",
+      "actual_tool_calls",
+      "expected_tool_calls",
+    ];
   if (taskType === "llm-general")
-    return ["input", "output", "expected_tool_calls"];
+    return ["input", "output", "actual_tool_calls", "expected_tool_calls"];
   return ["transcript"];
 }
 
@@ -462,18 +467,16 @@ export function serializeMessages(messages: unknown[]): string {
     .join("\n");
 }
 
-// The agent's reply followed by its tool calls as JSON, so a verdict on a
-// tool-call row never sits beside an empty cell.
-function replyWithToolCalls(p: Record<string, unknown>, reply: unknown): string {
-  const calls = agentToolCalls(p);
-  return [textOf(reply), calls.length > 0 ? JSON.stringify(calls) : ""]
-    .filter(Boolean)
-    .join("\n");
+// An empty list is kept as `[]`, since on re-upload it still marks a
+// tool-call row.
+function toolCallsCell(calls: unknown): string {
+  return Array.isArray(calls) ? JSON.stringify(calls) : "";
 }
 
-function expectedToolCallsCell(p: Record<string, unknown>): string {
-  return Array.isArray(p.expected_tool_calls) && p.expected_tool_calls.length > 0
-    ? JSON.stringify(p.expected_tool_calls)
+function actualToolCallsCell(p: Record<string, unknown>): string {
+  const calls = agentToolCalls(p);
+  return Array.isArray(p.actual_tool_calls) || calls.length > 0
+    ? JSON.stringify(calls)
     : "";
 }
 
@@ -507,15 +510,17 @@ export function extractPayloadInputValues(
       : "";
     return [
       history,
-      replyWithToolCalls(p, p.agent_response),
-      expectedToolCallsCell(p),
+      textOf(p.agent_response),
+      actualToolCallsCell(p),
+      toolCallsCell(p.expected_tool_calls),
     ];
   }
   if (taskType === "llm-general") {
     return [
       textOf(p.input),
-      replyWithToolCalls(p, p.output),
-      expectedToolCallsCell(p),
+      textOf(p.output),
+      actualToolCallsCell(p),
+      toolCallsCell(p.expected_tool_calls),
     ];
   }
   return [Array.isArray(p.transcript) ? serializeMessages(p.transcript) : ""];

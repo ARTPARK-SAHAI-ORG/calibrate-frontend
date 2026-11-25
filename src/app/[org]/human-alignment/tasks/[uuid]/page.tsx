@@ -51,6 +51,7 @@ import {
   payloadToHistory,
   textFieldsToPayload,
 } from "@/components/human-labelling/itemConversation";
+import { agentToolCalls } from "@/components/human-labelling/item-panes/shared";
 import { textOf } from "@/lib/messageVersions";
 import { BulkUploadSttItemsDialog } from "@/components/human-labelling/BulkUploadSttItemsDialog";
 import { BulkUploadTtsItemsDialog } from "@/components/human-labelling/BulkUploadTtsItemsDialog";
@@ -1791,6 +1792,16 @@ function LabellingTaskPageInner() {
    * search change, or on action success.
    */
   const [selectAllTotal, setSelectAllTotal] = useState(false);
+  // Under select-all only the rows on this page are known to be chosen.
+  const selectedLoadedItems = selectAllTotal
+    ? items
+    : (task?.items ?? []).filter((it) => selectedItemIds.has(it.uuid));
+  const selectedToolCall = selectedLoadedItems.some(
+    (it) => it.is_tool_call === true,
+  );
+  const selectedNonToolCall = selectedLoadedItems.some(
+    (it) => it.is_tool_call !== true,
+  );
 
   const toggleItem = (uuid: string) => {
     if (selectAllTotal) {
@@ -4300,7 +4311,11 @@ function LabellingTaskPageInner() {
                         name: r.name,
                         description: r.description,
                         ...textFieldsToPayload(r),
-                        tool_calls: undefined,
+                        // The old field is cleared only when its calls were read into the dialog.
+                        ...(Array.isArray(existing.tool_calls) &&
+                        agentToolCalls(existing) === existing.tool_calls
+                          ? { tool_calls: undefined }
+                          : {}),
                         actual_tool_calls: keepList(
                           existing.actual_tool_calls,
                           r.toolCalls,
@@ -4359,21 +4374,16 @@ function LabellingTaskPageInner() {
           isOpen={assignOpen}
           accessToken={accessToken}
           evaluators={task?.evaluators ?? []}
-          // Select-all reaches items beyond the loaded page, so it counts as
-          // holding both kinds. That puts the tool-call evaluator on the job,
-          // which a tool-call item needs before its labelling can finish.
-          hasToolCallItems={
-            selectAllTotal ||
-            (task?.items ?? []).some(
-              (it) => it.is_tool_call === true && selectedItemIds.has(it.uuid),
-            )
-          }
-          hasNonToolCallItems={
-            selectAllTotal ||
-            (task?.items ?? []).some(
-              (it) => it.is_tool_call !== true && selectedItemIds.has(it.uuid),
-            )
-          }
+          // Select-all reaches items beyond the loaded page, so it offers the
+          // labels for both kinds. That puts the tool-call evaluator on the
+          // job, which a tool-call item needs before its labelling can finish.
+          // Only a kind seen among the chosen rows must keep a label.
+          hasToolCallItems={selectAllTotal || selectedToolCall}
+          hasNonToolCallItems={selectAllTotal || selectedNonToolCall}
+          itemKindsPresent={{
+            toolCall: selectedToolCall,
+            other: selectedNonToolCall,
+          }}
           onClose={() => setAssignOpen(false)}
           onConfirm={handleAssignAnnotators}
         />

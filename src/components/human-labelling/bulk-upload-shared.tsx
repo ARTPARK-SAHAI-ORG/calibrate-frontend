@@ -1528,7 +1528,7 @@ function parseToolCallsCell(
     const unknownKey = Object.keys(call).find((key) => !allowed.includes(key));
     if (unknownKey) {
       return {
-        error: `${where} has a field that is not allowed: "${unknownKey}". A call in "${column}" can only have ${allowed.slice(0, -1).map((k) => `"${k}"`).join(", ")} and "${allowed[allowed.length - 1]}".`,
+        error: `${where} has a field that is not allowed: "${unknownKey}". A call in "${column}" can only have ${allowed.slice(0, -1).map((key) => `"${key}"`).join(", ")} and "${allowed[allowed.length - 1]}".`,
       };
     }
     if ((call.tool as string).length > MAX_TOOL_NAME_CHARS) {

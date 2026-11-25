@@ -42,7 +42,7 @@ import {
   type MetadataRow,
 } from "./MetadataFieldsEditor";
 import { parseItemNameConflictFromError } from "./itemNameConflict";
-import { restoreToolCalls } from "./itemConversation";
+import { argumentText, restoreToolCalls } from "./itemConversation";
 import {
   DiscardChangesDialog,
   useUnsavedCloseGuard,
@@ -112,7 +112,7 @@ function ungroupParams(params: ToolCallParam[]): ToolCallParam[] {
   if (!params.some((p) => p.group)) return params;
   return Object.entries(paramsToArgs(params)).map(([name, value]) => ({
     name,
-    value: argValueToText(value),
+    value: argumentText(value),
   }));
 }
 
@@ -144,12 +144,6 @@ function parseArgValue(text: string): unknown {
   return text;
 }
 
-function argValueToText(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (value === null || value === undefined) return "";
-  return JSON.stringify(value);
-}
-
 let draftIdCounter = 0;
 function nextDraftId(): number {
   draftIdCounter += 1;
@@ -167,12 +161,12 @@ function seedToolCalls(raw: unknown): DraftToolCall[] {
     const params: ToolCallParam[] = isGroupedArgs(record)
       ? WEBHOOK_GROUPS.flatMap((group) =>
           Object.entries((record[group] ?? {}) as Record<string, unknown>).map(
-            ([name, value]) => ({ name, value: argValueToText(value), group }),
+            ([name, value]) => ({ name, value: argumentText(value), group }),
           ),
         )
       : Object.entries(record).map(([name, value]) => ({
           name,
-          value: argValueToText(value),
+          value: argumentText(value),
         }));
     return { id: `seed-${i}`, tool: toolName, params };
   });
@@ -538,7 +532,7 @@ export function AddLlmGeneralItemsDialog({
   const valid =
     !!name.trim() &&
     !!input.trim() &&
-    (!!output.trim() || toolCalls.length > 0) &&
+    (!!output.trim() || toolCalls.length > 0 || storesEmptyToolCallList) &&
     varsComplete &&
     versionsComplete(inputExtras) &&
     (toolCalls.length > 0 || versionsComplete(outputExtras)) &&
@@ -583,7 +577,6 @@ export function AddLlmGeneralItemsDialog({
               arguments: paramsToArgs(tc.params),
             })),
             seed?.toolCalls,
-            argValueToText,
           ),
           expectedToolCalls: selectedToolsToCalls(expected.selectedTools),
           evaluator_variables,

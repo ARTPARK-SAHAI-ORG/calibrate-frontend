@@ -67,6 +67,8 @@ type TraceDetailDialogProps = {
   /** The button that adds a tool call evaluator, for a trace skipped because
    *  the agent has none. */
   addToolCallEvaluator?: React.ReactNode;
+  /** Opens the agent's Evaluators tab, for a trace no evaluator fits. */
+  onGoToEvaluators?: () => void;
   /** A window opened from inside this one is on screen, so Escape and the
    *  arrow keys belong to it. */
   keysPaused?: boolean;
@@ -375,6 +377,7 @@ export function TraceDetailDialog({
   position,
   evaluatorDescriptions,
   addToolCallEvaluator,
+  onGoToEvaluators,
   keysPaused = false,
   isSelected = false,
   onToggleSelected,
@@ -684,6 +687,7 @@ export function TraceDetailDialog({
                   descriptions={evaluatorDescriptions}
                   ineligible={ineligibleEvaluators}
                   addToolCallEvaluator={addToolCallEvaluator}
+                  onGoToEvaluators={onGoToEvaluators}
                 />
               </div>
             )}
@@ -709,6 +713,7 @@ export function TraceDetailDialog({
                     descriptions={evaluatorDescriptions}
                     ineligible={ineligibleEvaluators}
                     addToolCallEvaluator={addToolCallEvaluator}
+                    onGoToEvaluators={onGoToEvaluators}
                   />
                 </div>
               </div>

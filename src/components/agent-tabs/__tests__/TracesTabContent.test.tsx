@@ -57,10 +57,14 @@ jest.mock("../../../lib/tracesApi", () => ({
   fetchTrace: (...args: unknown[]) => fetchTrace(...args),
   fetchTraces: (...args: unknown[]) => fetchTraces(...args),
   fetchTraceUsage: (...args: unknown[]) => fetchTraceUsage(...args),
-  fetchHasTraceFeedback: (...args: unknown[]) =>
-    fetchHasTraceFeedback(...args),
-  fetchHasToolCallTrace: (...args: unknown[]) =>
-    fetchHasToolCallTrace(...args),
+  fetchHasTrace: (
+    accessToken: string,
+    agentId: string,
+    filter: { outputType?: string },
+  ) =>
+    filter.outputType === "tool_call"
+      ? fetchHasToolCallTrace(accessToken, agentId)
+      : fetchHasTraceFeedback(accessToken, agentId),
 }));
 
 // The agent's own evaluators decide whether the attach prompt has anything to
@@ -1301,6 +1305,70 @@ describe("TracesTabContent", () => {
       expect(fetchAgentEvaluators).toHaveBeenCalledTimes(2);
     });
 
+    it("leaves a newly linked evaluator's cells empty while its kind is read, and keeps the known ones", async () => {
+      fetchAgentEvaluators.mockResolvedValue([
+        { uuid: "ev-1", evaluator_type: "llm" },
+      ]);
+      mockUseTraces.mockReturnValue(
+        tracesResult([trace({ latest_run_status: "completed" })]),
+      );
+      const scoringOn = { ...traceScoring, enabled: true };
+      const { rerender } = render(
+        <TracesTabContent {...tabProps} traceScoring={scoringOn} />,
+      );
+      await waitFor(() =>
+        expect(screen.getAllByText("Not scored yet")).toHaveLength(2),
+      );
+
+      rerender(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={scoringOn}
+          isActive={false}
+        />,
+      );
+      let finish: (
+        list: { uuid: string; evaluator_type?: string }[],
+      ) => void = () => {};
+      fetchAgentEvaluators.mockReturnValue(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      );
+      rerender(
+        <TracesTabContent
+          {...tabProps}
+          isActive
+          traceScoring={{
+            ...scoringOn,
+            eligibility: {
+              eligible: [
+                { evaluator_uuid: "ev-1", name: "Tone" },
+                { evaluator_uuid: "ev-tc", name: "Tool call correctness" },
+              ],
+              ineligible: [],
+            },
+          }}
+        />,
+      );
+      await waitFor(() =>
+        expect(fetchAgentEvaluators).toHaveBeenCalledTimes(2),
+      );
+      expect(screen.getAllByText("Tool call correctness").length).toBeGreaterThan(0);
+      // Tone still reads as waiting; the new column says nothing yet.
+      expect(screen.getAllByText("Not scored yet")).toHaveLength(2);
+      expect(screen.queryByText("—")).not.toBeInTheDocument();
+
+      await act(async () =>
+        finish([
+          { uuid: "ev-1", evaluator_type: "llm" },
+          { uuid: "ev-tc", evaluator_type: "tool-call" },
+        ]),
+      );
+      expect(screen.getAllByText("—")).toHaveLength(2);
+      expect(screen.getAllByText("Not scored yet")).toHaveLength(2);
+    });
+
     describe("the note about a missing tool call evaluator", () => {
       const NOTE =
         "This agent has no tool call evaluator, so its tool calls are not checked.";
@@ -1381,6 +1449,27 @@ describe("TracesTabContent", () => {
         );
         render(<TracesTabContent {...tabProps} />);
         expect(await screen.findByText(new RegExp(NOTE))).toBeInTheDocument();
+      });
+
+      it("stays away when the warning that nothing can score is already shown", async () => {
+        fetchHasToolCallTrace.mockResolvedValue(true);
+        fetchAgentEvaluators.mockResolvedValue([]);
+        render(
+          <TracesTabContent
+            {...tabProps}
+            traceScoring={{
+              ...traceScoring,
+              enabled: true,
+              eligibility: { eligible: [], ineligible: [] },
+            }}
+          />,
+        );
+        expect(
+          await screen.findByRole("button", { name: "Evaluators tab" }),
+        ).toBeInTheDocument();
+        await waitFor(() => expect(fetchHasToolCallTrace).toHaveBeenCalled());
+        await waitFor(() => expect(fetchAgentEvaluators).toHaveBeenCalled());
+        expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument();
       });
 
       it("stays away when a tool call evaluator is already added", async () => {

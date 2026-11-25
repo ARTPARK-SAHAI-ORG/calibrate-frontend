@@ -420,6 +420,41 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     expect(screen.getByRole("button", { name: "Save item" })).toBeEnabled();
   });
 
+  it("saves an item that stores an empty tool call list and has no answer", () => {
+    renderDialog({
+      mode: "edit",
+      storesEmptyToolCallList: true,
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "", toolCalls: [] },
+      ],
+    });
+    expect(screen.getByRole("button", { name: "Save item" })).toBeEnabled();
+  });
+
+  it("saves an edited number argument as a number", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { months: 7, note: null } }],
+        },
+      ],
+    });
+    expect(screen.getByLabelText("note")).toHaveValue("null");
+    await user.clear(screen.getByLabelText("months"));
+    await user.type(screen.getByLabelText("months"), "8");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "dummy", arguments: { months: 8, note: null } },
+    ]);
+  });
+
   it("still asks for a reply item's values and skips the tool call evaluator", () => {
     renderDialog({
       mode: "edit",

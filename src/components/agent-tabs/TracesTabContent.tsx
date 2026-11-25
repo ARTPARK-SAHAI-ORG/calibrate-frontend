@@ -65,8 +65,7 @@ import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScore
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
   fetchTrace,
-  fetchHasToolCallTrace,
-  fetchHasTraceFeedback,
+  fetchHasTrace,
   fetchTraceUsage,
   fetchTraces,
   traceFilterKey,
@@ -478,6 +477,9 @@ export function TracesTabContent({
     Record<string, EvaluatorType>
   >({});
   const [evaluatorTypesLoading, setEvaluatorTypesLoading] = useState(true);
+  // True during every read, the first and each one after. An evaluator linked
+  // since the last read has no type yet, so its cells wait for this one.
+  const [evaluatorTypesReading, setEvaluatorTypesReading] = useState(true);
   // One column per evaluator that can score now, plus any that scored a trace
   // on this page, so taking an evaluator off the agent does not hide the
   // scores it already gave.
@@ -490,7 +492,7 @@ export function TracesTabContent({
         name,
         evaluator_type:
           evaluatorTypes[evaluator_uuid] ??
-          (evaluatorTypesLoading ? null : undefined),
+          (evaluatorTypesReading ? null : undefined),
       });
     };
     for (const item of eligibility?.eligible ?? []) {
@@ -502,7 +504,7 @@ export function TracesTabContent({
       }
     }
     return [...byId.values()];
-  }, [eligibility, items, evaluatorTypes, evaluatorTypesLoading]);
+  }, [eligibility, items, evaluatorTypes, evaluatorTypesReading]);
   // An evaluator taken off the agent takes its heading away with it, and with
   // no heading there is nothing left on screen to turn its ordering off.
   useEffect(() => {
@@ -570,6 +572,7 @@ export function TracesTabContent({
   useEffect(() => {
     if (!accessToken || !isActive) return;
     let cancelled = false;
+    setEvaluatorTypesReading(true);
     fetchAgentEvaluators(agentUuid, accessToken)
       .then((list) => {
         if (cancelled) return;
@@ -588,7 +591,9 @@ export function TracesTabContent({
         if (!cancelled) setEvaluatorTypesFailed(true);
       })
       .finally(() => {
-        if (!cancelled) setEvaluatorTypesLoading(false);
+        if (cancelled) return;
+        setEvaluatorTypesLoading(false);
+        setEvaluatorTypesReading(false);
       });
     return () => {
       cancelled = true;
@@ -667,12 +672,12 @@ export function TracesTabContent({
         if (!cancelled) setChatLink(next);
       })
       .catch((err) => reportError("Error fetching the chat link:", err));
-    fetchHasTraceFeedback(accessToken, agentUuid)
+    fetchHasTrace(accessToken, agentUuid, { feedback: "any" })
       .then((has) => {
         if (!cancelled) setHasFeedback(has);
       })
       .catch((err) => reportError("Error checking for trace feedback:", err));
-    fetchHasToolCallTrace(accessToken, agentUuid)
+    fetchHasTrace(accessToken, agentUuid, { outputType: "tool_call" })
       .then((has) => {
         if (!cancelled) setHasStoredToolCallTrace(has);
       })
@@ -939,7 +944,9 @@ export function TracesTabContent({
                 </p>
               </div>
             )}
-            {missingToolCallEvaluator && (
+            {/* One warning for one problem: the line above already points
+              to the Evaluators tab, where a tool call evaluator can be added. */}
+            {missingToolCallEvaluator && !nothingCanScore && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
                 <p className="text-sm text-amber-700 dark:text-amber-300">
                   This agent has no tool call evaluator, so its tool calls are not
@@ -1225,6 +1232,10 @@ export function TracesTabContent({
         addToolCallEvaluator={
           missingToolCallEvaluator ? addToolCallEvaluatorButton : undefined
         }
+        onGoToEvaluators={() => {
+          closeTrace();
+          onGoToEvaluators();
+        }}
         keysPaused={toolCallPickerOpen}
         isOpen={openTraceUuid != null}
         onClose={closeTrace}

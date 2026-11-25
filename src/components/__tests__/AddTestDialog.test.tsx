@@ -1850,6 +1850,68 @@ describe("AddTestDialog", () => {
       expect(config.evaluation.tool_calls).toBeUndefined();
     });
 
+    it("saves an item whose stored tool call has an empty argument", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...labelProps({
+            onSubmit,
+            initialConfig: {
+              history: [
+                { role: "user", content: "Weather?" },
+                {
+                  role: "assistant",
+                  tool_calls: [
+                    {
+                      id: "actual-call-0",
+                      type: "function",
+                      function: { name: "get_weather", arguments: '{"city":""}' },
+                    },
+                  ],
+                },
+                { role: "tool", content: "{}", tool_call_id: "actual-call-0" },
+              ],
+              evaluation: { type: "response" },
+            },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Weather?")).toBeInTheDocument(),
+      );
+      const criteria = screen.queryByPlaceholderText(
+        "Enter value for {{criteria}}",
+      );
+      if (criteria) await user.type(criteria, "Calls the tool");
+      await user.click(screen.getByRole("button", { name: "Create" }));
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    it("saves an item that stores an empty tool call list and has no answer", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...labelProps({
+            onSubmit,
+            storesEmptyToolCallList: true,
+            initialConfig: {
+              history: [{ role: "user", content: "Weather?" }],
+              evaluation: { type: "response" },
+            },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Weather?")).toBeInTheDocument(),
+      );
+      const create = screen.getByRole("button", { name: "Create" });
+      expect(create).toBeEnabled();
+      await user.click(create);
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+
     it("still refuses a conversation that ends on a user message", async () => {
       render(
         <ControlledDialog

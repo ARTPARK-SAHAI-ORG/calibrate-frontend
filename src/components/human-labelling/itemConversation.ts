@@ -102,11 +102,12 @@ export const DEFAULT_WEBHOOK_RESPONSE =
   '{\n  "status": "success",\n  "response": {}\n}';
 export const DEFAULT_STRUCTURED_RESPONSE = '{\n  "status": "received"\n}';
 
-// How the item dialog shows a saved argument value in its text box.
+// How the item dialogs show a saved argument value in their one-line text
+// box, which drops line breaks, so objects are written on one line.
 export function argumentText(value: unknown): string {
   if (value === null) return "null";
   if (value === undefined) return "";
-  if (typeof value === "object") return JSON.stringify(value, null, 2);
+  if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
 
@@ -117,6 +118,16 @@ export function isPlainObject(v: unknown): v is Record<string, unknown> {
 // A webhook call's own keys: the dialog shows only these and the values
 // inside them, so any other key missing from what it sends back was hidden.
 const WEBHOOK_GROUPS = ["body", "query"];
+
+// A value that was not text, edited in a text box, keeps its type when the
+// new text still reads as one (`7` edited to `8` is saved as 8, not "8").
+function parseEdited(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
 
 /** The dialog edits argument values as text, so a value it shows unchanged is
  * put back as the original value. Returns `previous` itself when nothing was
@@ -147,7 +158,10 @@ function restoreArguments(
     } else if (typeof v === "string" && v === text(before)) {
       out[k] = before;
     } else {
-      out[k] = v;
+      out[k] =
+        typeof v === "string" && before !== undefined && typeof before !== "string"
+          ? parseEdited(v)
+          : v;
       changed = true;
     }
   }
@@ -277,7 +291,10 @@ export function historyToPayloadFields(
     chat_history,
     agent_response,
     actual_tool_calls: keepList(previous?.actual_tool_calls, calls),
-    tool_calls: undefined,
+    // The old field is cleared only when its calls were read into the dialog.
+    ...(before.length > 0 && before === previous?.tool_calls
+      ? { tool_calls: undefined }
+      : {}),
   };
 }
 

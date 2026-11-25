@@ -5,6 +5,7 @@ import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { SpinnerIcon } from "@/components/icons";
 import { CONTACT_LINK } from "@/constants/limits";
 import { useUsesOwnProviderKeys } from "@/hooks";
+import { EvaluatorsTabLink } from "./NothingCanScoreMessage";
 import {
   ineligibleReasonCopy,
   isTraceScoringInProgress,
@@ -29,6 +30,8 @@ type TraceScorePanelProps = {
   /** The button that adds a tool call evaluator, shown when the run was
    *  skipped because the agent has none. */
   addToolCallEvaluator?: React.ReactNode;
+  /** Opens the agent's Evaluators tab, for a trace no evaluator fits. */
+  onGoToEvaluators?: () => void;
 };
 
 /** The verdict card keeps binary and rating displays apart, so the stored
@@ -48,11 +51,13 @@ function RunBody({
   descriptions,
   ineligible = [],
   addToolCallEvaluator,
+  onGoToEvaluators,
 }: {
   run: TraceScoringRun;
   descriptions?: Record<string, string>;
   ineligible?: TraceScoringIneligibleEvaluator[];
   addToolCallEvaluator?: React.ReactNode;
+  onGoToEvaluators?: () => void;
 }) {
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
   if (isTraceScoringInProgress(run.status)) {
@@ -65,9 +70,9 @@ function RunBody({
   }
 
   // A trace that could not be scored is a warning whatever the reason, so
-  // every reason gets the same amber box the Traces tab uses. Only the limit
-  // and a missing tool call evaluator have somewhere for the reader to go
-  // next, so only they carry a link.
+  // every reason gets the same amber box the Traces tab uses. Only the limit,
+  // a missing tool call evaluator and an agent with no evaluator that fits
+  // have somewhere for the reader to go next, so only they carry a link.
   if (run.status === "failed" || run.status === "skipped") {
     return (
       <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
@@ -77,6 +82,14 @@ function RunBody({
           {run.error === "over_limit" && usesOwnProviderKeys
             ? "This trace was not scored because the workspace had reached its scoring limit at the time"
             : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`}
+          {run.error === "no_usable_evaluators" &&
+            ineligible.length === 0 &&
+            onGoToEvaluators && (
+              <>
+                . Add one that does in the{" "}
+                <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
+              </>
+            )}
           {run.error === "no_tool_call_evaluator" && addToolCallEvaluator && (
             <>. {addToolCallEvaluator}</>
           )}
@@ -148,6 +161,7 @@ export function TraceScorePanel({
   descriptions,
   ineligible,
   addToolCallEvaluator,
+  onGoToEvaluators,
 }: TraceScorePanelProps) {
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -160,6 +174,7 @@ export function TraceScorePanel({
           descriptions={descriptions}
           ineligible={ineligible}
           addToolCallEvaluator={addToolCallEvaluator}
+          onGoToEvaluators={onGoToEvaluators}
         />
       ) : null}
     </div>

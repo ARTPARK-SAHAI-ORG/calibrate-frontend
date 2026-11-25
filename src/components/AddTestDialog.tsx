@@ -1970,7 +1970,20 @@ export function AddTestDialog({
 
   // Helper to check if tool call messages have empty params
   const hasEmptyToolCallParams = () => {
-    const toolCallMessages = chatMessages.filter((m) => m.role === "tool_call");
+    // A call the agent really made can carry an empty argument, so an item's
+    // own stored calls are not held to this.
+    const storedCallIds = new Set(
+      isLabelItem
+        ? (initialConfig?.history ?? []).flatMap((h) =>
+            (h.tool_calls ?? [])
+              .map((c) => c.id)
+              .filter((id) => id?.startsWith(ACTUAL_CALL_ID_PREFIX)),
+          )
+        : [],
+    );
+    const toolCallMessages = chatMessages.filter(
+      (m) => m.role === "tool_call" && !storedCallIds.has(m.id),
+    );
     for (const msg of toolCallMessages) {
       if (msg.toolParams && msg.toolParams.length > 0) {
         const hasEmpty = msg.toolParams.some((p) => !p.value.trim());
@@ -4244,7 +4257,10 @@ export function AddTestDialog({
                   // its own "empty input" validation runs on submit instead.
                   isLastMessageInvalid = false;
                 } else if (requireAssistantLastMessage) {
-                  isLastMessageInvalid = evalTargetStartIndex() < 0;
+                  // An item storing an empty tool call list records an agent
+                  // that did nothing, so it has no answer to end on.
+                  isLastMessageInvalid =
+                    evalTargetStartIndex() < 0 && !storesEmptyToolCallList;
                 } else if (allowAgentLastMessage) {
                   isLastMessageInvalid = isEmpty;
                 } else {

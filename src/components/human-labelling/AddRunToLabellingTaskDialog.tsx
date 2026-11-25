@@ -380,7 +380,7 @@ export function isToolCallTest(raw: RawTestCaseLike): boolean {
 /** Tests that can be added to LLM labelling tasks: a conversation agent's
  * next-reply test (`response`) and a basic agent's test
  * (`general`) both become a response item scored by the evaluators; a
- * tool-call test becomes a tool-call item a person marks correct or wrong. */
+ * tool-call test becomes a tool-call item judged by tool-call evaluators. */
 export function isLabellingEligibleRaw(raw: RawTestCaseLike): boolean {
   const type = raw.test_case?.evaluation?.type;
   return type === "response" || type === "general" || type === "tool_call";
@@ -388,7 +388,7 @@ export function isLabellingEligibleRaw(raw: RawTestCaseLike): boolean {
 
 // Build a tool-call item — a normal item inside an `llm` or `llm-general`
 // task, carrying the expected match spec and the tool calls the agent actually
-// made. A person marks it correct or wrong; AI judges skip it.
+// made. Only tool-call evaluators judge it.
 // `actual_tool_calls` is what marks the item as a tool-call one.
 function buildToolCallItem(
   raw: RawTestCaseLike,

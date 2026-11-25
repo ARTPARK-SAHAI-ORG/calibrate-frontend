@@ -364,6 +364,18 @@ it("shows and saves llm-general calls stored under tool_calls", async () => {
   expect(payload).not.toHaveProperty("actual_tool_calls");
 });
 
+it("keeps old tool_calls an llm-general item with a text answer never showed", async () => {
+  const user = setupUser();
+  const calls = [{ tool: "book_flight", arguments: {} }];
+  itemsTabWith("llm-general", { name: "Books", input: "Book it", output: "Booked", tool_calls: calls });
+  render(<LabellingTaskPage />);
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  const props = mockDialogProps.general.filter((p) => p.isOpen && p.mode === "edit").at(-1);
+  expect(props.initialRows[0].toolCalls).toEqual([]);
+  await props.onSubmit([{ ...props.initialRows[0], name: "Books a flight" }]);
+  expect(putPayload().tool_calls).toEqual(calls);
+});
+
 it("keeps an empty tool-call list the llm-general item already had", async () => {
   const user = setupUser();
   itemsTabWith("llm-general", {
@@ -490,4 +502,5 @@ it("counts select all as holding tool-call items when assigning labelling", asyn
   const props = mockDialogProps.assign.filter((p) => p.isOpen).at(-1);
   expect(props.hasToolCallItems).toBe(true);
   expect(props.hasNonToolCallItems).toBe(true);
+  expect(props.itemKindsPresent).toEqual({ toolCall: false, other: true });
 });

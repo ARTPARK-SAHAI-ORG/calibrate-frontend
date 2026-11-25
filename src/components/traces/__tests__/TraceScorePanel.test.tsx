@@ -1,4 +1,4 @@
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import { CONTACT_LINK } from "@/constants/limits";
 import { TraceScorePanel } from "../TraceScorePanel";
 import type { TraceScoringRun } from "@/lib/tracesApi";
@@ -263,6 +263,29 @@ it("names each evaluator that could not score the trace, and why", () => {
   ).toBeInTheDocument();
 });
 
+it("points at the Evaluators tab when no evaluator fits and none is listed", async () => {
+  const onGoToEvaluators = jest.fn();
+  const user = setupUser();
+  render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r11",
+        status: "skipped",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "no_usable_evaluators",
+        results: [],
+      }}
+      ineligible={[]}
+      onGoToEvaluators={onGoToEvaluators}
+    />,
+  );
+  expect(document.body).toHaveTextContent(
+    "No evaluator on this agent fits this trace. Add one that does in the Evaluators tab.",
+  );
+  await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
+  expect(onGoToEvaluators).toHaveBeenCalled();
+});
+
 it("says the agent has no tool call evaluator and offers the button to add one", () => {
   render(
     <TraceScorePanel
@@ -279,7 +302,7 @@ it("says the agent has no tool call evaluator and offers the button to add one",
     />,
   );
   expect(document.body).toHaveTextContent(
-    "This agent had no tool call evaluator when this trace arrived. Add a tool call evaluator",
+    "This agent had no tool call evaluator when this trace was scored. Add a tool call evaluator",
   );
   expect(
     screen.getByRole("button", { name: "Add a tool call evaluator" }),
@@ -299,7 +322,7 @@ it("says the trace was skipped before a tool call evaluator was added, with no b
     />,
   );
   expect(document.body).toHaveTextContent(
-    /^Scores\s*This agent had no tool call evaluator when this trace arrived$/,
+    /^Scores\s*This agent had no tool call evaluator when this trace was scored$/,
   );
   expect(
     screen.queryByRole("button", { name: "Add a tool call evaluator" }),

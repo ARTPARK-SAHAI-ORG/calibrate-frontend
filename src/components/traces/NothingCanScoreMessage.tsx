@@ -2,6 +2,23 @@
 
 import { nothingCanScoreCopy } from "@/lib/traceScoring";
 
+/** The words "Evaluators tab", as a button that opens that tab. */
+export function EvaluatorsTabLink({
+  onGoToEvaluators,
+}: {
+  onGoToEvaluators: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onGoToEvaluators}
+      className="font-semibold cursor-pointer hover:opacity-80"
+    >
+      Evaluators tab
+    </button>
+  );
+}
+
 /**
  * Why this agent's traces are not being scored, and where to fix it. The same
  * words wherever it is said: the banner above the table and the switch in
@@ -17,14 +34,7 @@ export function NothingCanScoreMessage({
   return (
     <>
       {nothingCanScoreCopy(ineligible)}{" "}
-      <button
-        type="button"
-        onClick={onGoToEvaluators}
-        className="font-semibold cursor-pointer hover:opacity-80"
-      >
-        Evaluators tab
-      </button>
-      .
+      <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
     </>
   );
 }
