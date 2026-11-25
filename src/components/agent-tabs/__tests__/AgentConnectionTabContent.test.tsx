@@ -731,9 +731,10 @@ describe("AgentConnectionTabContent request example", () => {
     expect(
       screen.getByText(/"messages": \[/, { exact: false }),
     ).toBeInTheDocument();
+    // One line, so no full stop.
     expect(
       screen.getByText(/Calibrate will create a POST request to this URL/),
-    ).toHaveTextContent("conversation messages");
+    ).toHaveTextContent(/with the conversation messages$/);
   });
 
   it("shows one piece of text for a general agent", () => {
