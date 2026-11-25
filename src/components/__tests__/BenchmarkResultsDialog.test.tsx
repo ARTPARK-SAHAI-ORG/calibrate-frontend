@@ -661,6 +661,39 @@ describe("BenchmarkResultsDialog", () => {
     expect(onGoBack).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    [500, null],
+    [422, { detail: "models: Field required" }],
+  ])("reports a %i on starting a comparison", async (status, body) => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.endsWith("/agent-tests/agent/agent-1/benchmark")) {
+        return Promise.resolve({
+          ok: false,
+          status,
+          json: async () => {
+            if (body === null) throw new Error("not JSON");
+            return body;
+          },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(
+      <BenchmarkResultsDialog {...defaultProps} isOpen models={["gpt-4"]} />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
+    );
+    expect(reportError).toHaveBeenCalledTimes(1);
+    expect(reportError).toHaveBeenCalledWith(
+      "Error starting benchmark:",
+      status,
+      expect.any(String),
+    );
+  });
+
   it("resets evaluators to [] on a poll response that omits them after a previous poll included them", async () => {
     jest.useFakeTimers({ advanceTimers: true });
     let pollCount = 0;

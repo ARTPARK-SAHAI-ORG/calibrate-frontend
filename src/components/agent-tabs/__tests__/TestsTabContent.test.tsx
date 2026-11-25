@@ -1447,7 +1447,6 @@ describe("TestsTabContent — populated table", () => {
     expect(screen.queryByTestId("test-runner-dialog")).not.toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalled();
   });
-
 });
 
 // ---------------------------------------------------------------------------

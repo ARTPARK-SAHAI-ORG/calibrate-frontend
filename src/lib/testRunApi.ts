@@ -165,8 +165,9 @@ export async function startTestRun(
 
 /**
  * `startTestRun` plus the failure handling every caller needs: sign out on a
- * 401, otherwise report the error and show one toast with the backend's
- * reason. Returns the new task id, or null when the run could not be started.
+ * 401, show the backend's reason when it refuses the run, otherwise report the
+ * error and show a generic toast. Returns the new task id, or null when the run
+ * could not be started.
  */
 export async function startTestRunOrNotify(
   backendUrl: string,

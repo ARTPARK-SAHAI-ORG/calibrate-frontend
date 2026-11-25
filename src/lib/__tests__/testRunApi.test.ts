@@ -122,7 +122,9 @@ describe("testRunApi", () => {
       await expect(
         startTestRunOrNotify(BACKEND_URL, TOKEN, "agent-1", null),
       ).resolves.toBeNull();
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      });
       expect(toast.error).not.toHaveBeenCalled();
     });
 
@@ -142,7 +144,11 @@ describe("testRunApi", () => {
 
     it("reports a request the backend could not read, and still shows its reason", async () => {
       (global.fetch as jest.Mock).mockResolvedValue(
-        jsonResponse({ detail: "test_uuids: Input should be a valid list" }, false, 422),
+        jsonResponse(
+          { detail: "test_uuids: Input should be a valid list" },
+          false,
+          422,
+        ),
       );
 
       await expect(
@@ -156,6 +162,7 @@ describe("testRunApi", () => {
         422,
         "test_uuids: Input should be a valid list",
       );
+      expect(reportError).toHaveBeenCalledTimes(1);
     });
 
     it("shows an error toast and returns null on any other failure", async () => {
@@ -170,6 +177,7 @@ describe("testRunApi", () => {
       expect(toast.error).toHaveBeenCalledWith(
         "Could not start the test run. Please try again.",
       );
+      expect(reportError).toHaveBeenCalled();
     });
   });
 
@@ -246,7 +254,9 @@ describe("testRunApi", () => {
     });
 
     it("keeps a finished run so it can be shown again without a download", async () => {
-      (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(run("task-1")));
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse(run("task-1")),
+      );
 
       expect(getCachedTestRun("task-1")).toBeUndefined();
       await fetchTestRun(BACKEND_URL, TOKEN, "task-1");
@@ -298,7 +308,9 @@ describe("testRunApi", () => {
     });
 
     it("never hands the lighter copy of a run to a reader asking for all of it", async () => {
-      (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(run("task-1")));
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse(run("task-1")),
+      );
 
       await fetchTestRun(BACKEND_URL, TOKEN, "task-1", "summary");
 
@@ -308,7 +320,9 @@ describe("testRunApi", () => {
     });
 
     it("never hands the whole run to a reader asking for the lighter copy", async () => {
-      (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(run("task-1")));
+      (global.fetch as jest.Mock).mockResolvedValue(
+        jsonResponse(run("task-1")),
+      );
 
       await fetchTestRun(BACKEND_URL, TOKEN, "task-1", "full");
 
@@ -391,7 +405,13 @@ describe("testRunApi", () => {
     it("keeps one model's answer apart from another model's", async () => {
       (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(testCase));
 
-      await fetchTestCase(BACKEND_URL, TOKEN, "task-1", "t-1", "openai/gpt-4.1");
+      await fetchTestCase(
+        BACKEND_URL,
+        TOKEN,
+        "task-1",
+        "t-1",
+        "openai/gpt-4.1",
+      );
       await fetchTestCase(
         BACKEND_URL,
         TOKEN,
@@ -531,7 +551,11 @@ describe("testRunApi", () => {
       // The backend answers 400 with "Can only stop a run that is queued or
       // in progress".
       (global.fetch as jest.Mock).mockResolvedValue(
-        jsonResponse({ detail: "Can only stop a run that is queued or in progress" }, false, 400),
+        jsonResponse(
+          { detail: "Can only stop a run that is queued or in progress" },
+          false,
+          400,
+        ),
       );
       await expect(abortRun(BACKEND_URL, TOKEN, "task-1")).rejects.toThrow(
         "Failed to stop the run",
@@ -559,7 +583,9 @@ describe("testRunApi", () => {
       await expect(
         abortRunOrNotify(BACKEND_URL, TOKEN, "task-1"),
       ).resolves.toBe(false);
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      });
       expect(toast.error).not.toHaveBeenCalled();
     });
 
@@ -629,7 +655,9 @@ describe("testRunApi", () => {
       await expect(
         deleteRunOrNotify(BACKEND_URL, TOKEN, "task-1"),
       ).resolves.toBe(false);
-      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" });
+      expect(signOut).toHaveBeenCalledWith({
+        callbackUrl: "/login?callbackUrl=%2F",
+      });
       expect(toast.error).not.toHaveBeenCalled();
     });
 

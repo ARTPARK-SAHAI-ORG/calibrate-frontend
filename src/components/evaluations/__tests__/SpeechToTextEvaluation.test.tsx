@@ -515,6 +515,7 @@ describe("SpeechToTextEvaluation", () => {
         "This run would process 25 rows, above this workspace's limit of 20. Run fewer rows, or ask an admin to raise the limit.",
       ),
     );
+    expect(mockReportError).not.toHaveBeenCalled();
   });
 
   describe("on the workspace's own keys", () => {

@@ -611,14 +611,12 @@ export function BenchmarkResultsDialog({
       );
 
       if (!response.ok) {
+        const message = await parseBackendErrorResponse(response);
+        if (response.status >= 500 || response.status === 422) {
+          reportError("Error starting benchmark:", response.status, message);
+        }
         setIsInitialLoading(false);
-        setError({
-          details: await parseBackendErrorResponse(
-            response,
-            "Error starting benchmark",
-          ),
-          notStarted: true,
-        });
+        setError({ details: message, notStarted: true });
         return;
       }
 
@@ -644,6 +642,7 @@ export function BenchmarkResultsDialog({
       setError({
         details:
           err instanceof Error ? err.message : "Failed to start benchmark",
+        notStarted: true,
       });
     }
   };

@@ -22,7 +22,8 @@ export type Shot = {
 /** A backend call as the signed-in user, for shots that need fresh data. */
 type Call = <T>(path: string, body?: unknown, method?: string) => Promise<T>;
 
-const text = (s: string) => (page: Page) => page.getByText(s, { exact: true }).first();
+const text = (s: string) => (page: Page) =>
+  page.getByText(s, { exact: true }).first();
 const heading = (s: string) => (page: Page) =>
   page.getByRole("heading", { name: s, exact: true }).first();
 const button = (name: string | RegExp) => (page: Page) =>
@@ -31,7 +32,11 @@ const click = (name: string | RegExp) => async (page: Page) => {
   await button(name)(page).click();
 };
 const openSwitcher = (page: Page) =>
-  page.getByRole("complementary").locator("button[aria-expanded]").first().click();
+  page
+    .getByRole("complementary")
+    .locator("button[aria-expanded]")
+    .first()
+    .click();
 /** Answer every visibility change as made public, so sharing changes nothing. */
 const fakeShare = (page: Page) =>
   page.route("**/visibility", (r) =>
@@ -48,7 +53,10 @@ async function openNewAgent(page: Page, kind: "agent" | "connection") {
 }
 
 async function openNewTest(page: Page, type: "next-reply" | "tool-invocation") {
-  await page.getByRole("button", { name: "Create test", exact: true }).first().click();
+  await page
+    .getByRole("button", { name: "Create test", exact: true })
+    .first()
+    .click();
   await chooseTestType(page, type);
 }
 
@@ -58,13 +66,17 @@ async function openAddEvaluator(page: Page) {
   await click("Continue")(page);
   // The form fills in a default prompt and judge model a moment after it
   // opens, over anything typed before then.
-  await expect(page.getByText("Select judge model")).toHaveCount(0, { timeout: 20_000 });
+  await expect(page.getByText("Select judge model")).toHaveCount(0, {
+    timeout: 20_000,
+  });
 }
 
 /** The model list comes from OpenRouter, which the test backend has no key
  * for; answer with the example's benchmark models. Reloads to use it. */
 async function fakeModelCatalog(page: Page, models: string[]) {
-  await page.route("**/openrouter/providers", (r) => r.fulfill({ json: { providers: "all" } }));
+  await page.route("**/openrouter/providers", (r) =>
+    r.fulfill({ json: { providers: "all" } }),
+  );
   await page.route("https://openrouter.ai/api/v1/models", (r) =>
     r.fulfill({ json: { data: models.map((id) => ({ id, name: id })) } }),
   );
@@ -102,9 +114,15 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
         );
         await page.getByPlaceholder("John", { exact: true }).fill("Asha");
         await page.getByPlaceholder("Doe", { exact: true }).fill("Rao");
-        await page.getByPlaceholder("john@example.com").fill("asha@example.com");
-        await page.getByPlaceholder("Create a strong password").fill("Tutor-2026!");
-        await page.getByPlaceholder("Confirm your password").fill("Tutor-2026!");
+        await page
+          .getByPlaceholder("john@example.com")
+          .fill("asha@example.com");
+        await page
+          .getByPlaceholder("Create a strong password")
+          .fill("Tutor-2026!");
+        await page
+          .getByPlaceholder("Confirm your password")
+          .fill("Tutor-2026!");
         await page.getByRole("button", { name: "Create account" }).click();
       },
       waitFor: heading("Check your email"),
@@ -130,7 +148,12 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
     },
 
     // agents
-    { file: "agents-list", path: "/agents", waitFor: text(d.agent.name), highlight: button("New agent") },
+    {
+      file: "agents-list",
+      path: "/agents",
+      waitFor: text(d.agent.name),
+      highlight: button("New agent"),
+    },
     {
       file: "agents-new-agent-build",
       path: "/agents",
@@ -168,21 +191,34 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
     {
       file: "agents-connection-verified",
       path: `/agents/${s.connectionAgentId}?tab=connection`,
-      waitFor: (page) => page.getByPlaceholder("https://your-agent.example.com/chat"),
+      waitFor: (page) =>
+        page.getByPlaceholder("https://your-agent.example.com/chat"),
     },
-    { file: "agents-tests-tab", path: `${agent}?tab=tests`, waitFor: text(d.tests[0].name) },
+    {
+      file: "agents-tests-tab",
+      path: `${agent}?tab=tests`,
+      waitFor: text(d.tests[0].name),
+    },
     {
       file: "agents-new-test-response",
       path: `${agent}?tab=tests`,
       action: async (page) => {
         const t = d.tests.find((x) => x.kind === "response")!;
         await openNewTest(page, "next-reply");
-        await page.getByPlaceholder(/Your .* name/i).first().fill(t.name);
-        await page.getByPlaceholder("Criteria that the agent's response should satisfy").fill(t.criteria!);
+        await page
+          .getByPlaceholder(/Your .* name/i)
+          .first()
+          .fill(t.name);
+        await page
+          .getByPlaceholder("Criteria that the agent's response should satisfy")
+          .fill(t.criteria!);
         // The editor opens on a three-turn sample; keep only the last user turn.
         await page.getByLabel("Remove message").first().click();
         await page.getByLabel("Remove message").first().click();
-        await page.getByPlaceholder(/Enter user message/).first().fill(t.user_message);
+        await page
+          .getByPlaceholder(/Enter user message/)
+          .first()
+          .fill(t.user_message);
       },
       waitFor: (page) => page.getByPlaceholder(/Your .* name/i).first(),
     },
@@ -192,17 +228,30 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       action: async (page) => {
         const t = d.tests.find((x) => x.kind === "tool_call")!;
         await openNewTest(page, "tool-invocation");
-        await page.getByPlaceholder(/Your .* name/i).first().fill(t.name);
-        await page.getByPlaceholder(/Enter user message/).first().fill(t.user_message);
+        await page
+          .getByPlaceholder(/Your .* name/i)
+          .first()
+          .fill(t.name);
+        await page
+          .getByPlaceholder(/Enter user message/)
+          .first()
+          .fill(t.user_message);
         await click("Add tool")(page);
-        await page.getByText(t.expected_tool_call!.name, { exact: true }).last().click();
-        for (const [name, value] of Object.entries(t.expected_tool_call!.arguments)) {
+        await page
+          .getByText(t.expected_tool_call!.name, { exact: true })
+          .last()
+          .click();
+        for (const [name, value] of Object.entries(
+          t.expected_tool_call!.arguments,
+        )) {
           const param = page
             .locator("div.rounded-xl.p-4")
             .filter({ has: page.getByText(name, { exact: true }) })
             .last();
-          if (typeof value === "boolean") await param.locator("select").last().selectOption(String(value));
-          else await param.getByPlaceholder("Expected value").fill(String(value));
+          if (typeof value === "boolean")
+            await param.locator("select").last().selectOption(String(value));
+          else
+            await param.getByPlaceholder("Expected value").fill(String(value));
         }
       },
       waitFor: (page) => page.getByPlaceholder(/Your .* name/i).first(),
@@ -217,9 +266,17 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       file: "agents-test-run-results",
       path: `${agent}?tab=runs&runId=${s.testRunId}`,
       action: async (page) => {
-        await dialog(page).getByRole("button", { name: "Tests", exact: true }).click();
-        await dialog(page).getByText(failed.name, { exact: true }).first().click();
-        await dialog(page).getByRole("button", { name: "See reasoning" }).first().click();
+        await dialog(page)
+          .getByRole("button", { name: "Tests", exact: true })
+          .click();
+        await dialog(page)
+          .getByText(failed.name, { exact: true })
+          .first()
+          .click();
+        await dialog(page)
+          .getByRole("button", { name: "See reasoning" })
+          .first()
+          .click();
       },
       waitFor: (page) => dialog(page).getByText(failed.demo.reasoning).first(),
     },
@@ -227,7 +284,9 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       file: "agents-compare-models",
       path: `${agent}?tab=runs&runId=${s.benchmarkId}`,
       action: async (page) => {
-        await dialog(page).getByRole("button", { name: "Results", exact: true }).click();
+        await dialog(page)
+          .getByRole("button", { name: "Results", exact: true })
+          .click();
       },
       waitFor: (page) => dialog(page).locator("table").first(),
     },
@@ -237,16 +296,28 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       action: click("Conversations"),
       waitFor: text(d.tests[0].user_message),
     },
-    { file: "agents-settings", path: `${agent}?tab=settings`, waitFor: text("Agent speaks first") },
+    {
+      file: "agents-settings",
+      path: `${agent}?tab=settings`,
+      waitFor: text("Agent speaks first"),
+    },
 
     // evaluators
-    { file: "evaluators-list", path: "/agent-evaluators", waitFor: text(d.evaluators[0].reply_name) },
+    {
+      file: "evaluators-list",
+      path: "/agent-evaluators",
+      waitFor: text(d.evaluators[0].reply_name),
+    },
     {
       file: "evaluators-create",
       path: "/agent-evaluators",
       action: click("Create evaluator"),
       waitFor: (page) =>
-        page.getByRole("heading", { name: /^(What is this evaluator for\?|Add evaluator)$/ }).first(),
+        page
+          .getByRole("heading", {
+            name: /^(What is this evaluator for\?|Add evaluator)$/,
+          })
+          .first(),
     },
     {
       file: "evaluators-detail-versions",
@@ -255,11 +326,31 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
     },
 
     // human-alignment
-    { file: "human-alignment-overview", path: "/human-alignment?tab=overview", waitFor: text(d.human_alignment.evaluator) },
-    { file: "human-alignment-tasks", path: "/human-alignment?tab=tasks", waitFor: text(d.human_alignment.task_name) },
-    { file: "human-alignment-task-overview", path: `${task}?tab=overview`, waitFor: text(d.human_alignment.evaluator) },
-    { file: "human-alignment-dataset", path: `${task}?tab=items`, waitFor: text(d.tests[0].name) },
-    { file: "human-alignment-labelling-jobs", path: `${task}?tab=jobs`, waitFor: text(d.human_alignment.annotators[0]) },
+    {
+      file: "human-alignment-overview",
+      path: "/human-alignment?tab=overview",
+      waitFor: text(d.human_alignment.evaluator),
+    },
+    {
+      file: "human-alignment-tasks",
+      path: "/human-alignment?tab=tasks",
+      waitFor: text(d.human_alignment.task_name),
+    },
+    {
+      file: "human-alignment-task-overview",
+      path: `${task}?tab=overview`,
+      waitFor: text(d.human_alignment.evaluator),
+    },
+    {
+      file: "human-alignment-dataset",
+      path: `${task}?tab=items`,
+      waitFor: text(d.tests[0].name),
+    },
+    {
+      file: "human-alignment-labelling-jobs",
+      path: `${task}?tab=jobs`,
+      waitFor: text(d.human_alignment.annotators[0]),
+    },
     {
       file: "human-alignment-annotator-view",
       // Annotators open their link without signing in.
@@ -279,21 +370,35 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
     },
 
     // simulations
-    { file: "simulations-personas", path: "/personas", waitFor: text(d.personas[0].name) },
+    {
+      file: "simulations-personas",
+      path: "/personas",
+      waitFor: text(d.personas[0].name),
+    },
     {
       file: "simulations-persona-edit",
       path: "/personas",
       action: async (page) => {
-        await page.getByText(d.personas[0].name, { exact: true }).first().click();
+        await page
+          .getByText(d.personas[0].name, { exact: true })
+          .first()
+          .click();
       },
       waitFor: heading("Edit persona"),
     },
-    { file: "simulations-scenarios", path: "/scenarios", waitFor: text(d.scenarios[0].name) },
+    {
+      file: "simulations-scenarios",
+      path: "/scenarios",
+      waitFor: text(d.scenarios[0].name),
+    },
     {
       file: "simulations-scenario-edit",
       path: "/scenarios",
       action: async (page) => {
-        await page.getByText(d.scenarios[0].name, { exact: true }).first().click();
+        await page
+          .getByText(d.scenarios[0].name, { exact: true })
+          .first()
+          .click();
       },
       waitFor: heading("Edit scenario"),
     },
@@ -327,22 +432,38 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
     },
 
     // stt
-    { file: "stt-datasets", path: "/stt?tab=datasets", waitFor: text(d.stt_dataset.name) },
+    {
+      file: "stt-datasets",
+      path: "/stt?tab=datasets",
+      waitFor: text(d.stt_dataset.name),
+    },
     {
       file: "stt-new-evaluation",
       path: "/stt/new",
       waitFor: (page) => page.getByRole("button", { name: "Evaluate" }).first(),
     },
-    { file: "stt-results", path: `/stt/${s.sttTaskId}?tab=leaderboard`, waitFor: text("Sarvam") },
+    {
+      file: "stt-results",
+      path: `/stt/${s.sttTaskId}?tab=leaderboard`,
+      waitFor: text("Sarvam"),
+    },
 
     // tts
-    { file: "tts-datasets", path: "/tts?tab=datasets", waitFor: text(d.tts_dataset.name) },
+    {
+      file: "tts-datasets",
+      path: "/tts?tab=datasets",
+      waitFor: text(d.tts_dataset.name),
+    },
     {
       file: "tts-new-evaluation",
       path: "/tts/new",
       waitFor: (page) => page.getByRole("button", { name: "Evaluate" }).first(),
     },
-    { file: "tts-results", path: `/tts/${s.ttsTaskId}?tab=leaderboard`, waitFor: text("Sarvam") },
+    {
+      file: "tts-results",
+      path: `/tts/${s.ttsTaskId}?tab=leaderboard`,
+      waitFor: text("Sarvam"),
+    },
 
     // workspace-settings
     {
@@ -376,7 +497,8 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       path: "/workspace-settings?tab=members",
       action: click("Remove"),
       waitFor: heading("Remove member"),
-      highlight: (page) => dialog(page).getByRole("button", { name: "Remove", exact: true }),
+      highlight: (page) =>
+        dialog(page).getByRole("button", { name: "Remove", exact: true }),
     },
     {
       file: "workspace-settings-create-workspace",
@@ -384,10 +506,16 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       action: async (page) => {
         await openSwitcher(page);
         await click("Create workspace")(page);
-        await page.getByPlaceholder("e.g. Acme Health").fill("Science tutor team");
+        await page
+          .getByPlaceholder("e.g. Acme Health")
+          .fill("Science tutor team");
       },
       waitFor: (page) => page.getByPlaceholder("e.g. Acme Health"),
-      highlight: (page) => dialog(page).getByRole("button", { name: "Create workspace", exact: true }),
+      highlight: (page) =>
+        dialog(page).getByRole("button", {
+          name: "Create workspace",
+          exact: true,
+        }),
     },
     {
       file: "workspace-settings-switcher",
@@ -396,8 +524,16 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       waitFor: text("English tutor team"),
       highlight: button("Create workspace"),
     },
-    { file: "workspace-settings-general", path: "/workspace-settings?tab=general", waitFor: (page) => page.locator("#workspace-name") },
-    { file: "workspace-settings-api-keys", path: "/workspace-settings?tab=api-keys", waitFor: text("Create key") },
+    {
+      file: "workspace-settings-general",
+      path: "/workspace-settings?tab=general",
+      waitFor: (page) => page.locator("#workspace-name"),
+    },
+    {
+      file: "workspace-settings-api-keys",
+      path: "/workspace-settings?tab=api-keys",
+      waitFor: text("Create key"),
+    },
     {
       file: "workspace-settings-byok",
       path: "/workspace-settings?tab=provider-keys",
@@ -408,7 +544,8 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       path: "/workspace-settings?tab=members",
       action: openSwitcher,
       waitFor: (page) => page.getByRole("link", { name: "API keys" }).first(),
-      highlight: (page) => page.getByRole("link", { name: "Workspace settings" }).first(),
+      highlight: (page) =>
+        page.getByRole("link", { name: "Workspace settings" }).first(),
     },
     {
       file: "profile-menu-api-keys",
@@ -433,7 +570,8 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       file: "get-started-forgot-password",
       path: "/forgot-password",
       signedOut: true,
-      action: (page) => page.getByPlaceholder("Enter your email").fill("priya@example.org"),
+      action: (page) =>
+        page.getByPlaceholder("Enter your email").fill("priya@example.org"),
       waitFor: heading("Forgot password"),
       highlight: button("Send reset link"),
     },
@@ -443,7 +581,9 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       signedOut: true,
       action: async (page) => {
         // The page checks the emailed link first; answer that the link is good.
-        await page.route("**/auth/check-reset-link", (r) => r.fulfill({ json: {} }));
+        await page.route("**/auth/check-reset-link", (r) =>
+          r.fulfill({ json: {} }),
+        );
         await page.goto("/reset-password?token=docs-example");
       },
       waitFor: (page) => page.getByPlaceholder("Create a strong password"),
@@ -453,7 +593,10 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       file: "get-started-invite",
       path: "/agents",
       action: async (page) => {
-        const { token } = await call<{ token: string }>(`/organizations/${s.workspaceId}/invite-link`, {});
+        const { token } = await call<{ token: string }>(
+          `/organizations/${s.workspaceId}/invite-link`,
+          {},
+        );
         await page.goto(`/invite/${token}`);
       },
       waitFor: button("Join"),
@@ -472,7 +615,9 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       file: "agents-run-tests-confirm",
       path: `${agent}?tab=tests`,
       action: async (page) => {
-        const boxes = page.getByRole("button", { name: "Select test" }).filter({ visible: true });
+        const boxes = page
+          .getByRole("button", { name: "Select test" })
+          .filter({ visible: true });
         await boxes.nth(0).click();
         await boxes.nth(1).click();
         await click(/^Run \d+ tests?$/)(page);
@@ -488,15 +633,19 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
     {
       file: "agents-run-export",
       path: `${agent}?tab=runs&runId=${s.testRunId}`,
-      waitFor: (page) => dialog(page).getByRole("button", { name: "Export results" }),
-      highlight: (page) => dialog(page).getByRole("button", { name: "Export results" }),
+      waitFor: (page) =>
+        dialog(page).getByRole("button", { name: "Export results" }),
+      highlight: (page) =>
+        dialog(page).getByRole("button", { name: "Export results" }),
     },
     {
       file: "agents-run-share",
       path: `${agent}?tab=runs&runId=${s.testRunId}`,
       action: async (page) => {
         await fakeShare(page);
-        await dialog(page).getByRole("button", { name: "Share", exact: true }).click();
+        await dialog(page)
+          .getByRole("button", { name: "Share", exact: true })
+          .click();
       },
       waitFor: button("Copy link"),
       highlight: button("Copy link"),
@@ -505,22 +654,36 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       file: "agents-submit-for-labelling",
       path: `${agent}?tab=runs&runId=${s.testRunId}`,
       action: async (page) => {
-        await dialog(page).getByRole("button", { name: "Tests", exact: true }).click();
-        await dialog(page).getByRole("button", { name: "Select all" }).first().click();
-        await dialog(page).getByRole("button", { name: "Submit for labelling" }).click();
+        await dialog(page)
+          .getByRole("button", { name: "Tests", exact: true })
+          .click();
+        await dialog(page)
+          .getByRole("button", { name: "Select all" })
+          .first()
+          .click();
+        await dialog(page)
+          .getByRole("button", { name: "Submit for labelling" })
+          .click();
       },
-      waitFor: (page) => page.getByRole("heading", { name: /^Submit \d+ test results? for labelling$/ }),
+      waitFor: (page) =>
+        page.getByRole("heading", {
+          name: /^Submit \d+ test results? for labelling$/,
+        }),
     },
     {
       file: "agents-compare-dialog",
       path: `${agent}?tab=runs`,
       action: async (page) => {
-        await fakeModelCatalog(page, d.benchmark_models.map((m) => m.model));
+        await fakeModelCatalog(
+          page,
+          d.benchmark_models.map((m) => m.model),
+        );
         await page.goto(ws(`${agent}?tab=runs&runId=${s.benchmarkId}`));
         // Rerun opens the compare window with the same three models picked.
         await dialog(page).getByRole("button", { name: "Rerun" }).click();
       },
-      waitFor: (page) => page.getByRole("button", { name: "Remove model" }).nth(2),
+      waitFor: (page) =>
+        page.getByRole("button", { name: "Remove model" }).nth(2),
       highlight: button("Run comparison"),
     },
     {
@@ -544,7 +707,8 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
         await expect(chip).toBeEnabled();
         await chip.click();
       },
-      waitFor: (page) => page.getByText(/^Turn (on|off) continuous monitoring$/).first(),
+      waitFor: (page) =>
+        page.getByText(/^Turn (on|off) continuous monitoring$/).first(),
     },
     {
       file: "agents-traces-to-tests",
@@ -563,7 +727,9 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       path: "/agent-evaluators",
       action: async (page) => {
         await openAddEvaluator(page);
-        await page.getByPlaceholder("e.g. Gives the correct vaccination schedule").fill(d.evaluators[0].reply_name);
+        await page
+          .getByPlaceholder("e.g. Gives the correct vaccination schedule")
+          .fill(d.evaluators[0].reply_name);
       },
       waitFor: text("Set the labels shown for Yes/No across the task"),
     },
@@ -572,7 +738,9 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       path: "/agent-evaluators",
       action: async (page) => {
         await openAddEvaluator(page);
-        await page.getByPlaceholder("e.g. Gives the correct vaccination schedule").fill(d.evaluators[1].reply_name);
+        await page
+          .getByPlaceholder("e.g. Gives the correct vaccination schedule")
+          .fill(d.evaluators[1].reply_name);
         await page.getByRole("button", { name: /^rating$/i }).click();
       },
       waitFor: button("Add row"),
@@ -581,7 +749,10 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       file: "evaluators-judge-model",
       path: "/agent-evaluators",
       action: async (page) => {
-        await fakeModelCatalog(page, d.benchmark_models.map((m) => m.model));
+        await fakeModelCatalog(
+          page,
+          d.benchmark_models.map((m) => m.model),
+        );
         await openAddEvaluator(page);
         await page.locator("label:has-text('Judge model') + button").click();
       },
@@ -594,18 +765,31 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
         await openAddEvaluator(page);
         await page
           .getByPlaceholder(/Use \{\{variable\}\} to mark values/)
-          .fill(`${d.evaluators[0].prompt} Judge it against this goal: {{criteria}}`);
-        await page.getByPlaceholder("Short description explaining the purpose of the variable").scrollIntoViewIfNeeded();
+          .fill(
+            `${d.evaluators[0].prompt} Judge it against this goal: {{criteria}}`,
+          );
+        await page
+          .getByPlaceholder(
+            "Short description explaining the purpose of the variable",
+          )
+          .scrollIntoViewIfNeeded();
       },
-      waitFor: (page) => page.getByPlaceholder("Short description explaining the purpose of the variable"),
+      waitFor: (page) =>
+        page.getByPlaceholder(
+          "Short description explaining the purpose of the variable",
+        ),
     },
     {
       file: "evaluators-required-field",
       path: "/agent-evaluators",
       action: async (page) => {
         await openAddEvaluator(page);
-        await page.getByPlaceholder(/Use \{\{variable\}\} to mark values/).fill("");
-        await dialog(page).getByRole("button", { name: "Create evaluator", exact: true }).click();
+        await page
+          .getByPlaceholder(/Use \{\{variable\}\} to mark values/)
+          .fill("");
+        await dialog(page)
+          .getByRole("button", { name: "Create evaluator", exact: true })
+          .click();
       },
       waitFor: text("Name is required"),
     },
@@ -621,7 +805,10 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       file: "evaluators-new-version",
       path: ev,
       action: click("Edit"),
-      waitFor: (page) => page.getByRole("checkbox", { name: /Mark the new version as the live version/ }),
+      waitFor: (page) =>
+        page.getByRole("checkbox", {
+          name: /Mark the new version as the live version/,
+        }),
     },
     {
       file: "evaluators-mark-current",
@@ -655,7 +842,9 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       path: "/human-alignment?tab=tasks",
       action: async (page) => {
         await click("Create new labelling task")(page);
-        await page.getByPlaceholder("e.g. Maternal health helpline, June calls").fill(d.human_alignment.task_name);
+        await page
+          .getByPlaceholder("e.g. Maternal health helpline, June calls")
+          .fill(d.human_alignment.task_name);
       },
       waitFor: heading("Create labelling task"),
       highlight: button("Next"),
@@ -667,12 +856,20 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
         const t = d.tests[1];
         await click("Add item")(page);
         await page.getByPlaceholder("Your item name").fill(t.name);
-        await page.getByPlaceholder("Mother asks when her baby's next vaccine is due").fill(t.criteria!);
+        await page
+          .getByPlaceholder("Mother asks when her baby's next vaccine is due")
+          .fill(t.criteria!);
         // The window opens on a four-turn sample; keep one exchange.
         await page.getByLabel("Remove message").first().click();
         await page.getByLabel("Remove message").first().click();
-        await page.getByPlaceholder(/Enter user message/).first().fill(t.user_message);
-        await page.getByPlaceholder(/Enter agent message/).first().fill(t.demo.reply);
+        await page
+          .getByPlaceholder(/Enter user message/)
+          .first()
+          .fill(t.user_message);
+        await page
+          .getByPlaceholder(/Enter agent message/)
+          .first()
+          .fill(t.demo.reply);
       },
       waitFor: (page) => page.getByPlaceholder("Your item name"),
     },
@@ -699,7 +896,8 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
         await click("Evaluate selected")(page);
       },
       waitFor: heading("Run evaluators"),
-      highlight: (page) => dialog(page).getByRole("button", { name: "Run", exact: true }),
+      highlight: (page) =>
+        dialog(page).getByRole("button", { name: "Run", exact: true }),
     },
     {
       file: "human-alignment-agreement-trend",
@@ -741,7 +939,9 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       path: "/simulations",
       action: async (page) => {
         await click("Add simulation")(page);
-        await page.getByPlaceholder("Enter simulation name").fill(d.simulation.name);
+        await page
+          .getByPlaceholder("Enter simulation name")
+          .fill(d.simulation.name);
       },
       waitFor: heading("Create your simulation"),
       highlight: button("Create Simulation"),
@@ -774,7 +974,9 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
       file: "simulations-add-evaluators",
       path: "/simulations",
       action: async (page) => {
-        const { uuid } = await call<{ uuid: string }>("/simulations", { name: `${d.simulation.name} (draft)` });
+        const { uuid } = await call<{ uuid: string }>("/simulations", {
+          name: `${d.simulation.name} (draft)`,
+        });
         await page.goto(ws(`/simulations/${uuid}?tab=config`));
         await click("Add evaluators")(page);
       },
@@ -785,7 +987,11 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
     ...(["stt", "tts"] as const).flatMap((p): Shot[] => {
       const taskId = p === "stt" ? s.sttTaskId : s.ttsTaskId;
       const datasetId = p === "stt" ? s.sttDatasetId : s.ttsDatasetId;
-      const { name: datasetName, rows, language: lang } = p === "stt" ? d.stt_dataset : d.tts_dataset;
+      const {
+        name: datasetName,
+        rows,
+        language: lang,
+      } = p === "stt" ? d.stt_dataset : d.tts_dataset;
       return [
         {
           file: `${p}-start`,
@@ -800,9 +1006,11 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
             // Show the workspace as using its own keys with only Sarvam's saved,
             // so the other providers say a key is needed.
             await page.route("**/org-limits/me", (r) =>
-              r.fulfill({ json: { max_rows_per_eval: null, uses_own_provider_keys: true } }),
+              r.fulfill({ json: { uses_own_provider_keys: true } }),
             );
-            await page.route(/\/providers(\?.*)?$/, (r) => r.fulfill({ json: { providers: ["sarvam"] } }));
+            await page.route(/\/providers(\?.*)?$/, (r) =>
+              r.fulfill({ json: { providers: ["sarvam"] } }),
+            );
             await page.reload();
             await page.locator("select").first().selectOption(lang);
           },
@@ -820,10 +1028,20 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
           path: `/${p}/${taskId}`,
           action: async (page) => {
             // The test backend finishes at once; show the run as still going.
-            await page.route(new RegExp(`/${p}/evaluate/${taskId}(\\?.*)?$`), async (r) => {
-              const res = await r.fetch();
-              await r.fulfill({ response: res, json: { ...(await res.json()), status: "in_progress", leaderboard_summary: null } });
-            });
+            await page.route(
+              new RegExp(`/${p}/evaluate/${taskId}(\\?.*)?$`),
+              async (r) => {
+                const res = await r.fetch();
+                await r.fulfill({
+                  response: res,
+                  json: {
+                    ...(await res.json()),
+                    status: "in_progress",
+                    leaderboard_summary: null,
+                  },
+                });
+              },
+            );
             await page.reload();
           },
           waitFor: text("Running"),
@@ -843,10 +1061,18 @@ export function shots(d: Demo, s: Seeded, call: Call): Shot[] {
           path: `/${p}/new`,
           action: async (page) => {
             await page
-              .getByPlaceholder(p === "stt" ? "e.g. English customer calls" : "e.g. English TTS test set")
+              .getByPlaceholder(
+                p === "stt"
+                  ? "e.g. English customer calls"
+                  : "e.g. English TTS test set",
+              )
               .fill(datasetName);
             await page
-              .getByPlaceholder(p === "stt" ? "Enter reference transcription" : "Enter text to synthesize")
+              .getByPlaceholder(
+                p === "stt"
+                  ? "Enter reference transcription"
+                  : "Enter text to synthesize",
+              )
               .first()
               .fill(rows[0]);
           },

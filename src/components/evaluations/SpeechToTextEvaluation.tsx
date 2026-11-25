@@ -395,11 +395,12 @@ export function SpeechToTextEvaluation({
 
       if (!response.ok) {
         if (response.status >= 500) {
-          reportError("Error evaluating:", new Error(`HTTP ${response.status}`));
+          reportError(
+            "Error evaluating:",
+            new Error(`HTTP ${response.status}`),
+          );
         }
-        toast.error(
-          await parseBackendErrorResponse(response),
-        );
+        toast.error(await parseBackendErrorResponse(response));
         setIsEvaluating(false);
         return;
       }
