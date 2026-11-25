@@ -328,9 +328,7 @@ it("asks before clearing a picked thumb, and clears it on confirm", async () => 
   await user.click(screen.getByRole("button", { name: "Bad reply" }));
   expect(screen.getByText("Clear your feedback?")).toBeInTheDocument();
   expect(
-    screen.getByText(
-      "This removes your thumbs down and your comment from this reply.",
-    ),
+    screen.getByText("Are you sure you want to delete your feedback?"),
   ).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Cancel" }));
   expect(screen.queryByText("Clear your feedback?")).toBeNull();
@@ -362,9 +360,7 @@ it("names a thumbs up in the clear question", async () => {
   await user.click(await screen.findByRole("button", { name: "Cancel" }));
   await user.click(screen.getByRole("button", { name: "Good reply" }));
   expect(
-    screen.getByText(
-      "This removes your thumbs up and your comment from this reply.",
-    ),
+    screen.getByText("Are you sure you want to delete your feedback?"),
   ).toBeInTheDocument();
 });
 

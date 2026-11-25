@@ -273,9 +273,6 @@ export function PublicChatView({ token }: { token: string }) {
     setClearing(null);
   };
 
-  const clearingThumb =
-    clearing && feedback[clearing]?.isCorrect ? "thumbs up" : "thumbs down";
-
   return (
     <PublicPageLayout
       title={agent.agent_name}
@@ -448,7 +445,7 @@ export function PublicChatView({ token }: { token: string }) {
         onClose={() => setClearing(null)}
         onConfirm={() => void clearFeedback()}
         title="Clear your feedback?"
-        message={`This removes your ${clearingThumb} and your comment from this reply.`}
+        message="Are you sure you want to delete your feedback?"
         confirmText="Clear feedback"
         busyText="Clearing..."
         isDeleting={clearBusy}
