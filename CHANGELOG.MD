@@ -1,5 +1,6 @@
 ## November 2026
 
+- Selecting all traces on an agent's Monitoring tab now covers only the traces that were there when you chose it, so a trace that arrives afterwards is no longer deleted or added to tests by mistake ([#804](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/804))
 - The Learn page now has an Other talks section with a button for each talk, including the IndiaFOSS 2026 talk, the Pragati masterclass and the AI Commons for Global Health talk, and it shows one talk at a time ([#834](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/834))
 - On the Analytics page, you can now copy a workspace owner's name or email with one click, and see and sort workspaces by when they were created ([#829](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/829))
 - The evaluator page now marks the lowest number on a rating scale as Worst and the highest as Best, as the create and edit screens already did, and the example labels follow the numbers instead of the row order ([#825](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/825))
