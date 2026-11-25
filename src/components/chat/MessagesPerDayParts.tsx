@@ -46,8 +46,8 @@ export function MessagesPerDayInfo({ maximum }: { maximum: number | null }) {
 export function MessagesPerDayTooHigh() {
   return (
     <p className="text-[13px] md:text-sm text-red-600 dark:text-red-400">
-      This is more than your workspace allows. <ContactLink /> to contact us
-      to extend your limits.
+      This is more than your workspace allows. <ContactLink /> to contact us to
+      extend your limits.
     </p>
   );
 }

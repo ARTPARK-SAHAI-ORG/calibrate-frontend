@@ -74,7 +74,14 @@ export function AgentChatLinkControl({
         initialIsPublic={link.is_public}
         initialShareToken={link.share_token}
         onChange={(is_public, share_token) =>
-          setLink((l) => l && { ...l, is_public, share_token: share_token ?? l.share_token })
+          setLink(
+            (l) =>
+              l && {
+                ...l,
+                is_public,
+                share_token: share_token ?? l.share_token,
+              },
+          )
         }
         disabledReason={
           // A link already public can still be made private.

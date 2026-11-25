@@ -110,7 +110,9 @@ it("reads the link again once the connection passes", async () => {
   );
   expect(await screen.findByRole("button", { name: /Share/ })).toBeDisabled();
   mockGet.mockResolvedValue(link());
-  rerender(<AgentChatLinkControl agentUuid="a1" connectionUnverified={false} />);
+  rerender(
+    <AgentChatLinkControl agentUuid="a1" connectionUnverified={false} />,
+  );
   await waitFor(() =>
     expect(screen.getByRole("button", { name: /Share/ })).toBeEnabled(),
   );
