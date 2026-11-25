@@ -36,16 +36,12 @@ it("reads the agent with no sign-in", async () => {
 
 it("posts a message and puts feedback", async () => {
   answer(200, {});
-  await sendChatMessage("t", { conversation_id: null, message: "hi", history: [] });
+  await sendChatMessage("t", { conversation_id: null, message: "hi" });
   await setChatFeedback("t", "tr", { is_correct: true, comment: null }, "jwt");
   const calls = (global.fetch as jest.Mock).mock.calls;
   expect(calls[0][0]).toBe("https://api.example.com/public/agent-chat/t/messages");
   expect(calls[0][1].method).toBe("POST");
-  expect(JSON.parse(calls[0][1].body)).toEqual({
-    conversation_id: null,
-    message: "hi",
-    history: [],
-  });
+  expect(JSON.parse(calls[0][1].body)).toEqual({ conversation_id: null, message: "hi" });
   expect(calls[1][0]).toBe(
     "https://api.example.com/public/agent-chat/t/traces/tr/feedback",
   );

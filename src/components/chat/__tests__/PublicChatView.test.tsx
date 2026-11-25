@@ -86,21 +86,14 @@ it("sends on Enter, shows the reply and carries the conversation on", async () =
   expect(screen.getByText("Hello")).toBeInTheDocument();
   expect(mockSend).toHaveBeenCalledWith(
     "tok",
-    { conversation_id: null, message: "Hello", history: [] },
+    { conversation_id: null, message: "Hello" },
     null,
   );
   await sendMessage(user, "Again");
   await waitFor(() =>
     expect(mockSend).toHaveBeenLastCalledWith(
       "tok",
-      {
-        conversation_id: "c1",
-        message: "Again",
-        history: [
-          { role: "user", content: "Hello" },
-          { role: "assistant", content: "Simulated agent reply.", tool_calls: [] },
-        ],
-      },
+      { conversation_id: "c1", message: "Again" },
       null,
     ),
   );
@@ -155,7 +148,7 @@ it("retries the same message when the agent did not reply", async () => {
   expect(await screen.findByText("Simulated agent reply.")).toBeInTheDocument();
   expect(mockSend).toHaveBeenLastCalledWith(
     "tok",
-    { conversation_id: null, message: "Hello", history: [] },
+    { conversation_id: null, message: "Hello" },
     null,
   );
   // The message is shown once, not once per try.
@@ -208,7 +201,7 @@ it("locks the box once the agent ends the conversation", async () => {
   await waitFor(() =>
     expect(mockSend).toHaveBeenLastCalledWith(
       "tok",
-      { conversation_id: null, message: "Hi", history: [] },
+      { conversation_id: null, message: "Hi" },
       null,
     ),
   );
@@ -380,7 +373,7 @@ it("sends the signed-in login so a member can open a private chat", async () => 
     expect(mockAgent).toHaveBeenCalledWith("tok", "member-jwt");
     expect(mockSend).toHaveBeenLastCalledWith(
       "tok",
-      { conversation_id: null, message: "Hi", history: [] },
+      { conversation_id: null, message: "Hi" },
       "member-jwt",
     );
   } finally {
@@ -398,29 +391,4 @@ it("starts a new chat from the ended note", async () => {
   await user.click(buttons[buttons.length - 1]);
   expect(screen.queryByText("The agent ended the conversation")).toBeNull();
   expect(screen.getByLabelText("Message")).toBeEnabled();
-});
-
-it("sends each reply's tool calls back with the next message", async () => {
-  const user = setupUser();
-  await open();
-  const calls = [{ tool: "book", arguments: { day: 1 }, output: { ok: true } }];
-  mockSend.mockResolvedValueOnce(reply({ reply: "Booked", tool_calls: calls }));
-  await sendMessage(user, "Book it");
-  expect(await screen.findByText("Booked")).toBeInTheDocument();
-  mockSend.mockResolvedValueOnce(reply());
-  await sendMessage(user, "Thanks");
-  await waitFor(() =>
-    expect(mockSend).toHaveBeenLastCalledWith(
-      "tok",
-      {
-        conversation_id: "c1",
-        message: "Thanks",
-        history: [
-          { role: "user", content: "Book it" },
-          { role: "assistant", content: "Booked", tool_calls: calls },
-        ],
-      },
-      null,
-    ),
-  );
 });

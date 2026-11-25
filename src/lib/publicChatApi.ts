@@ -63,19 +63,9 @@ export function fetchChatAgent(token: string, accessToken?: string | null) {
   return call<ChatAgent>(base(token), { accessToken });
 }
 
-/** One earlier turn of the conversation, sent back with each new message so
- *  the agent keeps the conversation even when its replies were not stored. */
-export type ChatHistoryTurn =
-  | { role: "user"; content: string }
-  | { role: "assistant"; content: string | null; tool_calls: ChatToolCall[] };
-
 export function sendChatMessage(
   token: string,
-  body: {
-    conversation_id: string | null;
-    message: string;
-    history: ChatHistoryTurn[];
-  },
+  body: { conversation_id: string | null; message: string },
   accessToken?: string | null,
 ) {
   return call<ChatReply>(`${base(token)}/messages`, {
