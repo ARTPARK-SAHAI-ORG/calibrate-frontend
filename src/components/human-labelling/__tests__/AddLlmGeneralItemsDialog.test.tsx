@@ -536,6 +536,26 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
   const expectedSection = () =>
     screen.getByText("Expected tool calls").closest(".relative") as HTMLElement;
 
+  it("keeps digits typed into a tool call's text input as text", async () => {
+    withTools();
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "", toolCalls: [] },
+      ],
+    });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(screen.getByRole("button", { name: "Pick book_flight" }));
+    await user.type(screen.getByLabelText("city"), "560001");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "book_flight", arguments: { city: "560001" } },
+    ]);
+  });
+
   it("saves expected tool calls apart from the agent's own", async () => {
     const user = setupUser();
     const { onSubmit } = renderDialog({

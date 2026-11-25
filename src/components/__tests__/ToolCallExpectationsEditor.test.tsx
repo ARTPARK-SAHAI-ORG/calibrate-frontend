@@ -1,5 +1,12 @@
 import { useEffect } from "react";
-import { act, render, screen, setupUser, waitFor } from "@/test-utils";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  setupUser,
+  waitFor,
+} from "@/test-utils";
 import {
   ToolCallExpectationsEditor,
   useToolCallExpectations,
@@ -184,5 +191,48 @@ describe("card ids", () => {
     const ids = editor.selectedTools.map((t) => t.cardId);
     expect(ids).toHaveLength(51);
     expect(new Set(ids).size).toBe(51);
+  });
+});
+
+describe("editing a stored call in its JSON view", () => {
+  it("does not bring back a required input the labelling item never stored", async () => {
+    const user = setupUser();
+    let editor!: ReturnType<typeof useToolCallExpectations>;
+    function Harness() {
+      editor = useToolCallExpectations();
+      useEffect(() => {
+        editor.reset(
+          toolCallsToSelectedTools(
+            [{ tool: "get_weather", arguments: { days: 3 } }],
+            [WEATHER],
+            true,
+          ),
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return (
+        <ToolCallExpectationsEditor
+          editor={editor}
+          heading="Expected tool calls"
+          emptyText="No tools"
+          availableTools={[WEATHER]}
+          availableToolsLoading={false}
+          onToolSaved={() => {}}
+          onCreateTool={() => {}}
+          showErrors={false}
+        />
+      );
+    }
+    render(<Harness />);
+    await user.click(await screen.findByRole("button", { name: "JSON" }));
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: '{"days": 4}' },
+    });
+    await waitFor(() =>
+      expect(
+        editor.selectedTools[0].expectedParameters.map((p) => p.name),
+      ).toEqual(["days"]),
+    );
+    expect(selectedToolsHaveInvalidParams(editor.selectedTools)).toBe(false);
   });
 });

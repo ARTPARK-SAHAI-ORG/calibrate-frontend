@@ -46,6 +46,9 @@ import {
   argumentRows,
   isPlainObject,
   restoreToolCalls,
+  skippedEvaluatorNote,
+  typeArguments,
+  EXPECTED_TOOL_CALLS_HELP,
 } from "./itemConversation";
 import {
   DiscardChangesDialog,
@@ -134,8 +137,8 @@ type AddLlmGeneralItemsDialogProps = {
   // Linked evaluators with their variable definitions, used to render the
   // per-item variable inputs and seed defaults.
   evaluators?: LlmGeneralEvaluatorDef[];
-  /** The item being edited stores an empty tool call list, which keeps it a
-   * tool-call item on save. */
+  /** The item being edited or duplicated stores an empty tool call list,
+   * which keeps it a tool-call item on save. */
   storesEmptyToolCallList?: boolean;
   // A single item to seed the dialog with (edit / duplicate). Kept as an
   // array for backwards-compatible call sites; only the first entry is used
@@ -536,7 +539,10 @@ export function AddLlmGeneralItemsDialog({
           toolCalls: restoreToolCalls(
             toolCalls.map((tc) => ({
               tool: tc.tool,
-              arguments: paramsToArgs(tc.params),
+              arguments: typeArguments(
+                paramsToArgs(tc.params),
+                availableTools.find((t) => t.name === tc.tool),
+              ),
             })),
             seed?.toolCalls,
             toolCalls.map((tc) => {
@@ -886,7 +892,7 @@ export function AddLlmGeneralItemsDialog({
                 <ToolCallExpectationsEditor
                   editor={expected}
                   heading="Expected tool calls"
-                  emptyText="Optional. Add the tool calls the agent should have made and the values it should have sent. Once you add one, this item is scored only by tool call evaluators, which compare the agent's tool calls with these."
+                  emptyText={EXPECTED_TOOL_CALLS_HELP}
                   availableTools={availableTools}
                   availableToolsLoading={toolsLoading}
                   accessToken={accessToken ?? undefined}
@@ -925,9 +931,7 @@ export function AddLlmGeneralItemsDialog({
                     </div>
                     {!evaluatorFits(e) && (
                       <p className="text-xs text-muted-foreground">
-                        {isToolCallItem
-                          ? "Does not score tool calls, so it is skipped for this item"
-                          : "Only scores tool calls, so it is skipped for this item"}
+                        {skippedEvaluatorNote(isToolCallItem)}
                       </p>
                     )}
                     {e.variables.length > 0 && evaluatorFits(e) && (

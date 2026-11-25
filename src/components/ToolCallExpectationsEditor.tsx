@@ -914,11 +914,7 @@ export function ToolCallExpectationsEditor({
       }));
       return;
     }
-    if (
-      parsed === null ||
-      typeof parsed !== "object" ||
-      Array.isArray(parsed)
-    ) {
+    if (!isPlainObject(parsed)) {
       setToolJsonError((prev) => ({
         ...prev,
         [tool.cardId]: "The top-level value must be a JSON object of parameters.",
@@ -927,7 +923,7 @@ export function ToolCallExpectationsEditor({
     }
     setToolJsonError((prev) => ({ ...prev, [tool.cardId]: null }));
     const schemaParams = getExpectedParamsForTool(tool.id, tool.name).params;
-    const rebuilt = overlayArgsOntoParams(schemaParams, parsed);
+    const rebuilt = overlayArgsOntoParams(schemaParams, parsed, !!tool.stored);
     setSelectedTools((prev) =>
       prev.map((t) =>
         t.cardId === tool.cardId ? { ...t, expectedParameters: rebuilt } : t,

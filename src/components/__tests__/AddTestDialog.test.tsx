@@ -1888,6 +1888,92 @@ describe("AddTestDialog", () => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
     });
 
+    it("saves an item whose earlier tool call has an empty argument", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...labelProps({
+            onSubmit,
+            initialConfig: {
+              history: [
+                { role: "user", content: "Weather?" },
+                {
+                  role: "assistant",
+                  tool_calls: [
+                    {
+                      id: "c1",
+                      type: "function",
+                      function: { name: "get_weather", arguments: '{"city":""}' },
+                    },
+                  ],
+                },
+                { role: "tool", content: "{}", tool_call_id: "c1" },
+                { role: "assistant", content: "It is sunny" },
+              ],
+              evaluation: { type: "response" },
+            },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Weather?")).toBeInTheDocument(),
+      );
+      const criteria = screen.queryByPlaceholderText(
+        "Enter value for {{criteria}}",
+      );
+      if (criteria) await user.type(criteria, "Answers");
+      await user.click(screen.getByRole("button", { name: "Create" }));
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    it("saves the item's own tool call values by the type each input declares", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...labelProps({
+            onSubmit,
+            initialConfig: {
+              history: [
+                { role: "user", content: "Weather?" },
+                {
+                  role: "assistant",
+                  tool_calls: [
+                    {
+                      id: "actual-call-0",
+                      type: "function",
+                      function: {
+                        name: "get_weather",
+                        arguments: '{"city":"560001","days":"3"}',
+                      },
+                    },
+                  ],
+                },
+                { role: "tool", content: "{}", tool_call_id: "actual-call-0" },
+              ],
+              evaluation: { type: "response" },
+            },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Weather?")).toBeInTheDocument(),
+      );
+      const criteria = screen.queryByPlaceholderText(
+        "Enter value for {{criteria}}",
+      );
+      if (criteria) await user.type(criteria, "Calls the tool");
+      await user.click(screen.getByRole("button", { name: "Create" }));
+      const call = onSubmit.mock.calls[0][0].history.find(
+        (h: { tool_calls?: unknown[] }) => h.tool_calls,
+      ).tool_calls[0];
+      expect(JSON.parse(call.function.arguments)).toEqual({
+        city: "560001",
+        days: 3,
+      });
+    });
+
     it("does not outline a stored call's empty argument when another field blocks the save", async () => {
       const user = setupUser();
       const onSubmit = jest.fn();

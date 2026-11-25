@@ -1,5 +1,9 @@
+import type { AvailableTool } from "@/components/ToolPicker";
 import {
   actualToolCallsStart,
+  clearOldToolCallsField,
+  gradedAnswerStart,
+  typeArguments,
   DEFAULT_STRUCTURED_RESPONSE,
   DEFAULT_WEBHOOK_RESPONSE,
   historyToPayloadFields,
@@ -563,7 +567,7 @@ describe("actualToolCallsStart", () => {
 });
 
 describe("restoreToolCalls", () => {
-  it("puts back stored values, also on a renamed call, and reads an added call's values as JSON", () => {
+  it("puts back stored values, also on a renamed call, and keeps an added call's values as given", () => {
     const stored = [
       { tool: "a", arguments: { n: 3, ok: true } },
       { tool: "b", arguments: { n: 3, s: "7" } },
@@ -581,7 +585,7 @@ describe("restoreToolCalls", () => {
     ).toEqual([
       { tool: "a", arguments: { n: 3, ok: true } },
       { tool: "c", arguments: { n: 3, s: "7" } },
-      { tool: "d", arguments: { n: 7 } },
+      { tool: "d", arguments: { n: "7" } },
     ]);
   });
 
@@ -669,17 +673,17 @@ describe("historyToPayloadFields matching stored calls", () => {
       ],
     });
     const fields = historyToPayloadFields(
-      [call("actual-call-1"), call("actual-call-1764000000000")],
+      [call("actual-call-1"), call("actual-call-new-1")],
       "llm",
       previous,
     );
     expect("actual_tool_calls" in fields && fields.actual_tool_calls).toEqual([
       { tool: "save", arguments: { n: 7 } },
-      { tool: "save", arguments: { n: 7 } },
+      { tool: "save", arguments: { n: "7" } },
     ]);
   });
 
-  it("reads typed values as JSON for an added call or key, and keeps an edited stored text value as text", () => {
+  it("keeps values as given for an added call or key, and keeps an edited stored text value as text", () => {
     const previous = {
       chat_history: [],
       agent_response: "",
@@ -697,15 +701,15 @@ describe("historyToPayloadFields matching stored calls", () => {
     });
     const fields = historyToPayloadFields(
       [
-        call("actual-call-0", { note: "7", n: "7" }),
-        call("actual-call-1764000000000", { n: "7", body: { ok: "true", city: "Pune" } }),
+        call("actual-call-0", { note: 7, n: "7" }),
+        call("actual-call-new-1", { n: 7, body: { ok: "true", city: "Pune" } }),
       ],
       "llm",
       previous,
     );
     expect("actual_tool_calls" in fields && fields.actual_tool_calls).toEqual([
-      { tool: "save", arguments: { note: "7", n: 7 } },
-      { tool: "save", arguments: { n: 7, body: { ok: true, city: "Pune" } } },
+      { tool: "save", arguments: { note: "7", n: "7" } },
+      { tool: "save", arguments: { n: 7, body: { ok: "true", city: "Pune" } } },
     ]);
   });
 });
@@ -739,32 +743,125 @@ describe("historyToPayloadFields with a renamed call", () => {
   });
 });
 
-describe("historyToPayloadFields with long digits", () => {
-  it("keeps a typed value as text when a number would change it", () => {
-    const fields = historyToPayloadFields(
-      [
-        {
-          role: "assistant",
-          tool_calls: [
-            {
-              id: "actual-call-1764000000000",
-              type: "function",
-              function: {
-                name: "save",
-                arguments: '{"account":"12345678901234567890","code":"007","n":"42"}',
-              },
-            },
-          ],
-        },
-      ],
-      "llm",
-    );
-    expect("actual_tool_calls" in fields && fields.actual_tool_calls).toEqual([
-      {
-        tool: "save",
-        arguments: { account: "12345678901234567890", code: "007", n: 42 },
+describe("typeArguments", () => {
+  const tool = (config: Record<string, unknown>) =>
+    ({ uuid: "t", name: "save", config }) as AvailableTool;
+  const declared = tool({
+    parameters: {
+      properties: {
+        phone: { type: "string" },
+        pin: { type: "integer" },
+        ok: { type: "boolean" },
+        tags: { type: "array" },
+        account: { type: "number" },
       },
-    ]);
+    },
+  });
+
+  it("turns a value into a number or true/false only when the tool declares that type", () => {
+    expect(
+      typeArguments(
+        {
+          phone: "9876543210",
+          pin: "560001",
+          ok: "true",
+          tags: '["a"]',
+          account: "12345678901234567890",
+          note: "7",
+        },
+        declared,
+      ),
+    ).toEqual({
+      phone: "9876543210",
+      pin: 560001,
+      ok: true,
+      tags: ["a"],
+      account: "12345678901234567890",
+      note: "7",
+    });
+  });
+
+  it("keeps text a declared number cannot be read as", () => {
+    expect(typeArguments({ pin: "abc" }, declared)).toEqual({ pin: "abc" });
+  });
+
+  it("keeps every value as text for a tool not in the list", () => {
+    expect(typeArguments({ n: "7", ok: "true" }, undefined)).toEqual({
+      n: "7",
+      ok: "true",
+    });
+  });
+
+  it("reads a webhook's query and body inputs by their group", () => {
+    const webhook = tool({
+      type: "webhook",
+      webhook: {
+        queryParameters: [{ id: "page", type: "integer" }],
+        body: { parameters: [{ id: "phone", type: "string" }] },
+      },
+    });
+    expect(
+      typeArguments(
+        { query: { page: "2" }, body: { phone: "9876543210" } },
+        webhook,
+      ),
+    ).toEqual({ query: { page: 2 }, body: { phone: "9876543210" } });
+  });
+
+  it("saves a phone number typed into a new call's text input as text", () => {
+    expect(
+      restoreToolCalls(
+        [
+          {
+            tool: "save",
+            arguments: typeArguments({ phone: "9876543210" }, declared),
+          },
+        ],
+        [],
+        [undefined],
+      ),
+    ).toEqual([{ tool: "save", arguments: { phone: "9876543210" } }]);
+  });
+
+  it("keeps a stored text value the dialog read back as a number unchanged", () => {
+    const stored = [{ tool: "save", arguments: { pin: "560001" } }];
+    expect(
+      restoreToolCalls(
+        [{ tool: "save", arguments: typeArguments({ pin: "560001" }, declared) }],
+        stored,
+        [0],
+      ),
+    ).toEqual(stored);
+  });
+});
+
+describe("gradedAnswerStart", () => {
+  const turns = (...roles: string[]) => roles.map((role, i) => ({ role, id: `${role}-${i}` }));
+  const start = (list: { role: string; id: string }[]) =>
+    gradedAnswerStart(
+      list,
+      (t) => (t.role === "call" ? "actual-call-0" : undefined),
+      (t) => t.role === "tool",
+      (t) => t.role === "agent",
+    );
+
+  it("takes in the agent's reply just before its own calls, or its last reply", () => {
+    expect(start(turns("user", "agent", "call", "tool"))).toBe(1);
+    expect(start(turns("user", "call"))).toBe(1);
+    expect(start(turns("user", "agent"))).toBe(1);
+    expect(start(turns("agent", "user"))).toBe(-1);
+  });
+});
+
+describe("clearOldToolCallsField", () => {
+  it("clears tool_calls only when its calls were the ones shown", () => {
+    const calls = [{ tool: "a", arguments: {} }];
+    expect(clearOldToolCallsField({ tool_calls: calls }, calls)).toEqual({
+      tool_calls: undefined,
+    });
+    expect(clearOldToolCallsField({ tool_calls: calls }, [])).toEqual({});
+    const empty: unknown[] = [];
+    expect(clearOldToolCallsField({ tool_calls: empty }, empty)).toEqual({});
   });
 });
 

@@ -3,7 +3,7 @@
 import type React from "react";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { SpinnerIcon } from "@/components/icons";
-import { CONTACT_LINK } from "@/constants/limits";
+import { ExtendLimitsLink } from "./ExtendLimitsLink";
 import { useUsesOwnProviderKeys } from "@/hooks";
 import { EvaluatorsTabLink } from "./NothingCanScoreMessage";
 import { WarningBox } from "./WarningBox";
@@ -108,15 +108,7 @@ function RunBody({
         {run.error === "over_limit" && !usesOwnProviderKeys && (
           <>
             {" "}
-            <a
-              href={CONTACT_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-bold"
-            >
-              Click here
-            </a>{" "}
-            to contact us to extend your limits.
+            <ExtendLimitsLink />
           </>
         )}
       </WarningBox>

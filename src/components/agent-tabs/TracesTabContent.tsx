@@ -57,7 +57,7 @@ import {
   useTraces,
 } from "@/hooks";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
-import { CONTACT_LINK } from "@/constants/limits";
+import { ExtendLimitsLink } from "@/components/traces/ExtendLimitsLink";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import { isToolCallTraceRow, traceRowOutputFacts } from "@/lib/traceScoring";
@@ -602,9 +602,19 @@ export function TracesTabContent({
   const hasReplyTrace =
     hasStoredReplyTrace || items.some((trace) => !isToolCallTraceRow(trace));
   const linkedTypes = evaluatorTypes ? Object.values(evaluatorTypes) : null;
-  // Null while any evaluator that can score has no known type yet.
+  // The evaluator list and the eligibility are read separately, so one can
+  // arrive before the other. Null until both name the same evaluators.
+  const eligibilityIds = eligibility
+    ? new Set(
+        [...eligibility.eligible, ...eligibility.ineligible].map(
+          (item) => item.evaluator_uuid,
+        ),
+      )
+    : null;
   const scoringTypes =
-    eligibility && evaluatorTypes
+    eligibility &&
+    evaluatorTypes &&
+    Object.keys(evaluatorTypes).every((id) => eligibilityIds?.has(id))
       ? eligibility.eligible.map((item) => evaluatorTypes[item.evaluator_uuid])
       : null;
   const knownScoringTypes = scoringTypes?.every(Boolean) ? scoringTypes : null;
@@ -619,6 +629,7 @@ export function TracesTabContent({
     hasToolCallTrace &&
     !!linkedTypes?.includes("tool-call") &&
     !knownScoringTypes.includes("tool-call");
+  const outputsWord = isGeneral ? "outputs" : "replies";
   const onlyToolCallEvaluators =
     knownScoringTypes !== null &&
     knownScoringTypes.every((type) => type === "tool-call") &&
@@ -920,16 +931,7 @@ export function TracesTabContent({
           <WarningBox>
             New traces are no longer being stored because this workspace has
             reached its limit of {traceCount(usage.max_traces)}. Delete traces
-            to make room.{" "}
-            <a
-              href={CONTACT_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-bold"
-            >
-              Click here
-            </a>{" "}
-            to contact us to extend your limits.
+            to make room. <ExtendLimitsLink />
           </WarningBox>
         )}
 
@@ -979,8 +981,8 @@ export function TracesTabContent({
             {onlyToolCallEvaluators && !nothingCanScore && (
               <WarningBox>
                 Only tool call evaluators can score this agent&apos;s traces, so
-                its replies are not checked. Add an evaluator that checks
-                replies in the{" "}
+                its {outputsWord} are not checked. Add an evaluator that checks{" "}
+                {outputsWord} in the{" "}
                 <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
               </WarningBox>
             )}
@@ -989,15 +991,7 @@ export function TracesTabContent({
                 {usage?.max_scored_traces != null
                   ? `Some traces were not scored because this workspace has reached its limit of scoring ${traceCount(usage.max_scored_traces)}.`
                   : "Some traces were not scored because this workspace has reached its limit for scoring traces."}{" "}
-                <a
-                  href={CONTACT_LINK}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold"
-                >
-                  Click here
-                </a>{" "}
-                to contact us to extend your limits.
+                <ExtendLimitsLink />
               </WarningBox>
             )}
           </div>

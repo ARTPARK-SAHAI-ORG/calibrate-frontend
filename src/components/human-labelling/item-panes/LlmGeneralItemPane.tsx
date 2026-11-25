@@ -8,6 +8,7 @@ import { readTextField } from "@/lib/messageVersions";
 import { ExpectedToolCalls } from "./ExpectedToolCalls";
 import { agentToolCalls } from "@/lib/labellingItem";
 import { Section } from "./shared";
+import { JudgedTogetherNote } from "./ToolCallItemPane";
 
 /**
  * Renders a general (non-conversational) "llm-general" evaluation item.
@@ -102,6 +103,7 @@ export function LlmGeneralItemPane({
           )}
         </Section>
       </div>
+      {output && toolCalls.length > 0 && <JudgedTogetherNote />}
       <div className="pl-4">
         <ExpectedToolCalls payload={payload} />
       </div>

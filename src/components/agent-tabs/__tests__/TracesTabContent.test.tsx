@@ -1692,6 +1692,41 @@ describe("TracesTabContent", () => {
         );
         expect(await screen.findByText(new RegExp(NOTE))).toBeInTheDocument();
       });
+
+      it("does not show while the eligibility has not caught up with a newly linked reply evaluator", async () => {
+        fetchHasTraceForReplies.mockResolvedValue(true);
+        fetchAgentEvaluators.mockResolvedValue([
+          { uuid: "ev-1", evaluator_type: "llm" },
+          { uuid: "ev-tc", evaluator_type: "tool-call" },
+        ]);
+        render(
+          <TracesTabContent {...tabProps} traceScoring={onlyToolCallScores} />,
+        );
+        await waitFor(() =>
+          expect(fetchHasTraceForReplies).toHaveBeenCalled(),
+        );
+        await waitFor(() => expect(fetchAgentEvaluators).toHaveBeenCalled());
+        expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument();
+      });
+
+      it("says outputs rather than replies on a general agent", async () => {
+        fetchHasTraceForReplies.mockResolvedValue(true);
+        fetchAgentEvaluators.mockResolvedValue([
+          { uuid: "ev-tc", evaluator_type: "tool-call" },
+        ]);
+        render(
+          <TracesTabContent
+            {...tabProps}
+            agentNature="general"
+            traceScoring={onlyToolCallScores}
+          />,
+        );
+        expect(
+          await screen.findByText(
+            /so its outputs are not checked\. Add an evaluator that checks outputs in the/,
+          ),
+        ).toBeInTheDocument();
+      });
     });
 
     describe("the note about a tool call evaluator that cannot score", () => {
@@ -1753,6 +1788,20 @@ describe("TracesTabContent", () => {
             }}
           />,
         );
+        await waitFor(() =>
+          expect(fetchHasTraceForToolCalls).toHaveBeenCalled(),
+        );
+        await waitFor(() => expect(fetchAgentEvaluators).toHaveBeenCalled());
+        expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument();
+      });
+
+      it("does not show while the eligibility has not caught up with a newly linked tool call evaluator", async () => {
+        fetchHasTraceForToolCalls.mockResolvedValue(true);
+        fetchAgentEvaluators.mockResolvedValue([
+          { uuid: "ev-1", evaluator_type: "llm" },
+          { uuid: "ev-tc", evaluator_type: "tool-call" },
+        ]);
+        render(<TracesTabContent {...tabProps} />);
         await waitFor(() =>
           expect(fetchHasTraceForToolCalls).toHaveBeenCalled(),
         );

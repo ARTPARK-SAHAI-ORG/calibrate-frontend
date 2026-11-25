@@ -43,8 +43,12 @@ import {
   ACTUAL_CALL_ID_PREFIX,
   DEFAULT_STRUCTURED_RESPONSE,
   DEFAULT_WEBHOOK_RESPONSE,
+  EXPECTED_TOOL_CALLS_HELP,
   actualToolCallsStart,
   argumentRows,
+  gradedAnswerStart,
+  skippedEvaluatorNote,
+  typeArguments,
 } from "@/components/human-labelling/itemConversation";
 import {
   ToolCallExpectationsEditor,
@@ -79,13 +83,15 @@ import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewM
 
 const RESPONSE_PLACEHOLDER = `// any valid JSON value\n${DEFAULT_WEBHOOK_RESPONSE}`;
 
+type ChatTurn = { id: string; role: string };
+const chatCallId = (m: ChatTurn) => (m.role === "tool_call" ? m.id : undefined);
+const isChatResponse = (m: ChatTurn) => m.role === "tool_response";
+
 // The same rule the labelling item save uses to pick `actual_tool_calls`.
-const chatActualCallsStart = (messages: { id: string; role: string }[]) =>
-  actualToolCallsStart(
-    messages,
-    (m) => (m.role === "tool_call" ? m.id : undefined),
-    (m) => m.role === "tool_response",
-  );
+const chatActualCallsStart = (messages: ChatTurn[]) =>
+  actualToolCallsStart(messages, chatCallId, isChatResponse);
+
+let newCallCounter = 0;
 
 export type TestConfig = {
   /** Absent for a general test — see `input` below instead. */
@@ -863,7 +869,7 @@ export function AddTestDialog({
     isWebhook: boolean = false,
     isInbuilt: boolean = false,
   ) => {
-    const toolCallId = `${ACTUAL_CALL_ID_PREFIX}${Date.now()}`;
+    const toolCallId = `${ACTUAL_CALL_ID_PREFIX}new-${++newCallCounter}`;
     const newMessages: typeof chatMessages = [
       ...chatMessages,
       {
@@ -1794,6 +1800,13 @@ export function AddTestDialog({
           }
         }
 
+        const args = keptCallIds.has(message.id)
+          ? typeArguments(
+              argsObj,
+              findFormTool(message.toolId, message.toolName),
+            )
+          : argsObj;
+
         // Add the assistant message with tool_calls
         history.push({
           role: "assistant",
@@ -1802,7 +1815,7 @@ export function AddTestDialog({
               id: toolCallId,
               function: {
                 name: message.toolName || "",
-                arguments: JSON.stringify(argsObj),
+                arguments: JSON.stringify(args),
               },
               type: "function",
             },
@@ -1940,14 +1953,15 @@ export function AddTestDialog({
     return false;
   };
 
-  // A call the agent really made can carry an empty argument, so an item's
-  // own stored calls are not required to fill every argument.
+  // A call the agent really made can carry an empty argument, so the tool
+  // calls an item already stores are not required to fill every argument.
+  // The ids match the ones the fill above gives each call.
   const storedCallIds = new Set(
     isLabelItem
-      ? (initialConfig?.history ?? []).flatMap((h) =>
-          (h.tool_calls ?? [])
-            .map((c) => c.id)
-            .filter((id) => id?.startsWith(ACTUAL_CALL_ID_PREFIX)),
+      ? (initialConfig?.history ?? []).flatMap((h, index) =>
+          h.role === "assistant" && h.tool_calls?.length
+            ? [h.tool_calls[0].id || `tool-${index}`]
+            : [],
         )
       : [],
   );
@@ -2186,10 +2200,7 @@ export function AddTestDialog({
 
   const trailingToolCallsStart = chatActualCallsStart(chatMessages);
 
-  // An llm item is a tool-call item when it ends on the agent's tool calls,
-  // has expected tool calls, or stores an empty tool call list. Only tool-call evaluators score such an item,
-  // and only the others score the rest, so values are asked for the
-  // evaluators that score this item and no others.
+  // Only tool-call evaluators score a tool-call item, and only the others score the rest.
   const isToolCallItem =
     showsExpectedToolCalls &&
     (storesEmptyToolCallList ||
@@ -2199,18 +2210,12 @@ export function AddTestDialog({
     !showsExpectedToolCalls ||
     evaluatorFitsItem(e.evaluator_type, isToolCallItem);
 
-  // Where the graded answer starts: the agent's last message, or the run of
-  // tool calls (with their responses) it ended on, together with the message
-  // just before them when that is the agent's. -1 when there is neither.
-  const evalTargetStart = (() => {
-    const start = trailingToolCallsStart;
-    if (start >= 0) {
-      return chatMessages[start - 1]?.role === "agent" ? start - 1 : start;
-    }
-    return chatMessages[chatMessages.length - 1]?.role === "agent"
-      ? chatMessages.length - 1
-      : -1;
-  })();
+  const evalTargetStart = gradedAnswerStart(
+    chatMessages,
+    chatCallId,
+    isChatResponse,
+    (m) => m.role === "agent",
+  );
 
   const evalTargetPill = (
     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -2705,9 +2710,7 @@ export function AddTestDialog({
 
             {!evaluatorFits(ev) && (
               <p className="text-xs text-muted-foreground">
-                {isToolCallItem
-                  ? "Does not score tool calls, so it is skipped for this item"
-                  : "Only scores tool calls, so it is skipped for this item"}
+                {skippedEvaluatorNote(isToolCallItem)}
               </p>
             )}
             {ev.variables.length > 0 && evaluatorFits(ev) && (
@@ -3101,7 +3104,7 @@ export function AddTestDialog({
                         <ToolCallExpectationsEditor
                           editor={toolExpectations}
                           heading="Expected tool calls"
-                          emptyText="Optional. Add the tool calls the agent should have made and the values it should have sent. Once you add one, this item is scored only by tool call evaluators, which compare the agent's tool calls with these."
+                          emptyText={EXPECTED_TOOL_CALLS_HELP}
                           availableTools={availableTools}
                           availableToolsLoading={availableToolsLoading}
                           accessToken={backendAccessToken ?? undefined}

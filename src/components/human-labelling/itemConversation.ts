@@ -9,7 +9,8 @@ import { normaliseHistoryItem } from "./item-panes/shared";
 import { agentToolCalls } from "@/lib/labellingItem";
 import { normalizeToolCall } from "@/components/test-results/shared";
 import type { ExpectedToolCall } from "@/components/ToolCallExpectationsEditor";
-import type { ToolCallParam } from "@/components/ToolPicker";
+import type { AvailableTool, ToolCallParam } from "@/components/ToolPicker";
+import { readToolParameters } from "@/lib/toolParams";
 
 export type HistoryItem = NonNullable<TestConfig["history"]>[number];
 
@@ -45,6 +46,31 @@ export function actualToolCallsStart<T>(
   while (start < turns.length && isResponse(turns[start])) start += 1;
   return start < turns.length ? start : -1;
 }
+
+/** Where the graded answer starts: the agent's own tool calls (see
+ * actualToolCallsStart), or the end of the conversation when it has none,
+ * moved back over the agent's text reply just before. -1 when there is
+ * neither. */
+export function gradedAnswerStart<T>(
+  turns: T[],
+  callId: (turn: T) => string | undefined,
+  isResponse: (turn: T) => boolean,
+  isReply: (turn: T) => boolean,
+): number {
+  const calls = actualToolCallsStart(turns, callId, isResponse);
+  const end = calls >= 0 ? calls : turns.length;
+  return end > 0 && isReply(turns[end - 1]) ? end - 1 : calls;
+}
+
+/** Help text under the expected tool calls on a labelling item. */
+export const EXPECTED_TOOL_CALLS_HELP =
+  "Optional. Add the tool calls the agent should have made and the values it should have sent. Once you add one, this item is scored only by tool call evaluators, which compare the agent's tool calls with these.";
+
+/** Why an evaluator does not score this item. */
+export const skippedEvaluatorNote = (isToolCallItem: boolean) =>
+  isToolCallItem
+    ? "Does not score tool calls, so it is skipped for this item"
+    : "Only scores tool calls, so it is skipped for this item";
 
 type ToolCallRecord = Pick<ExpectedToolCall, "tool" | "arguments"> & {
   output?: unknown;
@@ -154,14 +180,57 @@ function parseEdited(text: string): unknown {
     : value;
 }
 
-/** Values typed for a call or key with nothing stored behind it, read the way
- * parseEdited reads an edited value. */
-function parseTyped(value: unknown): unknown {
-  if (typeof value === "string") return parseEdited(value);
-  if (!isPlainObject(value)) return value;
+const VALUE_FITS_TYPE: Record<string, (v: unknown) => boolean> = {
+  number: (v) => typeof v === "number",
+  integer: Number.isInteger,
+  boolean: (v) => typeof v === "boolean",
+  object: isPlainObject,
+  array: Array.isArray,
+};
+
+/** The data type the tool declares for each input, nested under `query` and
+ * `body` for a webhook. */
+function declaredTypes(
+  tool: AvailableTool | undefined,
+): Record<string, unknown> {
+  const types = (config: Record<string, unknown> | undefined) =>
+    Object.fromEntries(
+      readToolParameters(config).map((p) => [p.name, p.dataType]),
+    );
+  const webhook = tool?.config?.type === "webhook" && tool.config.webhook;
+  if (!webhook) return types(tool?.config);
+  return {
+    query: types({ parameters: webhook.queryParameters }),
+    body: types({ parameters: webhook.body?.parameters }),
+  };
+}
+
+function applyTypes(
+  args: Record<string, unknown>,
+  types: Record<string, unknown>,
+): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(value).map(([k, v]) => [k, parseTyped(v)]),
+    Object.entries(args).map(([k, v]) => {
+      const type = types[k];
+      if (isPlainObject(v) && isPlainObject(type)) {
+        return [k, applyTypes(v, type)];
+      }
+      if (typeof v !== "string" || typeof type !== "string") return [k, v];
+      const value = parseEdited(v);
+      return [k, VALUE_FITS_TYPE[type]?.(value) ? value : v];
+    }),
   );
+}
+
+/** Arguments typed into a dialog's text boxes, with each value the tool
+ * declares as a number, true/false, object or list turned into one. Every
+ * other value, and every value of a tool not in the list, stays text, so a
+ * phone number typed into a text input is not saved as a number. */
+export function typeArguments(
+  args: Record<string, unknown>,
+  tool: AvailableTool | undefined,
+): Record<string, unknown> {
+  return applyTypes(args, declaredTypes(tool));
 }
 
 /** The dialog edits argument values as text, so a value it shows unchanged is
@@ -196,28 +265,29 @@ function restoreArguments(
       if (out[k] !== before) changed = true;
     } else if (
       before !== undefined &&
-      typeof v === "string" &&
-      v === argumentText(before)
+      argumentText(v) === argumentText(before)
     ) {
       out[k] = before;
     } else {
       out[k] =
         before === undefined
-          ? parseTyped(v)
-          : typeof v === "string" && typeof before !== "string"
-            ? parseEdited(v)
-            : v;
+          ? v
+          : typeof before === "string"
+            ? argumentText(v)
+            : typeof v === "string"
+              ? parseEdited(v)
+              : v;
       changed = true;
     }
   }
   return changed ? out : previous;
 }
 
-/** Tool calls back from a dialog that edits argument values as text.
- * `storedIndex[i]` is the position in `previous` that call i was read from,
- * or undefined for a call added in the dialog. A call read from a stored
- * call gets the stored values back where its text is unchanged, even when its
- * tool was renamed. */
+/** Tool calls back from a dialog that edits argument values as text, after
+ * typeArguments. `storedIndex[i]` is the position in `previous` that call i
+ * was read from, or undefined for a call added in the dialog. A call read from
+ * a stored call gets the stored values back where its text is unchanged, even
+ * when its tool was renamed, and an edited stored text value stays text. */
 export function restoreToolCalls<
   T extends { tool: string; arguments: Record<string, unknown> },
 >(next: T[], previous: unknown, storedIndex: (number | undefined)[]): T[] {
@@ -232,7 +302,7 @@ export function restoreToolCalls<
       ...call,
       arguments: prior
         ? restoreArguments(call.arguments, prior.args)
-        : (parseTyped(call.arguments) as Record<string, unknown>),
+        : call.arguments,
     };
   });
 }
@@ -249,6 +319,18 @@ function storedCallIndex(id: string | undefined): number | undefined {
 /** A list field on save: the new list when it has entries. An empty list is
  * kept only when the item already stored an empty one, since an empty list
  * still marks a tool-call item. A list emptied by the reader is removed. */
+/** Spread into a saved payload: removes the old `tool_calls` field when its
+ * calls were the ones read into the dialog (`shown`), since they are now
+ * saved as `actual_tool_calls`. */
+export function clearOldToolCallsField(
+  previous: Record<string, unknown> | undefined,
+  shown: unknown[],
+): { tool_calls?: undefined } {
+  return shown.length > 0 && shown === previous?.tool_calls
+    ? { tool_calls: undefined }
+    : {};
+}
+
 export function keepList<T>(previous: unknown, next: T[]): T[] | undefined {
   if (next.length > 0) return next;
   return Array.isArray(previous) && previous.length === 0 ? [] : undefined;
@@ -276,21 +358,24 @@ export function historyToPayloadFields(
     h.role === "assistant" &&
     Array.isArray(h.tool_calls) &&
     h.tool_calls.length > 0;
-  const isReply = (h: HistoryItem | undefined) =>
-    !!h &&
-    h.role === "assistant" &&
-    !isCall(h) &&
-    typeof h.content === "string";
-  const callStart = actualToolCallsStart(
+  const isReply = (h: HistoryItem) =>
+    h.role === "assistant" && !isCall(h) && typeof h.content === "string";
+  const answerStart = gradedAnswerStart(
     history,
     (h) => (isCall(h) ? h.tool_calls?.[0]?.id : undefined),
     (h) => h.role === "tool",
+    isReply,
   );
-  const start = callStart >= 0 ? callStart : history.length;
-  const trailing = history.slice(start);
-  const replyIndex = isReply(history[start - 1]) ? start - 1 : -1;
-  const reply = replyIndex >= 0 ? history[replyIndex] : undefined;
-  const chat_history = history.slice(0, replyIndex >= 0 ? replyIndex : start);
+  const reply =
+    answerStart >= 0 && isReply(history[answerStart])
+      ? history[answerStart]
+      : undefined;
+  const chat_history = history.slice(
+    0,
+    answerStart >= 0 ? answerStart : history.length,
+  );
+  const trailing =
+    answerStart >= 0 ? history.slice(answerStart + (reply ? 1 : 0)) : [];
   const agent_response = reply
     ? writeTextField(reply.content as string, {
         label: reply.label,
@@ -300,60 +385,53 @@ export function historyToPayloadFields(
   const before = agentToolCalls(previous ?? {});
   const read = trailing.filter(isCall).flatMap((turn) =>
     (turn.tool_calls ?? []).map((call) => {
-      const { args } = normalizeToolCall(call);
       const response = trailing.find(
         (t) => t.role === "tool" && t.tool_call_id === call.id,
       );
       return {
         tool: call.function.name,
-        arguments: args as Record<string, unknown>,
+        arguments: normalizeToolCall(call).args as Record<string, unknown>,
         content:
           typeof response?.content === "string" ? response.content : undefined,
         storedAt: storedCallIndex(call.id),
       };
     }),
   );
-  const calls: ToolCallRecord[] = read.map(
-    ({ tool, arguments: args, content, storedAt }) => {
-      const prior =
-        storedAt === undefined || before[storedAt] === undefined
-          ? undefined
-          : normalizeToolCall(before[storedAt]);
-      const priorOutput = prior?.output;
-      let output: unknown;
-      if (content !== undefined) {
-        if (priorOutput !== undefined && content === outputText(priorOutput)) {
-          output = priorOutput;
-        } else if (
-          prior &&
-          (priorOutput === undefined || priorOutput === "") &&
-          (content === DEFAULT_STRUCTURED_RESPONSE ||
-            content === DEFAULT_WEBHOOK_RESPONSE)
-        ) {
-          // The dialog filled in its default because no reply was stored.
-          output = priorOutput;
-        } else {
-          output =
-            typeof priorOutput === "string" ? content : parseEdited(content);
-        }
-      }
-      return {
-        tool,
-        arguments: prior
-          ? restoreArguments(args, prior.args)
-          : (parseTyped(args) as Record<string, unknown>),
-        ...(output !== undefined ? { output } : {}),
-      };
-    },
+  const restored = restoreToolCalls(
+    read.map(({ tool, arguments: args }) => ({ tool, arguments: args })),
+    before,
+    read.map((r) => r.storedAt),
   );
+  const calls: ToolCallRecord[] = read.map(({ content, storedAt }, i) => {
+    const prior =
+      storedAt === undefined || before[storedAt] === undefined
+        ? undefined
+        : normalizeToolCall(before[storedAt]);
+    const priorOutput = prior?.output;
+    let output: unknown;
+    if (content !== undefined) {
+      if (priorOutput !== undefined && content === outputText(priorOutput)) {
+        output = priorOutput;
+      } else if (
+        prior &&
+        (priorOutput === undefined || priorOutput === "") &&
+        (content === DEFAULT_STRUCTURED_RESPONSE ||
+          content === DEFAULT_WEBHOOK_RESPONSE)
+      ) {
+        // The dialog filled in its default because no reply was stored.
+        output = priorOutput;
+      } else {
+        output =
+          typeof priorOutput === "string" ? content : parseEdited(content);
+      }
+    }
+    return { ...restored[i], ...(output !== undefined ? { output } : {}) };
+  });
   return {
     chat_history,
     agent_response,
     actual_tool_calls: keepList(previous?.actual_tool_calls, calls),
-    // The old field is cleared only when its calls were read into the dialog.
-    ...(before.length > 0 && before === previous?.tool_calls
-      ? { tool_calls: undefined }
-      : {}),
+    ...clearOldToolCallsField(previous, before),
   };
 }
 

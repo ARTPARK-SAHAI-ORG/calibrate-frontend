@@ -43,12 +43,12 @@ import {
 } from "@/components/human-labelling/MetadataFieldsEditor";
 import { sampleItem } from "@/components/human-labelling/sampleItem";
 import {
+  clearOldToolCallsField,
   historyToPayloadFields,
   keepList,
   payloadToHistory,
   textFieldsToPayload,
 } from "@/components/human-labelling/itemConversation";
-import { agentToolCalls } from "@/lib/labellingItem";
 import { textOf } from "@/lib/messageVersions";
 import {
   buildItemsCsv,
@@ -105,6 +105,7 @@ import {
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import {
+  agentToolCalls,
   itemEditForm,
   toItemDetailItem,
   llmGeneralDialogRow,
@@ -4021,11 +4022,10 @@ function LabellingTaskPageInner() {
                         name: r.name,
                         description: r.description,
                         ...textFieldsToPayload(r),
-                        // The old field is cleared only when its calls were read into the dialog.
-                        ...(Array.isArray(existing.tool_calls) &&
-                        agentToolCalls(existing) === existing.tool_calls
-                          ? { tool_calls: undefined }
-                          : {}),
+                        ...clearOldToolCallsField(
+                          existing,
+                          agentToolCalls(existing),
+                        ),
                         actual_tool_calls: keepList(
                           existing.actual_tool_calls,
                           r.toolCalls,

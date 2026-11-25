@@ -19,6 +19,14 @@ import { normaliseHistoryItem } from "./shared";
  */
 const AGENT_ANSWER = "Agent's answer";
 
+export function JudgedTogetherNote() {
+  return (
+    <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+      The reply and the tool calls are judged together
+    </div>
+  );
+}
+
 export function ToolCallItemPane({
   payload,
 }: {
@@ -73,11 +81,7 @@ export function ToolCallItemPane({
       highlightEvalTarget={hasReply && hasCalls ? 2 : true}
       afterHistory={
         <>
-          {hasReply && hasCalls && (
-            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              The reply and the tool calls are judged together
-            </div>
-          )}
+          {hasReply && hasCalls && <JudgedTogetherNote />}
           <ExpectedToolCalls payload={payload} />
         </>
       }
