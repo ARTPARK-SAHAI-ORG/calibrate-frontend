@@ -141,13 +141,13 @@ describe("ConversationsView", () => {
 
   it("hands a picked filter back to the tab", async () => {
     const user = setupUser();
-    render(<ConversationsView {...props} />);
+    render(<ConversationsView {...props} hasFeedback />);
     await screen.findAllByText("conv-a");
 
     await user.click(screen.getByRole("button", { name: "Filter traces" }));
     await user.click(screen.getByRole("button", { name: "Response" }));
-    await user.click(screen.getByRole("button", { name: "Chat link" }));
-    await user.click(screen.getByRole("button", { name: "Any feedback" }));
+    await user.click(screen.getByRole("button", { name: "Chat" }));
+    await user.click(screen.getByRole("button", { name: "Any" }));
     await user.click(screen.getByRole("button", { name: /^Apply/ }));
 
     expect(onFilterChange).toHaveBeenCalledWith({

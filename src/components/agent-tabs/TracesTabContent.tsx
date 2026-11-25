@@ -60,6 +60,7 @@ import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScore
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
   fetchTrace,
+  fetchHasTraceFeedback,
   fetchTraceUsage,
   fetchTraces,
   traceFilterKey,
@@ -613,6 +614,21 @@ export function TracesTabContent({
       cancelled = true;
     };
   }, [accessToken, agentUuid, usageReads]);
+  // Whether any of the agent's traces carries feedback from the chat link,
+  // which is what puts the feedback section in the filter.
+  const [hasFeedback, setHasFeedback] = useState(false);
+  useEffect(() => {
+    if (!accessToken) return;
+    let cancelled = false;
+    fetchHasTraceFeedback(accessToken, agentUuid)
+      .then((has) => {
+        if (!cancelled) setHasFeedback(has);
+      })
+      .catch((err) => reportError("Error checking for trace feedback:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, agentUuid, usageReads]);
   // Rows skipped before the workspace's limit was lifted still say over_limit.
   const overLimit =
     usage?.max_scored_traces !== null &&
@@ -802,6 +818,7 @@ export function TracesTabContent({
           source={facets.source}
           feedback={facets.feedback}
           allLabels={allLabels}
+          hasFeedback={hasFeedback}
           onFilterChange={(next) => setView(next)}
         />
       </div>
@@ -904,6 +921,7 @@ export function TracesTabContent({
             labels={allLabels}
             scoreEvaluators={scoreFilterEvaluators}
             conversationIds={conversationIds}
+            hasFeedback={hasFeedback}
             onApply={(next) =>
               setView({
                 ...next,

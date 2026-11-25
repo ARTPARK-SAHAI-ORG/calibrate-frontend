@@ -211,7 +211,7 @@ it("leaves the labels out when the traces carry none", async () => {
 
   await openPanel(user);
 
-  expect(screen.queryByText("Filter by trace labels")).not.toBeInTheDocument();
+  expect(screen.queryByText("Trace labels")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Response" })).toBeInTheDocument();
 });
 
@@ -426,7 +426,7 @@ describe("narrowing by what the evaluators scored", () => {
 
     await openPanel(user);
 
-    expect(screen.queryByText("Filter by scores")).not.toBeInTheDocument();
+    expect(screen.queryByText("Scores")).not.toBeInTheDocument();
   });
 
   it("shows a condition the evaluator no longer offers, rather than a blank box", async () => {
@@ -478,12 +478,13 @@ describe("narrowing by what the evaluators scored", () => {
   });
 });
 
-it("names the output filter after the agent's output", async () => {
+it("heads the panel Filter traces, with a section per filter", async () => {
   const { user } = setup();
   await openPanel(user);
   expect(
-    screen.getByText("Filter by type of agent's output"),
+    screen.getByRole("heading", { name: "Filter traces" }),
   ).toBeInTheDocument();
+  expect(screen.getByText("Agent output")).toBeInTheDocument();
   expect(
     screen.queryByText(
       "Conversations where any of the turns match the filters are shown",
@@ -498,7 +499,7 @@ it("says a conversation matches on any one of its turns", async () => {
   );
   await openPanel(user);
   expect(
-    screen.getByText("Filter by type of agent's output across turns"),
+    screen.getByRole("heading", { name: "Filter conversations" }),
   ).toBeInTheDocument();
   expect(
     screen.getByText(
@@ -589,7 +590,7 @@ it("keeps a conversation picked from the address on offer even when the list lac
 it("leaves the conversation section out when there are no conversation IDs", async () => {
   const { user } = setup();
   await openPanel(user);
-  expect(screen.queryByText("Filter by conversation ID")).not.toBeInTheDocument();
+  expect(screen.queryByText("Conversation ID")).not.toBeInTheDocument();
 });
 
 it("has no conversation ID box on the conversations list", async () => {
@@ -604,31 +605,46 @@ it("has no conversation ID box on the conversations list", async () => {
     />,
   );
   await openPanel(user);
-  expect(screen.queryByText("Filter by conversation ID")).not.toBeInTheDocument();
+  expect(screen.queryByText("Conversation ID")).not.toBeInTheDocument();
 });
 
-it("narrows by where the trace came from and by feedback, on Apply", async () => {
-  const { user, onApply } = setup();
+it("narrows by source and by user feedback, on Apply", async () => {
+  const user = setupUser();
+  const onApply = jest.fn();
+  render(
+    <TracesFilter value={NONE} labels={[]} onApply={onApply} hasFeedback />,
+  );
 
   await openPanel(user);
-  expect(
-    screen.getByText("Filter by where the trace came from"),
-  ).toBeInTheDocument();
-  expect(screen.getByText("Filter by feedback")).toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Chat link" }));
-  await user.click(screen.getByRole("button", { name: "Thumbs down" }));
+  expect(screen.getByText("Source")).toBeInTheDocument();
+  expect(screen.getByText("User feedback")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Chat" }));
+  await user.click(screen.getByRole("button", { name: "Wrong" }));
   expect(applyButton()).toHaveTextContent("Apply (2)");
   await user.click(applyButton());
 
   expect(onApply).toHaveBeenCalledWith({
     ...NONE,
     source: "chat",
-    feedback: "down",
+    feedback: "wrong",
   });
 });
 
+it("leaves out the user feedback section while no trace carries feedback", async () => {
+  const { user } = setup();
+  await openPanel(user);
+  expect(screen.getByText("Source")).toBeInTheDocument();
+  expect(screen.queryByText("User feedback")).not.toBeInTheDocument();
+});
+
+it("keeps a picked feedback filter on offer, so it can be turned off", async () => {
+  const { user } = setup({ ...NONE, feedback: "correct" });
+  await openPanel(user);
+  expect(screen.getByText("User feedback")).toBeInTheDocument();
+});
+
 it("counts the source and feedback choices on the button", () => {
-  setup({ ...NONE, source: "api", feedback: "none" });
+  setup({ ...NONE, source: "api", feedback: "any" });
 
   expect(screen.getByText("2")).toBeInTheDocument();
 });
@@ -641,17 +657,11 @@ it("offers the source and feedback filters on the conversations list too", async
       labels={[]}
       onApply={jest.fn()}
       forConversations
+      hasFeedback
     />,
   );
   await openPanel(user);
-  for (const name of [
-    "API",
-    "Chat link",
-    "Thumbs up",
-    "Thumbs down",
-    "Any feedback",
-    "No feedback",
-  ]) {
+  for (const name of ["API", "Chat", "Correct", "Wrong", "Any"]) {
     expect(screen.getByRole("button", { name })).toBeInTheDocument();
   }
 });

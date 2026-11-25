@@ -952,6 +952,7 @@ export function TestDetailView({
   highlightEvalTarget = false,
   showVerdict = true,
   markOutput = true,
+  afterOutput,
 }: {
   history: TestCaseHistory[];
   /** `test_case.input` — set only for a test written as one input rather
@@ -985,6 +986,9 @@ export function TestDetailView({
   /** When false, the final reply gets no left border: nothing on screen is
    * being judged, as in a whole conversation read back. */
   markOutput?: boolean;
+  /** Drawn just under the agent's final reply, such as the feedback a
+   *  person left on it. */
+  afterOutput?: React.ReactNode;
 }) {
   // Precompute tool_call_id → response content map so the inline tool-call
   // card lookup is O(1) instead of scanning the entire history once per
@@ -1104,6 +1108,7 @@ export function TestDetailView({
               !(output?.tool_calls && output.tool_calls.length > 0) && (
                 <p className="text-sm text-muted-foreground">—</p>
               )}
+            {afterOutput}
           </div>
         </div>
       )}
@@ -1313,6 +1318,7 @@ export function TestDetailView({
               </div>
             </div>
           )}
+          {afterOutput}
         </div>
       )}
 

@@ -1053,6 +1053,26 @@ describe("showing a whole conversation", () => {
     },
   };
 
+  it("leaves one turn's feedback out of a whole conversation", async () => {
+    mockFetchTrace.mockResolvedValue({
+      ...detail,
+      uuid: "t-last",
+      feedback: { is_correct: false, comment: "Too slow", at: "2026-07-20" },
+    });
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={jest.fn()}
+        accessToken="tok"
+        traceUuid="t1"
+        conversation={conversation}
+      />,
+    );
+
+    await screen.findByText("At 14 weeks, for OPV and DPT.");
+    expect(screen.queryByText("Too slow")).not.toBeInTheDocument();
+  });
+
   it("draws the newest turn's trace under the conversation id, with no scores", async () => {
     mockFetchTrace.mockResolvedValue({ ...detail, uuid: "t-last" });
 
@@ -1158,11 +1178,11 @@ describe("showing a whole conversation", () => {
   });
 });
 
-it("says where the trace came from and shows its feedback", async () => {
+it("says where the trace came from, and puts the feedback under the reply it rates", async () => {
   mockFetchTrace.mockResolvedValue({
     ...detail,
     source: "chat",
-    feedback: { rating: "up", comment: "Clear answer", at: "2026-07-20" },
+    feedback: { is_correct: true, comment: "Clear answer", at: "2026-07-20" },
   });
   render(
     <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
@@ -1170,25 +1190,31 @@ it("says where the trace came from and shows its feedback", async () => {
 
   expect(await screen.findByText("Source")).toBeInTheDocument();
   expect(screen.getByText("Chat link")).toBeInTheDocument();
-  expect(screen.getByText("Feedback")).toBeInTheDocument();
-  expect(screen.getByRole("img", { name: "Thumbs up" })).toBeInTheDocument();
-  expect(screen.getByText("Clear answer")).toBeInTheDocument();
+  expect(screen.queryByText("Feedback")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("img", { name: "Thumbs up, with a comment" }),
+  ).toBeInTheDocument();
+  const reply = screen.getByText("At 14 weeks, for OPV and DPT.");
+  const comment = screen.getByText("Clear answer");
+  expect(
+    reply.compareDocumentPosition(comment) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
 });
 
-it("shows an API trace with no feedback without a feedback block", async () => {
+it("shows an API trace with no feedback and no thumb", async () => {
   mockFetchTrace.mockResolvedValue({ ...detail, source: "api", feedback: null });
   render(
     <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
   );
 
   expect(await screen.findByText("API")).toBeInTheDocument();
-  expect(screen.queryByText("Feedback")).not.toBeInTheDocument();
+  expect(screen.queryByRole("img", { name: /^Thumbs/ })).not.toBeInTheDocument();
 });
 
 it("shows a thumb with no comment on its own", async () => {
   mockFetchTrace.mockResolvedValue({
     ...detail,
-    feedback: { rating: "down", comment: null, at: "2026-07-20" },
+    feedback: { is_correct: false, comment: null, at: "2026-07-20" },
   });
   render(
     <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
@@ -1198,4 +1224,20 @@ it("shows a thumb with no comment on its own", async () => {
     await screen.findByRole("img", { name: "Thumbs down" }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Source")).not.toBeInTheDocument();
+});
+
+it("puts the feedback under the output of a basic agent's trace", async () => {
+  mockFetchTrace.mockResolvedValue({
+    ...detail,
+    input: "Book a slot for next week",
+    feedback: { is_correct: false, comment: "No slot given", at: "2026-07-20" },
+  });
+  render(
+    <TraceDetailDialog isOpen onClose={jest.fn()} accessToken="tok" traceUuid="t1" />,
+  );
+
+  expect(await screen.findByText("No slot given")).toBeInTheDocument();
+  expect(
+    screen.getByRole("img", { name: "Thumbs down, with a comment" }),
+  ).toBeInTheDocument();
 });
