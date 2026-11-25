@@ -38,9 +38,6 @@ describe("copy", () => {
     expect(ineligibleReasonCopy("declares_variables")).toBe(
       "Uses variables, which cannot be filled for a trace automatically",
     );
-    expect(ineligibleReasonCopy("no_judge_prompt")).toBe(
-      "Has no prompt, so only people can answer it",
-    );
     expect(ineligibleReasonCopy("other")).toBe(
       "Cannot score traces for this agent",
     );
@@ -86,9 +83,6 @@ describe("nothingCanScoreCopy", () => {
     expect(nothingCanScoreCopy([{ reason: "wrong_type_for_agent" }])).toBe(
       "None of the evaluators added to this agent are the kind that can score its traces. Add an evaluator that fits this agent in the",
     );
-    expect(nothingCanScoreCopy([{ reason: "no_judge_prompt" }])).toBe(
-      "None of the evaluators added to this agent have a prompt, so only people can answer them. Add an evaluator with a prompt in the",
-    );
     expect(nothingCanScoreCopy([{ reason: "no_live_version" }])).toBe(
       "None of the evaluators added to this agent have a live version. Add an evaluator with a live version in the",
     );
@@ -104,11 +98,11 @@ describe("nothingCanScoreCopy", () => {
     expect(
       nothingCanScoreCopy([
         { reason: "declares_variables" },
-        { reason: "no_judge_prompt" },
+        { reason: "no_live_version" },
         { reason: "declares_variables" },
       ]),
     ).toBe(
-      "None of this agent's evaluators can score traces: some use variables, some have no prompt. Add an evaluator that can score traces in the",
+      "None of this agent's evaluators can score traces: some use variables, some have no live version. Add an evaluator that can score traces in the",
     );
   });
 

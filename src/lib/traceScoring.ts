@@ -57,8 +57,6 @@ export function ineligibleReasonCopy(
       return "Has no live version";
     case "declares_variables":
       return "Uses variables, which cannot be filled for a trace automatically";
-    case "no_judge_prompt":
-      return "Has no prompt, so only people can answer it";
     default:
       return "Cannot score traces for this agent";
   }
@@ -79,12 +77,6 @@ const NOTHING_CAN_SCORE_BY_REASON: Record<
       "None of the evaluators added to this agent are the kind that can score its traces.",
     some: "some are not the kind this agent uses",
     fix: "Add an evaluator that fits this agent in the",
-  },
-  no_judge_prompt: {
-    every:
-      "None of the evaluators added to this agent have a prompt, so only people can answer them.",
-    some: "some have no prompt",
-    fix: "Add an evaluator with a prompt in the",
   },
   no_live_version: {
     every: "None of the evaluators added to this agent have a live version.",

@@ -24,16 +24,3 @@ it("says an agent with no evaluators has none to score with", () => {
   );
   expect(screen.getByText(/This agent has no evaluators/)).toBeInTheDocument();
 });
-
-it("names a missing prompt instead of variables", () => {
-  render(
-    <NothingCanScoreMessage
-      ineligible={[{ reason: "no_judge_prompt" }]}
-      onGoToEvaluators={jest.fn()}
-    />,
-  );
-  expect(document.body).toHaveTextContent(
-    "None of the evaluators added to this agent have a prompt, so only people can answer them. Add an evaluator with a prompt in the Evaluators tab.",
-  );
-  expect(document.body).not.toHaveTextContent(/variables/);
-});
