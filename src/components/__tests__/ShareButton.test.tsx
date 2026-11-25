@@ -92,8 +92,10 @@ describe("ShareButton", () => {
         initialShareToken="share123"
       />,
     );
-    await user.hover(screen.getByRole("button", { name: "Public" }));
-    expect(await screen.findByText("Make it private")).toBeInTheDocument();
+    await user.hover(screen.getByRole("button", { name: "Make it private" }));
+    expect(
+      await screen.findByText("Turn off the link to chat with this agent"),
+    ).toBeInTheDocument();
     await user.hover(screen.getByRole("button", { name: "Copy link" }));
     expect(
       await screen.findByText(
@@ -139,7 +141,7 @@ describe("ShareButton", () => {
     await user.click(screen.getByRole("button", { name: "Share chat link" }));
     await user.click(screen.getByRole("button", { name: "Create link" }));
     expect(
-      await screen.findByRole("button", { name: "Public" }),
+      await screen.findByRole("button", { name: "Make it private" }),
     ).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
@@ -159,7 +161,7 @@ describe("ShareButton", () => {
     await user.click(screen.getByRole("button", { name: "Share chat link" }));
     expect(screen.queryByText("Create a chat link?")).not.toBeInTheDocument();
     expect(
-      await screen.findByRole("button", { name: "Public" }),
+      await screen.findByRole("button", { name: "Make it private" }),
     ).toBeInTheDocument();
   });
 

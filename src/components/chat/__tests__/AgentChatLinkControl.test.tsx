@@ -32,7 +32,7 @@ it("previews a public chat page in a new tab", async () => {
   const preview = await screen.findByRole("link", { name: "Preview" });
   expect(preview).toHaveAttribute("href", "/public/chat/abc");
   expect(preview).toHaveAttribute("target", "_blank");
-  expect(screen.getByRole("button", { name: /Public/ })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Make it private" })).toBeEnabled();
   expect(mockGet).toHaveBeenCalledWith("/agents/a1/chat-link", "tok");
 });
 
@@ -78,7 +78,7 @@ it("greys out Preview when there is no link yet, then opens it once public", asy
     ok: true,
     json: async () => ({ is_public: false, share_token: null }),
   });
-  await user.click(screen.getByRole("button", { name: /Public/ }));
+  await user.click(screen.getByRole("button", { name: "Make it private" }));
   await screen.findByRole("button", { name: /Share/ });
   expect(screen.getByRole("link", { name: "Preview" })).toHaveAttribute(
     "href",
@@ -106,7 +106,9 @@ it("can still be made private when the connection stopped being checked", async 
     link({ connection_verified: false, is_public: true, share_token: "abc" }),
   );
   render(<AgentChatLinkControl agentUuid="a1" connectionUnverified />);
-  expect(await screen.findByRole("button", { name: /Public/ })).toBeEnabled();
+  expect(
+    await screen.findByRole("button", { name: "Make it private" }),
+  ).toBeEnabled();
 });
 
 it("reads the link again once the connection passes", async () => {

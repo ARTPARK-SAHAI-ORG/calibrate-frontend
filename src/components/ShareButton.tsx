@@ -69,6 +69,8 @@ export function publicSharePath(
  *  general words and no window. */
 type ShareWords = {
   share: string;
+  /** The button's name while the link is on. */
+  isPublic: string;
   makePublic: string;
   makePrivate: string;
   copy: string;
@@ -77,8 +79,9 @@ type ShareWords = {
 const HOVER_TEXT: Partial<Record<ShareableEntityType, ShareWords>> = {
   "agent-chat": {
     share: "Share chat link",
+    isPublic: "Make it private",
     makePublic: "Create a link anyone can use to chat with this agent",
-    makePrivate: "Make it private",
+    makePrivate: "Turn off the link to chat with this agent",
     copy: "Copy the link to chat with the agent and share it with users",
     firstShare: {
       title: "Create a chat link?",
@@ -90,6 +93,7 @@ const HOVER_TEXT: Partial<Record<ShareableEntityType, ShareWords>> = {
 };
 const DEFAULT_HOVER_TEXT: ShareWords = {
   share: "Share",
+  isPublic: "Public",
   makePublic: "Make this publicly shareable",
   makePrivate: "Make this private",
   copy: "Copy public link",
@@ -256,7 +260,7 @@ export function ShareButton({
               />
             </svg>
           )}
-          {isPublic ? "Public" : hoverText.share}
+          {isPublic ? hoverText.isPublic : hoverText.share}
         </button>
       </Tooltip>
 
