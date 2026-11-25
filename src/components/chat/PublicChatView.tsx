@@ -179,6 +179,16 @@ export function PublicChatView({ token }: { token: string }) {
     const run = chatRun.current;
     setSending(true);
     setSendError(null);
+    // The thumb is already saved; a comment box left empty is closed once the
+    // reader moves on. One with something typed in it stays open.
+    setFeedback((all) =>
+      Object.fromEntries(
+        Object.entries(all).map(([id, f]) => [
+          id,
+          f.open && !f.draft.trim() ? { ...f, open: false } : f,
+        ]),
+      ),
+    );
     if (!retry) setTurns((t) => [...t, { role: "user", text }]);
     const res = await sendChatMessage(
       token,

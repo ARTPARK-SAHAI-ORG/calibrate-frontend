@@ -483,3 +483,43 @@ it("scrolls the comment box into view when a thumb opens it", async () => {
   expect(scroll).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
   scroll.mockRestore();
 });
+
+it("closes an empty comment box when the next message is sent, and keeps one with text", async () => {
+  const user = setupUser();
+  await open();
+  mockSend
+    .mockResolvedValueOnce(reply())
+    .mockResolvedValueOnce(reply({ trace_uuid: "t2" }))
+    .mockResolvedValueOnce(reply({ trace_uuid: "t3" }));
+  mockFeedback.mockResolvedValue({ ok: true, data: { feedback: null } });
+  await sendMessage(user, "First");
+  await screen.findByText("Simulated agent reply.");
+  await user.click(screen.getByRole("button", { name: "Bad reply" }));
+  expect(
+    await screen.findByText("What was wrong with this reply? (optional)"),
+  ).toBeInTheDocument();
+
+  await sendMessage(user, "Second");
+  await waitFor(() =>
+    expect(
+      screen.queryByText("What was wrong with this reply? (optional)"),
+    ).toBeNull(),
+  );
+  // The thumb itself stays picked.
+  expect(
+    screen
+      .getAllByRole("button", { name: "Bad reply" })
+      .filter((b) => b.getAttribute("aria-pressed") === "true"),
+  ).toHaveLength(1);
+
+  const goods = await screen.findAllByRole("button", { name: "Good reply" });
+  await user.click(goods[goods.length - 1]);
+  await user.type(
+    await screen.findByRole("textbox", { name: /What was good/ }),
+    "Clear",
+  );
+  await sendMessage(user, "Third");
+  expect(screen.getByRole("textbox", { name: /What was good/ })).toHaveValue(
+    "Clear",
+  );
+});
