@@ -55,9 +55,21 @@ const BLOCKING = new Set([
 
 /** Ready-made first messages, put in the message box when clicked. */
 const STARTER_MESSAGES = [
-  "Hi, what can you help me with?",
-  "What do you need from me to get started?",
-  "Can you explain how this works?",
+  {
+    text: "Hi, what can you help me with?",
+    color:
+      "border-blue-500/40 bg-blue-500/10 text-blue-900 dark:text-blue-200 hover:bg-blue-500/20",
+  },
+  {
+    text: "What do you need from me to get started?",
+    color:
+      "border-violet-500/40 bg-violet-500/10 text-violet-900 dark:text-violet-200 hover:bg-violet-500/20",
+  },
+  {
+    text: "Can you explain how this works?",
+    color:
+      "border-teal-500/40 bg-teal-500/10 text-teal-900 dark:text-teal-200 hover:bg-teal-500/20",
+  },
 ];
 
 const BUTTON_CLASS =
@@ -286,17 +298,17 @@ export function PublicChatView({ token }: { token: string }) {
                 <p className="text-sm font-medium text-foreground">
                   Here are a few examples
                 </p>
-                {STARTER_MESSAGES.map((message) => (
+                {STARTER_MESSAGES.map(({ text, color }) => (
                   <button
-                    key={message}
+                    key={text}
                     type="button"
                     onClick={() => {
-                      setDraft(message);
+                      setDraft(text);
                       messageRef.current?.focus();
                     }}
-                    className="w-full text-left px-3 py-2 rounded-md border border-blue-500/40 bg-blue-500/10 text-sm font-medium text-blue-900 dark:text-blue-200 hover:bg-blue-500/20 transition-colors cursor-pointer"
+                    className={`w-full text-left px-3 py-2 rounded-md border text-sm font-medium transition-colors cursor-pointer ${color}`}
                   >
-                    {message}
+                    {text}
                   </button>
                 ))}
                 <p className="flex items-center justify-center gap-1.5 text-sm text-foreground mt-1">
