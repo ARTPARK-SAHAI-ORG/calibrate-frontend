@@ -360,6 +360,15 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
   }
 }
 
+// An empty expected or actual tool call list is kept on save and still marks
+// the item as a tool-call item.
+function storesEmptyToolCallList(payload: unknown): boolean {
+  const p = (payload ?? {}) as Record<string, unknown>;
+  return [p.expected_tool_calls, p.actual_tool_calls].some(
+    (list) => Array.isArray(list) && list.length === 0,
+  );
+}
+
 function sanitizeCsvName(s: string): string {
   return s.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "unnamed";
 }
@@ -2177,6 +2186,7 @@ function LabellingTaskPageInner() {
     uuid: e.uuid,
     name: e.name,
     description: e.description ?? null,
+    evaluator_type: e.evaluator_type,
     variables: e.variables ?? [],
   }));
 
@@ -3706,6 +3716,9 @@ function LabellingTaskPageInner() {
           mode="labelItem"
           allowAgentLastMessage={taskType === "conversation"}
           requireAssistantLastMessage={taskType === "llm"}
+          storesEmptyToolCallList={storesEmptyToolCallList(
+            duplicateSourcePayload,
+          )}
           initialConfig={addItemInitialConfig}
           initialEvaluators={newItemInitialEvaluators}
           onSubmit={async (
@@ -3820,6 +3833,9 @@ function LabellingTaskPageInner() {
           mode="labelItem"
           allowAgentLastMessage={taskType === "conversation"}
           requireAssistantLastMessage={taskType === "llm"}
+          storesEmptyToolCallList={storesEmptyToolCallList(
+            editingItem?.payload,
+          )}
           initialConfig={editingInitialConfig}
           initialEvaluators={editingInitialEvaluators}
           onSubmit={async (
@@ -4243,6 +4259,10 @@ function LabellingTaskPageInner() {
             }
           : {})}
         evaluators={llmGeneralEvaluatorDefs}
+        storesEmptyToolCallList={storesEmptyToolCallList(
+          items.find((it) => it.uuid === editLlmGeneralSingleItemUuid)
+            ?.payload,
+        )}
         initialRows={items
           .filter((it) => it.uuid === editLlmGeneralSingleItemUuid)
           .map(llmGeneralDialogRow)}

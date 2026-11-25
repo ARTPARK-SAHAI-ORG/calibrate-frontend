@@ -325,6 +325,91 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     expect(screen.getByRole("button", { name: "Save item" })).toBeEnabled();
   });
 
+  const replyEvaluator: LlmGeneralEvaluatorDef = {
+    uuid: "ev-reply",
+    name: "Correctness",
+    evaluator_type: "llm-general",
+    variables: [
+      { name: "criteria", description: "The criteria" },
+      { name: "extra", description: "The extra" },
+    ],
+  };
+  const toolCallEvaluator: LlmGeneralEvaluatorDef = {
+    uuid: "ev-tool",
+    name: "Tool call correctness",
+    evaluator_type: "tool-call",
+    variables: [{ name: "rule", description: "The rule" }],
+  };
+
+  it("saves a tool-call item without asking for, or dropping, the values of evaluators that skip it", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn().mockResolvedValue(undefined);
+    renderDialog({
+      mode: "edit",
+      onSubmit,
+      evaluators: [replyEvaluator, toolCallEvaluator],
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+          varValues: {
+            "ev-reply": { criteria: "Old rule" },
+            "ev-tool": { rule: "Right tool" },
+          },
+        },
+      ],
+    });
+    expect(
+      screen.getByText("Does not score tool calls, so it is skipped for this item"),
+    ).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("The criteria")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0][0].evaluator_variables).toEqual({
+      "ev-reply": { criteria: "Old rule", extra: "" },
+      "ev-tool": { rule: "Right tool" },
+    });
+  });
+
+  it("treats an item that stores an empty tool call list as a tool-call item", () => {
+    renderDialog({
+      mode: "edit",
+      storesEmptyToolCallList: true,
+      evaluators: [replyEvaluator, toolCallEvaluator],
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Sunny",
+          varValues: { "ev-tool": { rule: "Right tool" } },
+        },
+      ],
+    });
+    expect(
+      screen.getByText("Does not score tool calls, so it is skipped for this item"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save item" })).toBeEnabled();
+  });
+
+  it("still asks for a reply item's values and skips the tool call evaluator", () => {
+    renderDialog({
+      mode: "edit",
+      evaluators: [replyEvaluator, toolCallEvaluator],
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Sunny" },
+      ],
+    });
+    expect(
+      screen.getByText("Only scores tool calls, so it is skipped for this item"),
+    ).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("The criteria")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save item" })).toBeDisabled();
+  });
+
   it("adds a second tool call from the picker and sends both", async () => {
     const user = setupUser();
     const { onSubmit } = renderDialog({

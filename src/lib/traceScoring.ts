@@ -35,8 +35,7 @@ export function traceRowOutputFacts(
   };
 }
 
-/** Said above the traces list and in a trace whose tool calls were left
- * unscored, each followed by the button that adds one. */
+/** Said above the traces list, followed by the button that adds one. */
 export const NO_TOOL_CALL_EVALUATOR_NOTE =
   "This agent has no tool call evaluator, so its tool calls are not checked.";
 

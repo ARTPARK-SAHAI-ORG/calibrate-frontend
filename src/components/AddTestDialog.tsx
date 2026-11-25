@@ -244,6 +244,9 @@ type AddTestDialogProps = {
    * `agent_response` being judged. Takes precedence over `allowAgentLastMessage`.
    */
   requireAssistantLastMessage?: boolean;
+  /** The item being edited stores an empty tool call list, which keeps it a
+   * tool-call item on save. */
+  storesEmptyToolCallList?: boolean;
   /**
    * When true, the footer shows an extra "Run test" button next to the
    * primary Save action. Only offered in the default `mode === "test"` flow.
@@ -320,6 +323,7 @@ export function AddTestDialog({
   mode = "test",
   allowAgentLastMessage = false,
   requireAssistantLastMessage = false,
+  storesEmptyToolCallList = false,
   showRunAfterSave = false,
   onRun,
   agentNature = "conversation",
@@ -1914,7 +1918,7 @@ export function AddTestDialog({
     if (!isEvaluatorTab) return [];
     return attachedEvaluators.map((e) => {
       const ref: EvaluatorRefPayload = { evaluator_uuid: e.evaluator_uuid };
-      if (e.variables.length > 0 && evaluatorFits(e)) {
+      if (e.variables.length > 0) {
         ref.variable_values = { ...e.variable_values };
       }
       return ref;
@@ -2212,13 +2216,15 @@ export function AddTestDialog({
       : -1;
   };
 
-  // An llm item is a tool-call item when it ends on the agent's tool calls or
-  // has expected tool calls. Only tool-call evaluators score such an item,
+  // An llm item is a tool-call item when it ends on the agent's tool calls,
+  // has expected tool calls, or stores an empty tool call list. Only tool-call evaluators score such an item,
   // and only the others score the rest, so values are asked for the
   // evaluators that score this item and no others.
   const isToolCallItem =
     showsExpectedToolCalls &&
-    (trailingToolCallsStart() >= 0 || selectedTools.length > 0);
+    (storesEmptyToolCallList ||
+      trailingToolCallsStart() >= 0 ||
+      selectedTools.length > 0);
   const evaluatorFits = (e: { evaluator_type?: string }) =>
     !showsExpectedToolCalls ||
     evaluatorFitsItem(e.evaluator_type, isToolCallItem);
@@ -2730,8 +2736,8 @@ export function AddTestDialog({
             {!evaluatorFits(ev) && (
               <p className="text-xs text-muted-foreground">
                 {isToolCallItem
-                  ? "Does not score tool calls, so it is skipped for this item."
-                  : "Only scores tool calls, so it is skipped for this item."}
+                  ? "Does not score tool calls, so it is skipped for this item"
+                  : "Only scores tool calls, so it is skipped for this item"}
               </p>
             )}
             {ev.variables.length > 0 && evaluatorFits(ev) && (

@@ -388,6 +388,50 @@ it("keeps an empty tool-call list the llm-general item already had", async () =>
   expect(payload.expected_tool_calls).toEqual([]);
 });
 
+it("tells the llm edit dialog when the item stores an empty tool call list", async () => {
+  const user = setupUser();
+  itemsTabWith("llm", {
+    name: "Answers in words",
+    chat_history: [{ role: "user", content: "Book it" }],
+    agent_response: "I cannot",
+    expected_tool_calls: [],
+  });
+  render(<LabellingTaskPage />);
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  const props = mockDialogProps.llm.filter((p) => p.isEditing).at(-1);
+  expect(props.storesEmptyToolCallList).toBe(true);
+});
+
+it("does not mark an llm item with no tool call list as a tool-call item", async () => {
+  const user = setupUser();
+  itemsTabWith("llm", {
+    name: "Plain reply",
+    chat_history: [{ role: "user", content: "Hi" }],
+    agent_response: "Hello",
+  });
+  render(<LabellingTaskPage />);
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  const props = mockDialogProps.llm.filter((p) => p.isEditing).at(-1);
+  expect(props.storesEmptyToolCallList).toBe(false);
+});
+
+it("gives the llm-general edit dialog each evaluator's type and the empty tool call list", async () => {
+  const user = setupUser();
+  itemsTabWith("llm-general", {
+    name: "Answers in words",
+    input: "Book it",
+    output: "I cannot",
+    actual_tool_calls: [],
+  });
+  render(<LabellingTaskPage />);
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  const props = mockDialogProps.general.filter((p) => p.isOpen && p.mode === "edit").at(-1);
+  expect(props.storesEmptyToolCallList).toBe(true);
+  expect(props.evaluators.map((e: { evaluator_type?: string }) => e.evaluator_type)).toEqual(
+    TASK.evaluators.map((e) => e.evaluator_type),
+  );
+});
+
 it("counts select all as holding tool-call items when assigning labelling", async () => {
   const user = setupUser();
   itemsTabWith("llm", {

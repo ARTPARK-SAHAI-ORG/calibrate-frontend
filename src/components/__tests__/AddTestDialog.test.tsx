@@ -1920,7 +1920,7 @@ describe("AddTestDialog", () => {
       },
     ];
 
-    it("saves a tool-call item without the values of evaluators that do not score it", async () => {
+    it("saves a tool-call item without asking for, or dropping, the values of evaluators that skip it", async () => {
       const user = setupUser();
       const onSubmit = jest.fn();
       render(
@@ -1929,7 +1929,10 @@ describe("AddTestDialog", () => {
             onSubmit,
             isEditing: true,
             initialConfig: endsOnToolCall,
-            initialEvaluators: linkedEvaluators,
+            initialEvaluators: [
+              { ...linkedEvaluators[0], variable_values: { criteria: "Old rule" } },
+              linkedEvaluators[1],
+            ],
           })}
         />,
       );
@@ -1937,16 +1940,49 @@ describe("AddTestDialog", () => {
         expect(screen.getByDisplayValue("Weather in Pune?")).toBeInTheDocument(),
       );
       expect(
-        screen.getByText("Does not score tool calls, so it is skipped for this item."),
+        screen.getByText("Does not score tool calls, so it is skipped for this item"),
       ).toBeInTheDocument();
       expect(screen.queryByText("{{criteria}}")).not.toBeInTheDocument();
       await user.type(screen.getByPlaceholderText("Enter value for {{rule}}"), "Right tool");
       await user.click(screen.getByRole("button", { name: "Save" }));
       expect(onSubmit).toHaveBeenCalledTimes(1);
       expect(onSubmit.mock.calls[0][1]).toEqual([
-        { evaluator_uuid: "ev-correct" },
+        { evaluator_uuid: "ev-correct", variable_values: { criteria: "Old rule" } },
         { evaluator_uuid: "ev-tool", variable_values: { rule: "Right tool" } },
       ]);
+    });
+
+    it("treats an item that stores an empty tool call list as a tool-call item", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...labelProps({
+            onSubmit,
+            isEditing: true,
+            storesEmptyToolCallList: true,
+            initialConfig: {
+              history: [
+                { role: "user", content: "Weather?" },
+                { role: "assistant", content: "Sunny" },
+              ],
+              evaluation: { type: "response" },
+            },
+            initialEvaluators: [
+              linkedEvaluators[0],
+              { ...linkedEvaluators[1], variable_values: { rule: "Right tool" } },
+            ],
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Sunny")).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByText("Does not score tool calls, so it is skipped for this item"),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(onSubmit).toHaveBeenCalledTimes(1);
     });
 
     it("still asks for a reply item's criteria, with a message on screen", async () => {
@@ -1972,7 +2008,7 @@ describe("AddTestDialog", () => {
         expect(screen.getByDisplayValue("Sunny")).toBeInTheDocument(),
       );
       expect(
-        screen.getByText("Only scores tool calls, so it is skipped for this item."),
+        screen.getByText("Only scores tool calls, so it is skipped for this item"),
       ).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Save" }));
       expect(onSubmit).not.toHaveBeenCalled();
@@ -1984,7 +2020,7 @@ describe("AddTestDialog", () => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
       expect(onSubmit.mock.calls[0][1]).toEqual([
         { evaluator_uuid: "ev-correct", variable_values: { criteria: "Is right" } },
-        { evaluator_uuid: "ev-tool" },
+        { evaluator_uuid: "ev-tool", variable_values: { rule: "" } },
       ]);
     });
 

@@ -28,6 +28,7 @@ import {
 } from "@/components/ToolCallExpectationsEditor";
 import { OpenToolButton } from "@/components/tools/OpenToolButton";
 import { mergeFlatParams } from "@/lib/toolEditsInForm";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { getDefaultHeaders } from "@/lib/api";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { reportError } from "@/lib/reportError";
@@ -53,6 +54,7 @@ export type LlmGeneralEvaluatorDef = {
   uuid: string;
   name: string;
   description?: string | null;
+  evaluator_type?: string;
   variables: { name: string; description?: string; default?: string }[];
 };
 
@@ -182,6 +184,9 @@ type AddLlmGeneralItemsDialogProps = {
   // Linked evaluators with their variable definitions, used to render the
   // per-item variable inputs and seed defaults.
   evaluators?: LlmGeneralEvaluatorDef[];
+  /** The item being edited stores an empty tool call list, which keeps it a
+   * tool-call item on save. */
+  storesEmptyToolCallList?: boolean;
   // A single item to seed the dialog with (edit / duplicate). Kept as an
   // array for backwards-compatible call sites; only the first entry is used
   // since the dialog edits one item at a time.
@@ -228,6 +233,7 @@ export function AddLlmGeneralItemsDialog({
   isOpen,
   mode = "add",
   evaluators = [],
+  storesEmptyToolCallList = false,
   initialRows,
   onClose,
   onSubmit,
@@ -513,10 +519,20 @@ export function AddLlmGeneralItemsDialog({
     }));
   };
 
-  // Every variable on every evaluator must have a non-empty value.
-  const varsComplete = evaluatorsWithVariables.every((e) =>
-    e.variables.every((v) => (varValues[e.uuid]?.[v.name] ?? "").trim()),
-  );
+  // Only tool-call evaluators score a tool-call item, and only the others
+  // score the rest, so values are required only for the evaluators that
+  // score this item.
+  const isToolCallItem =
+    storesEmptyToolCallList ||
+    toolCalls.length > 0 ||
+    expected.selectedTools.length > 0;
+  const evaluatorFits = (e: LlmGeneralEvaluatorDef) =>
+    evaluatorFitsItem(e.evaluator_type, isToolCallItem);
+  const varsComplete = evaluatorsWithVariables
+    .filter(evaluatorFits)
+    .every((e) =>
+      e.variables.every((v) => (varValues[e.uuid]?.[v.name] ?? "").trim()),
+    );
   // An item's answer is either text or one or more tool calls, so either
   // one satisfies Output.
   const valid =
@@ -945,7 +961,14 @@ export function AddLlmGeneralItemsDialog({
                         </div>
                       )}
                     </div>
-                    {e.variables.length > 0 && (
+                    {!evaluatorFits(e) && (
+                      <p className="text-xs text-muted-foreground">
+                        {isToolCallItem
+                          ? "Does not score tool calls, so it is skipped for this item"
+                          : "Only scores tool calls, so it is skipped for this item"}
+                      </p>
+                    )}
+                    {e.variables.length > 0 && evaluatorFits(e) && (
                       <div className="space-y-3">
                         {e.variables.map((v) => {
                           const placeholder =

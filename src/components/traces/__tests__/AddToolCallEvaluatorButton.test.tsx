@@ -10,13 +10,18 @@ jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
   CreateEvaluatorFlow: ({
     useCaseTypes,
     onCreated,
+    onClose,
   }: {
     useCaseTypes?: string[];
     onCreated: (evaluator: { uuid: string }) => void;
+    onClose: () => void;
   }) => (
     <div data-testid="create-flow">
       {useCaseTypes?.join(",")}
-      <button type="button" onClick={() => onCreated({ uuid: "ev-new" })}>
+      <button type="button" onClick={() => {
+          onCreated({ uuid: "ev-new" });
+          onClose();
+        }}>
         Finish creating
       </button>
     </div>

@@ -41,18 +41,17 @@ export function AddToolCallEvaluatorButton({
       !linkedEvaluatorUuids.includes(e.uuid),
   );
 
-  const show = (picker: boolean, create: boolean) => {
-    setPickerOpen(picker);
-    setCreateOpen(create);
-    onOpenChange?.(picker || create);
-  };
-  // Adding one can remove this button while a window is still open, and the
-  // parent must not be left thinking it is.
-  const closeOnUnmount = useRef<() => void>(() => {});
-  closeOnUnmount.current = () => {
-    if (pickerOpen || createOpen) onOpenChange?.(false);
-  };
-  useEffect(() => () => closeOnUnmount.current(), []);
+  // A ref, so a new callback on each render does not tell the parent closed then open.
+  const onOpenChangeRef = useRef(onOpenChange);
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  });
+  const windowOpen = pickerOpen || createOpen;
+  useEffect(() => {
+    if (!windowOpen) return;
+    onOpenChangeRef.current?.(true);
+    return () => onOpenChangeRef.current?.(false);
+  }, [windowOpen]);
 
   const open = async () => {
     if (!accessToken) return;
@@ -63,7 +62,7 @@ export function AddToolCallEvaluatorButton({
       toast.error("Could not load your evaluators. Please try again.");
       return;
     }
-    show(true, false);
+    setPickerOpen(true);
   };
 
   const add = async (uuids: string[]) => {
@@ -78,8 +77,6 @@ export function AddToolCallEvaluatorButton({
     } catch (err) {
       reportError("Error attaching created evaluator:", err);
       toast.error("Could not add the new evaluator to this agent.");
-    } finally {
-      show(false, false);
     }
   };
 
@@ -98,11 +95,14 @@ export function AddToolCallEvaluatorButton({
             isOpen
             availableEvaluators={available}
             description="Choose tool call evaluators from your library to add to this agent"
-            onClose={() => show(false, false)}
+            onClose={() => setPickerOpen(false)}
             onEvaluatorDeleted={(uuid) =>
               setLibrary((prev) => prev.filter((e) => e.uuid !== uuid))
             }
-            onCreateEvaluator={() => show(false, true)}
+            onCreateEvaluator={() => {
+              setPickerOpen(false);
+              setCreateOpen(true);
+            }}
             onAdd={add}
           />,
           document.body,
@@ -111,7 +111,7 @@ export function AddToolCallEvaluatorButton({
         createPortal(
           <CreateEvaluatorFlow
             open
-            onClose={() => show(false, false)}
+            onClose={() => setCreateOpen(false)}
             existingEvaluators={library}
             onCreated={(evaluator) => void addCreated(evaluator)}
             useCaseTypes={["tool-call"]}
