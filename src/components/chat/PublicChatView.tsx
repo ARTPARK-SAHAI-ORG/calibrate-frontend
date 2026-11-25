@@ -611,13 +611,22 @@ function AgentTurn({
         <div className="flex items-center gap-1">
           {thumb(true)}
           {thumb(false)}
-          {feedback.comment && !commentOpen && (
+          {feedback.comment && (
             <Tooltip content={feedback.comment} position="top">
               <button
                 type="button"
                 aria-label="Edit your comment"
-                onClick={() => onEditComment(feedback.comment ?? "")}
-                className={`${THUMB_CLASS} border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted`}
+                aria-pressed={commentOpen}
+                onClick={() =>
+                  commentOpen
+                    ? onCancel()
+                    : onEditComment(feedback.comment ?? "")
+                }
+                className={`${THUMB_CLASS} ${
+                  commentOpen
+                    ? "border-foreground/40 bg-muted text-foreground"
+                    : "border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
               >
                 <ChatIcon className="w-4 h-4" />
               </button>

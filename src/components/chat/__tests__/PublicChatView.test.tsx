@@ -572,7 +572,18 @@ it("opens the saved comment in the comment box to edit it", async () => {
   );
   const box = screen.getByRole("textbox", { name: /What was wrong/ });
   expect(box).toHaveValue("Wrong hours");
-  await user.type(box, " on Sunday");
+  // The icon stays while the box is open, and clicking it again closes the box.
+  const icon = screen.getByRole("button", { name: "Edit your comment" });
+  expect(icon).toHaveAttribute("aria-pressed", "true");
+  await user.click(icon);
+  expect(
+    screen.queryByRole("textbox", { name: /What was wrong/ }),
+  ).not.toBeInTheDocument();
+  await user.click(icon);
+  await user.type(
+    screen.getByRole("textbox", { name: /What was wrong/ }),
+    " on Sunday",
+  );
   await user.click(screen.getByRole("button", { name: "Save" }));
   expect(mockFeedback).toHaveBeenLastCalledWith(
     "tok",
