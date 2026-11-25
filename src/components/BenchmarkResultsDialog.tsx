@@ -209,7 +209,10 @@ export function BenchmarkResultsDialog({
     BenchmarkLeaderboardSummaryRow[] | undefined
   >(undefined);
   // Set when the run failed with nothing to show: the box replaces the view.
-  const [error, setError] = useState<{ details: string | null } | null>(null);
+  const [error, setError] = useState<{
+    details: string | null;
+    notStarted?: boolean;
+  } | null>(null);
   const [stoppedEarly, setStoppedEarly] = useState(false);
   // Why the run failed, when it had already finished some tests: those rows
   // are shown as usual with this line in the note above the leaderboard.
@@ -614,6 +617,7 @@ export function BenchmarkResultsDialog({
             response,
             "Error starting benchmark",
           ),
+          notStarted: true,
         });
         return;
       }
@@ -804,7 +808,10 @@ export function BenchmarkResultsDialog({
                 />
               )}
               {!isDone && !isInitialLoading && (
-                <StatusBadge status={error ? "failed" : taskStatus} showSpinner />
+                <StatusBadge
+                  status={error ? "failed" : taskStatus}
+                  showSpinner
+                />
               )}
             </div>
             {!isInitialLoading && (
@@ -950,7 +957,15 @@ export function BenchmarkResultsDialog({
         {/* Error State */}
         {!isInitialLoading && error && (
           <div className="flex-1 flex items-center justify-center p-4 md:p-6">
-            <RunFailureBox details={error.details} onTryAgain={onGoBack} />
+            <RunFailureBox
+              details={error.details}
+              onTryAgain={onGoBack}
+              sentence={
+                error.notStarted
+                  ? "The model comparison was not started."
+                  : undefined
+              }
+            />
           </div>
         )}
 

@@ -652,6 +652,9 @@ describe("BenchmarkResultsDialog", () => {
     );
     expect(screen.getByText(LIMIT_DETAIL)).toBeInTheDocument();
     expect(screen.getByTestId("status-badge")).toHaveTextContent("failed");
+    expect(
+      screen.getByText("The model comparison was not started."),
+    ).toBeInTheDocument();
     expect(reportError).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Try again" }));
