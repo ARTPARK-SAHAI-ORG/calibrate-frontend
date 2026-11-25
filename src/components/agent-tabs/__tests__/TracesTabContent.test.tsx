@@ -40,6 +40,17 @@ const fetchTrace = jest.fn();
 const fetchTraces = jest.fn();
 const fetchTraceUsage = jest.fn();
 const fetchHasTraceFeedback = jest.fn();
+const fetchChatLink = jest.fn();
+const chatLink = (messagesToday: number, limit: number) => ({
+  is_public: false,
+  share_token: "tok",
+  connection_verified: true,
+  messages_today: messagesToday,
+  daily_message_limit: limit,
+});
+jest.mock("../../../lib/chatLinkApi", () => ({
+  fetchChatLink: (...args: unknown[]) => fetchChatLink(...args),
+}));
 jest.mock("../../../lib/tracesApi", () => ({
   ...jest.requireActual("../../../lib/tracesApi"),
   fetchTrace: (...args: unknown[]) => fetchTrace(...args),
@@ -423,6 +434,7 @@ beforeEach(() => {
     traces_scored: 12,
     max_scored_traces: 100,
   });
+  fetchChatLink.mockResolvedValue(chatLink(0, 200));
   // A test that opens a trace from the address replaces this, and
   // clearAllMocks leaves the replacement in place, so it is put back here.
   mockUseDialogUrlParam.mockImplementation(() => ({ setParam: jest.fn() }));
@@ -776,18 +788,12 @@ describe("TracesTabContent", () => {
       // logs. Waiting for something here to go wrong would mean never saying
       // it at all.
       render(<TracesTabContent {...tabProps} />);
-      expect(fetchTraceUsage).toHaveBeenCalledWith("test-token", "agent-1");
+      expect(fetchTraceUsage).toHaveBeenCalledWith("test-token");
+      expect(fetchChatLink).toHaveBeenCalledWith("test-token", "agent-1");
     });
 
     it("says the chat link reached its daily limit, with a way to ask for more", async () => {
-      fetchTraceUsage.mockResolvedValue({
-        traces_stored: 3,
-        max_traces: 50000,
-        traces_scored: 1,
-        max_scored_traces: 100,
-        chat_replies_today: 1200,
-        max_chat_replies_per_day: 1200,
-      });
+      fetchChatLink.mockResolvedValue(chatLink(1200, 1200));
       render(<TracesTabContent {...tabProps} />);
       const line = await screen.findByText(
         /Talking to this agent reached its limit of 1,200 replies today\./,
@@ -795,35 +801,26 @@ describe("TracesTabContent", () => {
       expect(line).toHaveTextContent("Click here to contact us");
     });
 
+    it("warns at the agent's own limit, below the workspace maximum", async () => {
+      fetchChatLink.mockResolvedValue(chatLink(3, 3));
+      render(<TracesTabContent {...tabProps} />);
+      expect(
+        await screen.findByText(/reached its limit of 3 replies today/),
+      ).toBeInTheDocument();
+    });
+
     it("says one reply, not one replies, when the daily limit is one", async () => {
-      fetchTraceUsage.mockResolvedValue({
-        traces_stored: 3,
-        max_traces: 50000,
-        traces_scored: 1,
-        max_scored_traces: 100,
-        chat_replies_today: 1,
-        max_chat_replies_per_day: 1,
-      });
+      fetchChatLink.mockResolvedValue(chatLink(1, 1));
       render(<TracesTabContent {...tabProps} />);
       expect(
         await screen.findByText(/reached its limit of 1 reply today/),
       ).toBeInTheDocument();
     });
 
-    it.each([
-      ["below the limit", 199, 200],
-      ["with no limit", 5000, null],
-    ])("says nothing about the daily limit %s", async (_, today, cap) => {
-      fetchTraceUsage.mockResolvedValue({
-        traces_stored: 3,
-        max_traces: 50000,
-        traces_scored: 1,
-        max_scored_traces: 100,
-        chat_replies_today: today,
-        max_chat_replies_per_day: cap,
-      });
+    it("says nothing about the daily limit below the agent's own limit", async () => {
+      fetchChatLink.mockResolvedValue(chatLink(6, 7));
       render(<TracesTabContent {...tabProps} />);
-      await waitFor(() => expect(fetchTraceUsage).toHaveBeenCalled());
+      await waitFor(() => expect(fetchChatLink).toHaveBeenCalled());
       await act(async () => {});
       expect(screen.queryByText(/Talking to this agent reached/)).not.toBeInTheDocument();
     });

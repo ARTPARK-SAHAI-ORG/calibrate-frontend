@@ -461,10 +461,6 @@ export type TraceUsage = {
   traces_scored: number;
   /** Null means the workspace has no scoring limit. */
   max_scored_traces: number | null;
-  /** Replies the agent's chat link gave today. */
-  chat_replies_today: number;
-  /** Null means the chat link has no daily limit. */
-  max_chat_replies_per_day: number | null;
 };
 
 /** Whether any of the agent's traces carries feedback from the chat link. */
@@ -481,15 +477,10 @@ export async function fetchHasTraceFeedback(
   return page.total > 0;
 }
 
-/** Usage for the workspace; the chat link's counts are for `agentId`. */
 export async function fetchTraceUsage(
   accessToken: string,
-  agentId: string,
 ): Promise<TraceUsage> {
-  return apiGet<TraceUsage>(
-    `/traces/usage?agent_id=${encodeURIComponent(agentId)}`,
-    accessToken,
-  );
+  return apiGet<TraceUsage>("/traces/usage", accessToken);
 }
 
 /** Every conversation ID on this agent's traces, newest activity first. */

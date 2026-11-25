@@ -390,16 +390,13 @@ describe("fetchTraceUsage", () => {
       max_scored_traces: 100,
     });
 
-    await expect(fetchTraceUsage("tok", "ag 1")).resolves.toEqual({
+    await expect(fetchTraceUsage("tok")).resolves.toEqual({
       traces_stored: 412,
       max_traces: 50000,
       traces_scored: 100,
       max_scored_traces: 100,
     });
-    expect(mockApiGet).toHaveBeenCalledWith(
-      "/traces/usage?agent_id=ag%201",
-      "tok",
-    );
+    expect(mockApiGet).toHaveBeenCalledWith("/traces/usage", "tok");
   });
 });
 

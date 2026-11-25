@@ -70,6 +70,7 @@ import {
   type TraceSummary,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
+import { fetchChatLink, type ChatLink } from "@/lib/chatLinkApi";
 
 /**
  * A number of traces, said the way a person says it: "1 trace", "50,000
@@ -600,6 +601,8 @@ export function TracesTabContent({
   // logs the refusal on its own server, and this tab just looks like a quiet
   // day. The scoring limit's own number comes from the same answer.
   const [usage, setUsage] = useState<TraceUsage | null>(null);
+  // Today's chat messages against this agent's own daily limit.
+  const [chatLink, setChatLink] = useState<ChatLink | null>(null);
   // Whether any of the agent's traces carries feedback from the chat link,
   // which is what puts the feedback section in the filter.
   const [hasFeedback, setHasFeedback] = useState(false);
@@ -608,11 +611,16 @@ export function TracesTabContent({
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
-    fetchTraceUsage(accessToken, agentUuid)
+    fetchTraceUsage(accessToken)
       .then((next) => {
         if (!cancelled) setUsage(next);
       })
       .catch((err) => reportError("Error fetching trace usage:", err));
+    fetchChatLink(accessToken, agentUuid)
+      .then((next) => {
+        if (!cancelled) setChatLink(next);
+      })
+      .catch((err) => reportError("Error fetching the chat link:", err));
     fetchHasTraceFeedback(accessToken, agentUuid)
       .then((has) => {
         if (!cancelled) setHasFeedback(has);
@@ -632,9 +640,9 @@ export function TracesTabContent({
   const storageFull =
     usage != null && usage.traces_stored >= usage.max_traces;
   const isScoringLive = traceScoring.enabled && !overLimit && !storageFull;
-  const chatReplyCap = usage?.max_chat_replies_per_day ?? null;
+  const chatReplyCap = chatLink?.daily_message_limit ?? null;
   const chatLimitReached =
-    chatReplyCap !== null && usage!.chat_replies_today >= chatReplyCap;
+    chatReplyCap !== null && chatLink!.messages_today >= chatReplyCap;
 
   const handleRefresh = async () => {
     // A refresh can bring in traces of the other kind, which the counts read

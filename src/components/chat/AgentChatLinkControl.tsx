@@ -1,17 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiGet } from "@/lib/api";
+import { fetchChatLink, type ChatLink } from "@/lib/chatLinkApi";
 import { useAccessToken } from "@/hooks";
 import { reportError } from "@/lib/reportError";
 import { ShareButton, publicSharePath } from "@/components/ShareButton";
 import { Tooltip } from "@/components/Tooltip";
-
-type ChatLink = {
-  is_public: boolean;
-  share_token: string | null;
-  connection_verified: boolean;
-};
 
 const PREVIEW_CLASS =
   "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors bg-pink-500/14 border-pink-500/45 text-pink-900 dark:text-pink-200";
@@ -51,7 +45,7 @@ export function AgentChatLinkControl({
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
-    apiGet<ChatLink>(`/agents/${agentUuid}/chat-link`, accessToken)
+    fetchChatLink(accessToken, agentUuid)
       .then((data) => !cancelled && setLink(data))
       .catch((err) => reportError("Failed to read the chat link", err));
     return () => {
