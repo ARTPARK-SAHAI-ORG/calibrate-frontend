@@ -118,6 +118,30 @@ it("reads the link again once the connection passes", async () => {
   );
 });
 
+it("reads the link again after a save, which is when the Connection tab's check is stored", async () => {
+  // The screen already says verified, but the link was read before the save.
+  mockGet.mockResolvedValue(link({ connection_verified: false }));
+  const { rerender } = render(
+    <AgentChatLinkControl
+      agentUuid="a1"
+      connectionUnverified={false}
+      saveCount={0}
+    />,
+  );
+  expect(await screen.findByRole("button", { name: /Share/ })).toBeDisabled();
+  mockGet.mockResolvedValue(link());
+  rerender(
+    <AgentChatLinkControl
+      agentUuid="a1"
+      connectionUnverified={false}
+      saveCount={1}
+    />,
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: /Share/ })).toBeEnabled(),
+  );
+});
+
 it("draws nothing when the link cannot be read", async () => {
   mockGet.mockRejectedValue(new Error("boom"));
   render(<AgentChatLinkControl agentUuid="a1" connectionUnverified={false} />);

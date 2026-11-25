@@ -5,11 +5,7 @@ import { useParams, useRouter } from "@/lib/nav";
 import { AppLayout } from "@/components/AppLayout";
 import { AgentDetail, AgentDetailHeaderState } from "@/components/AgentDetail";
 import { useSidebarState } from "@/lib/sidebar";
-import {
-  SpinnerIcon,
-  CheckCircleIcon,
-  SaveIcon,
-} from "@/components/icons";
+import { SpinnerIcon, CheckCircleIcon, SaveIcon } from "@/components/icons";
 import { VerifyErrorPopover } from "@/components/VerifyErrorPopover";
 import { AgentChatLinkControl } from "@/components/chat/AgentChatLinkControl";
 import { AgentMoreMenu } from "@/components/AgentMoreMenu";
@@ -91,6 +87,7 @@ export default function AgentDetailPage() {
           <AgentChatLinkControl
             agentUuid={uuid}
             connectionUnverified={headerState.isConnectionUnverified}
+            saveCount={headerState.saveCount}
           />
         </div>
         <AgentMoreMenu onDuplicate={() => headerState.onDuplicate()} />

@@ -30,14 +30,18 @@ function OpenIcon() {
 }
 
 /** Makes the agent's chat page public or private, and opens it to preview.
- *  `connectionUnverified` is only there to read the link again once the
- *  connection check passes. */
+ *  `connectionUnverified` and `saveCount` are only there to read the link
+ *  again once a passed connection check is stored: the check on the agent's
+ *  header stores it at once, the one on the Connection tab with the next
+ *  save. */
 export function AgentChatLinkControl({
   agentUuid,
   connectionUnverified,
+  saveCount = 0,
 }: {
   agentUuid: string;
   connectionUnverified: boolean;
+  saveCount?: number;
 }) {
   const accessToken = useAccessToken();
   const [link, setLink] = useState<ChatLink | null>(null);
@@ -51,7 +55,7 @@ export function AgentChatLinkControl({
     return () => {
       cancelled = true;
     };
-  }, [agentUuid, accessToken, connectionUnverified]);
+  }, [agentUuid, accessToken, connectionUnverified, saveCount]);
 
   if (!link || !accessToken) return null;
 

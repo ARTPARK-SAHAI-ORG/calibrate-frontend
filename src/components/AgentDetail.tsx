@@ -71,6 +71,9 @@ export type AgentDetailHeaderState = {
   onEditName: () => void;
   onDuplicate: () => void;
   isConnectionUnverified: boolean;
+  /** Goes up by one each time the agent is saved. A passed connection check
+   *  from the Connection tab is only stored by the save after it. */
+  saveCount: number;
   isVerifying: boolean;
   onVerify: () => void;
   verifyError: string | null;
@@ -412,6 +415,7 @@ export function AgentDetail({
   // we flag this and let an effect fire the save once the verified state has
   // landed and saveRef has been rebuilt.
   const [pendingSaveAfterVerify, setPendingSaveAfterVerify] = useState(false);
+  const [saveCount, setSaveCount] = useState(0);
 
   // Tools linked to this agent
   const [agentTools, setAgentTools] = useState<ToolData[]>([]);
@@ -855,6 +859,7 @@ export function AgentDetail({
         if (!silent) {
           setShowSaveToast(true);
         }
+        setSaveCount((n) => n + 1);
         return true;
       } catch (err) {
         reportError("Error saving agent:", err);
@@ -1122,6 +1127,7 @@ export function AgentDetail({
         onEditName: handleOpenEditNameDialog,
         onDuplicate: () => setIsDuplicateDialogOpen(true),
         isConnectionUnverified,
+        saveCount,
         isVerifying: verify.isVerifying,
         onVerify: handleVerifyClick,
         verifyError: verify.verifyError,
@@ -1138,6 +1144,7 @@ export function AgentDetail({
     isSaving,
     onHeaderStateChange,
     isConnectionUnverified,
+    saveCount,
     verify.isVerifying,
     verify.verifyError,
     verify.verifySampleResponse,
