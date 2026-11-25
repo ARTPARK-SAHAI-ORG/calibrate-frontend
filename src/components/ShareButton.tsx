@@ -11,7 +11,8 @@ export type ShareableEntityType =
   | "benchmark"
   | "simulation-run"
   | "annotation-evaluator-run"
-  | "annotation-job";
+  | "annotation-job"
+  | "agent-chat";
 
 /**
  * Composite-id entity types accept `entityId` as `${taskUuid}:${jobUuid}`
@@ -40,6 +41,7 @@ const VISIBILITY_ENDPOINTS: Record<
     const [taskUuid, jobUuid] = splitComposite(id);
     return `/annotation-tasks/${taskUuid}/jobs/${jobUuid}/visibility`;
   },
+  "agent-chat": (id) => `/agents/${id}/chat-link/visibility`,
 };
 
 const PUBLIC_PATHS: Record<ShareableEntityType, string> = {
@@ -50,7 +52,16 @@ const PUBLIC_PATHS: Record<ShareableEntityType, string> = {
   "simulation-run": "simulation-run",
   "annotation-evaluator-run": "annotation-eval",
   "annotation-job": "annotation-jobs/view",
+  "agent-chat": "chat",
 };
+
+/** The address a shared item opens at, on this site. */
+export function publicSharePath(
+  entityType: ShareableEntityType,
+  shareToken: string,
+): string {
+  return `/public/${PUBLIC_PATHS[entityType]}/${shareToken}`;
+}
 
 interface ShareButtonProps {
   entityType: ShareableEntityType;
@@ -58,6 +69,10 @@ interface ShareButtonProps {
   accessToken: string;
   initialIsPublic: boolean;
   initialShareToken: string | null;
+  /** Told the new state after each toggle. */
+  onChange?: (isPublic: boolean, shareToken: string | null) => void;
+  /** When set, the toggle is greyed out and its hover text says why. */
+  disabledReason?: string;
 }
 
 export function ShareButton({
@@ -66,6 +81,8 @@ export function ShareButton({
   accessToken,
   initialIsPublic,
   initialShareToken,
+  onChange,
+  disabledReason,
 }: ShareButtonProps) {
   const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [shareToken, setShareToken] = useState<string | null>(
@@ -85,7 +102,7 @@ export function ShareButton({
   const [error, setError] = useState<string | null>(null);
 
   const publicUrl = shareToken
-    ? `${window.location.origin}/public/${PUBLIC_PATHS[entityType]}/${shareToken}`
+    ? `${window.location.origin}${publicSharePath(entityType, shareToken)}`
     : null;
 
   const toggle = async () => {
@@ -112,7 +129,9 @@ export function ShareButton({
       setIsPublic(data.is_public);
       // Eval-runs/STT/TTS/etc. return `share_token`; annotator-job visibility
       // returns `view_token` (read-only credential). Accept either.
-      setShareToken(data.share_token ?? data.view_token ?? null);
+      const token = data.share_token ?? data.view_token ?? null;
+      setShareToken(token);
+      onChange?.(data.is_public, token);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -132,15 +151,14 @@ export function ShareButton({
       {/* Toggle button */}
       <Tooltip
         content={
-          isPublic
-            ? "Make this private"
-            : "Make this publicly shareable"
+          disabledReason ??
+          (isPublic ? "Make this private" : "Make this publicly shareable")
         }
         position="bottom"
       >
         <button
           onClick={toggle}
-          disabled={isLoading}
+          disabled={isLoading || !!disabledReason}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
             isPublic
               ? "bg-sky-500/18 border-sky-500/50 text-sky-900 dark:text-sky-100 hover:bg-sky-500/30 dark:hover:bg-sky-500/25"

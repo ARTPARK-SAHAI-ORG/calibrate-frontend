@@ -50,6 +50,7 @@ jest.mock("../../../../hooks", () => ({
     createApiKey: jest.fn(),
     revokeApiKey: jest.fn(),
   }),
+  useOrgLimits: () => ({ uses_own_provider_keys: false }),
   seedOrgsCache: jest.fn(),
 }));
 

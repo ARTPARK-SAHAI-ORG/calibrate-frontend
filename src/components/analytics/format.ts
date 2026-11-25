@@ -10,6 +10,7 @@ export const KIND_LABELS: Record<AnalyticsKind, string> = {
   labelling_evaluator_run: "Evaluator run on labelling items",
   trace_scoring: "Trace scoring",
   trace: "Trace",
+  chat: "Chat link message",
 };
 
 export function kindLabel(kind: AnalyticsKind | null): string {
@@ -20,6 +21,7 @@ export const LIMIT_LABELS: Record<AnalyticsLimitName, string> = {
   max_rows_per_eval: "Too many rows in one evaluation",
   max_traces: "Trace cap reached",
   max_scored_traces: "Trace scoring limit reached",
+  max_chat_replies_per_day: "Too many chat link replies in one day",
 };
 
 /** A count with thousands commas (1,234). */

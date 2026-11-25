@@ -137,7 +137,13 @@ export function PublicPageLayout({
   );
 }
 
-export function PublicNotFound({ message }: { message?: string }) {
+export function PublicNotFound({
+  message,
+  detail = "The results may have been made private, or the link may be incorrect.",
+}: {
+  message?: string;
+  detail?: string;
+}) {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
       <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
@@ -149,7 +155,7 @@ export function PublicNotFound({ message }: { message?: string }) {
         {message ?? "This link is not available"}
       </p>
       <p className="text-[13px] text-muted-foreground text-center max-w-sm">
-        The results may have been made private, or the link may be incorrect.
+        {detail}
       </p>
     </div>
   );

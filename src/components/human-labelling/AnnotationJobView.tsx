@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
-import { getBackendUrl } from "@/lib/api";
+import { publicFetch } from "@/lib/publicFetch";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
@@ -259,33 +259,6 @@ function readSavedComment(v: unknown): string {
     }
   }
   return "";
-}
-
-async function publicFetch<T>(
-  path: string,
-  init?: { method?: string; body?: unknown },
-): Promise<
-  { ok: true; data: T } | { ok: false; status: number; text: string }
-> {
-  const res = await fetch(`${getBackendUrl()}${path}`, {
-    method: init?.method ?? "GET",
-    headers: {
-      accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-    },
-    body: init?.body ? JSON.stringify(init.body) : undefined,
-  });
-  if (!res.ok) {
-    let text = "";
-    try {
-      text = await res.text();
-    } catch {
-      // ignore
-    }
-    return { ok: false, status: res.status, text };
-  }
-  const data = (await res.json()) as T;
-  return { ok: true, data };
 }
 
 export type AnnotationJobMode = "public" | "admin" | "public-readonly";
