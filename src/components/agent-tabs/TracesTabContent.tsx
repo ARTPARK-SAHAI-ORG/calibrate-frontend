@@ -564,6 +564,9 @@ export function TracesTabContent({
   // scoring eligibility is read again, so an evaluator linked meanwhile has a
   // type for its column.
   const [evaluatorsReloadKey, setEvaluatorsReloadKey] = useState(0);
+  // A failed read says nothing about which evaluators the agent has.
+  const [evaluatorTypesFailed, setEvaluatorTypesFailed] = useState(false);
+  const [toolCallPickerOpen, setToolCallPickerOpen] = useState(false);
   useEffect(() => {
     if (!accessToken || !isActive) return;
     let cancelled = false;
@@ -579,8 +582,12 @@ export function TracesTabContent({
         }
         setEvaluatorDescriptions(byId);
         setEvaluatorTypes(typeById);
+        setEvaluatorTypesFailed(false);
       })
-      .catch((err) => reportError("Error fetching agent evaluators:", err))
+      .catch((err) => {
+        reportError("Error fetching agent evaluators:", err);
+        if (!cancelled) setEvaluatorTypesFailed(true);
+      })
       .finally(() => {
         if (!cancelled) setEvaluatorTypesLoading(false);
       });
@@ -611,6 +618,7 @@ export function TracesTabContent({
   const linkedEvaluatorUuids = Object.keys(evaluatorTypes);
   const missingToolCallEvaluator =
     !evaluatorTypesLoading &&
+    !evaluatorTypesFailed &&
     (hasStoredToolCallTrace ||
       items.some((trace) => isToolCallOutput(traceRowOutputFacts(trace)))) &&
     !Object.values(evaluatorTypes).includes("tool-call");
@@ -622,9 +630,9 @@ export function TracesTabContent({
       onAdded={() => {
         setEvaluatorsReloadKey((key) => key + 1);
         void traceScoring.refreshEligibility();
-        void refetch();
         onAgentDefaultsAttached?.();
       }}
+      onOpenChange={setToolCallPickerOpen}
     />
   );
 
@@ -1231,6 +1239,7 @@ export function TracesTabContent({
         addToolCallEvaluator={
           missingToolCallEvaluator ? addToolCallEvaluatorButton : undefined
         }
+        keysPaused={toolCallPickerOpen}
         isOpen={openTraceUuid != null}
         onClose={closeTrace}
         accessToken={accessToken}

@@ -617,6 +617,31 @@ it("navigates with arrow keys but leaves the disabled side alone", async () => {
   expect(onNext).toHaveBeenCalledTimes(1);
 });
 
+it("leaves Escape and the arrow keys alone while a window opened from it is on screen", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  const onClose = jest.fn();
+  const onNext = jest.fn();
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={onClose}
+      accessToken="tok"
+      traceUuid="t1"
+      onNext={onNext}
+      hasNext={true}
+      keysPaused
+    />,
+  );
+  await waitFor(() => expect(screen.getByText("msg-1")).toBeInTheDocument());
+
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+  });
+  expect(onClose).not.toHaveBeenCalled();
+  expect(onNext).not.toHaveBeenCalled();
+});
+
 it("surfaces an error when the fetch fails", async () => {
   mockFetchTrace.mockRejectedValue(new Error("boom"));
   render(

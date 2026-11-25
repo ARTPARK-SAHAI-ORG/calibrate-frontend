@@ -67,6 +67,9 @@ type TraceDetailDialogProps = {
   /** The button that adds a tool call evaluator, for a trace skipped because
    *  the agent has none. */
   addToolCallEvaluator?: React.ReactNode;
+  /** A window opened from inside this one is on screen, so Escape and the
+   *  arrow keys belong to it. */
+  keysPaused?: boolean;
   /** Whether this trace is ticked in the list behind the dialog. */
   isSelected?: boolean;
   /** Tick or untick this trace without closing the dialog and going back to
@@ -372,6 +375,7 @@ export function TraceDetailDialog({
   position,
   evaluatorDescriptions,
   addToolCallEvaluator,
+  keysPaused = false,
   isSelected = false,
   onToggleSelected,
   selectedCount = 0,
@@ -489,7 +493,14 @@ export function TraceDetailDialog({
     };
   }, [isOpen, traceUuid, accessToken, hasOpenScoreRun]);
 
-  useDialogNavKeys({ isOpen, onClose, hasPrev, onPrev, hasNext, onNext });
+  useDialogNavKeys({
+    isOpen: isOpen && !keysPaused,
+    onClose,
+    hasPrev,
+    onPrev,
+    hasNext,
+    onNext,
+  });
   // Same width and limits as the evaluators column of the test results window.
   const scoresPanel = useResizableWidth(512, 320, 720, "grow-left");
 

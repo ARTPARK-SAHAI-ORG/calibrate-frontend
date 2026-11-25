@@ -279,7 +279,7 @@ it("says the agent has no tool call evaluator and offers the button to add one",
     />,
   );
   expect(document.body).toHaveTextContent(
-    "No tool call evaluator is added to this agent, so its tool calls are not checked. Add a tool call evaluator",
+    "This agent had no tool call evaluator when this trace arrived. Add a tool call evaluator",
   );
   expect(
     screen.getByRole("button", { name: "Add a tool call evaluator" }),
@@ -299,7 +299,27 @@ it("says the trace was skipped before a tool call evaluator was added, with no b
     />,
   );
   expect(document.body).toHaveTextContent(
-    "No tool call evaluator was added to this agent when this trace arrived",
+    /^Scores\s*This agent had no tool call evaluator when this trace arrived$/,
+  );
+  expect(
+    screen.queryByRole("button", { name: "Add a tool call evaluator" }),
+  ).not.toBeInTheDocument();
+});
+
+it("offers the button only beside the missing tool call evaluator reason", () => {
+  render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r11",
+        status: "failed",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "cli_failed",
+        results: [],
+      }}
+      addToolCallEvaluator={
+        <button type="button">Add a tool call evaluator</button>
+      }
+    />,
   );
   expect(
     screen.queryByRole("button", { name: "Add a tool call evaluator" }),

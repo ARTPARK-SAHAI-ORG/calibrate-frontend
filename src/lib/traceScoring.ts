@@ -38,7 +38,7 @@ export function traceRowOutputFacts(
 /** Said above the traces list and in a trace whose tool calls were left
  * unscored, each followed by the button that adds one. */
 export const NO_TOOL_CALL_EVALUATOR_NOTE =
-  "No tool call evaluator is added to this agent, so its tool calls are not checked.";
+  "This agent has no tool call evaluator, so its tool calls are not checked.";
 
 /** A run that is still open and should be refetched. */
 export function isTraceScoringInProgress(
@@ -129,7 +129,7 @@ export function scoringRunErrorCopy(error: string | null | undefined): string {
     case "over_limit":
       return "This workspace has reached its limit for scoring traces";
     case "no_tool_call_evaluator":
-      return "No tool call evaluator was added to this agent when this trace arrived";
+      return "This agent had no tool call evaluator when this trace arrived";
     case "no_usable_evaluators":
       return "No evaluator on this agent fits this trace";
     case "scoring_disabled":

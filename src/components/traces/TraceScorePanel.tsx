@@ -8,7 +8,6 @@ import { useUsesOwnProviderKeys } from "@/hooks";
 import {
   ineligibleReasonCopy,
   isTraceScoringInProgress,
-  NO_TOOL_CALL_EVALUATOR_NOTE,
   scoringRunErrorCopy,
 } from "@/lib/traceScoring";
 import type {
@@ -67,30 +66,20 @@ function RunBody({
 
   // A trace that could not be scored is a warning whatever the reason, so
   // every reason gets the same amber box the Traces tab uses. Only the limit
-  // has somewhere for the reader to go next, so only it carries the link.
-  if (
-    run.status === "skipped" &&
-    run.error === "no_tool_call_evaluator" &&
-    addToolCallEvaluator
-  ) {
-    return (
-      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-        <p className="text-sm text-amber-700 dark:text-amber-300">
-          {NO_TOOL_CALL_EVALUATOR_NOTE} {addToolCallEvaluator}
-        </p>
-      </div>
-    );
-  }
-
+  // and a missing tool call evaluator have somewhere for the reader to go
+  // next, so only they carry a link.
   if (run.status === "failed" || run.status === "skipped") {
     return (
       <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
         <p className="text-sm text-amber-700 dark:text-amber-300">
-          {/* A lone reason takes no full stop. Only the limit one is followed
-              by a second sentence, so only it needs one. */}
+          {/* A lone reason takes no full stop. One followed by more words or
+              a button takes one. */}
           {run.error === "over_limit" && usesOwnProviderKeys
             ? "This trace was not scored because the workspace had reached its scoring limit at the time"
             : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`}
+          {run.error === "no_tool_call_evaluator" && addToolCallEvaluator && (
+            <>. {addToolCallEvaluator}</>
+          )}
           {run.error === "over_limit" && !usesOwnProviderKeys && (
             <>
               {" "}
