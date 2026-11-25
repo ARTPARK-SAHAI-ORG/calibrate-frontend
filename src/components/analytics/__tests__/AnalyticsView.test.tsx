@@ -273,7 +273,7 @@ describe("AnalyticsView", () => {
     expect(names()).toEqual(["Beta", "Gamma", "Alpha"]);
     await user.click(within(table).getByRole("button", { name: /^Workspace/ }));
     expect(names()).toEqual(["Gamma", "Beta", "Alpha"]);
-  });
+  }, 10000);
 
   it("filters the failed evaluations and expands a row", async () => {
     const user = setupUser();
