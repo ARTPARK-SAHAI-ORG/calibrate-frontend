@@ -1,4 +1,11 @@
-import { render, screen, setupUser, waitFor, fireEvent } from "@/test-utils";
+import {
+  act,
+  render,
+  screen,
+  setupUser,
+  waitFor,
+  fireEvent,
+} from "@/test-utils";
 import { PublicChatView } from "../PublicChatView";
 import {
   fetchChatAgent,
@@ -104,7 +111,10 @@ it("adds a line on Shift+Enter and keeps Send off for an empty box", async () =>
   await open();
   const send = screen.getByRole("button", { name: "Send" });
   expect(send).toBeDisabled();
-  await user.type(screen.getByLabelText("Message"), "a{Shift>}{Enter}{/Shift}b");
+  await user.type(
+    screen.getByLabelText("Message"),
+    "a{Shift>}{Enter}{/Shift}b",
+  );
   expect(screen.getByLabelText("Message")).toHaveValue("a\nb");
   expect(mockSend).not.toHaveBeenCalled();
 });
@@ -277,7 +287,9 @@ it("saves a thumbs down at once, then the comment, and keeps only that thumb", a
     { is_correct: false, comment: "Too short" },
     null,
   );
-  await waitFor(() => expect(screen.queryByRole("textbox", { name: /wrong/ })).toBeNull());
+  await waitFor(() =>
+    expect(screen.queryByRole("textbox", { name: /wrong/ })).toBeNull(),
+  );
   expect(screen.queryByText("Too short")).toBeNull();
   expect(screen.getByRole("button", { name: "Bad reply" })).toHaveAttribute(
     "aria-pressed",
@@ -335,7 +347,9 @@ it("asks before clearing a picked thumb, and clears it on confirm", async () => 
   await waitFor(() =>
     expect(screen.queryByText("Clear your feedback?")).toBeNull(),
   );
-  expect(screen.getByRole("button", { name: "Good reply" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Good reply" }),
+  ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Bad reply" })).not.toHaveAttribute(
     "aria-pressed",
   );
@@ -399,10 +413,39 @@ it("says when the agent was stopped after too many tool calls", async () => {
   mockSend.mockResolvedValueOnce(reply({ reply: null, stopped_early: true }));
   await sendMessage(user, "Book it");
   expect(
-    await screen.findByText(/stopped after using tools too many times in a row/),
+    await screen.findByText(
+      /stopped after using tools too many times in a row/,
+    ),
   ).toBeInTheDocument();
   mockSend.mockResolvedValueOnce(reply());
   await sendMessage(user, "Again");
   expect(await screen.findByText("Simulated agent reply.")).toBeInTheDocument();
   expect(screen.getAllByText(/stopped after using tools/)).toHaveLength(1);
+});
+
+it("keeps New chat usable, and does nothing before a message is sent", async () => {
+  const user = setupUser();
+  await open();
+  const newChat = screen.getByRole("button", { name: "New chat" });
+  expect(newChat).toBeEnabled();
+  await user.type(screen.getByLabelText("Message"), "Half typed");
+  await user.click(newChat);
+  expect(screen.getByLabelText("Message")).toHaveValue("Half typed");
+  expect(mockSend).not.toHaveBeenCalled();
+});
+
+it("starts a new chat while a reply is on its way, and drops that reply", async () => {
+  const user = setupUser();
+  await open();
+  let answer!: (value: unknown) => void;
+  mockSend.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+  await sendMessage(user, "First chat");
+  expect(screen.getByText("First chat")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "New chat" }));
+  expect(screen.queryByText("First chat")).toBeNull();
+  expect(screen.getByLabelText("Message")).toBeEnabled();
+
+  await act(async () => answer(reply({ reply: "Late reply" })));
+  expect(screen.queryByText("Late reply")).toBeNull();
 });

@@ -9,11 +9,7 @@ import {
 import { ErrorNote, InfoNote } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
-import {
-  SpinnerIcon,
-  ThumbsDownIcon,
-  ThumbsUpIcon,
-} from "@/components/icons";
+import { SpinnerIcon, ThumbsDownIcon, ThumbsUpIcon } from "@/components/icons";
 import {
   TURN_BUBBLE_CLASS,
   ToolCallCard,
@@ -97,6 +93,8 @@ export function PublicChatView({ token }: { token: string }) {
   const [clearing, setClearing] = useState<string | null>(null);
   const [clearBusy, setClearBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  // Bumped by New chat, so a reply still on its way to the old chat is dropped.
+  const chatRun = useRef(0);
 
   // Wait for the login, so a member of the workspace can open a private chat.
   useEffect(() => {
@@ -153,6 +151,7 @@ export function PublicChatView({ token }: { token: string }) {
   const canSend = !locked && draft.trim() !== "" && !tooLong;
 
   const send = async (text: string, retry = false) => {
+    const run = chatRun.current;
     setSending(true);
     setSendError(null);
     if (!retry) setTurns((t) => [...t, { role: "user", text }]);
@@ -161,6 +160,7 @@ export function PublicChatView({ token }: { token: string }) {
       { conversation_id: conversationId, message: text },
       accessToken,
     );
+    if (run !== chatRun.current) return;
     setSending(false);
     if (!res.ok) {
       setSendError(res.error);
@@ -190,6 +190,10 @@ export function PublicChatView({ token }: { token: string }) {
   };
 
   const newChat = () => {
+    // Nothing sent yet: this already is a new chat.
+    if (turns.length === 0) return;
+    chatRun.current += 1;
+    setSending(false);
     setTurns([]);
     setConversationId(null);
     setDraft("");
@@ -252,12 +256,7 @@ export function PublicChatView({ token }: { token: string }) {
       title={agent.agent_name}
       contentClassName="max-w-3xl flex flex-col"
       actions={
-        <button
-          type="button"
-          onClick={newChat}
-          disabled={sending || turns.length === 0}
-          className={BUTTON_CLASS}
-        >
+        <button type="button" onClick={newChat} className={BUTTON_CLASS}>
           New chat
         </button>
       }
