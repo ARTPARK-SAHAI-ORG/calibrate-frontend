@@ -60,10 +60,7 @@ import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
 import { CONTACT_LINK } from "@/constants/limits";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
-import {
-  isToolCallOutput,
-  traceRowOutputFacts,
-} from "@/lib/traceScoring";
+import { isToolCallRow, traceRowOutputFacts } from "@/lib/traceScoring";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
@@ -249,9 +246,7 @@ export function TracesTabContent({
   // A trace either replied or only called a tool, and the two become different
   // kinds of test. One selection makes one kind, so a mix is refused rather
   // than quietly turned into the wrong thing.
-  const toolCallOnlyCount = selectedTraces.filter((trace) =>
-    isToolCallOutput(traceRowOutputFacts(trace)),
-  ).length;
+  const toolCallOnlyCount = selectedTraces.filter(isToolCallRow).length;
   const isMixedSelection =
     toolCallOnlyCount > 0 && toolCallOnlyCount < selectedTraces.length;
   const selectedTestType =
@@ -274,9 +269,7 @@ export function TracesTabContent({
   // is nothing to pick.
   const labellingIsToolCallOnly =
     labellableTraces.length > 0 &&
-    labellableTraces.every((trace) =>
-      isToolCallOutput(traceRowOutputFacts(trace)),
-    );
+    labellableTraces.every(isToolCallRow);
 
   // Send selected traces for labelling. Step one asks which evaluators the
   // annotators score against; step two needs the full traces, which the list
@@ -476,10 +469,12 @@ export function TracesTabContent({
     eligibility !== null && eligibility.eligible.length === 0;
   // What each column's evaluator judges, so a row it does not apply to reads
   // as empty rather than as waiting. Filled with the descriptions below.
-  const [evaluatorTypes, setEvaluatorTypes] = useState<
-    Record<string, EvaluatorType>
-  >({});
-  const [evaluatorTypesLoading, setEvaluatorTypesLoading] = useState(true);
+  // Null until a read succeeds. A failed re-read keeps the last known types,
+  // so cells and notes do not change on a passing error.
+  const [evaluatorTypes, setEvaluatorTypes] = useState<Record<
+    string,
+    EvaluatorType
+  > | null>(null);
   // True during every read, the first and each one after. An evaluator linked
   // since the last read has no type yet, so its cells wait for this one.
   const [evaluatorTypesReading, setEvaluatorTypesReading] = useState(true);
@@ -494,7 +489,7 @@ export function TracesTabContent({
         evaluator_uuid,
         name,
         evaluator_type:
-          evaluatorTypes[evaluator_uuid] ??
+          evaluatorTypes?.[evaluator_uuid] ??
           (evaluatorTypesReading ? null : undefined),
       });
     };
@@ -558,10 +553,8 @@ export function TracesTabContent({
     return [...ids].flatMap((uuid) => knownEvaluators.get(uuid) ?? []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scoreColumns, facets.scores, scoreAverages, items]);
-  // The backend marks a trace it could not score for the workspace cap, so the
-  // page can say so without asking for the limit itself.
   // A trace's scores name each evaluator but not what it judges, so the words
-  // come from the agent's own evaluator list, read once for the tab.
+  // come from the agent's own evaluator list.
   const [evaluatorDescriptions, setEvaluatorDescriptions] = useState<
     Record<string, string>
   >({});
@@ -569,8 +562,6 @@ export function TracesTabContent({
   // scoring eligibility is read again, so an evaluator linked meanwhile has a
   // type for its column.
   const [evaluatorsReloadKey, setEvaluatorsReloadKey] = useState(0);
-  // A failed read says nothing about which evaluators the agent has.
-  const [evaluatorTypesFailed, setEvaluatorTypesFailed] = useState(false);
   const [toolCallPickerOpen, setToolCallPickerOpen] = useState(false);
   useEffect(() => {
     if (!accessToken || !isActive) return;
@@ -587,16 +578,10 @@ export function TracesTabContent({
         }
         setEvaluatorDescriptions(byId);
         setEvaluatorTypes(typeById);
-        setEvaluatorTypesFailed(false);
       })
-      .catch((err) => {
-        reportError("Error fetching agent evaluators:", err);
-        if (!cancelled) setEvaluatorTypesFailed(true);
-      })
+      .catch((err) => reportError("Error fetching agent evaluators:", err))
       .finally(() => {
-        if (cancelled) return;
-        setEvaluatorTypesLoading(false);
-        setEvaluatorTypesReading(false);
+        if (!cancelled) setEvaluatorTypesReading(false);
       });
     return () => {
       cancelled = true;
@@ -605,21 +590,35 @@ export function TracesTabContent({
 
   // Whether any trace, not only one on this page, is nothing but tool calls.
   const [hasStoredToolCallTrace, setHasStoredToolCallTrace] = useState(false);
-  const missingToolCallEvaluator =
-    !evaluatorTypesLoading &&
-    !evaluatorTypesFailed &&
-    (hasStoredToolCallTrace ||
-      items.some((trace) => isToolCallOutput(traceRowOutputFacts(trace)))) &&
-    !Object.values(evaluatorTypes).includes("tool-call");
   const [hasStoredReplyTrace, setHasStoredReplyTrace] = useState(false);
-  const linkedTypes = Object.values(evaluatorTypes);
+  const hasToolCallTrace = hasStoredToolCallTrace || items.some(isToolCallRow);
+  const hasReplyTrace =
+    hasStoredReplyTrace || items.some((trace) => !isToolCallRow(trace));
+  const linkedTypes = evaluatorTypes ? Object.values(evaluatorTypes) : null;
+  // Null while any evaluator that can score has no known type yet.
+  const scoringTypes =
+    eligibility && evaluatorTypes
+      ? eligibility.eligible.map((item) => evaluatorTypes[item.evaluator_uuid])
+      : null;
+  const knownScoringTypes = scoringTypes?.every(Boolean) ? scoringTypes : null;
+  // Matches the backend, which says a tool call trace was skipped for having
+  // no tool call evaluator only when none is linked at all.
+  const missingToolCallEvaluator =
+    linkedTypes !== null &&
+    hasToolCallTrace &&
+    !linkedTypes.includes("tool-call");
+  const toolCallEvaluatorCannotScore =
+    linkedTypes !== null &&
+    knownScoringTypes !== null &&
+    knownScoringTypes.length > 0 &&
+    hasToolCallTrace &&
+    linkedTypes.includes("tool-call") &&
+    !knownScoringTypes.includes("tool-call");
   const onlyToolCallEvaluators =
-    !evaluatorTypesLoading &&
-    !evaluatorTypesFailed &&
-    linkedTypes.length > 0 &&
-    linkedTypes.every((type) => type === "tool-call") &&
-    (hasStoredReplyTrace ||
-      items.some((trace) => !isToolCallOutput(traceRowOutputFacts(trace))));
+    knownScoringTypes !== null &&
+    knownScoringTypes.length > 0 &&
+    knownScoringTypes.every((type) => type === "tool-call") &&
+    hasReplyTrace;
   const addToolCallEvaluatorButton = (
     <AddToolCallEvaluatorButton
       agentUuid={agentUuid}
@@ -806,6 +805,7 @@ export function TracesTabContent({
     nothingCanScore ||
     overLimit ||
     missingToolCallEvaluator ||
+    toolCallEvaluatorCannotScore ||
     onlyToolCallEvaluators;
 
   const integrationGuideButton = (
@@ -975,11 +975,21 @@ export function TracesTabContent({
                 </p>
               </div>
             )}
+            {toolCallEvaluatorCannotScore && !nothingCanScore && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  No tool call evaluator on this agent can score traces, so its
+                  tool calls are not checked. Add one that can in the{" "}
+                  <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
+                </p>
+              </div>
+            )}
             {onlyToolCallEvaluators && !nothingCanScore && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
                 <p className="text-sm text-amber-700 dark:text-amber-300">
-                  This agent has only tool call evaluators, so its replies are
-                  not checked. Add an evaluator that checks replies in the{" "}
+                  Only tool call evaluators can score this agent&apos;s traces,
+                  so its replies are not checked. Add an evaluator that checks
+                  replies in the{" "}
                   <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
                 </p>
               </div>

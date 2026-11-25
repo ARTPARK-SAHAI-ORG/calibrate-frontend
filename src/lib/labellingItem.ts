@@ -144,3 +144,12 @@ export function isToolCallContent(content: Record<string, unknown>): boolean {
     Array.isArray(content.expected_tool_calls)
   );
 }
+
+// An empty expected or actual tool call list is kept on save and still marks
+// the item as a tool-call item.
+export function storesEmptyToolCallList(payload: unknown): boolean {
+  const p = (payload ?? {}) as Record<string, unknown>;
+  return [p.expected_tool_calls, p.actual_tool_calls].some(
+    (list) => Array.isArray(list) && list.length === 0,
+  );
+}

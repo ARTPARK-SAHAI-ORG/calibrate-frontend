@@ -1,5 +1,5 @@
 import { textFieldsToPayload } from "@/components/human-labelling/itemConversation";
-import { evaluatorFitsItem, evaluatorTypesForTask, fitsTaskType, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables } from "../labellingItem";
+import { evaluatorFitsItem, evaluatorTypesForTask, fitsTaskType, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables, storesEmptyToolCallList } from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
 // field by field, and is_tool_call was left off the list. The dialog then
@@ -176,5 +176,15 @@ describe("fitsTaskType", () => {
     expect(fitsTaskType("tool-call", "conversation")).toBe(false);
     expect(fitsTaskType("llm", "llm-general")).toBe(false);
     expect(fitsTaskType(undefined, "llm")).toBe(false);
+  });
+});
+
+describe("storesEmptyToolCallList", () => {
+  it("is true only when an expected or actual tool call list is empty", () => {
+    expect(storesEmptyToolCallList({ actual_tool_calls: [] })).toBe(true);
+    expect(storesEmptyToolCallList({ expected_tool_calls: [] })).toBe(true);
+    expect(storesEmptyToolCallList({ actual_tool_calls: [{ tool: "x" }] })).toBe(false);
+    expect(storesEmptyToolCallList({ agent_response: "hi" })).toBe(false);
+    expect(storesEmptyToolCallList(null)).toBe(false);
   });
 });

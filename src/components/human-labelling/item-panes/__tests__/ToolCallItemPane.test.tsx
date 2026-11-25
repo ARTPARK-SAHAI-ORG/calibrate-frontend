@@ -61,7 +61,7 @@ describe("ToolCallItemPane", () => {
     ).toBeInTheDocument();
   });
 
-  it("labels the reply and the calls apart and says the evaluator reads both", () => {
+  it("labels the reply and the calls apart and says they are judged together", () => {
     render(
       <ToolCallItemPane
         payload={{
@@ -76,9 +76,7 @@ describe("ToolCallItemPane", () => {
     expect(screen.getByText("Agent's reply")).toBeInTheDocument();
     expect(screen.getByText("Agent's tool calls")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "The evaluator reads the agent's reply and its tool calls together",
-      ),
+      screen.getByText("The reply and the tool calls are judged together"),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Evaluation target")).toHaveLength(2);
   });

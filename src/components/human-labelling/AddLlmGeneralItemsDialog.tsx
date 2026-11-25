@@ -583,6 +583,10 @@ export function AddLlmGeneralItemsDialog({
               arguments: paramsToArgs(tc.params),
             })),
             seed?.toolCalls,
+            toolCalls.map((tc) => {
+              const match = tc.id.match(/^seed-(\d+)$/);
+              return match ? Number(match[1]) : undefined;
+            }),
           ),
           expectedToolCalls: selectedToolsToCalls(expected.selectedTools),
           evaluator_variables,

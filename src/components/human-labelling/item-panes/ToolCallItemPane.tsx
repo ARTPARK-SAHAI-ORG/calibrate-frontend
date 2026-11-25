@@ -71,8 +71,7 @@ export function ToolCallItemPane({
         <>
           {hasReply && hasCalls && (
             <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              The evaluator reads the agent&apos;s reply and its tool calls
-              together
+              The reply and the tool calls are judged together
             </div>
           )}
           <ExpectedToolCalls payload={payload} />

@@ -5,10 +5,9 @@ import { RunStateMark } from "@/components/ui";
 import { SpinnerIcon } from "@/components/icons";
 import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
 import {
-  isToolCallOutput,
+  isToolCallRow,
   isTraceScoringInProgress,
   scoringRunErrorCopy,
-  traceRowOutputFacts,
 } from "@/lib/traceScoring";
 import type { TraceSummary } from "@/lib/tracesApi";
 import { evaluatorFitsItem } from "@/lib/labellingItem";
@@ -108,7 +107,7 @@ function ScoreValue({
     column.evaluator_type &&
     !evaluatorFitsItem(
       column.evaluator_type,
-      isToolCallOutput(traceRowOutputFacts(trace)),
+      isToolCallRow(trace),
     )
   ) {
     return DOES_NOT_APPLY;

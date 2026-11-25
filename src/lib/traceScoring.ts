@@ -13,7 +13,7 @@ export type TraceOutputFacts = {
 };
 
 /** True when the output is a tool call and nothing else. Such a trace is built
- * as a tool-call item (a person marks it correct or wrong) rather than a
+ * as a tool-call item (judged by tool-call evaluators) rather than a
  * response item. A trace that also replied is a response item, and its call
  * rides along in the conversation. */
 export function isToolCallOutput({
@@ -35,6 +35,13 @@ export function traceRowOutputFacts(
   };
 }
 
+/** True when a list row's output is a tool call and nothing else. */
+export function isToolCallRow(
+  trace: Pick<TraceSummary, "response_preview" | "tool_call_count">,
+): boolean {
+  return isToolCallOutput(traceRowOutputFacts(trace));
+}
+
 /** A run that is still open and should be refetched. */
 export function isTraceScoringInProgress(
   status: TraceScoringStatus | null | undefined,
@@ -42,44 +49,41 @@ export function isTraceScoringInProgress(
   return status === "pending" || status === "processing";
 }
 
-/** Why a linked evaluator cannot score this agent's traces. */
-export function ineligibleReasonCopy(
-  reason: TraceScoringIneligibleReason | string,
-): string {
-  switch (reason) {
-    case "wrong_type_for_agent":
-      return "Is not the kind of evaluator this agent uses";
-    case "no_live_version":
-      return "Has no live version";
-    case "declares_variables":
-      return "Uses variables, which cannot be filled for a trace automatically";
-    default:
-      return "Cannot score traces for this agent";
-  }
-}
-
 const NOTHING_CAN_SCORE_BY_REASON: Record<
   TraceScoringIneligibleReason,
-  { every: string; some: string; fix: string }
+  { one: string; every: string; some: string; fix: string }
 > = {
   declares_variables: {
+    one: "Uses variables, which cannot be filled for a trace automatically",
     every:
       "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically.",
     some: "some use variables",
     fix: "Add an evaluator without variables in the",
   },
   wrong_type_for_agent: {
+    one: "Is not the kind of evaluator this agent uses",
     every:
       "None of the evaluators added to this agent are the kind that can score its traces.",
     some: "some are not the kind this agent uses",
     fix: "Add an evaluator that fits this agent in the",
   },
   no_live_version: {
+    one: "Has no live version",
     every: "None of the evaluators added to this agent have a live version.",
     some: "some have no live version",
     fix: "Add an evaluator with a live version in the",
   },
 };
+
+/** Why a linked evaluator cannot score this agent's traces. */
+export function ineligibleReasonCopy(
+  reason: TraceScoringIneligibleReason | string,
+): string {
+  return (
+    NOTHING_CAN_SCORE_BY_REASON[reason as TraceScoringIneligibleReason]?.one ??
+    "Cannot score traces for this agent"
+  );
+}
 
 /**
  * Why an agent's traces are not being scored, and what to do about it. The

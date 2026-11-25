@@ -576,6 +576,7 @@ describe("restoreToolCalls", () => {
           { tool: "d", arguments: {} },
         ],
         stored,
+        [0, 1, undefined],
       ),
     ).toEqual([
       { tool: "a", arguments: { n: 3, ok: true } },
@@ -589,6 +590,7 @@ describe("restoreToolCalls", () => {
       restoreToolCalls(
         [{ tool: "a", arguments: { n: 3 } }],
         [{ tool: "a", arguments: { n: 3, extra: 1 } }],
+        [0],
       ),
     ).toEqual([{ tool: "a", arguments: { n: 3 } }]);
   });
@@ -600,10 +602,10 @@ describe("restoreToolCalls with webhook arguments", () => {
       { tool: "w", arguments: { body: { id: 7, x: 1 }, headers: { k: "v" } } },
     ];
     expect(
-      restoreToolCalls([{ tool: "w", arguments: { body: { id: 7, x: 1 } } }], stored),
+      restoreToolCalls([{ tool: "w", arguments: { body: { id: 7, x: 1 } } }], stored, [0]),
     ).toEqual(stored);
     expect(
-      restoreToolCalls([{ tool: "w", arguments: { body: { id: 7 } } }], stored),
+      restoreToolCalls([{ tool: "w", arguments: { body: { id: 7 } } }], stored, [0]),
     ).toEqual([{ tool: "w", arguments: { body: { id: 7 }, headers: { k: "v" } } }]);
   });
 
@@ -611,7 +613,7 @@ describe("restoreToolCalls with webhook arguments", () => {
     const stored = [
       { tool: "w", arguments: { body: { id: 7 }, headers: { k: "v" } } },
     ];
-    expect(restoreToolCalls([{ tool: "w", arguments: {} }], stored)).toEqual([
+    expect(restoreToolCalls([{ tool: "w", arguments: {} }], stored, [0])).toEqual([
       { tool: "w", arguments: { headers: { k: "v" } } },
     ]);
   });
@@ -621,6 +623,7 @@ describe("restoreToolCalls with webhook arguments", () => {
       restoreToolCalls(
         [{ tool: "w", arguments: { city: "Pune" } }],
         [{ tool: "w", arguments: { city: "Pune", body: "raw" } }],
+        [0],
       ),
     ).toEqual([{ tool: "w", arguments: { city: "Pune" } }]);
   });
@@ -630,7 +633,39 @@ describe("restoreToolCalls with webhook arguments", () => {
       { tool: "w", arguments: { query: { q: "x" }, headers: { k: "v" } } },
     ];
     expect(
-      restoreToolCalls([{ tool: "w", arguments: { query: { q: "y" } } }], stored),
+      restoreToolCalls([{ tool: "w", arguments: { query: { q: "y" } } }], stored, [0]),
     ).toEqual([{ tool: "w", arguments: { query: { q: "y" }, headers: { k: "v" } } }]);
+  });
+});
+
+describe("historyToPayloadFields matching stored calls", () => {
+  it("matches each call to the stored call it was read from, not its place", () => {
+    const previous = {
+      chat_history: [],
+      agent_response: "",
+      actual_tool_calls: [
+        { tool: "save", arguments: { n: "7" } },
+        { tool: "save", arguments: { n: 7 } },
+      ],
+    };
+    const call = (id: string) => ({
+      role: "assistant" as const,
+      tool_calls: [
+        {
+          id,
+          type: "function" as const,
+          function: { name: "save", arguments: '{"n":"7"}' },
+        },
+      ],
+    });
+    const fields = historyToPayloadFields(
+      [call("actual-call-1"), call("actual-call-1764000000000")],
+      "llm",
+      previous,
+    );
+    expect("actual_tool_calls" in fields && fields.actual_tool_calls).toEqual([
+      { tool: "save", arguments: { n: 7 } },
+      { tool: "save", arguments: { n: "7" } },
+    ]);
   });
 });

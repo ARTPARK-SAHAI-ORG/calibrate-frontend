@@ -32,7 +32,10 @@ export function actualToolCallsStart<T>(
   const isActual = (t: T) =>
     callId(t)?.startsWith(ACTUAL_CALL_ID_PREFIX) === true;
   let start = turns.length;
-  while (start > 0 && (isActual(turns[start - 1]) || isResponse(turns[start - 1]))) {
+  while (
+    start > 0 &&
+    (isActual(turns[start - 1]) || isResponse(turns[start - 1]))
+  ) {
     start -= 1;
   }
   // A response that follows an earlier call belongs with that call.
@@ -107,7 +110,7 @@ export function isPlainObject(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
 
-const WEBHOOK_GROUPS = ["body", "query"];
+export const WEBHOOK_GROUPS = ["body", "query"];
 
 /** True when the arguments hold a webhook's body or query as an object. The
  * dialogs then show only the values inside those, and other keys stay hidden. */
@@ -159,7 +162,9 @@ function restoreArguments(
       out[k] = before;
     } else {
       out[k] =
-        typeof v === "string" && before !== undefined && typeof before !== "string"
+        typeof v === "string" &&
+        before !== undefined &&
+        typeof before !== "string"
           ? parseEdited(v)
           : v;
       changed = true;
@@ -168,22 +173,34 @@ function restoreArguments(
   return changed ? out : previous;
 }
 
-/** Tool calls back from a dialog that edits argument values as text: each
- * call that still names the same tool as the stored call in its place gets
- * the stored values back where its text is unchanged. */
+/** Tool calls back from a dialog that edits argument values as text.
+ * `storedIndex[i]` is the position in `previous` that call i was read from,
+ * or undefined for a call added in the dialog. A call that still names the
+ * same tool as its stored call gets the stored values back where its text is
+ * unchanged. */
 export function restoreToolCalls<
   T extends { tool: string; arguments: Record<string, unknown> },
->(next: T[], previous: unknown): T[] {
+>(next: T[], previous: unknown, storedIndex: (number | undefined)[]): T[] {
   const before = Array.isArray(previous) ? previous : [];
   return next.map((call, i) => {
-    if (before[i] === undefined) return call;
-    const prior = normalizeToolCall(before[i]);
+    const at = storedIndex[i];
+    if (at === undefined || before[at] === undefined) return call;
+    const prior = normalizeToolCall(before[at]);
     if (prior.toolName !== call.tool) return call;
     return {
       ...call,
       arguments: restoreArguments(call.arguments, prior.args),
     };
   });
+}
+
+/** The position in `actual_tool_calls` a call was read from, taken from the
+ * id payloadToHistory gave it. Undefined for a call added in the dialog. */
+function storedCallIndex(id: string | undefined): number | undefined {
+  const rest = id?.startsWith(ACTUAL_CALL_ID_PREFIX)
+    ? id.slice(ACTUAL_CALL_ID_PREFIX.length)
+    : "";
+  return /^\d+$/.test(rest) ? Number(rest) : undefined;
 }
 
 /** A list field on save: the new list when it has entries. An empty list is
@@ -238,53 +255,50 @@ export function historyToPayloadFields(
       })
     : "";
   const before = agentToolCalls(previous ?? {});
+  const read = trailing.filter(isCall).flatMap((turn) =>
+    (turn.tool_calls ?? []).map((call) => {
+      const { args } = normalizeToolCall(call);
+      const response = trailing.find(
+        (t) => t.role === "tool" && t.tool_call_id === call.id,
+      );
+      return {
+        tool: call.function.name,
+        arguments: args as Record<string, unknown>,
+        content:
+          typeof response?.content === "string" ? response.content : undefined,
+        storedAt: storedCallIndex(call.id),
+      };
+    }),
+  );
   const calls: ToolCallRecord[] = restoreToolCalls(
-    trailing
-      .filter(isCall)
-      .flatMap((turn) =>
-        (turn.tool_calls ?? []).map((call) => {
-          const { args } = normalizeToolCall(call);
-          const response = trailing.find(
-            (t) => t.role === "tool" && t.tool_call_id === call.id,
-          );
-          return {
-            tool: call.function.name,
-            arguments: args as Record<string, unknown>,
-            content:
-              typeof response?.content === "string"
-                ? response.content
-                : undefined,
-          };
-        }),
-      )
-      .map(({ tool, arguments: args, content }, i) => {
-        const prior =
-          before[i] === undefined ? undefined : normalizeToolCall(before[i]);
-        const same = prior?.toolName === tool;
-        const priorOutput = same ? prior?.output : undefined;
-        let output: unknown;
-        if (content !== undefined) {
-          if (
-            priorOutput !== undefined &&
-            content === outputText(priorOutput)
-          ) {
-            output = priorOutput;
-          } else if (!(
-            same &&
-            priorOutput === undefined &&
-            (content === DEFAULT_STRUCTURED_RESPONSE ||
-              content === DEFAULT_WEBHOOK_RESPONSE)
-          )) {
-            output = parseEdited(content);
-          }
+    read.map(({ tool, arguments: args, content, storedAt }) => {
+      const prior =
+        storedAt === undefined || before[storedAt] === undefined
+          ? undefined
+          : normalizeToolCall(before[storedAt]);
+      const same = prior?.toolName === tool;
+      const priorOutput = same ? prior?.output : undefined;
+      let output: unknown;
+      if (content !== undefined) {
+        if (priorOutput !== undefined && content === outputText(priorOutput)) {
+          output = priorOutput;
+        } else if (!(
+          same &&
+          priorOutput === undefined &&
+          (content === DEFAULT_STRUCTURED_RESPONSE ||
+            content === DEFAULT_WEBHOOK_RESPONSE)
+        )) {
+          output = parseEdited(content);
         }
-        return {
-          tool,
-          arguments: args,
-          ...(output !== undefined ? { output } : {}),
-        };
-      }),
+      }
+      return {
+        tool,
+        arguments: args,
+        ...(output !== undefined ? { output } : {}),
+      };
+    }),
     before,
+    read.map((c) => c.storedAt),
   );
   return {
     chat_history,

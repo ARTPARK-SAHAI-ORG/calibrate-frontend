@@ -21,13 +21,6 @@ export type ExpectedToolCall = {
   accept_any_arguments?: boolean;
 };
 
-// A single expected parameter row in a tool-call test. The shape is recursive:
-// `object`-typed parameters carry their own `properties` (nested rows) so the
-// dialog can render a section-within-a-section. `required` is derived from the
-// tool's declared schema and gates whether the row can be removed. `custom`
-// rows are user-added (free-form name + value) — they appear for
-// structured-output tools with no declared parameters and for `object` params
-// that declare no properties of their own.
 // Data types a custom (user-added) expected parameter can take — mirrors the
 // set offered in the add-tool dialog's ParameterCard.
 const EXPECTED_PARAM_TYPES = [
@@ -49,6 +42,13 @@ type MatchType = "exact" | "llm_judge" | "any";
 // presentation-only variant of an exact match (emitted as value: null).
 type MatchMode = "exact" | "llm_judge" | "null" | "any";
 
+// A single expected parameter row in a tool-call test. The shape is recursive:
+// `object`-typed parameters carry their own `properties` (nested rows) so the
+// dialog can render a section-within-a-section. `required` is derived from the
+// tool's declared schema and gates whether the row can be removed. `custom`
+// rows are user-added (free-form name + value) — they appear for
+// structured-output tools with no declared parameters and for `object` params
+// that declare no properties of their own.
 type ExpectedParam = {
   id: string;
   name: string;
@@ -175,6 +175,10 @@ export type SelectedToolConfig = {
   // the user may add arbitrary top-level expected parameters for the test.
   allowCustomParameters: boolean;
   expectedParameters: ExpectedParam[];
+  // A labelling item's call as stored, and the form the editor saved it as
+  // when it was read in. While the rows still save to that form, the stored
+  // call is saved instead.
+  stored?: { call: ExpectedToolCall; readAs: string };
 };
 
 let expParamIdCounter = 0;
@@ -572,7 +576,6 @@ function AddBackChips({
   );
 }
 
-/** Saved expected tool calls back into the editor's rows. */
 /** The editor's rows for saved tool calls. `savedOnly` leaves out required
  * inputs a call does not carry, so a labelling item, which records what was
  * expected rather than what the tool needs, still saves as it was. */
@@ -622,7 +625,7 @@ export function toolCallsToSelectedTools(
       }
     }
 
-    return {
+    const selected: SelectedToolConfig = {
       id: inbuiltTool ? inbuiltTool.id : toolCall.tool,
       name: inbuiltTool ? inbuiltTool.name : toolCall.tool,
       expectation,
@@ -631,29 +634,51 @@ export function toolCallsToSelectedTools(
       allowCustomParameters,
       expectedParameters,
     };
+    if (savedOnly) {
+      selected.stored = {
+        call: toolCall,
+        readAs: JSON.stringify(buildCall(selected)),
+      };
+    }
+    return selected;
   });
 }
 
-/** The editor's rows as the tool calls they are saved as. */
-export function selectedToolsToCalls(
-  tools: SelectedToolConfig[],
-): ExpectedToolCall[] {
-  return tools.map((tool) => ({
+function buildCall(tool: SelectedToolConfig): ExpectedToolCall {
+  return {
     tool: tool.isInbuilt ? tool.id : tool.name,
     arguments: tool.acceptAnyParameterValues
       ? {}
       : buildArgsFromExpectedParams(tool.expectedParameters),
     accept_any_arguments: tool.acceptAnyParameterValues,
     ...(tool.expectation === "should-not-call" ? { is_called: false } : {}),
-  }));
+  };
 }
 
-/** True when a tool expected to be called has an incomplete parameter. */
+function isUnchanged(tool: SelectedToolConfig): boolean {
+  return (
+    !!tool.stored && JSON.stringify(buildCall(tool)) === tool.stored.readAs
+  );
+}
+
+/** The editor's rows as the tool calls they are saved as. A stored call the
+ * person did not change is saved exactly as it was stored. */
+export function selectedToolsToCalls(
+  tools: SelectedToolConfig[],
+): ExpectedToolCall[] {
+  return tools.map((tool) =>
+    isUnchanged(tool) ? tool.stored!.call : buildCall(tool),
+  );
+}
+
+/** True when a tool expected to be called has an incomplete parameter. A
+ * stored call the person did not change is not checked. */
 export function selectedToolsHaveInvalidParams(
   tools: SelectedToolConfig[],
 ): boolean {
   return tools.some(
     (tool) =>
+      !isUnchanged(tool) &&
       tool.expectation === "should-call" &&
       !tool.acceptAnyParameterValues &&
       hasInvalidExpectedParams(tool.expectedParameters),

@@ -109,6 +109,7 @@ import {
   toItemDetailItem,
   llmGeneralDialogRow,
   readEvaluatorVariables,
+  storesEmptyToolCallList,
 } from "@/lib/labellingItem";
 import { parseBackendTime } from "@/lib/relativeTime";
 
@@ -363,15 +364,6 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
   } catch {
     return "—";
   }
-}
-
-// An empty expected or actual tool call list is kept on save and still marks
-// the item as a tool-call item.
-function storesEmptyToolCallList(payload: unknown): boolean {
-  const p = (payload ?? {}) as Record<string, unknown>;
-  return [p.expected_tool_calls, p.actual_tool_calls].some(
-    (list) => Array.isArray(list) && list.length === 0,
-  );
 }
 
 function sanitizeCsvName(s: string): string {
@@ -4310,10 +4302,8 @@ function LabellingTaskPageInner() {
                 updates: rows
                   .filter((r) => !!r.uuid)
                   .map((r) => {
-                    // The save replaces the whole item, so start from what
-                    // the item already holds. Without this, editing an item
-                    // whose answer was a tool call deletes the call: the
-                    // form has no field for it.
+                    // The save replaces the whole item, so start from what it
+                    // already holds.
                     const existing = (items.find((it) => it.uuid === r.uuid)
                       ?.payload ?? {}) as Record<string, unknown>;
                     return {

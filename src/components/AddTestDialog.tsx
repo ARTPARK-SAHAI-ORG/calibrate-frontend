@@ -46,6 +46,8 @@ import {
   actualToolCallsStart,
   argumentText,
   hasArgumentGroups,
+  isPlainObject,
+  WEBHOOK_GROUPS,
 } from "@/components/human-labelling/itemConversation";
 import {
   ToolCallExpectationsEditor,
@@ -584,14 +586,9 @@ export function AddTestDialog({
 
               if (isWebhook && hasArgumentGroups(parsedArgs)) {
                 // Extract params from body, query with their group (headers are not shown in UI)
-                const webhookKeys = ["body", "query"];
-                webhookKeys.forEach((groupKey) => {
+                WEBHOOK_GROUPS.forEach((groupKey) => {
                   const groupValue = parsedArgs[groupKey];
-                  if (
-                    groupValue &&
-                    typeof groupValue === "object" &&
-                    !Array.isArray(groupValue)
-                  ) {
+                  if (isPlainObject(groupValue)) {
                     Object.entries(groupValue).forEach(
                       ([paramName, paramValue]) => {
                         toolParams.push({
@@ -2219,7 +2216,7 @@ export function AddTestDialog({
     onNext: showRunUnsavedConfirm || roleChange ? undefined : navNext,
   });
 
-  const trailingToolCallsStart = () => chatActualCallsStart(chatMessages);
+  const trailingToolCallsStart = chatActualCallsStart(chatMessages);
 
   // An llm item is a tool-call item when it ends on the agent's tool calls,
   // has expected tool calls, or stores an empty tool call list. Only tool-call evaluators score such an item,
@@ -2228,7 +2225,7 @@ export function AddTestDialog({
   const isToolCallItem =
     showsExpectedToolCalls &&
     (storesEmptyToolCallList ||
-      trailingToolCallsStart() >= 0 ||
+      trailingToolCallsStart >= 0 ||
       selectedTools.length > 0);
   const evaluatorFits = (e: { evaluator_type?: string }) =>
     !showsExpectedToolCalls ||
@@ -2238,7 +2235,7 @@ export function AddTestDialog({
   // tool calls (with their responses) it ended on, together with the message
   // just before them when that is the agent's. -1 when there is neither.
   const evalTargetStart = (() => {
-    const start = trailingToolCallsStart();
+    const start = trailingToolCallsStart;
     if (start >= 0) {
       return chatMessages[start - 1]?.role === "agent" ? start - 1 : start;
     }

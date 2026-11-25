@@ -90,3 +90,37 @@ describe("selectedToolsHaveInvalidParams", () => {
     ).toBe(false);
   });
 });
+
+describe("a labelling item's stored expected calls", () => {
+  const stored = [
+    { tool: "get_weather", arguments: { city: "", days: "" } },
+    { tool: "save", arguments: { months: 7 } },
+  ];
+
+  it("saves calls the person did not change exactly as stored", () => {
+    const rows = toolCallsToSelectedTools(stored, [WEATHER], true);
+    expect(JSON.stringify(selectedToolsToCalls(rows))).toBe(
+      JSON.stringify(stored),
+    );
+    expect(selectedToolsHaveInvalidParams(rows)).toBe(false);
+  });
+
+  it("converts only the call the person edited", () => {
+    const rows = toolCallsToSelectedTools(stored, [WEATHER], true);
+    const edited = [
+      rows[0],
+      {
+        ...rows[1],
+        expectedParameters: [{ ...rows[1].expectedParameters[0], value: "8" }],
+      },
+    ];
+    expect(selectedToolsToCalls(edited)).toEqual([
+      stored[0],
+      {
+        tool: "save",
+        arguments: { months: { match_type: "exact", value: 8 } },
+        accept_any_arguments: false,
+      },
+    ]);
+  });
+});

@@ -1484,7 +1484,7 @@ export function FormatHelpToggle({
   );
 }
 
-export type BulkToolCall = {
+type BulkToolCall = {
   tool: string;
   arguments?: unknown;
   output?: unknown;
@@ -1576,12 +1576,12 @@ export function toolCallColumns(replyColumn: string): BulkContentColumn[] {
       [
         "actual_tool_calls",
         "Tool calls made",
-        `(optional) A JSON array of the tool calls the agent made. Each call is an object with a "tool" field naming the tool and, if the tool takes any, an "arguments" object. ${emptyReply}`,
+        `(optional) A JSON array of the tool calls the agent made. Each call is an object with only these fields: "tool", the name of the tool; "arguments", an object, if the tool takes any; and "output", what the tool returned, if you have it. ${emptyReply}`,
       ],
       [
         "expected_tool_calls",
         "Expected tool calls",
-        `(optional) A JSON array of the tool calls the agent should have made, in the same format as "actual_tool_calls". ${emptyReply}`,
+        `(optional) A JSON array of the tool calls the agent should have made. Each call is an object with only these fields: "tool", the name of the tool; "arguments", an object, if the tool takes any; and "accept_any_arguments", set to true when any arguments count as correct. ${emptyReply}`,
       ],
     ] as const
   ).map(

@@ -616,7 +616,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     accessTokenMock.mockReturnValue(null);
   });
 
-  it("does not save while an expected parameter is left empty", async () => {
+  it("does not save while an edited expected parameter is left empty", async () => {
     withTools();
     const user = setupUser();
     const { onSubmit } = renderDialog({
@@ -628,12 +628,14 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
           input: "Hi",
           output: "Hello",
           expectedToolCalls: [
-            { tool: "book_flight", arguments: { city: "" }, accept_any_arguments: false },
+            { tool: "book_flight", arguments: { city: "Pune" }, accept_any_arguments: false },
           ],
         },
       ],
     });
     await screen.findByText("Accept any values for the parameters");
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.clear(screen.getByDisplayValue("Pune"));
     await user.click(screen.getByRole("button", { name: "Save item" }));
     expect(
       await screen.findByText(
@@ -710,6 +712,31 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     await user.click(screen.getByRole("button", { name: "Save item" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual(stored);
+  });
+
+  it("matches a kept tool call to its own stored call after an earlier one is removed", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [
+            { tool: "dummy", arguments: { n: "7" } },
+            { tool: "dummy", arguments: { n: 7 } },
+          ],
+        },
+      ],
+    });
+    await user.click(screen.getAllByRole("button", { name: "Remove dummy" })[0]);
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "dummy", arguments: { n: 7 } },
+    ]);
   });
 
   it("opens again with the expected tool calls' JSON view closed", async () => {
