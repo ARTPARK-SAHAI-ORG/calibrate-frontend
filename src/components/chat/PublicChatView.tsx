@@ -140,7 +140,7 @@ export function PublicChatView({ token }: { token: string }) {
   }, [agent]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView?.({ block: "end" });
+    endRef.current?.scrollIntoView?.({ block: "end", behavior: "smooth" });
   }, [turns, sendError, sending]);
 
   if (loadError === "not_found") {
@@ -389,7 +389,6 @@ export function PublicChatView({ token }: { token: string }) {
             </button>
           </InfoNote>
         )}
-        <div ref={endRef} />
       </div>
 
       <div className="sticky bottom-0 bg-background pt-2 pb-4">
@@ -440,6 +439,9 @@ export function PublicChatView({ token }: { token: string }) {
           </p>
         )}
       </div>
+      {/* Below the message box, which stays fixed at the bottom of the window:
+          scrolling here shows the whole of the latest message above it. */}
+      <div ref={endRef} />
 
       <DeleteConfirmationDialog
         isOpen={clearing !== null}
@@ -476,6 +478,18 @@ function AgentTurn({
   onSave: () => void;
 }) {
   const picked = feedback.isCorrect;
+  // The comment box opens under the reply; bring it into view, clear of the
+  // message box fixed at the bottom of the window.
+  const commentRef = useRef<HTMLDivElement>(null);
+  const commentOpen = feedback.open && picked !== null;
+  useEffect(() => {
+    if (commentOpen) {
+      commentRef.current?.scrollIntoView?.({
+        block: "nearest",
+        behavior: "smooth",
+      });
+    }
+  }, [commentOpen]);
 
   const thumb = (isCorrect: boolean) => {
     const Icon = isCorrect ? ThumbsUpIcon : ThumbsDownIcon;
@@ -550,8 +564,11 @@ function AgentTurn({
           )}
         </div>
       )}
-      {feedback.open && picked !== null && (
-        <div className="w-full md:w-[520px] rounded-xl border border-border p-3 flex flex-col gap-2">
+      {commentOpen && (
+        <div
+          ref={commentRef}
+          className="w-full md:w-[520px] rounded-xl border border-border p-3 flex flex-col gap-2 scroll-mb-36"
+        >
           <label
             htmlFor={`comment-${turn.traceUuid}`}
             className="text-sm font-medium text-foreground"

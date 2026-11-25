@@ -459,7 +459,9 @@ it("puts a starter message in the message box without sending it", async () => {
     }),
   );
   expect(screen.getByText("Here are a few examples")).toBeInTheDocument();
-  expect(screen.getByText("Click one to put it in the message box")).toBeInTheDocument();
+  expect(
+    screen.getByText("Click one to put it in the message box"),
+  ).toBeInTheDocument();
   const box = screen.getByLabelText("Message");
   expect(box).toHaveValue("What do you need from me to get started?");
   expect(box).toHaveFocus();
@@ -469,4 +471,19 @@ it("puts a starter message in the message box without sending it", async () => {
   await user.keyboard("{Enter}");
   expect(await screen.findByText("Simulated agent reply.")).toBeInTheDocument();
   expect(screen.queryByText("Talk to the agent")).toBeNull();
+});
+
+it("scrolls the comment box into view when a thumb opens it", async () => {
+  const user = setupUser();
+  await open();
+  mockSend.mockResolvedValue(reply());
+  mockFeedback.mockResolvedValue({ ok: true, data: { feedback: null } });
+  await sendMessage(user);
+  await screen.findByText("Simulated agent reply.");
+  const scroll = jest.spyOn(Element.prototype, "scrollIntoView");
+  scroll.mockClear();
+  await user.click(screen.getByRole("button", { name: "Good reply" }));
+  await screen.findByText("What was good about this reply? (optional)");
+  expect(scroll).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+  scroll.mockRestore();
 });
