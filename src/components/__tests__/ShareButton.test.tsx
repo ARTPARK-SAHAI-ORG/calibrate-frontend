@@ -114,7 +114,9 @@ describe("ShareButton", () => {
     );
     await user.hover(screen.getByRole("button", { name: /Share/ }));
     expect(
-      await screen.findByText("Let anyone with the link chat with this agent"),
+      await screen.findByText(
+        "Create a link anyone can use to chat with this agent",
+      ),
     ).toBeInTheDocument();
   });
 
