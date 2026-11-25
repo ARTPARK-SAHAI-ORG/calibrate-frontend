@@ -255,7 +255,7 @@ it("names each evaluator that could not score the trace, and why", () => {
     />,
   );
   expect(
-    screen.getByText("No evaluators could score this trace"),
+    screen.getByText("No evaluator on this agent fits this trace"),
   ).toBeInTheDocument();
   expect(screen.getByText("Tone check")).toBeInTheDocument();
   expect(
