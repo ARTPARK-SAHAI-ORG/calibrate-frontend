@@ -27,12 +27,6 @@ jest.mock("../../../../../../hooks", () => ({
   useAccessToken: () => "test-token",
 }));
 
-jest.mock("../../../../../../lib/evalLimit", () => ({
-  overEvalLimit: async () => false,
-}));
-jest.mock("../../../../../../lib/evaluatorRunLimit", () => ({
-  evaluatorRunLimitMessage: async () => null,
-}));
 
 // The item dialogs have their own tests. Here they only hand back what the
 // page passed them, so a test can call their onSubmit directly.
