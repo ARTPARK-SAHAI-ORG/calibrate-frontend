@@ -264,7 +264,7 @@ async function replied(user: ReturnType<typeof setupUser>) {
   await screen.findByText("Simulated agent reply.");
 }
 
-it("saves a thumbs down at once, then the comment, and keeps only that thumb", async () => {
+it("saves a thumbs down at once, then the comment, and keeps the other thumb unpicked", async () => {
   const user = setupUser();
   await replied(user);
 
@@ -278,7 +278,9 @@ it("saves a thumbs down at once, then the comment, and keeps only that thumb", a
   const box = await screen.findByLabelText(
     "What was wrong with this reply? (optional)",
   );
-  expect(screen.queryByRole("button", { name: "Good reply" })).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "Good reply" }),
+  ).not.toHaveAttribute("aria-pressed");
   await user.type(box, "Too short");
   await user.click(screen.getByRole("button", { name: "Save" }));
   expect(mockFeedback).toHaveBeenLastCalledWith(
@@ -522,4 +524,67 @@ it("closes an empty comment box when the next message is sent, and keeps one wit
   expect(screen.getByRole("textbox", { name: /What was good/ })).toHaveValue(
     "Clear",
   );
+});
+
+it("shows the saved comment from an icon beside the thumb, and none without a comment", async () => {
+  const user = setupUser();
+  await open();
+  mockSend
+    .mockResolvedValueOnce(reply())
+    .mockResolvedValueOnce(reply({ trace_uuid: "t2" }));
+  mockFeedback.mockResolvedValue({ ok: true, data: { feedback: null } });
+  await sendMessage(user, "First");
+  await screen.findByText("Simulated agent reply.");
+  await user.click(screen.getByRole("button", { name: "Bad reply" }));
+  await user.type(
+    await screen.findByRole("textbox", { name: /What was wrong/ }),
+    "Wrong clinic hours",
+  );
+  await user.click(screen.getByRole("button", { name: "Save" }));
+
+  const icon = await screen.findByRole("button", { name: "Your comment" });
+  await user.hover(icon);
+  expect(await screen.findByText("Wrong clinic hours")).toBeInTheDocument();
+
+  // A thumb saved with no comment gets no icon.
+  await sendMessage(user, "Second");
+  const goods = await screen.findAllByRole("button", { name: "Good reply" });
+  await user.click(goods[goods.length - 1]);
+  await user.click(await screen.findByRole("button", { name: "Save" }));
+  expect(screen.getAllByRole("button", { name: "Your comment" })).toHaveLength(
+    1,
+  );
+});
+
+it("switches to the other thumb after asking once", async () => {
+  const user = setupUser();
+  await replied(user);
+  mockFeedback.mockResolvedValue({ ok: true, data: { feedback: null } });
+  await user.click(screen.getByRole("button", { name: "Bad reply" }));
+  await screen.findByLabelText("What was wrong with this reply? (optional)");
+
+  await user.click(screen.getByRole("button", { name: "Good reply" }));
+  expect(
+    screen.getByText("Your previous feedback will be erased and replaced"),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Replace feedback" }));
+
+  expect(mockFeedback).toHaveBeenLastCalledWith(
+    "tok",
+    "t1",
+    { is_correct: true, comment: null },
+    null,
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Good reply" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    ),
+  );
+  expect(screen.getByRole("button", { name: "Bad reply" })).not.toHaveAttribute(
+    "aria-pressed",
+  );
+  expect(
+    screen.getByLabelText("What was good about this reply? (optional)"),
+  ).toBeInTheDocument();
 });

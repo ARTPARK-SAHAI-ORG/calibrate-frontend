@@ -90,6 +90,8 @@ type Feedback = {
   /** The comment box is open. */
   open: boolean;
   draft: string;
+  /** The comment last saved with the thumb, shown from beside it. */
+  comment: string | null;
   saving: boolean;
   failed: boolean;
 };
@@ -98,6 +100,7 @@ const NO_FEEDBACK: Feedback = {
   isCorrect: null,
   open: false,
   draft: "",
+  comment: null,
   saving: false,
   failed: false,
 };
@@ -116,6 +119,11 @@ export function PublicChatView({ token }: { token: string }) {
   const [feedback, setFeedback] = useState<Record<string, Feedback>>({});
   const [clearing, setClearing] = useState<string | null>(null);
   const [clearBusy, setClearBusy] = useState(false);
+  const [replacing, setReplacing] = useState<{
+    traceUuid: string;
+    isCorrect: boolean;
+  } | null>(null);
+  const [replaceBusy, setReplaceBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const messageRef = useRef<HTMLTextAreaElement>(null);
   // Bumped by New chat, so a reply still on its way to the old chat is dropped.
@@ -263,15 +271,29 @@ export function PublicChatView({ token }: { token: string }) {
 
   const pickThumb = async (traceUuid: string, isCorrect: boolean) => {
     if (await saveFeedback(traceUuid, isCorrect, null)) {
-      patchFeedback(traceUuid, { isCorrect, open: true, draft: "" });
+      patchFeedback(traceUuid, {
+        isCorrect,
+        open: true,
+        draft: "",
+        comment: null,
+      });
     }
   };
 
   const saveComment = async (traceUuid: string) => {
     const f = feedback[traceUuid] ?? NO_FEEDBACK;
-    if (await saveFeedback(traceUuid, f.isCorrect, f.draft.trim() || null)) {
-      patchFeedback(traceUuid, { open: false });
+    const comment = f.draft.trim() || null;
+    if (await saveFeedback(traceUuid, f.isCorrect, comment)) {
+      patchFeedback(traceUuid, { open: false, comment });
     }
+  };
+
+  const replaceFeedback = async () => {
+    if (!replacing) return;
+    setReplaceBusy(true);
+    await pickThumb(replacing.traceUuid, replacing.isCorrect);
+    setReplaceBusy(false);
+    setReplacing(null);
   };
 
   const clearFeedback = async () => {
@@ -345,6 +367,10 @@ export function PublicChatView({ token }: { token: string }) {
               }
               onPick={(isCorrect) =>
                 turn.traceUuid && void pickThumb(turn.traceUuid, isCorrect)
+              }
+              onSwitch={(isCorrect) =>
+                turn.traceUuid &&
+                setReplacing({ traceUuid: turn.traceUuid, isCorrect })
               }
               onClear={() => turn.traceUuid && setClearing(turn.traceUuid)}
               onDraft={(text) =>
@@ -451,6 +477,16 @@ export function PublicChatView({ token }: { token: string }) {
       <div ref={endRef} />
 
       <DeleteConfirmationDialog
+        isOpen={replacing !== null}
+        onClose={() => setReplacing(null)}
+        onConfirm={() => void replaceFeedback()}
+        title="Replace your feedback?"
+        message="Your previous feedback will be erased and replaced"
+        confirmText="Replace feedback"
+        busyText="Replacing..."
+        isDeleting={replaceBusy}
+      />
+      <DeleteConfirmationDialog
         isOpen={clearing !== null}
         onClose={() => setClearing(null)}
         onConfirm={() => void clearFeedback()}
@@ -471,6 +507,7 @@ function AgentTurn({
   turn,
   feedback,
   onPick,
+  onSwitch,
   onClear,
   onDraft,
   onCancel,
@@ -479,6 +516,8 @@ function AgentTurn({
   turn: Extract<Turn, { role: "agent" }>;
   feedback: Feedback;
   onPick: (isCorrect: boolean) => void;
+  /** The other thumb, once one is picked: replaces it after asking. */
+  onSwitch: (isCorrect: boolean) => void;
   onClear: () => void;
   onDraft: (text: string) => void;
   onCancel: () => void;
@@ -501,14 +540,16 @@ function AgentTurn({
   const thumb = (isCorrect: boolean) => {
     const Icon = isCorrect ? ThumbsUpIcon : ThumbsDownIcon;
     const label = isCorrect ? "Good reply" : "Bad reply";
-    if (picked === null) {
+    if (picked !== isCorrect) {
       return (
         <Tooltip content={label} position="top">
           <button
             type="button"
             aria-label={label}
             disabled={feedback.saving}
-            onClick={() => onPick(isCorrect)}
+            onClick={() =>
+              picked === null ? onPick(isCorrect) : onSwitch(isCorrect)
+            }
             className={`${THUMB_CLASS} border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted`}
           >
             <Icon className="w-4 h-4" />
@@ -516,7 +557,6 @@ function AgentTurn({
         </Tooltip>
       );
     }
-    if (picked !== isCorrect) return null;
     return (
       <Tooltip content="Clear your feedback" position="top">
         <button
@@ -564,6 +604,17 @@ function AgentTurn({
         <div className="flex items-center gap-1">
           {thumb(true)}
           {thumb(false)}
+          {feedback.comment && !commentOpen && (
+            <Tooltip content={feedback.comment} position="top">
+              <button
+                type="button"
+                aria-label="Your comment"
+                className={`${THUMB_CLASS} border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted`}
+              >
+                <ChatIcon className="w-4 h-4" />
+              </button>
+            </Tooltip>
+          )}
           {feedback.failed && (
             <span className="text-xs text-red-600 dark:text-red-400 ml-2">
               Your feedback could not be saved. Try again
