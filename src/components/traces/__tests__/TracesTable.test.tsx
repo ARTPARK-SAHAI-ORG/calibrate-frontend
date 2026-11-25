@@ -501,27 +501,21 @@ describe("TracesTable", () => {
 });
 
 describe("chat link traces and feedback", () => {
-  it("marks a trace from the chat link, and says so on hover", async () => {
-    const user = setupUser();
+  it("labels a trace from the chat link", () => {
     renderTable({ traces: [trace({ source: "chat" })] });
 
-    const marks = screen.getAllByRole("img", {
-      name: "Sent from the chat link",
-    });
     // One on the desktop row and one on the phone card.
-    expect(marks).toHaveLength(2);
-    await user.hover(marks[0]);
-    expect(
-      (await screen.findAllByText("Sent from the chat link")).length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByText("Chat link")).toHaveLength(2);
+    expect(screen.queryByText("API")).not.toBeInTheDocument();
   });
 
-  it("leaves a trace from the app unmarked", () => {
-    renderTable({ traces: [trace({ source: "api" })] });
+  it("labels every other trace as API, including one with no source", () => {
+    renderTable({
+      traces: [trace({ uuid: "a", source: "api" }), trace({ uuid: "b" })],
+    });
 
-    expect(
-      screen.queryByRole("img", { name: "Sent from the chat link" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getAllByText("API")).toHaveLength(4);
+    expect(screen.queryByText("Chat link")).not.toBeInTheDocument();
   });
 
   it("shows the thumb under Feedback, with the comment on hover", async () => {

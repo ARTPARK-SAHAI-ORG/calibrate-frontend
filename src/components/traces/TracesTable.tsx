@@ -108,20 +108,20 @@ function ScoreColumnHeading({
   );
 }
 
-/** A chat bubble on a trace sent from the agent's chat link. API traces carry
- *  nothing, since that is where most traces come from. */
-function ChatSourceMark({ trace }: { trace: TraceSummary }) {
-  if (trace.source !== "chat") return null;
+/** Where a trace came from, on every row: the chat link or the API. */
+function TraceSourceLabel({ trace }: { trace: TraceSummary }) {
+  const chat = trace.source === "chat";
   return (
-    <Tooltip content="Sent from the chat link" position="top">
-      <span
-        role="img"
-        aria-label="Sent from the chat link"
-        className="flex-shrink-0 text-muted-foreground"
-      >
-        <ChatIcon className="w-4 h-4" />
-      </span>
-    </Tooltip>
+    <span
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium flex-shrink-0 whitespace-nowrap ${
+        chat
+          ? "bg-sky-500/15 text-sky-800 dark:text-sky-200"
+          : "bg-muted text-muted-foreground"
+      }`}
+    >
+      {chat && <ChatIcon className="w-3 h-3" />}
+      {chat ? "Chat link" : "API"}
+    </span>
   );
 }
 
@@ -359,7 +359,7 @@ export function TracesTable({
                 className="min-w-0 self-stretch py-2.5 flex items-center gap-2"
               >
                 <TraceScoreMark trace={trace} />
-                <ChatSourceMark trace={trace} />
+                <TraceSourceLabel trace={trace} />
                 {trace.input_preview && (
                   <div className="text-sm font-medium text-foreground truncate">
                     {trace.input_preview}
@@ -412,7 +412,7 @@ export function TracesTable({
                   className="min-w-0 flex items-start gap-2"
                 >
                   <TraceScoreMark trace={trace} />
-                  <ChatSourceMark trace={trace} />
+                  <TraceSourceLabel trace={trace} />
                   {trace.input_preview && (
                     <p className="text-sm font-medium text-foreground line-clamp-2">
                       {trace.input_preview}
