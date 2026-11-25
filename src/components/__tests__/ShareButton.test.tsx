@@ -1,4 +1,11 @@
-import { render, screen, setupUser, waitFor, fireEvent, act } from "@/test-utils";
+import {
+  render,
+  screen,
+  setupUser,
+  waitFor,
+  fireEvent,
+  act,
+} from "@/test-utils";
 import { ShareButton } from "../ShareButton";
 
 jest.mock("../../lib/clipboard", () => ({
@@ -74,6 +81,47 @@ describe("ShareButton", () => {
     expect(await screen.findByText("Copy public link")).toBeInTheDocument();
   });
 
+  it("says what each button does for a link to chat with an agent", async () => {
+    const user = setupUser();
+    const { rerender } = render(
+      <ShareButton
+        entityType="agent-chat"
+        entityId="a1"
+        accessToken="tok"
+        initialIsPublic={true}
+        initialShareToken="share123"
+      />,
+    );
+    await user.hover(screen.getByRole("button", { name: "Public" }));
+    expect(
+      await screen.findByText(
+        "Turn off the link, so nobody can chat with this agent from it",
+      ),
+    ).toBeInTheDocument();
+    await user.hover(screen.getByRole("button", { name: "Copy link" }));
+    expect(
+      await screen.findByText(
+        "Copy the link to chat with the agent and share it with users",
+      ),
+    ).toBeInTheDocument();
+
+    rerender(
+      <ShareButton
+        entityType="agent-chat"
+        entityId="a1"
+        accessToken="tok"
+        initialIsPublic={false}
+        initialShareToken={null}
+      />,
+    );
+    await user.hover(screen.getByRole("button", { name: /Share/ }));
+    expect(
+      await screen.findByText(
+        "Turn on a link that lets anyone chat with this agent, without signing in",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("toggles from private to public, calling the visibility endpoint and updating state", async () => {
     const user = setupUser();
     mockFetchOnce({ is_public: true, share_token: "newtoken" });
@@ -91,7 +139,9 @@ describe("ShareButton", () => {
     await user.click(screen.getByRole("button", { name: /Share/ }));
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Public" })).toBeInTheDocument(),
+      expect(
+        screen.getByRole("button", { name: "Public" }),
+      ).toBeInTheDocument(),
     );
     expect(global.fetch).toHaveBeenCalledWith(
       "https://api.example.com/agent-tests/run/run-1/visibility",
@@ -126,7 +176,9 @@ describe("ShareButton", () => {
         expect.anything(),
       ),
     );
-    await waitFor(() => expect(screen.getByText("Copy link")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Copy link")).toBeInTheDocument(),
+    );
   });
 
   it("routes annotation-evaluator-run composite ids to the evaluator-runs endpoint", async () => {
@@ -256,7 +308,9 @@ describe("ShareButton", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /Share/ }));
-    expect(await screen.findByText("Failed to update visibility")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Failed to update visibility"),
+    ).toBeInTheDocument();
   });
 
   it("shows a generic error message when fetch throws a non-Error value", async () => {
@@ -292,7 +346,9 @@ describe("ShareButton", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /Share/ }));
-    expect(await screen.findByText("Backend URL not configured")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Backend URL not configured"),
+    ).toBeInTheDocument();
   });
 
   it("copies the public link and shows the copied state, reverting after a timeout", async () => {
@@ -366,7 +422,9 @@ describe("ShareButton", () => {
     await user.click(screen.getByRole("button", { name: /Share/ }));
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Public" })).toBeInTheDocument(),
+      expect(
+        screen.getByRole("button", { name: "Public" }),
+      ).toBeInTheDocument(),
     );
     expect(screen.queryByText("Copy link")).not.toBeInTheDocument();
   });

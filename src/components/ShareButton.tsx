@@ -63,6 +63,28 @@ export function publicSharePath(
   return `/public/${PUBLIC_PATHS[entityType]}/${shareToken}`;
 }
 
+/** Hover text that says what each button does for this kind of link. Kinds
+ *  not listed use the general words. */
+const HOVER_TEXT: Partial<
+  Record<
+    ShareableEntityType,
+    { makePublic: string; makePrivate: string; copy: string }
+  >
+> = {
+  "agent-chat": {
+    makePublic:
+      "Turn on a link that lets anyone chat with this agent, without signing in",
+    makePrivate:
+      "Turn off the link, so nobody can chat with this agent from it",
+    copy: "Copy the link to chat with the agent and share it with users",
+  },
+};
+const DEFAULT_HOVER_TEXT = {
+  makePublic: "Make this publicly shareable",
+  makePrivate: "Make this private",
+  copy: "Copy public link",
+};
+
 interface ShareButtonProps {
   entityType: ShareableEntityType;
   entityId: string;
@@ -89,6 +111,7 @@ export function ShareButton({
     initialShareToken,
   );
   const [isLoading, setIsLoading] = useState(false);
+  const hoverText = HOVER_TEXT[entityType] ?? DEFAULT_HOVER_TEXT;
 
   // Sync internal state when parent props change (e.g. after polling fetches actual share state)
   useEffect(() => {
@@ -152,7 +175,7 @@ export function ShareButton({
       <Tooltip
         content={
           disabledReason ??
-          (isPublic ? "Make this private" : "Make this publicly shareable")
+          (isPublic ? hoverText.makePrivate : hoverText.makePublic)
         }
         position="bottom"
       >
@@ -222,7 +245,7 @@ export function ShareButton({
 
       {/* Copy link — only shown when public */}
       {isPublic && publicUrl && (
-        <Tooltip content="Copy public link" position="top">
+        <Tooltip content={hoverText.copy} position="top">
           <button
             onClick={copyLink}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors cursor-pointer ${
