@@ -9,7 +9,7 @@ jest.mock("sonner", () => ({
 import { toast } from "sonner";
 
 let mockUsesOwnKeys = false;
-jest.mock("../../../hooks/useMaxRowsPerEval", () => ({
+jest.mock("../../../hooks/useOrgLimits", () => ({
   useUsesOwnProviderKeys: () => mockUsesOwnKeys,
 }));
 
@@ -126,24 +126,9 @@ describe("TTSDatasetEditor", () => {
     expect(input.className).not.toContain("border-red-500");
   });
 
-  it("shows a limit toast and refuses to add rows past maxRowsPerEval", async () => {
+  it("adds another row without a limit toast", async () => {
     const user = setupUser();
-    render(<Harness maxRowsPerEval={1} />);
-    await user.type(
-      screen.getByPlaceholderText("Enter text to synthesize"),
-      "Row one",
-    );
-    await user.click(screen.getByText("Add another row"));
-
-    expect(toast.error).toHaveBeenCalled();
-    expect(
-      screen.getAllByPlaceholderText("Enter text to synthesize"),
-    ).toHaveLength(1);
-  });
-
-  it("adds rows freely when the workspace has no row limit", async () => {
-    const user = setupUser();
-    render(<Harness maxRowsPerEval={null} />);
+    render(<Harness />);
     await user.type(
       screen.getByPlaceholderText("Enter text to synthesize"),
       "Row one",
@@ -472,20 +457,6 @@ describe("TTSDatasetEditor", () => {
       );
       expect(screen.getByDisplayValue("Hello, world")).toBeInTheDocument();
       expect(screen.getByDisplayValue("Second line")).toBeInTheDocument();
-    });
-
-    it("rejects a CSV that produces more rows than maxRowsPerEval", async () => {
-      const { container } = render(<Harness maxRowsPerEval={1} />);
-      const input = container.querySelector(
-        "#tts-csv-upload",
-      ) as HTMLInputElement;
-      const file = csvFile("text\nOne\nTwo");
-      await setupUser().upload(input, file);
-
-      await waitFor(() => expect(toast.error).toHaveBeenCalled());
-      expect(
-        screen.getAllByPlaceholderText("Enter text to synthesize"),
-      ).toHaveLength(1);
     });
 
     it("rejects a CSV row whose text exceeds the max length", async () => {

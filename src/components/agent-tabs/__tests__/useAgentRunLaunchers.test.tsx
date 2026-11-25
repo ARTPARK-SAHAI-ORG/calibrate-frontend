@@ -13,12 +13,6 @@ jest.mock("../../../lib/testRunApi", () => ({
     startTestRunOrNotifyMock(...args),
 }));
 
-const overEvalLimitMock = jest.fn();
-jest.mock("../../../lib/evalLimit", () => ({
-  __esModule: true,
-  overEvalLimit: (...args: unknown[]) => overEvalLimitMock(...args),
-}));
-
 jest.mock("../../../hooks", () => ({
   __esModule: true,
   useAccessToken: () => "token-1",
@@ -85,7 +79,6 @@ function setup(extra: Partial<Parameters<typeof useAgentRunLaunchers>[0]> = {}) 
 beforeEach(() => {
   process.env.NEXT_PUBLIC_BACKEND_URL = "http://backend";
   startTestRunOrNotifyMock.mockReset().mockResolvedValue("task-1");
-  overEvalLimitMock.mockReset().mockResolvedValue(false);
   benchmarkProps = null;
   verifyProps = null;
   mockBenchmarkMounts.count = 0;
@@ -93,7 +86,7 @@ beforeEach(() => {
 });
 
 describe("useAgentRunLaunchers", () => {
-  it("creates a run with the test ids and count, then reports it", async () => {
+  it("creates a run with the test ids, then reports it", async () => {
     const { hook, onRunCreated } = setup();
     let taskId: string | null = null;
     await act(async () => {
@@ -104,13 +97,12 @@ describe("useAgentRunLaunchers", () => {
       "token-1",
       "agent-1",
       ["t1", "t2"],
-      2,
     );
     expect(onRunCreated).toHaveBeenCalledWith("task-1", "bulk");
     expect(taskId).toBe("task-1");
   });
 
-  it("sends no ids and the linked total when running every linked test", async () => {
+  it("sends no ids when running every linked test", async () => {
     const { hook } = setup();
     await act(async () => {
       await hook.result.current.launchTestRun([], true);
@@ -120,7 +112,6 @@ describe("useAgentRunLaunchers", () => {
       "token-1",
       "agent-1",
       null,
-      7,
     );
   });
 
@@ -139,18 +130,7 @@ describe("useAgentRunLaunchers", () => {
     expect(screen.getByTestId("verify-dialog")).toBeInTheDocument();
   });
 
-  it("does not open the model picker when the run is over the limit", async () => {
-    overEvalLimitMock.mockResolvedValue(true);
-    const { hook, redraw } = setup();
-    await act(async () => {
-      await hook.result.current.openCompare(tests, false);
-    });
-    redraw();
-    expect(overEvalLimitMock).toHaveBeenCalledWith("token-1", 2, "tests", "model_comparison");
-    expect(screen.queryByTestId("benchmark-dialog")).toBeNull();
-  });
-
-  it("opens the model picker on the given tests when under the limit", async () => {
+  it("opens the model picker on the given tests", async () => {
     const onComparisonCreated = jest.fn();
     const onComparisonClosed = jest.fn();
     const { hook, redraw } = setup({ onComparisonCreated, onComparisonClosed });
@@ -219,13 +199,12 @@ describe("useAgentRunLaunchers", () => {
     expect(benchmarkProps?.initialModels).toBeUndefined();
   });
 
-  it("checks the linked total and names no tests when comparing every linked test", async () => {
+  it("names no tests when comparing every linked test", async () => {
     const { hook, redraw } = setup();
     await act(async () => {
       await hook.result.current.openCompare(tests, true);
     });
     redraw();
-    expect(overEvalLimitMock).toHaveBeenCalledWith("token-1", 7, "tests", "model_comparison");
     expect(benchmarkProps?.tests).toEqual([]);
   });
 
@@ -267,7 +246,6 @@ describe("useAgentRunLaunchers", () => {
       "token-1",
       "agent-1",
       ["t1", "t2"],
-      2,
     );
     expect(onRunCreated).toHaveBeenCalledWith("task-1", "bulk");
     expect(screen.queryByTestId("verify-dialog")).toBeNull();
@@ -280,7 +258,6 @@ describe("useAgentRunLaunchers", () => {
         await hook.result.current.confirmTestRun(tests, true, "all");
       });
       redraw();
-      expect(overEvalLimitMock).toHaveBeenCalledWith("token-1", 7, "tests", "test_run");
       expect(screen.getByText("Run every test on this agent")).toBeInTheDocument();
       expect(screen.getByText(/start the evaluation on 7 tests/)).toBeInTheDocument();
       expect(startTestRunOrNotifyMock).not.toHaveBeenCalled();
@@ -294,7 +271,6 @@ describe("useAgentRunLaunchers", () => {
         "token-1",
         "agent-1",
         null,
-        7,
       );
       expect(onRunCreated).toHaveBeenCalledWith("task-1", "all");
       expect(screen.queryByText("Run every test on this agent")).toBeNull();
@@ -306,7 +282,6 @@ describe("useAgentRunLaunchers", () => {
         await hook.result.current.confirmTestRun(tests, false, "bulk");
       });
       redraw();
-      expect(overEvalLimitMock).toHaveBeenCalledWith("token-1", 2, "tests", "test_run");
       expect(screen.getByText("Run the selected tests")).toBeInTheDocument();
 
       await act(async () => {
@@ -332,20 +307,8 @@ describe("useAgentRunLaunchers", () => {
         "token-1",
         "agent-1",
         ["t1", "t2"],
-        2,
       );
       expect(onRunCreated).toHaveBeenCalledWith("task-1", "bulk");
-    });
-
-    it("does not ask when the run is over the limit", async () => {
-      overEvalLimitMock.mockResolvedValue(true);
-      const { hook, redraw } = setup();
-      await act(async () => {
-        await hook.result.current.confirmTestRun(tests, true, "all");
-      });
-      redraw();
-      expect(screen.queryByText("Run every test on this agent")).toBeNull();
-      expect(startTestRunOrNotifyMock).not.toHaveBeenCalled();
     });
 
     it("mentions the connection check on an unverified connection agent, and holds the run behind it", async () => {
@@ -368,7 +331,7 @@ describe("useAgentRunLaunchers", () => {
   });
 
   describe("openCompare", () => {
-    it("resolves true and opens the picker when under the limit", async () => {
+    it("resolves true and opens the picker", async () => {
       const { hook, redraw } = setup();
       let opened: boolean | null = null;
       await act(async () => {
@@ -378,16 +341,6 @@ describe("useAgentRunLaunchers", () => {
       expect(opened).toBe(true);
       expect(screen.getByTestId("benchmark-dialog")).toBeInTheDocument();
       expect(toast.error).not.toHaveBeenCalled();
-    });
-
-    it("resolves false when over the limit", async () => {
-      overEvalLimitMock.mockResolvedValue(true);
-      const { hook } = setup();
-      let opened: boolean | null = null;
-      await act(async () => {
-        opened = await hook.result.current.openCompare(tests, false);
-      });
-      expect(opened).toBe(false);
     });
 
     it("refuses with a toast on an unverified connection agent", async () => {
@@ -404,7 +357,6 @@ describe("useAgentRunLaunchers", () => {
       expect(toast.error).toHaveBeenCalledWith(
         "Verify the agent connection before comparing models.",
       );
-      expect(overEvalLimitMock).not.toHaveBeenCalled();
       expect(screen.queryByTestId("benchmark-dialog")).toBeNull();
       expect(screen.queryByTestId("enable-benchmark-dialog")).toBeNull();
     });
@@ -425,7 +377,6 @@ describe("useAgentRunLaunchers", () => {
       expect(toast.error).toHaveBeenCalledWith(
         "Turn benchmarking on in the Connection tab first.",
       );
-      expect(overEvalLimitMock).not.toHaveBeenCalled();
       expect(screen.queryByTestId("benchmark-dialog")).toBeNull();
       expect(screen.queryByTestId("enable-benchmark-dialog")).toBeNull();
     });

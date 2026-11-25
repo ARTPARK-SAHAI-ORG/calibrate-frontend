@@ -13,9 +13,6 @@ export const LIMITS = {
   SIMULATION_MAX_PERSONAS: 2,
   SIMULATION_MAX_SCENARIOS: 5,
 
-  // Fallback when the per-user limit API is unreachable
-  DEFAULT_MAX_ROWS_PER_EVAL: 20,
-
   // Fallback when the workspace trace-limit API is unreachable
 
   // Max concurrent S3 uploads when bulk-uploading audio (ZIP import)
@@ -39,25 +36,4 @@ export function showLimitToast(message: string) {
       to contact us to extend your limits.
     </span>,
   );
-}
-
-/**
- * The one check every bulk run funnels through.
- *
- * `count` is the amount of work the run creates. Where one row is repeated,
- * the caller multiplies it out first: tests times models in a model
- * comparison, items times evaluators in a labelling run. Shows the limit toast
- * and returns true when the run is too big to start. A null `max` means the
- * workspace has no limit.
- */
-export function exceedsEvalLimit(
-  count: number,
-  max: number | null,
-  noun: string,
-): boolean {
-  if (max === null || count <= max) return false;
-  showLimitToast(
-    `You can only run up to ${max} ${noun} at a time. This run needs ${count}.`,
-  );
-  return true;
 }

@@ -14,18 +14,12 @@ import { SpeechToTextEvaluation } from "../SpeechToTextEvaluation";
 let mockEnabledProviders: Set<string> | null = null;
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
-  useMaxRowsPerEval: () => 20,
   useEnabledProviders: () => mockEnabledProviders,
   isProviderEnabled: (enabled: Set<string> | null, value: string) =>
     !enabled || enabled.has(value.toLowerCase()),
   // Pulled in by the create-evaluator flow behind the Evaluators tab.
   useOpenRouterModels: () => ({ providers: [], isLoading: false }),
   findModelInProviders: () => null,
-}));
-
-// The run checks the same limit of 20 outside React.
-jest.mock("../../../hooks/useMaxRowsPerEval", () => ({
-  getMaxRowsPerEval: async () => 20,
 }));
 
 // ─── Missing provider keys ─────────────────────────────────────────────────
@@ -486,9 +480,8 @@ describe("SpeechToTextEvaluation", () => {
     expect(mockToastError).toHaveBeenCalledWith("Please select a dataset.");
   });
 
-  it("blocks a saved dataset that is bigger than the row limit", async () => {
+  it("shows the backend message when the run is over the row limit", async () => {
     const user = setupUser();
-    // 25 rows, over the limit of 20.
     mockListDatasets.mockResolvedValue([
       { uuid: "ds-1", name: "Big Dataset", item_count: 25 },
     ]);
@@ -504,52 +497,24 @@ describe("SpeechToTextEvaluation", () => {
     await waitFor(() => screen.getByTestId("dataset-picker"));
     await user.click(screen.getByTestId("pick-ds-1"));
 
-    await act(async () => {
-      evaluateRef.current?.();
-    });
-
-    expect(mockToastError).toHaveBeenCalled();
-    const calledUrls = (global.fetch as jest.Mock).mock.calls.map((c) => c[0]);
-    expect(calledUrls.some((u: string) => u.includes("/stt/evaluate"))).toBe(
-      false,
-    );
-  });
-
-  it("runs a saved dataset that fits inside the row limit", async () => {
-    const user = setupUser();
-    mockListDatasets.mockResolvedValue([
-      { uuid: "ds-1", name: "Small Dataset", item_count: 5 },
-    ]);
-    const evaluateRef = { current: null as (() => void) | null };
-    render(<SpeechToTextEvaluation evaluateRef={evaluateRef} />);
-
-    await user.click(screen.getByText("Evaluators"));
-    await waitFor(() => screen.getByTestId("evaluator-e1"));
-    await selectProvider(user, "Deepgram");
-
-    await user.click(screen.getByText("Dataset"));
-    await user.click(screen.getByText("Use existing dataset"));
-    await waitFor(() => screen.getByTestId("dataset-picker"));
-    await user.click(screen.getByTestId("pick-ds-1"));
-
     (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ task_id: "task-ok", status: "queued" }),
+      ok: false,
+      status: 400,
+      json: async () => ({
+        detail:
+          "This run would process 25 rows, above this workspace's limit of 20. Run fewer rows, or ask an admin to raise the limit.",
+      }),
     });
 
     await act(async () => {
       evaluateRef.current?.();
     });
 
-    await waitFor(() => {
-      const calledUrls = (global.fetch as jest.Mock).mock.calls.map(
-        (c) => c[0],
-      );
-      expect(calledUrls.some((u: string) => u.includes("/stt/evaluate"))).toBe(
-        true,
-      );
-    });
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith(
+        "This run would process 25 rows, above this workspace's limit of 20. Run fewer rows, or ask an admin to raise the limit.",
+      ),
+    );
   });
 
   describe("on the workspace's own keys", () => {
@@ -949,7 +914,7 @@ describe("SpeechToTextEvaluation", () => {
     );
   });
 
-  it("reports an error and resets isEvaluating when the evaluate request fails", async () => {
+  it("shows an error and resets isEvaluating when the evaluate request fails", async () => {
     const user = setupUser();
     const evaluateRef = { current: null as (() => void) | null };
     const onEvaluatingChange = jest.fn();
@@ -992,9 +957,8 @@ describe("SpeechToTextEvaluation", () => {
     });
 
     await waitFor(() =>
-      expect(mockReportError).toHaveBeenCalledWith(
-        "Error evaluating:",
-        expect.any(Error),
+      expect(mockToastError).toHaveBeenCalledWith(
+        "Something went wrong on our end. Please try again in a moment.",
       ),
     );
     expect(onEvaluatingChange).toHaveBeenCalledWith(false);

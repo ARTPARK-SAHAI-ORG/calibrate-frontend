@@ -58,7 +58,6 @@ import {
 import { useLabellingSelection } from "@/components/human-labelling/useLabellingSelection";
 import { buildBenchmarkCsv } from "@/lib/exportTestResults";
 import { useAccessToken, useDialogNavKeys } from "@/hooks";
-import { overEvalLimit } from "@/lib/evalLimit";
 import {
   fetchDefaultLLMNextReplyEvaluator,
   type DefaultEvaluatorSummary,
@@ -585,25 +584,6 @@ export function BenchmarkResultsDialog({
     if (!backendUrl) {
       setIsInitialLoading(false);
       setError({ details: "BACKEND_URL environment variable is not set" });
-      return;
-    }
-
-    // Every test is run once per model, so the work is tests times models.
-    // Over the limit, the toast says so and we hand the user back to the model
-    // picker (or close, when there is no picker to go back to).
-    // No uuids means every linked test, so count those through `totalTests`.
-    const testCount =
-      testUuids.length > 0 ? testUuids.length : (totalTests ?? 0);
-    if (
-      await overEvalLimit(
-        backendAccessToken,
-        testCount * models.length,
-        "tests",
-        "model_comparison",
-      )
-    ) {
-      setIsInitialLoading(false);
-      (onGoBack ?? onClose)();
       return;
     }
 

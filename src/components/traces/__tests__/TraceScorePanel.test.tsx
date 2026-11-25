@@ -4,8 +4,8 @@ import { TraceScorePanel } from "../TraceScorePanel";
 import type { TraceScoringRun } from "@/lib/tracesApi";
 
 let mockUsesOwnKeys = false;
-jest.mock("../../../hooks/useMaxRowsPerEval", () => ({
-  ...jest.requireActual("../../../hooks/useMaxRowsPerEval"),
+jest.mock("../../../hooks/useOrgLimits", () => ({
+  ...jest.requireActual("../../../hooks/useOrgLimits"),
   useUsesOwnProviderKeys: () => mockUsesOwnKeys,
 }));
 

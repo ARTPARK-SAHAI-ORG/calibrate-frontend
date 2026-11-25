@@ -10,7 +10,7 @@ import {
 import { Tooltip } from "@/components/Tooltip";
 import { toast } from "sonner";
 import { LIMITS, showLimitToast } from "@/constants/limits";
-import { useUsesOwnProviderKeys } from "@/hooks/useMaxRowsPerEval";
+import { useUsesOwnProviderKeys } from "@/hooks/useOrgLimits";
 import { DeleteConfirmationDialog } from "../DeleteConfirmationDialog";
 import { RowIndexBadge } from "./RowIndexBadge";
 import type { DatasetItem } from "@/lib/datasets";
@@ -46,9 +46,6 @@ type Props = {
   datasetName?: string;
   onDatasetNameChange?: (name: string) => void;
   datasetNameInvalid?: boolean;
-  /** Dynamic max rows per eval from backend */
-  /** Null means the workspace has no limit. */
-  maxRowsPerEval?: number | null;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -64,7 +61,6 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
       datasetName = "",
       onDatasetNameChange,
       datasetNameInvalid = false,
-      maxRowsPerEval = LIMITS.DEFAULT_MAX_ROWS_PER_EVAL,
     },
     ref,
   ) {
@@ -128,12 +124,6 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
     // ── Row management ─────────────────────────────────────────────────────
 
     const addRow = () => {
-      if (maxRowsPerEval !== null && newRows.length >= maxRowsPerEval) {
-        showLimitToast(
-          `You can only add up to ${maxRowsPerEval} rows at a time.`,
-        );
-        return;
-      }
       const invalidIds = new Set<string>();
       newRows.forEach((row) => {
         if (!row.text.trim()) invalidIds.add(row.id);
@@ -211,10 +201,6 @@ export const TTSDatasetEditor = forwardRef<TTSDatasetEditorHandle, Props>(
           cols.push(current.trim());
           const text = cols[textIdx]?.trim();
           if (text) parsed.push({ id: Date.now().toString() + i, text });
-        }
-        if (maxRowsPerEval !== null && parsed.length > maxRowsPerEval) {
-          showLimitToast(`You can only upload up to ${maxRowsPerEval} rows.`);
-          return;
         }
         const longRow =
           !usesOwnKeys &&

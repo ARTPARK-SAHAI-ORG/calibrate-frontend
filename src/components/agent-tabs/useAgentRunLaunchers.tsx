@@ -3,7 +3,6 @@
 import { toast } from "sonner";
 import React, { useRef, useState } from "react";
 import { useAccessToken } from "@/hooks";
-import { overEvalLimit } from "@/lib/evalLimit";
 import { startTestRunOrNotify } from "@/lib/testRunApi";
 import { ConfirmDialog } from "@/components/ui";
 import { BenchmarkDialog } from "@/components/BenchmarkDialog";
@@ -163,7 +162,6 @@ export function useAgentRunLaunchers({
         accessToken,
         agentUuid,
         allLinked ? null : tests.map((t) => t.uuid),
-        countOf(tests, allLinked),
       );
       if (!taskId) return null;
       onRunCreated(taskId, runKey);
@@ -177,23 +175,12 @@ export function useAgentRunLaunchers({
     }
   };
 
-  // Ask before starting: the size check first, so nobody confirms a run that
-  // cannot start, then the confirmation, then launchTestRun.
+  // Ask before starting, then launchTestRun.
   const confirmTestRun = async (
     tests: LaunchableTest[],
     allLinked = false,
     runKey = "all",
   ): Promise<void> => {
-    if (
-      await overEvalLimit(
-        accessToken,
-        countOf(tests, allLinked),
-        "tests",
-        "test_run",
-      )
-    ) {
-      return;
-    }
     setRunToConfirm({ tests, allLinked, runKey });
   };
 
@@ -211,10 +198,7 @@ export function useAgentRunLaunchers({
     return startRunNow(tests, allLinked, runKey);
   };
 
-  // Comparing against even one model already runs every chosen test once, so
-  // the test count alone can rule a run out before the model picker opens.
-  // Resolves true once the picker (or the question before it) is open, and
-  // false when the size limit refused the comparison.
+  // Resolves true once the picker (or the question before it) is open.
   const openCompare = async (
     tests: LaunchableTest[],
     allLinked: boolean,
@@ -228,16 +212,6 @@ export function useAgentRunLaunchers({
     }
     if (isBenchmarkDisabled && !canEnableBenchmarkHere) {
       toast.error("Turn benchmarking on in the Connection tab first.");
-      return false;
-    }
-    if (
-      await overEvalLimit(
-        accessToken,
-        countOf(tests, allLinked),
-        "tests",
-        "model_comparison",
-      )
-    ) {
       return false;
     }
     setBenchmarkTests(allLinked ? [] : tests);

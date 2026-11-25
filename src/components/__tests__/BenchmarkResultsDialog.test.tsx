@@ -210,15 +210,6 @@ jest.mock("../../hooks", () => ({
     .useDialogNavKeys,
 }));
 
-// The run size limit, read through `overEvalLimit`, which imports this module
-// directly rather than through the hooks barrel.
-const getMaxRowsPerEvalMock = jest.fn(async () => 100);
-jest.mock("../../hooks/useMaxRowsPerEval", () => ({
-  __esModule: true,
-  useMaxRowsPerEval: () => 100,
-  getMaxRowsPerEval: (...args: unknown[]) => getMaxRowsPerEvalMock(...args),
-}));
-
 jest.mock("../../lib/defaultEvaluators", () => ({
   __esModule: true,
   fetchDefaultLLMNextReplyEvaluator: jest.fn().mockResolvedValue(null),
@@ -290,83 +281,6 @@ describe("BenchmarkResultsDialog", () => {
     );
     expect(container).toBeEmptyDOMElement();
     expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it("does not start a comparison bigger than the workspace limit", async () => {
-    // 2 tests across 3 models is 6 test runs, over a limit of 5.
-    getMaxRowsPerEvalMock.mockResolvedValueOnce(5);
-    const onBenchmarkCreated = jest.fn();
-    const onGoBack = jest.fn();
-    (global.fetch as jest.Mock).mockImplementation((url: string) =>
-      Promise.reject(new Error(`Unexpected fetch ${url}`)),
-    );
-
-    render(
-      <BenchmarkResultsDialog
-        {...defaultProps}
-        isOpen
-        models={["gpt-4", "gpt-5", "claude"]}
-        onBenchmarkCreated={onBenchmarkCreated}
-        onGoBack={onGoBack}
-      />,
-    );
-
-    // Back to the model picker, with the limit toast explaining why.
-    await waitFor(() => expect(onGoBack).toHaveBeenCalled());
-    expect(toast.error).toHaveBeenCalled();
-    expect(onBenchmarkCreated).not.toHaveBeenCalled();
-    expect(
-      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
-        String(url).endsWith("/agent-tests/agent/agent-1/benchmark"),
-      ),
-    ).toHaveLength(0);
-  });
-
-  it("counts every linked test when no uuids are given", async () => {
-    // No uuids means every linked test: 50 tests across 3 models is 150 test
-    // runs, over the limit of 100. Counting the uuids would have checked 0.
-    const onGoBack = jest.fn();
-    (global.fetch as jest.Mock).mockImplementation((url: string) =>
-      Promise.reject(new Error(`Unexpected fetch ${url}`)),
-    );
-
-    render(
-      <BenchmarkResultsDialog
-        {...defaultProps}
-        testUuids={[]}
-        testNames={[]}
-        totalTests={50}
-        isOpen
-        models={["gpt-4", "gpt-5", "claude"]}
-        onGoBack={onGoBack}
-      />,
-    );
-
-    await waitFor(() => expect(onGoBack).toHaveBeenCalled());
-    expect(
-      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
-        String(url).endsWith("/agent-tests/agent/agent-1/benchmark"),
-      ),
-    ).toHaveLength(0);
-  });
-
-  it("closes when there is no picker to go back to and the run is over the limit", async () => {
-    getMaxRowsPerEvalMock.mockResolvedValueOnce(1);
-    const onClose = jest.fn();
-    (global.fetch as jest.Mock).mockImplementation((url: string) =>
-      Promise.reject(new Error(`Unexpected fetch ${url}`)),
-    );
-
-    render(
-      <BenchmarkResultsDialog
-        {...defaultProps}
-        isOpen
-        onClose={onClose}
-        models={["gpt-4"]}
-      />,
-    );
-
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
   function mockBenchmarkStart() {
@@ -711,11 +625,14 @@ describe("BenchmarkResultsDialog", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("shows the error card and calls reportError when the POST fails, and 'Try again' calls onGoBack", async () => {
+  const LIMIT_DETAIL =
+    "This run would process 6 rows, above this workspace's limit of 5. Run fewer rows, or ask an admin to raise the limit.";
+
+  it("shows the backend detail in the error card when the POST fails, and 'Try again' calls onGoBack", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.endsWith("/agent-tests/agent/agent-1/benchmark")) {
         return Promise.resolve(
-          jsonResponse({ detail: "bad request" }, false, 400),
+          jsonResponse({ detail: LIMIT_DETAIL }, false, 400),
         );
       }
       return Promise.reject(new Error(`Unexpected fetch ${url}`));
@@ -735,6 +652,7 @@ describe("BenchmarkResultsDialog", () => {
     await waitFor(() =>
       expect(screen.getByText("Something went wrong")).toBeInTheDocument(),
     );
+    expect(screen.getByText(LIMIT_DETAIL)).toBeInTheDocument();
     expect(reportError).toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Try again" }));

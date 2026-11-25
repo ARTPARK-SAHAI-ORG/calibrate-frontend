@@ -2,7 +2,7 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { toast } from "sonner";
 import { getDefaultHeaders } from "./api";
-import { overEvalLimit } from "./evalLimit";
+import { parseBackendErrorResponse } from "./parseBackendError";
 import { reportError } from "./reportError";
 import type { AggStat, LatencyStat } from "./llmMetrics";
 import type { BenchmarkEvaluatorSummaryEntry } from "./benchmarkEvaluatorSummary";
@@ -118,6 +118,9 @@ export class UnauthorizedError extends Error {
   }
 }
 
+/** The backend refused the run; `message` is its reason, fit to show. */
+export class RunNotStartedError extends Error {}
+
 /**
  * Start a run of `testUuids` against `agentUuid` and return its task id.
  *
@@ -146,6 +149,9 @@ export async function startTestRun(
   );
 
   if (response.status === 401) throw new UnauthorizedError();
+  if (response.status >= 400 && response.status < 500) {
+    throw new RunNotStartedError(await parseBackendErrorResponse(response));
+  }
   if (!response.ok) throw new Error("Failed to start test run");
 
   const result: TestRunStatusResponse = await response.json();
@@ -153,25 +159,16 @@ export async function startTestRun(
 }
 
 /**
- * `startTestRun` plus the two things every caller needs: the workspace limit
- * on how many tests one run may cover, and the failure handling (sign out on a
- * 401, otherwise report the error and show one toast). Returns the new task
- * id, or null when the run was over the limit or could not be started.
- *
- * `testCount` says how big the run is. It defaults to the length of
- * `testUuids`, and only has to be passed when `testUuids` is null (run every
- * test linked to the agent), where the list itself does not say.
+ * `startTestRun` plus the failure handling every caller needs: sign out on a
+ * 401, otherwise report the error and show one toast with the backend's
+ * reason. Returns the new task id, or null when the run could not be started.
  */
 export async function startTestRunOrNotify(
   backendUrl: string,
   accessToken: string | null | undefined,
   agentUuid: string,
   testUuids: string[] | null,
-  testCount: number = testUuids?.length ?? 0,
 ): Promise<string | null> {
-  if (await overEvalLimit(accessToken, testCount, "tests", "test_run")) {
-    return null;
-  }
   try {
     return await startTestRun(backendUrl, accessToken, agentUuid, testUuids);
   } catch (error) {
@@ -180,7 +177,11 @@ export async function startTestRunOrNotify(
       return null;
     }
     reportError("Error starting test run:", error);
-    toast.error("Could not start the test run. Please try again.");
+    toast.error(
+      error instanceof RunNotStartedError
+        ? error.message
+        : "Could not start the test run. Please try again.",
+    );
     return null;
   }
 }

@@ -44,14 +44,6 @@ jest.mock("../../lib/api", () => ({
   apiPost: jest.fn(async () => ({})),
 }));
 
-// The run size limit. High by default so existing runs are never blocked;
-// lowered in the limit-specific tests below.
-const mockGetMaxRowsPerEval = jest.fn(async () => 100);
-jest.mock("../../hooks/useMaxRowsPerEval", () => ({
-  __esModule: true,
-  getMaxRowsPerEval: (...args: unknown[]) => mockGetMaxRowsPerEval(...args),
-}));
-
 jest.mock("sonner", () => ({
   __esModule: true,
   toast: { error: jest.fn() },
@@ -398,21 +390,6 @@ describe("BenchmarkDialog", () => {
     await user.click(screen.getByText("select-openai/gpt-4o"));
 
     expect(runButton).not.toBeDisabled();
-  });
-
-  it("blocks Run comparison before the confirm step when tests times models exceeds the limit", async () => {
-    // 2 tests (from the fixture) on 1 model is already over a limit of 1.
-    mockGetMaxRowsPerEval.mockResolvedValueOnce(1);
-    const user = setupUser();
-    render(<BenchmarkDialog {...baseProps()} />);
-
-    await user.click(screen.getByText("Select a model"));
-    await user.click(screen.getByText("select-openai/gpt-4o"));
-    await user.click(screen.getByRole("button", { name: /Run comparison/i }));
-
-    await waitFor(() => expect(toast.error).toHaveBeenCalled());
-    expect(screen.queryByText("Compare the models")).not.toBeInTheDocument();
-    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it("non-connection agent: Run comparison directly shows results with correct props", async () => {

@@ -22,7 +22,6 @@ jest.mock("../../../hooks", () => ({
   useAgentTests: jest.requireActual("../../../hooks/useAgentTests")
     .useAgentTests,
   useItemPager: jest.requireActual("../../../hooks/useItemPager").useItemPager,
-  useMaxRowsPerEval: () => 100,
   useDialogUrlParam: () => ({ setParam: jest.fn() }),
 }));
 

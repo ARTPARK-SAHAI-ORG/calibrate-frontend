@@ -9,7 +9,6 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import {
   useAccessToken,
-  useMaxRowsPerEval,
   useEnabledProviders,
   isProviderEnabled,
 } from "@/hooks";
@@ -20,7 +19,7 @@ import {
   getTtsApiType,
 } from "../agent-tabs/constants/providers";
 import { LIMITS, showLimitToast } from "@/constants/limits";
-import { overEvalLimit } from "@/lib/evalLimit";
+import { parseBackendErrorResponse } from "@/lib/parseBackendError";
 import { listDatasets, Dataset } from "@/lib/datasets";
 import { DatasetPicker } from "./DatasetPicker";
 import { TTSDatasetEditor, TTSDatasetEditorHandle } from "./TTSDatasetEditor";
@@ -139,7 +138,6 @@ export function TextToSpeechEvaluation({
   const [datasetNameInvalid, setDatasetNameInvalid] = useState(false);
 
   const editorRef = useRef<TTSDatasetEditorHandle | null>(null);
-  const maxRowsPerEval = useMaxRowsPerEval();
 
   // Evaluators (filtered to TTS purpose). Org defaults (`is_default`) are
   // pre-selected on first load — see /evaluators page for the same
@@ -382,18 +380,6 @@ export function TextToSpeechEvaluation({
         };
       }
 
-      // Rows typed or uploaded here already passed the editor's limit, but a
-      // saved dataset never did, so the row count is checked again here.
-      const rowCount =
-        inputMode === "dataset"
-          ? (availableDatasets.find((d) => d.uuid === selectedDatasetId)
-              ?.item_count ?? 0)
-          : (requestBody.texts as string[]).length;
-      if (await overEvalLimit(backendAccessToken, rowCount, "rows", "tts")) {
-        setIsEvaluating(false);
-        return;
-      }
-
       const response = await fetch(`${backendUrl}/tts/evaluate`, {
         method: "POST",
         headers: {
@@ -410,7 +396,11 @@ export function TextToSpeechEvaluation({
       }
 
       if (!response.ok) {
-        throw new Error("Failed to evaluate");
+        toast.error(
+          await parseBackendErrorResponse(response, "Error evaluating"),
+        );
+        setIsEvaluating(false);
+        return;
       }
 
       const result: EvaluationResult = await response.json();
@@ -1005,7 +995,6 @@ export function TextToSpeechEvaluation({
                 if (v.trim()) setDatasetNameInvalid(false);
               }}
               datasetNameInvalid={datasetNameInvalid}
-              maxRowsPerEval={maxRowsPerEval}
             />
           </div>
         )}

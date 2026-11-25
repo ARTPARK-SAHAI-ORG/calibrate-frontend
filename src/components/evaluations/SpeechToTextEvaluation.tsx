@@ -9,11 +9,10 @@ import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import {
   useAccessToken,
-  useMaxRowsPerEval,
   useEnabledProviders,
   isProviderEnabled,
 } from "@/hooks";
-import { overEvalLimit } from "@/lib/evalLimit";
+import { parseBackendErrorResponse } from "@/lib/parseBackendError";
 import { toast } from "sonner";
 import {
   sttProviders,
@@ -107,7 +106,6 @@ export function SpeechToTextEvaluation({
   const editorRef = useRef<STTDatasetEditorHandle | null>(null);
   // True while the editor is still sending clips up (a zip, or a single row).
   const [isUploadingRows, setIsUploadingRows] = useState(false);
-  const maxRowsPerEval = useMaxRowsPerEval();
   const [providersInvalid, setProvidersInvalid] = useState(false);
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(
     new Set(),
@@ -380,18 +378,6 @@ export function SpeechToTextEvaluation({
         };
       }
 
-      // Rows typed or uploaded here already passed the editor's limit, but a
-      // saved dataset never did, so the row count is checked again here.
-      const rowCount =
-        inputMode === "dataset"
-          ? (availableDatasets.find((d) => d.uuid === selectedDatasetId)
-              ?.item_count ?? 0)
-          : (requestBody.texts as string[]).length;
-      if (await overEvalLimit(backendAccessToken, rowCount, "rows", "stt")) {
-        setIsEvaluating(false);
-        return;
-      }
-
       const response = await fetch(`${backendUrl}/stt/evaluate`, {
         method: "POST",
         headers: {
@@ -408,7 +394,11 @@ export function SpeechToTextEvaluation({
       }
 
       if (!response.ok) {
-        throw new Error("Failed to evaluate");
+        toast.error(
+          await parseBackendErrorResponse(response, "Error evaluating"),
+        );
+        setIsEvaluating(false);
+        return;
       }
 
       const result: EvaluationResult = await response.json();
@@ -1059,7 +1049,6 @@ export function SpeechToTextEvaluation({
               ref={editorRef}
               accessToken={backendAccessToken}
               onUploadingChange={setIsUploadingRows}
-              maxRowsPerEval={maxRowsPerEval}
             />
           </div>
         )}

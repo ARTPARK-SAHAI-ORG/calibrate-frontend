@@ -378,16 +378,6 @@ describe("STTDatasetEditor", () => {
     ).toHaveLength(4); // two rows x desktop/mobile
   });
 
-  it("blocks adding rows past maxRowsPerEval with a limit toast", async () => {
-    const user = setupUser();
-    render(<Harness maxRowsPerEval={1} />);
-    await user.click(screen.getAllByText("Add another sample")[0]);
-    expect(toast.error).toHaveBeenCalled();
-    expect(
-      screen.getAllByPlaceholderText("Enter reference transcription"),
-    ).toHaveLength(2);
-  });
-
   it("validate() flags incomplete rows and leaves fully-blank rows alone", async () => {
     const user = setupUser();
     render(<Harness />);
@@ -854,16 +844,6 @@ describe("STTDatasetEditor", () => {
           "No valid data rows found in data.csv",
         ),
       );
-    });
-
-    it("rejects a ZIP producing more rows than maxRowsPerEval", async () => {
-      const { container } = render(<Harness maxRowsPerEval={1} />);
-      const file = await buildZip({
-        csv: "audio_file,text\na.wav,One\nb.wav,Two",
-      });
-      await uploadZip(container, file);
-
-      await waitFor(() => expect(toast.error).toHaveBeenCalled());
     });
 
     it("processes a valid ZIP, uploads referenced audio to S3, and tolerates a missing audio entry", async () => {
