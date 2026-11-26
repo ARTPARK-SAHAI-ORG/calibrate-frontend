@@ -4,6 +4,7 @@ import { CloseIcon } from "@/components/icons";
 import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
+import { Tooltip } from "@/components/Tooltip";
 import { traceValue } from "@/components/agent-tabs/traceValue";
 import { MAX_KEY_LENGTH } from "@/components/human-labelling/MetadataFieldsEditor";
 import { SpinnerIcon, WarningTriangleIcon } from "@/components/icons";
@@ -592,8 +593,18 @@ export function TraceVariablesDialog({
         <div className="px-5 md:px-6 py-5 md:py-6 border-b border-border">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-base md:text-lg font-semibold text-foreground">
-                Configure for traces
+              <h2 className="text-base md:text-lg font-semibold text-foreground flex flex-wrap items-center gap-2">
+                {saved.length > 1 ? (
+                  <>
+                    Configure
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted border border-border">
+                      {current.name}
+                    </span>
+                    for traces
+                  </>
+                ) : (
+                  "Configure for traces"
+                )}
               </h2>
               <p className="text-xs md:text-sm text-muted-foreground mt-1.5">
                 This evaluator has variables. Map each one to a part of the
@@ -682,9 +693,25 @@ export function TraceVariablesDialog({
         {/* Footer: dismissal is the header ✕, so no Close here. */}
         <div className="flex items-center justify-end gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">
           {saved.length > 1 && (
-            <p className="mr-auto text-sm text-muted-foreground">
-              Evaluator {index + 1} of {saved.length}: {current.name}
-            </p>
+            <div className="mr-auto flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                {saved.map((e, i) => (
+                  <Tooltip key={e.uuid} content={e.name} position="top">
+                    <span
+                      aria-label={e.name}
+                      className={`block w-2.5 h-2.5 rounded-full ${
+                        i === index
+                          ? "bg-foreground"
+                          : isMissingTraceValue(e)
+                            ? "bg-border"
+                            : "bg-teal-500"
+                      }`}
+                    />
+                  </Tooltip>
+                ))}
+              </div>
+              {index + 1} of {saved.length}
+            </div>
           )}
           {traces !== null &&
             (!hasTraces ? (

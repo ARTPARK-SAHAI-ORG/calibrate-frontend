@@ -105,7 +105,7 @@ it("opens the dialog with only the evaluators still missing values", async () =>
   await user.click(configureNow());
 
   expect(
-    await screen.findByText("Evaluator 1 of 2: needs-one"),
+    await screen.findByRole("heading", { name: "Configure needs-one for traces" }),
   ).toBeInTheDocument();
   expect(fetchAgentEvaluators).toHaveBeenCalledWith("agent-1", "token");
 
@@ -113,7 +113,7 @@ it("opens the dialog with only the evaluators still missing values", async () =>
   await pick(user, "Input");
   await user.click(screen.getByRole("button", { name: "Save and next" }));
   expect(
-    await screen.findByText("Evaluator 2 of 2: needs-two"),
+    await screen.findByRole("heading", { name: "Configure needs-two for traces" }),
   ).toBeInTheDocument();
 });
 

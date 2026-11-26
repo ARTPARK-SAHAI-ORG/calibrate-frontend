@@ -850,17 +850,17 @@ describe("EvaluatorsTabContent", () => {
         screen.getByRole("button", { name: "Confirm add three" }),
       );
 
-      await screen.findByRole("heading", { name: "Configure for traces" });
-      expect(
-        screen.getByText("Evaluator 1 of 2: Agrees with the nurse"),
-      ).toBeInTheDocument();
+      await screen.findByRole("heading", {
+        name: "Configure Agrees with the nurse for traces",
+      });
+      expect(screen.getByText("1 of 2")).toBeInTheDocument();
 
       await pick(user, "nurse_reply", "Conversation");
       await pick(user, "ai", "Agent reply");
       await user.click(screen.getByRole("button", { name: "Save and next" }));
 
       expect(
-        await screen.findByText("Evaluator 2 of 2: Uses the guideline"),
+        await screen.findByRole("heading", { name: "Configure Uses the guideline for traces" }),
       ).toBeInTheDocument();
     });
 

@@ -496,7 +496,13 @@ describe("several evaluators", () => {
     });
     await loaded();
 
-    expect(screen.getByText("Evaluator 2 of 3: Alpha")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Configure Alpha for traces" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2 of 3")).toBeInTheDocument();
+    expect(screen.getByLabelText("Bravo")).toHaveClass("bg-teal-500");
+    expect(screen.getByLabelText("Alpha")).toHaveClass("bg-foreground");
+    expect(screen.getByLabelText("Charlie")).toHaveClass("bg-border");
     expect(source("nurse_reply")).toHaveTextContent("Not set");
 
     await pick(user, source("nurse_reply"), "Input");
@@ -504,8 +510,9 @@ describe("several evaluators", () => {
     await user.click(button("Save and next"));
 
     expect(
-      await screen.findByText("Evaluator 3 of 3: Charlie"),
+      await screen.findByRole("heading", { name: "Configure Charlie for traces" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("3 of 3")).toBeInTheDocument();
     expect(onSave).toHaveBeenLastCalledWith("a", {
       nurse_reply: "input",
       language: "labels",

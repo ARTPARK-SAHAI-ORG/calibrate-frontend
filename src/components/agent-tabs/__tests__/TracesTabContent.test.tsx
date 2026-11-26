@@ -2080,7 +2080,7 @@ describe("TracesTabContent", () => {
         />,
       );
       await user.click(configureNow());
-      await screen.findByRole("heading", { name: "Configure for traces" });
+      await screen.findByRole("heading", { name: "Configure Alpha for traces" });
       await waitFor(() =>
         expect(fetchTraces).toHaveBeenCalledWith("test-token", {
           limit: 20,
@@ -2131,7 +2131,7 @@ describe("TracesTabContent", () => {
         screen.queryByRole("button", { name: "Configure now" }),
       ).not.toBeInTheDocument();
       expect(
-        await screen.findByText("Evaluator 2 of 2: Bravo"),
+        await screen.findByRole("heading", { name: "Configure Bravo for traces" }),
       ).toBeInTheDocument();
     });
   });
