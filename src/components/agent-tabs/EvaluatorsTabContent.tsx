@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useAccessToken } from "@/hooks";
+import { useAccessToken, useBulkDeletion } from "@/hooks";
 import { reportError } from "@/lib/reportError";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddEvaluatorsDialog } from "@/components/agent-tabs/AddEvaluatorsDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
-import { EvaluatorCard } from "@/components/evaluators/EvaluatorCard";
+import { AgentEvaluatorsTable } from "@/components/agent-tabs/AgentEvaluatorsTable";
 import {
   DuplicateEvaluatorButton,
   EVALUATOR_CARD_BUTTON_CLASS,
@@ -68,6 +68,38 @@ export function EvaluatorsTabContent({
   const [deleteMode, setDeleteMode] = useState<DeleteMode>("remove");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Ticking several evaluators and removing them from the agent in one call.
+  // Only this agent's link goes; the list is pruned in place, no re-read.
+  const bulkRemoval = useBulkDeletion<EvaluatorData>({
+    items: attachedEvaluators,
+    onDeleted: (uuids) =>
+      setAttachedEvaluators((prev) =>
+        prev.filter((e) => !uuids.includes(e.uuid)),
+      ),
+    accessToken: backendAccessToken,
+    // Replaced by each row's own "Select <name>".
+    selectLabel: "Select evaluator",
+    buildBulkRequest: (backendUrl, uuids) => ({
+      url: `${backendUrl}/agents/${agentUuid}/evaluators/bulk-unlink`,
+      method: "POST",
+      body: JSON.stringify({ evaluator_ids: uuids }),
+    }),
+    // Required by the hook; single removal keeps its own dialog below.
+    buildSingleRequest: (backendUrl, uuid) => ({
+      url: `${backendUrl}/agents/${agentUuid}/evaluators/${uuid}`,
+      method: "DELETE",
+    }),
+    failureMessage:
+      "Could not remove these evaluators. Nothing was removed. Please try again.",
+  });
+  const bulkCount = bulkRemoval.itemsToDeleteBulk.length;
+  const bulkOnlyName =
+    bulkCount === 1
+      ? attachedEvaluators.find(
+          (e) => e.uuid === bulkRemoval.itemsToDeleteBulk[0],
+        )?.name
+      : undefined;
 
   const loadAttached = useCallback(async () => {
     if (!backendAccessToken) return;
@@ -332,33 +364,31 @@ export function EvaluatorsTabContent({
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          {attachedEvaluators.map((evaluator) => (
-            <EvaluatorCard
-              key={evaluator.uuid}
-              evaluator={evaluator}
-              data-tour="evaluator-card"
-              data-evaluator-name={evaluator.name}
-              actions={
-                <>
-                  <DuplicateEvaluatorButton
-                    evaluator={evaluator}
-                    onCreated={handleCreated}
-                  />
-                  <Tooltip content="Remove from agent" position="top">
-                    <button
-                      onClick={() => openRemoveDialog(evaluator)}
-                      className={EVALUATOR_CARD_BUTTON_CLASS}
-                    >
-                      <XIcon className="w-4 h-4" />
-                      Remove
-                    </button>
-                  </Tooltip>
-                </>
-              }
-            />
-          ))}
-        </div>
+        <AgentEvaluatorsTable
+          evaluators={attachedEvaluators}
+          checkboxProps={bulkRemoval.checkboxProps}
+          allSelected={bulkRemoval.allSelected}
+          onToggleAll={bulkRemoval.toggleSelectAll}
+          selectedCount={bulkRemoval.selectedUuids.size}
+          onRemoveSelected={bulkRemoval.openBulkDeleteDialog}
+          renderActions={(evaluator) => (
+            <>
+              <DuplicateEvaluatorButton
+                evaluator={evaluator}
+                onCreated={handleCreated}
+              />
+              <Tooltip content="Remove from agent" position="top">
+                <button
+                  onClick={() => openRemoveDialog(evaluator)}
+                  className={EVALUATOR_CARD_BUTTON_CLASS}
+                >
+                  <XIcon className="w-4 h-4" />
+                  Remove
+                </button>
+              </Tooltip>
+            </>
+          )}
+        />
       )}
 
       {/* Add existing evaluators */}
@@ -382,6 +412,30 @@ export function EvaluatorsTabContent({
         existingEvaluators={allEvaluators}
         onCreated={handleCreated}
         useCaseTypes={evaluatorTypesForTask(agentTaskType(agentNature))}
+      />
+
+      {/* Remove the ticked evaluators from this agent */}
+      <DeleteConfirmationDialog
+        isOpen={bulkRemoval.deleteDialogOpen}
+        onClose={bulkRemoval.closeDeleteDialog}
+        onConfirm={bulkRemoval.deleteItems}
+        title={
+          bulkCount === 1 ? "Remove evaluator" : `Remove ${bulkCount} evaluators`
+        }
+        message={
+          bulkCount === 1
+            ? `Are you sure you want to remove "${bulkOnlyName ?? ""}" from this agent? The evaluator will stay in your library and on any other agents that use it.`
+            : `Are you sure you want to remove ${bulkCount} evaluators from this agent? They will stay in your library and on any other agents that use them.`
+        }
+        confirmText="Remove"
+        isDeleting={bulkRemoval.isDeleting}
+        extraContent={
+          bulkRemoval.deleteError && (
+            <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+              {bulkRemoval.deleteError}
+            </p>
+          )
+        }
       />
 
       {/* Shared detach/delete confirmation */}

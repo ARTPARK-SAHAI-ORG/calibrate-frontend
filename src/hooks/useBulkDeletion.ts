@@ -43,6 +43,8 @@ type UseBulkDeletionArgs<T extends { uuid: string }> = {
    *  the parsed `detail` into the shown error and nothing is pruned. */
   bulkRejectionStatus?: number;
   formatBulkRejection?: (detail: unknown) => string;
+  /** What the dialog says when the request fails for any other reason. */
+  failureMessage?: string;
 };
 
 /**
@@ -66,6 +68,7 @@ export function useBulkDeletion<T extends { uuid: string }>({
   buildSingleRequest,
   bulkRejectionStatus,
   formatBulkRejection,
+  failureMessage = "Something went wrong while deleting. Please try again.",
 }: UseBulkDeletionArgs<T>) {
   const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -231,7 +234,7 @@ export function useBulkDeletion<T extends { uuid: string }>({
       setItemsToDeleteBulk([]);
     } catch (err) {
       reportError("Error deleting:", err);
-      setDeleteError("Something went wrong while deleting. Please try again.");
+      setDeleteError(failureMessage);
     } finally {
       setIsDeleting(false);
     }

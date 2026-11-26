@@ -40,8 +40,8 @@ type EvaluatorLibraryPanelProps = {
 };
 
 /**
- * Every evaluator of one kind, with view, delete and create, drawn with the
- * same `EvaluatorCard` the agent Evaluators tab uses. Used by the Evaluators tab
+ * Every evaluator of one kind, with view, delete and create, drawn as
+ * `EvaluatorCard`s. Used by the Evaluators tab
  * on the Speech-to-Text and Text-to-Speech pages, so evaluators can be managed
  * without starting a run.
  */

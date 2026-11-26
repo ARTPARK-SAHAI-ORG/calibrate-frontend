@@ -3,7 +3,7 @@
 import React from "react";
 import { Tooltip } from "@/components/Tooltip";
 
-type SelectCheckboxProps = {
+export type SelectCheckboxProps = {
   /** Whether the box is currently ticked. */
   checked: boolean;
   /** Invoked when the box is toggled. Click propagation is stopped first,

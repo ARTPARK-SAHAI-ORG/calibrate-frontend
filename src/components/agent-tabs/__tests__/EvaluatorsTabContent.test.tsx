@@ -1,4 +1,4 @@
-import { render, screen, waitFor, setupUser } from "@/test-utils";
+import { render, screen, waitFor, within, setupUser } from "@/test-utils";
 import { EvaluatorsTabContent } from "../EvaluatorsTabContent";
 import { fetchEvaluatorDetail } from "@/lib/evaluatorApi";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
@@ -575,5 +575,158 @@ describe("EvaluatorsTabContent", () => {
 
     await user.hover(remove);
     expect(await screen.findByText("Remove from agent")).toBeInTheDocument();
+  });
+
+  describe("removing several evaluators at once", () => {
+    const three = [
+      evaluator({ uuid: "ev-1", name: "Follows Refund Policy" }),
+      evaluator({ uuid: "ev-2", name: "Tone check" }),
+      evaluator({ uuid: "ev-3", name: "Language check" }),
+    ];
+    const fetchMock = jest.fn();
+
+    beforeEach(() => {
+      process.env.NEXT_PUBLIC_BACKEND_URL = "http://backend";
+      global.fetch = fetchMock as unknown as typeof fetch;
+      fetchMock.mockReset();
+      mockFetchAgentEvaluators.mockResolvedValue(three);
+      mockFetchAllEvaluators.mockResolvedValue(three);
+    });
+
+    it("shows Remove selected only once something is ticked", async () => {
+      const user = setupUser();
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      await screen.findByText("Tone check");
+
+      expect(screen.getByText("3 evaluators")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Remove selected/ }),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Select Tone check" }));
+      // One on a computer (header row) and one on a phone (above the list).
+      expect(
+        screen.getAllByRole("button", { name: "Remove selected (1)" }),
+      ).toHaveLength(2);
+    });
+
+    it("ticks every evaluator from the header box, and unticks them again", async () => {
+      const user = setupUser();
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      await screen.findByText("Tone check");
+
+      await user.click(
+        screen.getByRole("button", { name: "Select all evaluators" }),
+      );
+      expect(
+        screen.getAllByRole("button", { name: "Remove selected (3)" }),
+      ).toHaveLength(2);
+      expect(
+        screen.getByRole("button", { name: "Select Tone check" }),
+      ).toHaveAttribute("aria-pressed", "true");
+
+      await user.click(
+        screen.getByRole("button", { name: "Select all evaluators" }),
+      );
+      expect(
+        screen.queryByRole("button", { name: /Remove selected/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("ticking a row does not open the evaluator", async () => {
+      const user = setupUser();
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      await screen.findByText("Tone check");
+
+      await user.click(screen.getByRole("button", { name: "Select Tone check" }));
+      expect(
+        screen.queryByRole("heading", { name: "Tone check", level: 2 }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("removes the ticked evaluators in one call and drops their rows", async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      const user = setupUser();
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      await screen.findByText("Tone check");
+
+      await user.click(screen.getByRole("button", { name: "Select Tone check" }));
+      await user.click(
+        screen.getByRole("button", { name: "Select Language check" }),
+      );
+      await user.click(
+        screen.getAllByRole("button", { name: "Remove selected (2)" })[0],
+      );
+
+      expect(screen.getByText("Remove 2 evaluators")).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "Are you sure you want to remove 2 evaluators from this agent? They will stay in your library and on any other agents that use them.",
+        ),
+      ).toBeInTheDocument();
+      await user.click(
+        within(screen.getByText("Remove 2 evaluators").parentElement!).getByRole(
+          "button",
+          { name: "Remove" },
+        ),
+      );
+
+      await waitFor(() =>
+        expect(screen.queryByText("Tone check")).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Language check")).not.toBeInTheDocument();
+      expect(screen.getByText("Follows Refund Policy")).toBeInTheDocument();
+      expect(screen.queryByText("Remove 2 evaluators")).not.toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe("http://backend/agents/agent-1/evaluators/bulk-unlink");
+      expect(init.method).toBe("POST");
+      expect(JSON.parse(init.body)).toEqual({ evaluator_ids: ["ev-2", "ev-3"] });
+      expect(mockDetach).not.toHaveBeenCalled();
+    });
+
+    it("names the evaluator when only one is ticked", async () => {
+      const user = setupUser();
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      await screen.findByText("Tone check");
+
+      await user.click(screen.getByRole("button", { name: "Select Tone check" }));
+      await user.click(
+        screen.getAllByRole("button", { name: "Remove selected (1)" })[0],
+      );
+      expect(screen.getByText("Remove evaluator")).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Are you sure you want to remove "Tone check" from this agent? The evaluator will stay in your library and on any other agents that use it.',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps the box open and says nothing was removed when the call fails", async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+      const user = setupUser();
+      render(<EvaluatorsTabContent agentUuid="agent-1" />);
+      await screen.findByText("Tone check");
+
+      await user.click(screen.getByRole("button", { name: "Select Tone check" }));
+      await user.click(
+        screen.getByRole("button", { name: "Select Language check" }),
+      );
+      await user.click(
+        screen.getAllByRole("button", { name: "Remove selected (2)" })[0],
+      );
+      await user.click(
+        within(screen.getByText("Remove 2 evaluators").parentElement!).getByRole(
+          "button",
+          { name: "Remove" },
+        ),
+      );
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Could not remove these evaluators. Nothing was removed. Please try again.",
+      );
+      expect(screen.getByText("Remove 2 evaluators")).toBeInTheDocument();
+      expect(screen.getByText("Tone check")).toBeInTheDocument();
+    });
   });
 });
