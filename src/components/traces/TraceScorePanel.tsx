@@ -1,13 +1,13 @@
 "use client";
 
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
+import { RunFailureBox } from "@/components/RunFailureBox";
 import { SpinnerIcon } from "@/components/icons";
 import { CONTACT_LINK } from "@/constants/limits";
 import { useUsesOwnProviderKeys } from "@/hooks";
 import {
   ineligibleReasonCopy,
   isTraceScoringInProgress,
-  scoringFailedCopy,
   scoringRunErrorCopy,
 } from "@/lib/traceScoring";
 import type {
@@ -61,11 +61,11 @@ function RunBody({
 
   if (run.status === "failed") {
     return (
-      <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
-        <p className="text-sm text-red-600 dark:text-red-400 break-words">
-          {scoringFailedCopy(run.error)}
-        </p>
-      </div>
+      <RunFailureBox
+        details={run.error ?? null}
+        sentence="The evaluators could not score this trace."
+        className="w-full"
+      />
     );
   }
 

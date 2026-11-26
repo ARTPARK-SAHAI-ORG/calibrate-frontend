@@ -187,7 +187,7 @@ it("shows every reason a trace was not scored as a warning, not a note", () => {
   expect(screen.queryByRole("link")).not.toBeInTheDocument();
 });
 
-it("shows a failed run as an error in red, with the reason calibrate gave", () => {
+it("shows a failed run in the red failure box, with the reason to copy", () => {
   const { container } = render(
     <TraceScorePanel
       run={{
@@ -201,13 +201,17 @@ it("shows a failed run as an error in red, with the reason calibrate gave", () =
   );
 
   const box = container.querySelector(".border-red-500\\/30");
-  expect(box).toHaveTextContent("Scoring failed: Error code: 402 - out of credits");
-  expect(box?.querySelector("p")?.className).toContain("text-red-600");
+  expect(box).toHaveTextContent("Something went wrong");
+  expect(box).toHaveTextContent("The evaluators could not score this trace.");
+  expect(box?.querySelector("pre")).toHaveTextContent(
+    "Error code: 402 - out of credits",
+  );
+  expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
   expect(container.querySelector(".border-amber-500\\/40")).toBeNull();
 });
 
-it("says only that scoring failed when the failed run gave no reason", () => {
-  render(
+it("leaves out the details when the failed run gave no reason", () => {
+  const { container } = render(
     <TraceScorePanel
       run={{
         run_uuid: "r7",
@@ -218,7 +222,10 @@ it("says only that scoring failed when the failed run gave no reason", () => {
       }}
     />,
   );
-  expect(screen.getByText("Scoring failed")).toBeInTheDocument();
+  expect(
+    screen.getByText("The evaluators could not score this trace."),
+  ).toBeInTheDocument();
+  expect(container.querySelector("pre")).toBeNull();
 });
 
 it("says the workspace is over its scoring limit and offers the contact link", () => {
