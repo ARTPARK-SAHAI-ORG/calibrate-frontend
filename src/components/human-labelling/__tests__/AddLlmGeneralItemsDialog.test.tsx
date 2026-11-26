@@ -717,16 +717,65 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     });
     await screen.findByText("Accept any values for the parameters");
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    const scroll = jest.fn();
+    const realScroll = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scroll;
     await user.clear(screen.getByDisplayValue("Pune"));
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    // The first bad field is scrolled to and focused; the message is under it.
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("data-param-error"),
+    );
+    expect(scroll).toHaveBeenCalledWith({
+      block: "center",
+      behavior: "smooth",
+    });
+    expect(
+      screen.queryByText(
+        "Complete every highlighted parameter in Expected tool calls.",
+      ),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Switch to Form/)).not.toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+    accessTokenMock.mockReturnValue(null);
+    Element.prototype.scrollIntoView = realScroll;
+  });
+
+  it("says to switch to Form when the bad expected parameter is edited as JSON", async () => {
+    withTools();
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: [
+            {
+              tool: "book_flight",
+              arguments: { city: "Pune" },
+              accept_any_arguments: false,
+            },
+          ],
+        },
+      ],
+    });
+    await screen.findByText("Accept any values for the parameters");
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.clear(screen.getByDisplayValue("Pune"));
+    await user.click(screen.getByRole("button", { name: "JSON" }));
     await user.click(screen.getByRole("button", { name: "Save item" }));
     expect(
       await screen.findByText(
-        "Complete every highlighted parameter in Expected tool calls.",
+        "Some expected tool call values are missing or invalid. Switch to Form to see which",
       ),
     ).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
     accessTokenMock.mockReturnValue(null);
   });
+
 
   it("saves an expected call that leaves out a required input as it was", async () => {
     withTools();
@@ -1230,12 +1279,12 @@ describe("AddLlmGeneralItemsDialog", () => {
     expect(screen.queryByText("Add item")).not.toBeInTheDocument();
   });
 
-  it("renders the add-mode header with no evaluators section when none provided", () => {
+  it("renders the add-mode header with no evaluator cards when none provided", () => {
     renderDialog();
     expect(
       screen.getByRole("heading", { name: "Add item" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
+    expect(screen.queryByText("Relevance")).not.toBeInTheDocument();
   });
 
   it("keeps Add disabled until name/input/output are filled", async () => {
@@ -1350,6 +1399,72 @@ describe("AddLlmGeneralItemsDialog", () => {
         metadata: [],
       },
     ]);
+  });
+
+  describe("column widths", () => {
+    const LEFT = "calibrate:one-shot-item-form-left-width";
+    const RIGHT = "calibrate:one-shot-item-form-right-width";
+    beforeEach(() => window.localStorage.clear());
+    afterAll(() => window.localStorage.clear());
+
+    const leftColumn = () =>
+      screen
+        .getByPlaceholderText("Your item name")
+        .closest("[style]") as HTMLElement;
+    const rightColumn = () =>
+      screen.getByTestId("label-item-evaluators-column");
+    const drag = (name: string, clientX: number) => {
+      const handle = screen.getByRole("separator", { name });
+      handle.parentElement!.getBoundingClientRect = () =>
+        ({ left: 0, right: 1000, width: 1000 }) as DOMRect;
+      fireEvent.mouseDown(handle);
+      fireEvent.mouseMove(document, { clientX });
+      fireEvent.mouseUp(document);
+    };
+
+    it("opens at the widths saved in this browser", () => {
+      window.localStorage.setItem(LEFT, "30");
+      window.localStorage.setItem(RIGHT, "35");
+      renderDialog({ evaluators: [evaluatorWithVars] });
+      expect(leftColumn().style.getPropertyValue("--form-column-width")).toBe(
+        "30%",
+      );
+      expect(rightColumn().style.getPropertyValue("--side-column-width")).toBe(
+        "35%",
+      );
+    });
+
+    it("saves each column's width when its divider is dragged", () => {
+      renderDialog({ evaluators: [evaluatorWithVars] });
+      drag("Resize the form column", 300);
+      drag("Resize the right column", 700);
+      expect(leftColumn().style.getPropertyValue("--form-column-width")).toBe(
+        "30%",
+      );
+      expect(rightColumn().style.getPropertyValue("--side-column-width")).toBe(
+        "30%",
+      );
+      expect(window.localStorage.getItem(LEFT)).toBe("30");
+      expect(window.localStorage.getItem(RIGHT)).toBe("30");
+    });
+
+    it("keeps at least a quarter of the row for the input and output", () => {
+      window.localStorage.setItem(LEFT, "50");
+      window.localStorage.setItem(RIGHT, "40");
+      renderDialog({ evaluators: [evaluatorWithVars] });
+      expect(rightColumn().style.getPropertyValue("--side-column-width")).toBe(
+        "25%",
+      );
+    });
+
+    it("keeps the evaluators column when no evaluator scores the item", () => {
+      renderDialog({ evaluators: [] });
+      expect(
+        within(rightColumn()).getByText(
+          "No evaluator on this task scores this item",
+        ),
+      ).toBeInTheDocument();
+    });
   });
 
   it("puts the evaluators in their own right column", () => {

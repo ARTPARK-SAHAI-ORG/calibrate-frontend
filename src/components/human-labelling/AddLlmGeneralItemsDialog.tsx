@@ -33,7 +33,11 @@ import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { getDefaultHeaders } from "@/lib/api";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { reportError } from "@/lib/reportError";
-import { normalizeToolCall } from "@/components/test-results/shared";
+import {
+  ResizeHandle,
+  normalizeToolCall,
+} from "@/components/test-results/shared";
+import { useSavedColumnWidth } from "@/hooks/useSavedColumnWidth";
 import { humaniseDetailObject } from "./bulk-upload-shared";
 import {
   MetadataFieldsEditor,
@@ -189,6 +193,25 @@ export function AddLlmGeneralItemsDialog({
 }: AddLlmGeneralItemsDialogProps) {
   useHideFloatingButton(isOpen);
   const accessToken = useAccessToken();
+  // The left column and the evaluators column can be dragged wider or
+  // narrower; the input and output take what is left, at least a quarter.
+  const leftColumn = useSavedColumnWidth(
+    "calibrate:one-shot-item-form-left-width",
+    20,
+    15,
+    50,
+    "left",
+  );
+  const rightColumn = useSavedColumnWidth(
+    "calibrate:one-shot-item-form-right-width",
+    25,
+    15,
+    40,
+  );
+  const sideColumnPercent = Math.min(
+    rightColumn.percent,
+    75 - leftColumn.percent,
+  );
 
   const isEdit = mode === "edit";
   const evaluatorsWithVariables = evaluators.filter(
@@ -496,7 +519,21 @@ export function AddLlmGeneralItemsDialog({
     if (!valid || submitting) return;
     if (selectedToolsHaveInvalidParams(expected.selectedTools)) {
       setExpectedAttempted(true);
-      setError("Complete every highlighted parameter in Expected tool calls.");
+      setError(null);
+      // Each field says what is wrong under it. The highlight lands on the
+      // next render, so look for it after that.
+      requestAnimationFrame(() => {
+        const bad = document.querySelector<HTMLElement>("[data-param-error]");
+        if (!bad) {
+          // A tool edited as JSON has no field to point at.
+          setError(
+            "Some expected tool call values are missing or invalid. Switch to Form to see which",
+          );
+          return;
+        }
+        bad.scrollIntoView?.({ block: "center", behavior: "smooth" });
+        bad.focus();
+      });
       return;
     }
     const evaluator_variables: VarValues = {};
@@ -618,7 +655,14 @@ export function AddLlmGeneralItemsDialog({
             output in the middle, evaluators on the right. */}
         <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
           {/* Left column mirrors the AddTestDialog left column. */}
-          <div className="w-full md:w-[20%] flex flex-col border-b md:border-b-0 md:border-r border-border overflow-y-auto p-4 md:p-6 space-y-6">
+          <div
+            style={
+              {
+                "--form-column-width": `${leftColumn.percent}%`,
+              } as React.CSSProperties
+            }
+            className="w-full md:w-[var(--form-column-width)] md:shrink-0 flex flex-col border-b md:border-b-0 border-border overflow-y-auto p-4 md:p-6 space-y-6"
+          >
             <div>
               <label className="block text-base font-medium text-foreground mb-2">
                 Name
@@ -665,9 +709,14 @@ export function AddLlmGeneralItemsDialog({
             />
           </div>
 
+          <ResizeHandle
+            onMouseDown={leftColumn.startDrag}
+            label="Resize the form column"
+          />
+
           {/* Middle: input + output boxes shown side by side, each filling
               the full dialog height. */}
-          <div className="w-full md:flex-1 flex flex-col md:flex-row bg-muted/30 min-h-0">
+          <div className="w-full md:flex-1 md:min-w-0 flex flex-col md:flex-row bg-muted/30 min-h-0">
             <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-4 md:p-6 border-b md:border-b-0 md:border-r border-border">
               {/* As tall as the Output row beside it, which holds the tool
                   buttons, so both headings start on the same line. */}
@@ -895,76 +944,87 @@ export function AddLlmGeneralItemsDialog({
             </div>
           </div>
 
-          {(evaluators.some(evaluatorFits) || isToolCallItem) && (
-            <div
-              data-testid="label-item-evaluators-column"
-              className="w-full md:w-[25%] flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 md:border-l border-border p-4 md:p-6"
-            >
-              <label className="block text-base font-medium text-foreground mb-2">
-                Evaluators
-              </label>
-              <div className="space-y-4">
-                {isToolCallItem && !evaluators.some(evaluatorFits) && (
-                  <PendingToolCallEvaluatorCard />
-                )}
-                {evaluators.filter(evaluatorFits).map((e) => (
-                  <div
-                    key={e.uuid}
-                    className="border border-border rounded-lg p-4 bg-background"
-                  >
-                    <div className="min-w-0 mb-3">
-                      <div className="text-sm font-semibold text-foreground">
-                        {e.name}
-                      </div>
-                      {e.description && (
-                        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                          {e.description}
-                        </div>
-                      )}
+          <ResizeHandle
+            onMouseDown={rightColumn.startDrag}
+            label="Resize the right column"
+          />
+
+          {/* Always drawn, so the columns do not move as the item switches
+              between a text output and a tool call. */}
+          <div
+            data-testid="label-item-evaluators-column"
+            style={
+              {
+                "--side-column-width": `${sideColumnPercent}%`,
+              } as React.CSSProperties
+            }
+            className="w-full md:w-[var(--side-column-width)] md:shrink-0 flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 border-border p-4 md:p-6"
+          >
+            <label className="block text-base font-medium text-foreground mb-2">
+              Evaluators
+            </label>
+            <div className="space-y-4">
+              {isToolCallItem && !evaluators.some(evaluatorFits) && (
+                <PendingToolCallEvaluatorCard />
+              )}
+              {!isToolCallItem && !evaluators.some(evaluatorFits) && (
+                <p className="text-sm text-muted-foreground">
+                  No evaluator on this task scores this item
+                </p>
+              )}
+              {evaluators.filter(evaluatorFits).map((e) => (
+                <div
+                  key={e.uuid}
+                  className="border border-border rounded-lg p-4 bg-background"
+                >
+                  <div className="min-w-0 mb-3">
+                    <div className="text-sm font-semibold text-foreground">
+                      {e.name}
                     </div>
-                    {e.variables.length > 0 && (
-                      <div className="space-y-3">
-                        {e.variables.map((v) => {
-                          const placeholder =
-                            v.description && v.description.length > 0
-                              ? v.description
-                              : v.default && v.default.length > 0
-                                ? v.default
-                                : `Enter value for {{${v.name}}}`;
-                          return (
-                            <div key={v.name}>
-                              <div className="text-xs text-muted-foreground mb-1.5">
-                                <code className="font-mono">{`{{${v.name}}}`}</code>
-                              </div>
-                              <textarea
-                                value={varValues[e.uuid]?.[v.name] ?? ""}
-                                onChange={(ev) =>
-                                  updateVar(e.uuid, v.name, ev.target.value)
-                                }
-                                placeholder={placeholder}
-                                disabled={submitting}
-                                rows={4}
-                                className="w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-                              />
-                            </div>
-                          );
-                        })}
+                    {e.description && (
+                      <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                        {e.description}
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
+                  {e.variables.length > 0 && (
+                    <div className="space-y-3">
+                      {e.variables.map((v) => {
+                        const placeholder =
+                          v.description && v.description.length > 0
+                            ? v.description
+                            : v.default && v.default.length > 0
+                              ? v.default
+                              : `Enter value for {{${v.name}}}`;
+                        return (
+                          <div key={v.name}>
+                            <div className="text-xs text-muted-foreground mb-1.5">
+                              <code className="font-mono">{`{{${v.name}}}`}</code>
+                            </div>
+                            <textarea
+                              value={varValues[e.uuid]?.[v.name] ?? ""}
+                              onChange={(ev) =>
+                                updateVar(e.uuid, v.name, ev.target.value)
+                              }
+                              placeholder={placeholder}
+                              disabled={submitting}
+                              rows={4}
+                              className="w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-5 md:px-6 py-4 border-t border-border">
-          {error && (
-            <ErrorNote className="mr-auto">
-              {error}
-            </ErrorNote>
-          )}
+          {error && <ErrorNote className="mr-auto">{error}</ErrorNote>}
           <button
             onClick={handleSubmit}
             disabled={!valid || submitting}
