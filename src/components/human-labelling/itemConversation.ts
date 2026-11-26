@@ -66,12 +66,6 @@ export function gradedAnswerStart<T>(
 export const EXPECTED_TOOL_CALLS_HELP =
   "Optional. Add the tool calls the agent should have made and the values it should have sent. Once you add one, this item is scored only by tool call evaluators, which compare the agent's tool calls with these.";
 
-/** Why an evaluator does not score this item. */
-export const skippedEvaluatorNote = (isToolCallItem: boolean) =>
-  isToolCallItem
-    ? "Does not score tool calls, so it is skipped for this item"
-    : "Only scores tool calls, so it is skipped for this item";
-
 type ToolCallRecord = Pick<ExpectedToolCall, "tool" | "arguments"> & {
   output?: unknown;
 };

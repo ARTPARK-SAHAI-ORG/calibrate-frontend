@@ -2360,9 +2360,7 @@ describe("AddTestDialog", () => {
       await waitFor(() =>
         expect(screen.getByDisplayValue("Weather in Pune?")).toBeInTheDocument(),
       );
-      expect(
-        screen.getByText("Does not score tool calls, so it is skipped for this item"),
-      ).toBeInTheDocument();
+      expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
       expect(screen.queryByText("{{criteria}}")).not.toBeInTheDocument();
       await user.type(screen.getByPlaceholderText("Enter value for {{rule}}"), "Right tool");
       await user.click(screen.getByRole("button", { name: "Save" }));
@@ -2399,9 +2397,7 @@ describe("AddTestDialog", () => {
       await waitFor(() =>
         expect(screen.getByDisplayValue("Sunny")).toBeInTheDocument(),
       );
-      expect(
-        screen.getByText("Does not score tool calls, so it is skipped for this item"),
-      ).toBeInTheDocument();
+      expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Save" }));
       expect(onSubmit).toHaveBeenCalledTimes(1);
     });
@@ -2428,9 +2424,7 @@ describe("AddTestDialog", () => {
       await waitFor(() =>
         expect(screen.getByDisplayValue("Sunny")).toBeInTheDocument(),
       );
-      expect(
-        screen.getByText("Only scores tool calls, so it is skipped for this item"),
-      ).toBeInTheDocument();
+      expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Save" }));
       expect(onSubmit).not.toHaveBeenCalled();
       expect(

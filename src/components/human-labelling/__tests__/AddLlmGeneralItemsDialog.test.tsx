@@ -390,9 +390,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
         },
       ],
     });
-    expect(
-      screen.getByText("Does not score tool calls, so it is skipped for this item"),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("The criteria")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save item" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
@@ -442,9 +440,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
         },
       ],
     });
-    expect(
-      screen.getByText("Does not score tool calls, so it is skipped for this item"),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save item" })).toBeEnabled();
   });
 
@@ -511,9 +507,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
         { uuid: "i1", name: "Item one", input: "Hi", output: "Sunny" },
       ],
     });
-    expect(
-      screen.getByText("Only scores tool calls, so it is skipped for this item"),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("The criteria")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save item" })).toBeDisabled();
   });

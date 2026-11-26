@@ -49,7 +49,6 @@ import {
   hasArgumentGroups,
   gradedAnswerStart,
   paramsToArgs,
-  skippedEvaluatorNote,
   typeArguments,
 } from "@/components/human-labelling/itemConversation";
 import {
@@ -2639,7 +2638,9 @@ export function AddTestDialog({
         data-tour="test-evaluators-area"
         className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1"
       >
-        {attachedEvaluators.map((ev) => (
+        {/* Only the evaluators that score this item: a tool call item is
+            scored only by tool call evaluators, any other item only by the rest. */}
+        {attachedEvaluators.filter(evaluatorFits).map((ev) => (
           <div
             key={ev.evaluator_uuid}
             className="border border-border rounded-lg p-4 bg-background"
@@ -2649,7 +2650,7 @@ export function AddTestDialog({
                 does not carry it. */}
             <div
               className={`flex items-start justify-between gap-2 ${
-                ev.variables.length > 0 || !evaluatorFits(ev) ? "mb-3" : ""
+                ev.variables.length > 0 ? "mb-3" : ""
               }`}
             >
               {/* Opens the prompt on top, so how this
@@ -2699,12 +2700,7 @@ export function AddTestDialog({
               )}
             </div>
 
-            {!evaluatorFits(ev) && (
-              <p className="text-xs text-muted-foreground">
-                {skippedEvaluatorNote(isToolCallItem)}
-              </p>
-            )}
-            {ev.variables.length > 0 && evaluatorFits(ev) && (
+            {ev.variables.length > 0 && (
               <div className="space-y-3">
                 {ev.variables.map((v) => {
                   // Uniform rendering for every evaluator variable:

@@ -47,7 +47,6 @@ import {
   isPlainObject,
   paramsToArgs,
   restoreToolCalls,
-  skippedEvaluatorNote,
   typeArguments,
   EXPECTED_TOOL_CALLS_HELP,
 } from "./itemConversation";
@@ -895,7 +894,7 @@ export function AddLlmGeneralItemsDialog({
             </div>
           </div>
 
-          {evaluators.length > 0 && (
+          {evaluators.some(evaluatorFits) && (
             <div
               data-testid="label-item-evaluators-column"
               className="w-full md:w-[25%] flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 md:border-l border-border p-4 md:p-6"
@@ -904,7 +903,7 @@ export function AddLlmGeneralItemsDialog({
                 Evaluators
               </label>
               <div className="space-y-4">
-                {evaluators.map((e) => (
+                {evaluators.filter(evaluatorFits).map((e) => (
                   <div
                     key={e.uuid}
                     className="border border-border rounded-lg p-4 bg-background"
@@ -919,12 +918,7 @@ export function AddLlmGeneralItemsDialog({
                         </div>
                       )}
                     </div>
-                    {!evaluatorFits(e) && (
-                      <p className="text-xs text-muted-foreground">
-                        {skippedEvaluatorNote(isToolCallItem)}
-                      </p>
-                    )}
-                    {e.variables.length > 0 && evaluatorFits(e) && (
+                    {e.variables.length > 0 && (
                       <div className="space-y-3">
                         {e.variables.map((v) => {
                           const placeholder =
