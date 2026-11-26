@@ -494,7 +494,7 @@ describe("naming one trace's test", () => {
     expect(box).toHaveValue("It skipped rotavirus");
     expect(
       screen.getByText(
-        "Automatically filled in from the comment left with the rating",
+        "Automatically filled in from the comment given with the feedback",
       ),
     ).toBeInTheDocument();
     // The evaluators wait for the second step.

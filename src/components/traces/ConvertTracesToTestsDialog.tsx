@@ -246,7 +246,7 @@ export function ConvertTracesToTestsDialog({
               {suggested.from && (
                 <p className="text-xs text-muted-foreground mt-1 mb-2">
                   {suggested.from === "comment"
-                    ? "Automatically filled in from the comment left with the rating"
+                    ? "Automatically filled in from the comment given with the feedback"
                     : "Automatically filled in from the user's message"}
                 </p>
               )}
