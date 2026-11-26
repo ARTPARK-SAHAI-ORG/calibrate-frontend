@@ -257,7 +257,9 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     });
 
     // One row per conversation; the trace without an ID is not one.
-    await page.getByRole("button", { name: "Conversations", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Conversations", exact: true })
+      .click();
     await expect(page).toHaveURL(/view=conversations/);
     await expect(page.getByText(convA).first()).toBeVisible({ timeout: 15000 });
     await expect(page.getByText(convB).first()).toBeVisible();
@@ -329,6 +331,11 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     await expect(
       dialog.getByRole("heading", { name: /Add 1 trace to your tests/ }),
     ).toBeVisible();
+    // One trace is named first, filled in from the user's message.
+    const nameBox = dialog.getByLabel("Test name");
+    await expect(nameBox).toHaveValue(/^A question worth testing\./);
+    await nameBox.fill(msgId);
+    await dialog.getByRole("button", { name: "Next" }).click();
     const submit = dialog.getByRole("button", {
       name: "Add to tests",
       exact: true,
@@ -349,7 +356,7 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     });
 
     // The converted test is linked to this agent, so it shows on its Tests tab
-    // under the trace's message id.
+    // under the name typed in the dialog.
     await page.goto(`/agents/${agentUuid}?tab=tests`);
     await waitForOrgReady(page);
     await page.getByPlaceholder("Search tests").first().fill(msgId);
