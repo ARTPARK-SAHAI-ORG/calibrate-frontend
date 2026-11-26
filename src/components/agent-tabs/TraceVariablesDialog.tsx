@@ -58,7 +58,7 @@ const OTHER_KEY = "\u0000other";
 const LATEST_HEADING = "Values from your latest trace";
 
 const CHIP =
-  "inline-flex self-start px-2 py-0.5 rounded-md text-sm font-mono font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300";
+  "inline-block self-start max-w-full px-2 py-0.5 rounded-md text-sm font-mono font-semibold break-all bg-blue-500/10 text-blue-700 dark:text-blue-300";
 const CODE = "font-mono text-[13px] px-1 py-px rounded bg-amber-700/10";
 const PILL =
   "flex-shrink-0 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[11px] font-medium";
@@ -421,8 +421,8 @@ export function TraceVariablesDialog({
 
   const chooseStep = (
     <div className="flex flex-col lg:flex-row">
-      <div className="flex-1 min-w-0 p-4 md:p-6">
-        <div className="grid grid-cols-[max-content_max-content] gap-x-6 gap-y-3 items-center content-start text-sm whitespace-nowrap">
+      <div className="min-w-0 lg:flex-none p-4 md:p-6 lg:max-h-[60vh] lg:overflow-y-auto">
+        <div className="grid grid-cols-[minmax(0,240px)_max-content] gap-x-6 gap-y-3 items-start content-start text-sm">
           <span className="text-xs font-medium text-muted-foreground">
             Variable
           </span>
@@ -432,7 +432,7 @@ export function TraceVariablesDialog({
           {variables.map(({ name }) => sourceRow(name))}
         </div>
       </div>
-      <div className="lg:w-[520px] flex-shrink-0 border-t lg:border-t-0 lg:border-l border-border p-4 md:p-6 space-y-2 min-w-0">
+      <div className="flex-1 border-t lg:border-t-0 lg:border-l border-border p-4 md:p-6 space-y-2 min-w-0 lg:max-h-[60vh] lg:overflow-y-auto">
         <p className="text-sm font-medium text-foreground">
           What your code needs to send
         </p>
