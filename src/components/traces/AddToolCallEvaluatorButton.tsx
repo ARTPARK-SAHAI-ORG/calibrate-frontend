@@ -23,12 +23,15 @@ export function AddToolCallEvaluatorButton({
   accessToken,
   onAdded,
   onOpenChange,
+  asButton = false,
 }: {
   agentUuid: string;
   accessToken: string | null;
   onAdded: () => void;
   /** Told when a window this button opened appears or goes away. */
   onOpenChange?: (open: boolean) => void;
+  /** A button on its own, rather than a link inside a sentence. */
+  asButton?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -79,7 +82,11 @@ export function AddToolCallEvaluatorButton({
       <button
         type="button"
         onClick={() => void open()}
-        className="font-semibold cursor-pointer hover:opacity-80"
+        className={
+          asButton
+            ? "h-8 px-2.5 rounded-md text-sm font-medium border bg-amber-500/12 border-amber-500/45 text-amber-950 dark:text-amber-100 transition-colors hover:bg-amber-500/22 dark:hover:bg-amber-500/18 cursor-pointer"
+            : "font-semibold cursor-pointer hover:opacity-80"
+        }
       >
         Add a tool call evaluator
       </button>

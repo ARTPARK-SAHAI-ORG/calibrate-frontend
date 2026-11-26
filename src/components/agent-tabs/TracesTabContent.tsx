@@ -640,8 +640,9 @@ export function TracesTabContent({
     knownScoringTypes.length > 0 &&
     knownScoringTypes.every((type) => type === "tool-call") &&
     hasReplyTrace;
-  const addToolCallEvaluatorButton = (
+  const addToolCallEvaluatorButton = (asButton = false) => (
     <AddToolCallEvaluatorButton
+      asButton={asButton}
       agentUuid={agentUuid}
       accessToken={accessToken}
       onAdded={() => {
@@ -984,7 +985,7 @@ export function TracesTabContent({
             {missingToolCallEvaluator && !nothingCanScore && (
               <WarningBox>
                 This agent has no tool call evaluator, so its tool calls are not
-                checked. {addToolCallEvaluatorButton}
+                checked. {addToolCallEvaluatorButton()}
               </WarningBox>
             )}
             {toolCallEvaluatorCannotScore && !nothingCanScore && (
@@ -1268,7 +1269,7 @@ export function TracesTabContent({
         evaluatorDescriptions={evaluatorDescriptions}
         ineligibleEvaluators={ineligibleForOpenTrace}
         addToolCallEvaluator={
-          missingToolCallEvaluator ? addToolCallEvaluatorButton : undefined
+          missingToolCallEvaluator ? addToolCallEvaluatorButton(true) : undefined
         }
         onGoToEvaluators={() => {
           closeTrace();

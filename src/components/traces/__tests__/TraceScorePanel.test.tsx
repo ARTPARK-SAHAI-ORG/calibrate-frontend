@@ -328,12 +328,14 @@ it("says the agent has no tool call evaluator and offers the button to add one",
       }
     />,
   );
-  expect(document.body).toHaveTextContent(
-    "This trace was not scored because the agent had no tool call evaluator. Add a tool call evaluator",
+  const sentence = screen.getByText(
+    "This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent.",
   );
-  expect(
-    screen.getByRole("button", { name: "Add a tool call evaluator" }),
-  ).toBeInTheDocument();
+  const button = screen.getByRole("button", {
+    name: "Add a tool call evaluator",
+  });
+  // The button sits on its own line under the sentence, not inside it.
+  expect(sentence).not.toContainElement(button);
 });
 
 it("says the trace was skipped before a tool call evaluator was added, with no button, once the agent has one", () => {
@@ -349,7 +351,7 @@ it("says the trace was skipped before a tool call evaluator was added, with no b
     />,
   );
   expect(document.body).toHaveTextContent(
-    /^Scores\s*This trace was not scored because the agent had no tool call evaluator$/,
+    /^Scores\s*This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent$/,
   );
   expect(
     screen.queryByRole("button", { name: "Add a tool call evaluator" }),

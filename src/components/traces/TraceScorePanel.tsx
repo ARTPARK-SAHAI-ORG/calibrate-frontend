@@ -78,16 +78,20 @@ function RunBody({
     return (
       <WarningBox
         after={
-          run.error === "no_usable_evaluators" &&
-          ineligible.length > 0 && (
-            <ul className="mt-1 list-disc pl-5 text-sm text-amber-700 dark:text-amber-300">
-              {ineligible.map((item) => (
-                <li key={item.evaluator_uuid}>
-                  <span className="font-medium">{item.name}</span>:{" "}
-                  {ineligibleReasonCopy(item.reason).toLowerCase()}
-                </li>
-              ))}
-            </ul>
+          run.error === "no_tool_call_evaluator" && addToolCallEvaluator ? (
+            <div className="mt-2">{addToolCallEvaluator}</div>
+          ) : (
+            run.error === "no_usable_evaluators" &&
+            ineligible.length > 0 && (
+              <ul className="mt-1 list-disc pl-5 text-sm text-amber-700 dark:text-amber-300">
+                {ineligible.map((item) => (
+                  <li key={item.evaluator_uuid}>
+                    <span className="font-medium">{item.name}</span>:{" "}
+                    {ineligibleReasonCopy(item.reason).toLowerCase()}
+                  </li>
+                ))}
+              </ul>
+            )
           )
         }
       >
@@ -102,9 +106,7 @@ function RunBody({
             <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
           </>
         )}
-        {run.error === "no_tool_call_evaluator" && addToolCallEvaluator && (
-          <>. {addToolCallEvaluator}</>
-        )}
+        {run.error === "no_tool_call_evaluator" && addToolCallEvaluator && "."}
         {run.error === "over_limit" && !usesOwnProviderKeys && (
           <>
             {" "}
