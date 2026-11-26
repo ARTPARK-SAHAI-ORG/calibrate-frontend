@@ -110,7 +110,7 @@ export function ConvertTracesToTestsDialog({
   const suggested = defaultTestName(nameFrom?.comment, nameFrom?.userMessage);
   // Null until the reader types, so the suggestion shows until then.
   const [typedName, setTypedName] = useState<string | null>(null);
-  const name = (typedName ?? suggested.name).trim();
+  const name = (typedName ?? suggested).trim();
   // Naming, then picking evaluators. A tool-call test has no evaluators, so
   // naming it is the whole window.
   const stepped = naming && needsEvaluator;
@@ -243,17 +243,10 @@ export function ConvertTracesToTestsDialog({
               <input
                 id="convert-test-name"
                 autoFocus
-                value={typedName ?? suggested.name}
+                value={typedName ?? suggested}
                 onChange={(e) => setTypedName(e.target.value)}
                 className="w-full h-9 md:h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              {typedName === null && suggested.from && (
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  {suggested.from === "comment"
-                    ? "Filled in from the comment left with the rating"
-                    : "Filled in from the user's message"}
-                </p>
-              )}
             </div>
           )}
           {needsEvaluator && !showPicker ? null : needsEvaluator && loading ? (

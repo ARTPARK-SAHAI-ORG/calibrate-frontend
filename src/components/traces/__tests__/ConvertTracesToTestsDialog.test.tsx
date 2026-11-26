@@ -492,9 +492,7 @@ describe("naming one trace's test", () => {
 
     const box = screen.getByLabelText("Test name");
     expect(box).toHaveValue("It skipped rotavirus");
-    expect(
-      screen.getByText("Filled in from the comment left with the rating"),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/Filled in from/)).toBeNull();
     // The evaluators wait for the second step.
     expect(screen.queryByText("Correctness")).toBeNull();
     expect(screen.queryByRole("button", { name: "Add to tests" })).toBeNull();
@@ -502,7 +500,6 @@ describe("naming one trace's test", () => {
     await user.clear(box);
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
     await user.type(box, "Rotavirus left out");
-    expect(screen.queryByText(/Filled in from/)).toBeNull();
     await user.click(screen.getByRole("button", { name: "Next" }));
 
     await waitFor(() =>
@@ -538,9 +535,6 @@ describe("naming one trace's test", () => {
     expect(screen.getByLabelText("Test name")).toHaveValue(
       `${"a".repeat(60)}…`,
     );
-    expect(
-      screen.getByText("Filled in from the user's message"),
-    ).toBeInTheDocument();
   });
 
   it("never cuts an emoji in half", () => {
@@ -571,7 +565,6 @@ describe("naming one trace's test", () => {
   it("starts empty with nothing to name it from", () => {
     setup({ traceUuids: ["tr-1"], nameFrom: {} });
     expect(screen.getByLabelText("Test name")).toHaveValue("");
-    expect(screen.queryByText(/Filled in from/)).toBeNull();
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
   });
 
