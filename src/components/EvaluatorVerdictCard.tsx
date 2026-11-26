@@ -164,6 +164,14 @@ const RATING_ACTIVE_CLASS: Record<Tone, string> = {
 
 export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
   const tone: Tone = props.mode === "read" ? readVerdictTone(props) : "neutral";
+  // Read mode on an optional evaluator nobody answered: say so where the
+  // verdict would sit, instead of a bare card.
+  const optionalUnanswered =
+    props.mode === "read" &&
+    props.isOptional === true &&
+    (props.outputType === "binary"
+      ? props.match === null || props.match === undefined
+      : props.score === null || props.score === undefined);
 
   const hasVariables =
     !!props.variableValues &&
@@ -260,7 +268,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
                 {props.versionLabel}
               </span>
             )}
-            {props.isOptional && (
+            {props.isOptional && !optionalUnanswered && (
               <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-muted-foreground whitespace-nowrap font-medium">
                 Optional
               </span>
@@ -270,6 +278,11 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             className="flex-shrink-0 flex items-center gap-1.5"
             data-evaluator-verdict-chips
           >
+            {optionalUnanswered && (
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                Optional, not answered yet
+              </span>
+            )}
             {props.mode === "read" && (
               <ReadVerdictPill
                 outputType={props.outputType}

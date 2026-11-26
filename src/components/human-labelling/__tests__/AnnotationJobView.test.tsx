@@ -1487,7 +1487,7 @@ describe("AnnotationJobView", () => {
       ).toBeInTheDocument();
     });
 
-    it("hides a skipped optional evaluator in the admin view but keeps a blank required one", async () => {
+    it("shows a skipped optional evaluator in the admin view with a note, and a blank required one without it", async () => {
       fetchMock.mockResolvedValue(
         jsonResponse(withOptionalRating({ read_only: true })),
       );
@@ -1497,7 +1497,8 @@ describe("AnnotationJobView", () => {
       await waitFor(() =>
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
-      expect(screen.queryByText("Quality")).not.toBeInTheDocument();
+      expect(screen.getByText("Quality")).toBeInTheDocument();
+      expect(screen.getAllByText("Optional, not answered yet")).toHaveLength(1);
     });
 
     it("still shows an optional evaluator the annotator did answer", async () => {
@@ -1522,6 +1523,9 @@ describe("AnnotationJobView", () => {
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
       expect(screen.getByText("Quality")).toBeInTheDocument();
+      expect(
+        screen.queryByText("Optional, not answered yet"),
+      ).not.toBeInTheDocument();
     });
 
     it("asks before leaving an optional answer added to a row that was already submitted", async () => {

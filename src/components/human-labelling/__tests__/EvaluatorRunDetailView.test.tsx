@@ -2018,10 +2018,11 @@ describe("EvaluatorResultsPane", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("hides an optional evaluator with no human label and no score", () => {
+  it("shows an optional evaluator nobody answered, with a note saying so", () => {
     render(
       <EvaluatorResultsPane
         {...baseProps}
+        groupVersionsByEvaluator
         evaluators={[
           {
             evaluator_id: "ev-bin",
@@ -2029,13 +2030,11 @@ describe("EvaluatorResultsPane", () => {
             is_optional: true,
           },
         ]}
-        runs={[]}
+        runs={[makeRun({ value: { value: null } })]}
       />,
     );
-    expect(screen.queryByText("Binary Evaluator")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("No result recorded for this item."),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+    expect(screen.getByText("Optional, not answered yet")).toBeInTheDocument();
   });
 
   it("shows an optional evaluator that a run scored but nobody labelled", () => {
@@ -2054,6 +2053,9 @@ describe("EvaluatorResultsPane", () => {
     );
     expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
     expect(screen.getByText("Correct")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Optional, not answered yet"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows an optional evaluator that a person labelled but no run scored", () => {
@@ -2110,27 +2112,6 @@ describe("EvaluatorResultsPane", () => {
     );
     expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
     expect(screen.getByText("Wrong")).toBeInTheDocument();
-  });
-
-  it("says so when every evaluator on the item could be skipped and none was answered", () => {
-    render(
-      <EvaluatorResultsPane
-        {...baseProps}
-        evaluators={[
-          {
-            evaluator_id: "ev-bin",
-            evaluator_version_id: "v-bin-1",
-            is_optional: true,
-          },
-        ]}
-        runs={[]}
-      />,
-    );
-    expect(
-      screen.getByText(
-        "Every evaluator on this item could be skipped, and none was answered or scored.",
-      ),
-    ).toBeInTheDocument();
   });
 
   it("keeps a required evaluator with nothing on it", () => {

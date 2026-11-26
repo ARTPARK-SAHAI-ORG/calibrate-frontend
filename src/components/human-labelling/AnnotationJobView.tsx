@@ -1811,10 +1811,6 @@ function EvaluatorsPane({
       {forItem.map((ev) => {
         const k = fieldKey(item.uuid, ev.uuid);
         const f = fields[k];
-        // Reviewing what came back: an optional evaluator the annotator
-        // skipped has nothing to show, so drop the card entirely.
-        if (readOnly && ev.is_optional === true && !hasFieldValue(f))
-          return null;
         const variableValues = itemEvaluatorVariables[ev.uuid];
         const outputType = drawableOutputType(ev);
         if (!outputType) {
