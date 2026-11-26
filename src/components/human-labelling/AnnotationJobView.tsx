@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { publicFetch } from "@/lib/publicFetch";
-import { evaluatorFitsItem } from "@/lib/labellingItem";
+import { evaluatorFitsItem, type ItemKind } from "@/lib/labellingItem";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
@@ -132,6 +132,8 @@ export type Item = {
   /** True when this row's answer was a tool call rather than a written
    * reply. Set by the backend; absent on an older response. */
   is_tool_call?: boolean;
+  /** True when this row has reply text. Set by the backend. */
+  has_reply?: boolean;
   metadata?: MetadataEntry[] | null;
 };
 
@@ -173,10 +175,10 @@ function fieldKey(itemId: string, evaluatorId: string): FieldKey {
  * finished?" checks and the submit guard all ask here, so they cannot disagree. */
 function evaluatorsForItem(
   evaluators: Evaluator[],
-  item: { is_tool_call?: boolean } | null | undefined,
+  item: ItemKind | null | undefined,
 ): Evaluator[] {
   return evaluators.filter((ev) =>
-    evaluatorFitsItem(ev.evaluator_type, item?.is_tool_call === true),
+    evaluatorFitsItem(ev.evaluator_type, item ?? {}),
   );
 }
 
@@ -218,13 +220,13 @@ function GreenBar({
   );
 }
 
+const onlyToolCalls = (it: Item) =>
+  it.is_tool_call === true && it.has_reply !== true;
+
 /** Which intro a job gets. Tool-call items are not a kind of task of their own,
- *  so a job counts as one only when every item is a tool call. */
+ *  so a job counts as one only when every item is tool calls with no reply. */
 function introKind(data: JobResponse): LabellingJobKind {
-  if (
-    data.items.length > 0 &&
-    data.items.every((it) => it.is_tool_call === true)
-  )
+  if (data.items.length > 0 && data.items.every(onlyToolCalls))
     return "tool-call";
   const type = data.task.type;
   return type === "conversation" ||
@@ -1127,7 +1129,7 @@ function AnnotateView({
       buildLabellingJobTour({
         jobUuid: data.job.uuid,
         onPreviewAnswer: setPreviewAnswerUuid,
-        kind: currentItem.is_tool_call === true ? "tool-call" : introKind(data),
+        kind: onlyToolCalls(currentItem) ? "tool-call" : introKind(data),
         hasItemDetails: hasItemDetails(
           currentItem.payload,
           currentItem.metadata,

@@ -2289,6 +2289,64 @@ describe("AnnotationJobView picks the evaluators per row", () => {
     expect(screen.getByText("Quality")).toBeInTheDocument();
     expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
   });
+
+  it("shows the reply, the tool calls and both kinds of evaluator on a row that has both, and needs every answer", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        mixedJob({
+          items: [
+            {
+              ...items[0],
+              is_tool_call: true,
+              has_reply: true,
+              payload: {
+                ...items[0].payload,
+                actual_tool_calls: [{ tool: "book", arguments: {} }],
+              },
+            },
+          ],
+        }),
+      ),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Tool call correctness")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Correctness")).toBeInTheDocument();
+    expect(screen.getByText("Quality")).toBeInTheDocument();
+    expect(screen.getByText("Agent's reply")).toBeInTheDocument();
+    expect(screen.getByText("Agent's tool calls")).toBeInTheDocument();
+
+    // The tool call evaluator is the last card, so its Correct is the last one.
+    await user.click(
+      screen.getAllByRole("button", { name: "Correct" }).at(-1)!,
+    );
+    await user.click(
+      screen.getByRole("button", { name: /Submit & Next|Mark as complete/ }),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getAllByRole("button", { name: "Correct" })[0]);
+    await user.click(screen.getByRole("button", { name: "3" }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ saved: [], count: 3, status: "completed" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /Submit & Next|Mark as complete/ }),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const post = fetchMock.mock.calls.find(
+      ([url, opts]) =>
+        typeof url === "string" &&
+        url.endsWith("/annotations") &&
+        (opts as RequestInit | undefined)?.method === "POST",
+    );
+    const body = JSON.parse((post![1] as RequestInit).body as string);
+    expect(
+      body.annotations.map((a: { evaluator_id: string }) => a.evaluator_id).sort(),
+    ).toEqual(["ev-1", "ev-2", "ev-tool"]);
+  });
 });
 
 describe("AnnotationJobView message versions", () => {

@@ -402,7 +402,23 @@ describe("a column whose evaluator does not judge this kind of trace", () => {
     },
   ];
 
-  it("shows a dash under the tool-call evaluator for a trace that replied", () => {
+  it("shows a dash under the tool-call evaluator for a trace that only replied", () => {
+    render(
+      <TraceScoreCells
+        trace={{
+          latest_run_status: "completed",
+          response_preview: "At 14 weeks.",
+          tool_call_count: 0,
+        }}
+        columns={typed}
+        layout="row"
+      />,
+    );
+    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.getByText("Not scored yet")).toBeInTheDocument();
+  });
+
+  it("shows no dash for a trace that replied and called a tool", () => {
     render(
       <TraceScoreCells
         trace={{
@@ -414,8 +430,8 @@ describe("a column whose evaluator does not judge this kind of trace", () => {
         layout="row"
       />,
     );
-    expect(screen.getByText("—")).toBeInTheDocument();
-    expect(screen.getByText("Not scored yet")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Not scored yet")).toHaveLength(2);
   });
 
   it("shows a dash under every other evaluator for a trace that only called a tool, even while scoring runs or after it failed", () => {

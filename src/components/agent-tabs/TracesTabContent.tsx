@@ -60,7 +60,11 @@ import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
 import { ExtendLimitsLink } from "@/constants/limits";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
-import { isToolCallTraceRow, traceRowOutputFacts } from "@/lib/traceScoring";
+import {
+  isToolCallTraceRow,
+  traceItemKind,
+  traceRowOutputFacts,
+} from "@/lib/traceScoring";
 import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
@@ -598,11 +602,12 @@ export function TracesTabContent({
     };
   }, [agentUuid, accessToken, isActive, evaluatorsReloadKey]);
 
-  // Whether any trace, not only one on this page, is nothing but tool calls.
+  // Whether any trace, not only one on this page, called a tool or replied.
   const [hasStoredToolCallTrace, setHasStoredToolCallTrace] = useState(false);
   const [hasStoredReplyTrace, setHasStoredReplyTrace] = useState(false);
   const hasToolCallTrace =
-    hasStoredToolCallTrace || items.some(isToolCallTraceRow);
+    hasStoredToolCallTrace ||
+    items.some((trace) => traceRowOutputFacts(trace).hasToolCalls);
   const hasReplyTrace =
     hasStoredReplyTrace ||
     items.some((trace) => traceRowOutputFacts(trace).hasResponse);
@@ -783,7 +788,7 @@ export function TracesTabContent({
       ? ineligible.filter((item) =>
           evaluatorFitsItem(
             evaluatorTypes[item.evaluator_uuid],
-            isToolCallTraceRow(openTraceItem),
+            traceItemKind(traceRowOutputFacts(openTraceItem)),
           ),
         )
       : ineligible;

@@ -112,6 +112,7 @@ export type EvaluatorRunItemSnapshot = {
   uuid: string;
   payload: unknown;
   is_tool_call?: boolean;
+  has_reply?: boolean;
   metadata?: MetadataEntry[] | null;
 };
 
@@ -219,6 +220,7 @@ export function snapshotToItem(
     created_at: "",
     deleted_at: null,
     is_tool_call: snap.is_tool_call,
+    has_reply: snap.has_reply,
     metadata: snap.metadata,
   };
 }
@@ -1868,7 +1870,7 @@ export function EvaluatorRunDetailView({
     return detailsEvaluators.filter((e) => {
       const type = getJobEvaluator(e)?.evaluator_type;
       return (
-        (type != null && evaluatorFitsItem(type, item.is_tool_call === true)) ||
+        (type != null && evaluatorFitsItem(type, item)) ||
         rs.some((r) => r.evaluator_id === e.evaluator_id)
       );
     });

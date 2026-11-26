@@ -318,17 +318,19 @@ describe("historyToPayloadFields", () => {
     });
   });
 
-  it("leaves calls under tool_calls alone on an item with a text reply", () => {
+  it("keeps both the reply and the calls under tool_calls on an item that has both", () => {
     const payload = {
       chat_history: [{ role: "user", content: "hi" }],
       agent_response: "Hello",
       tool_calls: [{ tool: "lookup", arguments: { n: 3 } }],
     };
     const history = payloadToHistory(payload, "llm");
-    expect(history.some((t) => t.tool_calls)).toBe(false);
-    const fields = historyToPayloadFields(history, "llm", payload);
-    expect(fields).not.toHaveProperty("tool_calls");
-    expect(fields).not.toHaveProperty("actual_tool_calls", expect.anything());
+    expect(history.some((t) => t.tool_calls)).toBe(true);
+    expect(historyToPayloadFields(history, "llm", payload)).toEqual({
+      chat_history: [{ role: "user", content: "hi" }],
+      agent_response: "Hello",
+      actual_tool_calls: [{ tool: "lookup", arguments: { n: 3 } }],
+    });
   });
 
   it("reads a string tool output back as the same string", () => {

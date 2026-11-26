@@ -47,6 +47,11 @@ export function textOf(raw: unknown): string {
   return readTextField(raw)?.content ?? "";
 }
 
+/** No text, or only spaces, tabs and line breaks, as the backend reads it. */
+export function isBlank(text: string | null | undefined): boolean {
+  return !/[^ \t\r\n]/.test(text ?? "");
+}
+
 /** Writes a reply field back: a plain string when it carries no label and no
  * versions, so an item saved before versions existed keeps its old shape. */
 export function writeTextField(

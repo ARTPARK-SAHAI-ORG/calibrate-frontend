@@ -79,14 +79,14 @@ describe("LlmGeneralItemPane", () => {
     expect(screen.getByText("book_flight")).toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
     expect(
-      screen.getByText("The reply and the tool calls are judged together"),
+      screen.getByText("Tool call evaluators judge the tool calls, and the other evaluators judge the output."),
     ).toBeInTheDocument();
   });
 
   it("shows no judged-together note when the output is only text", () => {
     render(<LlmGeneralItemPane payload={{ input: "Hi", output: "Hello" }} />);
     expect(
-      screen.queryByText("The reply and the tool calls are judged together"),
+      screen.queryByText("Tool call evaluators judge the tool calls, and the other evaluators judge the output."),
     ).not.toBeInTheDocument();
   });
 

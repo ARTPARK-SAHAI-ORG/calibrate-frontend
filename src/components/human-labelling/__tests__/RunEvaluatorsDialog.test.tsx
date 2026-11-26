@@ -108,6 +108,31 @@ describe("RunEvaluatorsDialog", () => {
     expect(screen.getByRole("button", { name: "Run" })).toBeEnabled();
   });
 
+  it("counts an item with a reply and tool calls as fitting either kind", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue([
+      ...detailResponse,
+      {
+        uuid: "ev-tool",
+        live_version_id: "vt-live",
+        live_version_index: 0,
+        versions: [{ uuid: "vt-live", version_number: 1 }],
+      },
+    ]);
+    renderDialog({
+      evaluators: [
+        { uuid: "ev-1", name: "Relevance", evaluator_type: "llm" },
+        { uuid: "ev-tool", name: "Right tool", evaluator_type: "tool-call" },
+      ],
+      items: [{ is_tool_call: true, has_reply: true }, { is_tool_call: true }],
+    });
+    expect(await screen.findByText("Right tool")).toBeInTheDocument();
+    await user.click(screen.getByText("Right tool"));
+    expect(
+      screen.getByText(/^1 of the chosen items fit none of the ticked evaluators/),
+    ).toBeInTheDocument();
+  });
+
   it("turns Run off when no chosen item fits the ticked evaluators", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValue([

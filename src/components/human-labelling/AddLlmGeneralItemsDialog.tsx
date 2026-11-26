@@ -466,15 +466,17 @@ export function AddLlmGeneralItemsDialog({
     }));
   };
 
-  // Only tool-call evaluators score a tool-call item, and only the others
-  // score the rest, so values are required only for the evaluators that
-  // score this item.
+  // Values are required only for the evaluators that score this item: tool
+  // call evaluators score its tool calls, the others score its output.
   const isToolCallItem =
     storesEmptyToolCallList ||
     toolCalls.length > 0 ||
     expected.selectedTools.length > 0;
   const evaluatorFits = (e: LlmGeneralEvaluatorDef) =>
-    evaluatorFitsItem(e.evaluator_type, isToolCallItem);
+    evaluatorFitsItem(e.evaluator_type, {
+      is_tool_call: isToolCallItem,
+      has_reply: !!output.trim(),
+    });
   const varsComplete = evaluatorsWithVariables
     .filter(evaluatorFits)
     .every((e) =>

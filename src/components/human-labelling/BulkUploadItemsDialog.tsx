@@ -3,7 +3,11 @@
 import React, { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { apiClient } from "@/lib/api";
-import { evaluatorFitsItem, isToolCallContent } from "@/lib/labellingItem";
+import {
+  evaluatorFitsItem,
+  isToolCallContent,
+  payloadItemKind,
+} from "@/lib/labellingItem";
 import { ClippedText, ErrorNote } from "@/components/ui";
 import {
   AnnotationOptIn,
@@ -50,8 +54,8 @@ export type BulkLinkedEvaluator = {
   output_type: "binary" | "rating" | null;
   scale_min: number | null;
   scale_max: number | null;
-  // Only a "tool-call" evaluator scores a tool call row, and only the others
-  // score the rest, so a variable is required only on rows its evaluator scores.
+  // A variable is required only on rows its evaluator scores: see
+  // evaluatorFitsItem.
   evaluator_type?: string | null;
 };
 
@@ -417,6 +421,7 @@ export function BulkUploadItemsDialog({
             setParseError(contentError);
             return;
           }
+          const rowKind = payloadItemKind(content);
 
           const refs: EvaluatorRef[] = [];
           let rowError: string | null = null;
@@ -430,7 +435,7 @@ export function BulkUploadItemsDialog({
                 // this row or the item never carried a value for it.
                 if (
                   uploadAnnotations ||
-                  !evaluatorFitsItem(e.evaluator_type, toolCallRow)
+                  !evaluatorFitsItem(e.evaluator_type, rowKind)
                 )
                   continue;
                 rowError = `Row ${i + 1}: missing value for "${variableColumnName(

@@ -1,7 +1,13 @@
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import type { ExpectedToolCall } from "@/components/ToolCallExpectationsEditor";
 import type { MetadataEntry } from "@/components/ui";
-import { readTurnExtras, textOf, type TurnExtras } from "@/lib/messageVersions";
+import {
+  isBlank,
+  readTextField,
+  readTurnExtras,
+  textOf,
+  type TurnExtras,
+} from "@/lib/messageVersions";
 
 export type ItemDetailSourceItem = {
   id: number;
@@ -11,6 +17,7 @@ export type ItemDetailSourceItem = {
   created_at: string;
   deleted_at: string | null;
   is_tool_call?: boolean;
+  has_reply?: boolean;
   metadata?: MetadataEntry[] | null;
 };
 
@@ -26,6 +33,7 @@ export function toItemDetailItem(
     created_at: match.created_at,
     deleted_at: match.deleted_at,
     is_tool_call: match.is_tool_call,
+    has_reply: match.has_reply,
     metadata: match.metadata,
   };
 }
@@ -50,23 +58,29 @@ export function fitsTaskType(
   );
 }
 
-// A tool-call evaluator judges only tool-call rows, and every other evaluator
-// only the rest. The backend applies the same rule when it runs the judges.
+/** What the backend stamps on an item: `is_tool_call` when tool call
+ *  evaluators judge it, `has_reply` when it has reply text. */
+export type ItemKind = { is_tool_call?: boolean; has_reply?: boolean };
+
+// A tool-call evaluator judges tool-call rows; every other evaluator judges a
+// row with no tool calls or with a reply. The backend applies the same rule.
 export function evaluatorFitsItem(
   evaluatorType: string | null | undefined,
-  isToolCallItem: boolean,
+  item: ItemKind,
 ): boolean {
-  return (evaluatorType === "tool-call") === isToolCallItem;
+  return evaluatorType === "tool-call"
+    ? item.is_tool_call === true
+    : item.is_tool_call !== true || item.has_reply === true;
 }
 
 // An evaluator is offered when it fits at least one of the items. With no
 // items to check, every evaluator is offered.
 export function evaluatorsFittingItems<
   E extends { evaluator_type?: string | null },
->(evaluators: E[], items: { is_tool_call?: boolean }[]): E[] {
+>(evaluators: E[], items: ItemKind[]): E[] {
   if (items.length === 0) return evaluators;
   return evaluators.filter((e) =>
-    items.some((it) => evaluatorFitsItem(e.evaluator_type, it.is_tool_call === true)),
+    items.some((it) => evaluatorFitsItem(e.evaluator_type, it)),
   );
 }
 
@@ -162,6 +176,22 @@ export function isToolCallContent(content: Record<string, unknown>): boolean {
   );
 }
 
+/** The item kind of a payload not yet saved, read the way the backend reads
+ *  it: a tool call list from a tool call test, or any tool call the agent
+ *  made, makes it a tool-call item; non-blank reply text is a reply, read
+ *  from `output` only when `agent_response` is missing. */
+export function payloadItemKind(payload: Record<string, unknown>): ItemKind {
+  return {
+    is_tool_call:
+      isToolCallContent(payload) ||
+      (Array.isArray(payload.tool_calls) && payload.tool_calls.length > 0),
+    has_reply: !isBlank(
+      (readTextField(payload.agent_response) ?? readTextField(payload.output))
+        ?.content,
+    ),
+  };
+}
+
 // An empty expected or actual tool call list is kept on save and still marks
 // the item as a tool-call item.
 export function storesEmptyToolCallList(payload: unknown): boolean {
@@ -172,10 +202,8 @@ export function storesEmptyToolCallList(payload: unknown): boolean {
 }
 
 /** The tool calls the agent made: `actual_tool_calls` whenever it is a list,
- * even an empty one, else `tool_calls` when the item has no text reply. The
- * backend reads the same. */
+ * even an empty one, else `tool_calls`. The backend reads the same. */
 export function agentToolCalls(payload: Record<string, unknown>): unknown[] {
   if (Array.isArray(payload.actual_tool_calls)) return payload.actual_tool_calls;
-  if (textOf(payload.agent_response) || textOf(payload.output)) return [];
   return Array.isArray(payload.tool_calls) ? payload.tool_calls : [];
 }

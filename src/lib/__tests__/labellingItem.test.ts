@@ -1,5 +1,5 @@
 import { textFieldsToPayload } from "@/components/human-labelling/itemConversation";
-import { agentToolCalls, evaluatorFitsItem, evaluatorsFittingItems, evaluatorTypesForTask, fitsTaskType, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables, selectedTaskItems, storesEmptyToolCallList } from "../labellingItem";
+import { agentToolCalls, evaluatorFitsItem, payloadItemKind, evaluatorsFittingItems, evaluatorTypesForTask, fitsTaskType, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables, selectedTaskItems, storesEmptyToolCallList } from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
 // field by field, and is_tool_call was left off the list. The dialog then
@@ -42,13 +42,41 @@ describe("toItemDetailItem", () => {
 });
 
 describe("evaluatorFitsItem", () => {
-  it("pairs tool-call evaluators with tool-call rows only", () => {
-    expect(evaluatorFitsItem("tool-call", true)).toBe(true);
-    expect(evaluatorFitsItem("tool-call", false)).toBe(false);
-    expect(evaluatorFitsItem("llm", true)).toBe(false);
-    expect(evaluatorFitsItem("llm", false)).toBe(true);
-    expect(evaluatorFitsItem(undefined, false)).toBe(true);
-    expect(evaluatorFitsItem(undefined, true)).toBe(false);
+  it("pairs tool-call evaluators with tool-call rows, and the others with replies or rows with no tool calls", () => {
+    expect(evaluatorFitsItem("tool-call", { is_tool_call: true })).toBe(true);
+    expect(evaluatorFitsItem("tool-call", { is_tool_call: false })).toBe(false);
+    expect(evaluatorFitsItem("tool-call", { has_reply: true })).toBe(false);
+    expect(evaluatorFitsItem("llm", { is_tool_call: true })).toBe(false);
+    expect(evaluatorFitsItem("llm", { is_tool_call: false })).toBe(true);
+    expect(evaluatorFitsItem(undefined, {})).toBe(true);
+    expect(evaluatorFitsItem(undefined, { is_tool_call: true })).toBe(false);
+  });
+
+  it("lets both kinds judge a row with a reply and tool calls", () => {
+    const both = { is_tool_call: true, has_reply: true };
+    expect(evaluatorFitsItem("tool-call", both)).toBe(true);
+    expect(evaluatorFitsItem("llm", both)).toBe(true);
+  });
+});
+
+describe("payloadItemKind", () => {
+  it("reads tool calls and a non-blank reply off a payload", () => {
+    expect(payloadItemKind({ agent_response: "hi" })).toEqual({ is_tool_call: false, has_reply: true });
+    expect(payloadItemKind({ agent_response: "  ", tool_calls: [{ tool: "a" }] })).toEqual({ is_tool_call: true, has_reply: false });
+    expect(payloadItemKind({ output: "ok", tool_calls: [{ tool: "a" }] })).toEqual({ is_tool_call: true, has_reply: true });
+    expect(payloadItemKind({ expected_tool_calls: [], tool_calls: [] })).toEqual({ is_tool_call: true, has_reply: false });
+    expect(payloadItemKind({ tool_calls: [] })).toEqual({ is_tool_call: false, has_reply: false });
+  });
+
+  it("reads output only when agent_response is missing, as the backend does", () => {
+    expect(payloadItemKind({ agent_response: "", output: "ok" }).has_reply).toBe(false);
+    expect(payloadItemKind({ agent_response: null, output: "ok" }).has_reply).toBe(true);
+    expect(payloadItemKind({ agent_response: { content: "hi" } }).has_reply).toBe(true);
+  });
+
+  it("treats spaces, tabs and line breaks alone as no reply", () => {
+    expect(payloadItemKind({ agent_response: " \t\r\n" }).has_reply).toBe(false);
+    expect(payloadItemKind({ output: { content: "\n\n" } }).has_reply).toBe(false);
   });
 });
 
@@ -197,6 +225,7 @@ describe("agentToolCalls", () => {
   });
   it("falls back to tool_calls, and to nothing", () => {
     expect(agentToolCalls({ tool_calls: calls })).toEqual(calls);
+    expect(agentToolCalls({ agent_response: "hi", tool_calls: calls })).toEqual(calls);
     expect(agentToolCalls({ tool_calls: "x" })).toEqual([]);
     expect(agentToolCalls({})).toEqual([]);
   });
@@ -227,7 +256,7 @@ describe("evaluatorsFittingItems", () => {
     { uuid: "reply", evaluator_type: "llm" },
     { uuid: "calls", evaluator_type: "tool-call" },
   ];
-  const offered = (items: { is_tool_call?: boolean }[]) =>
+  const offered = (items: { is_tool_call?: boolean; has_reply?: boolean }[]) =>
     evaluatorsFittingItems(evaluators, items).map((e) => e.uuid);
 
   it("offers every evaluator when there are no items", () => {
@@ -244,5 +273,9 @@ describe("evaluatorsFittingItems", () => {
 
   it("offers both when the items are of both kinds", () => {
     expect(offered([{ is_tool_call: true }, {}])).toEqual(["reply", "calls"]);
+  });
+
+  it("offers both for one item with a reply and tool calls", () => {
+    expect(offered([{ is_tool_call: true, has_reply: true }])).toEqual(["reply", "calls"]);
   });
 });

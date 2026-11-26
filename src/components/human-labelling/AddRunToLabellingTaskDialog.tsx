@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/lib/nav";
 import { apiClient, unwrapList } from "@/lib/api";
 import { reportError } from "@/lib/reportError";
-import { isToolCallOutput, type TraceOutputFacts } from "@/lib/traceScoring";
+import type { TraceOutputFacts } from "@/lib/traceScoring";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import type { TestCaseResult } from "@/components/TestRunnerDialog";
 import type { BenchmarkModelResult } from "@/components/eval-details";
@@ -195,8 +195,10 @@ export function traceOutputFacts(t: TraceLabellingItem): TraceOutputFacts {
   };
 }
 
+/** A trace that called a tool becomes a tool-call item, keeping any reply
+ * beside the calls so both kinds of evaluator judge it. */
 export function isToolCallTrace(t: TraceLabellingItem): boolean {
-  return isToolCallOutput(traceOutputFacts(t));
+  return traceOutputFacts(t).hasToolCalls;
 }
 
 export function isLabellableTrace(t: TraceLabellingItem): boolean {
@@ -388,7 +390,7 @@ export function isLabellingEligibleRaw(raw: RawTestCaseLike): boolean {
 
 // Build a tool-call item — a normal item inside an `llm` or `llm-general`
 // task, carrying the expected match spec and the tool calls the agent actually
-// made. Only tool-call evaluators judge it.
+// made. Tool-call evaluators judge it, and the others judge any reply.
 // `actual_tool_calls` is what marks the item as a tool-call one.
 function buildToolCallItem(
   raw: RawTestCaseLike,
@@ -726,9 +728,10 @@ export function buildItemsFromSource(
             skippedCount += 1;
             continue;
           }
-          // A trace that only called a tool becomes a tool-call item here too,
-          // holding the call beside the input that produced it. There is no
-          // expected call to compare against, so a person judges it on its own.
+          // A trace that called a tool becomes a tool-call item here too,
+          // holding the call and any output beside the input that produced
+          // it. There is no expected call to compare against, so a person
+          // judges it on its own.
           if (isToolCallTrace(t)) {
             items.push({
               ...buildToolCallItem({
@@ -737,7 +740,10 @@ export function buildItemsFromSource(
                   input,
                   evaluation: { type: "tool_call", tool_calls: [] },
                 },
-                output: t.output as { tool_calls?: ToolCallOutput[] },
+                output: t.output as {
+                  response?: string;
+                  tool_calls?: ToolCallOutput[];
+                },
               }),
               metadata: t.metadata,
             });
@@ -763,10 +769,10 @@ export function buildItemsFromSource(
           toolCallEvaluatorUuids,
         };
       }
-      // Conversational traces all go to an `llm` task: a trace that replied
-      // becomes a response item, a trace that only called a tool becomes a
-      // tool-call item. A trace has no expected calls, so that side stays
-      // empty and a person judges the call on its own.
+      // Conversational traces all go to an `llm` task: a trace that called a
+      // tool becomes a tool-call item, keeping any reply, and a trace that
+      // only replied becomes a response item. A trace has no expected calls,
+      // so that side stays empty and a person judges the call on its own.
       for (const t of source.traces) {
         if (!isLabellableTrace(t)) {
           skippedCount += 1;
@@ -780,7 +786,10 @@ export function buildItemsFromSource(
                 history: t.input as TestCaseHistory[],
                 evaluation: { type: "tool_call", tool_calls: [] },
               },
-              output: t.output as { tool_calls?: ToolCallOutput[] },
+              output: t.output as {
+                response?: string;
+                tool_calls?: ToolCallOutput[];
+              },
             }),
             metadata: t.metadata,
           });

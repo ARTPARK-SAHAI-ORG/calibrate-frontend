@@ -162,9 +162,8 @@ type AssignAnnotatorsDialogProps = {
    * Tool call correctness is then shown ticked and cannot be unticked, and
    * custom tool-call labels are offered. */
   hasToolCallItems: boolean;
-  /** True when at least one of the chosen items is answered in writing rather
-   * than by a tool call. Labels that are not tool-call labels are offered only
-   * then. */
+  /** True when at least one of the chosen items has a reply, or has no tool
+   * calls. Labels that are not tool-call labels are offered only then. */
   hasNonToolCallItems: boolean;
   onClose: () => void;
   /** The evaluators to show in the created labelling jobs. */
@@ -244,7 +243,7 @@ export function AssignAnnotatorsDialog({
   const choosableEvaluators = evaluators.filter(
     (ev) =>
       !isBuiltInToolCallEvaluator(ev) &&
-      (evaluatorFitsItem(ev.evaluator_type, true)
+      (evaluatorFitsItem(ev.evaluator_type, { is_tool_call: true })
         ? hasToolCallItems
         : hasNonToolCallItems),
   );
@@ -357,17 +356,19 @@ export function AssignAnnotatorsDialog({
     ({ isToolCall, chosen }) =>
       chosen &&
       offeredLabels.some((ev) =>
-        evaluatorFitsItem(ev.evaluator_type, isToolCall),
+        evaluatorFitsItem(ev.evaluator_type, { is_tool_call: isToolCall }),
       ) &&
       !shownLabels.some((ev) =>
-        evaluatorFitsItem(ev.evaluator_type, isToolCall),
+        evaluatorFitsItem(ev.evaluator_type, { is_tool_call: isToolCall }),
       ),
   );
   const evaluatorSelectionValid = kindsMissingLabel.length === 0;
   const missingLabelMessage =
     kindsMissingLabel.length === 1 && hasToolCallItems && hasNonToolCallItems
       ? `Pick at least one label for the ${
-          kindsMissingLabel[0].isToolCall ? "tool-call items" : "other items"
+          kindsMissingLabel[0].isToolCall
+            ? "items with tool calls"
+            : "items with a reply"
         }`
       : "Pick at least one label";
   const allEvaluatorsPicked =
