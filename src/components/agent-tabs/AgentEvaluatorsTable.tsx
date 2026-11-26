@@ -59,7 +59,7 @@ export function AgentEvaluatorsTable({
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3 mb-3">
+      <div className="flex items-center justify-between gap-3 mb-3 min-h-8">
         <p className="text-sm text-muted-foreground">
           {evaluators.length}{" "}
           {evaluators.length === 1 ? "evaluator" : "evaluators"}
