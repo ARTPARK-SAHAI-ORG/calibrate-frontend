@@ -73,7 +73,6 @@ export function TextVersionsEditor({
   onChange,
   onPendingChange,
   disabled = false,
-  headingAside,
   children,
 }: {
   field: "input" | "output";
@@ -82,8 +81,6 @@ export function TextVersionsEditor({
   /** Told whether a typed heading or name is waiting for its tick. */
   onPendingChange?: (pending: boolean) => void;
   disabled?: boolean;
-  /** Drawn at the end of the heading's row. */
-  headingAside?: ReactNode;
   children: ReactNode;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -174,9 +171,7 @@ export function TextVersionsEditor({
 
   return (
     <>
-      {/* As tall as the buttons a caller may add, so the heading rows of
-          two boxes side by side line up. */}
-      <div className="flex items-center gap-1 min-h-9 mb-3">
+      <div className="flex items-center gap-1 mb-3">
         <input
           type="text"
           value={headingDraft ?? label}
@@ -203,7 +198,6 @@ export function TextVersionsEditor({
             canConfirm={!headingTaken}
           />
         )}
-        {headingAside}
       </div>
       {headingTaken && (
         <p className="text-xs text-red-500 px-4 -mt-1 mb-3">{TAKEN_MESSAGE}</p>

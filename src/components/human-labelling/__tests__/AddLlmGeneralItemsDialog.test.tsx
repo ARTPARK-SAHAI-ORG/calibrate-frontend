@@ -1422,6 +1422,13 @@ describe("AddLlmGeneralItemsDialog", () => {
       fireEvent.mouseUp(document);
     };
 
+    it("opens with the form column at 28% when nothing is saved", () => {
+      renderDialog();
+      expect(leftColumn().style.getPropertyValue("--form-column-width")).toBe(
+        "28%",
+      );
+    });
+
     it("opens at the widths saved in this browser", () => {
       window.localStorage.setItem(LEFT, "30");
       window.localStorage.setItem(RIGHT, "35");
