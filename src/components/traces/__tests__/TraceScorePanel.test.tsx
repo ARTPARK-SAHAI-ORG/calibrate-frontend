@@ -1,4 +1,4 @@
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import { CONTACT_LINK } from "@/constants/limits";
 import { TraceScorePanel } from "../TraceScorePanel";
 import type { TraceScoringRun } from "@/lib/tracesApi";
@@ -302,4 +302,65 @@ it("names each evaluator that could not score the trace, and why", () => {
   expect(
     screen.getByText(/uses variables, which cannot be filled/),
   ).toBeInTheDocument();
+});
+
+describe("the Score this trace button", () => {
+  const skippedFor = (error: string): TraceScoringRun => ({
+    run_uuid: "r-score",
+    status: "skipped",
+    created_at: "2026-08-29T12:00:00Z",
+    error,
+    results: [],
+  });
+  const button = <button type="button">Score this trace</button>;
+
+  it("shows under the no-evaluator reason in place of the list of evaluators that cannot score", () => {
+    render(
+      <TraceScorePanel
+        run={skippedFor("no_usable_evaluators")}
+        scoreTrace={button}
+        scoringEvaluatorNames={["Helpfulness", "Tone", "Safety"]}
+        ineligible={[
+          { evaluator_uuid: "ev-x", name: "Clarity", reason: "no_live_version" },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Score this trace" }),
+    ).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent("Clarity");
+    for (const name of ["Helpfulness", "Tone", "Safety"]) {
+      expect(screen.getByText(name).tagName).toBe("SPAN");
+      expect(screen.getByText(name)).toHaveClass("rounded-md");
+    }
+    expect(document.body).toHaveTextContent(
+      /This trace was not scored because none of the agent's evaluators could score it then\. Helpfulness, Tone and Safety can score it now\.\s*Score this trace$/,
+    );
+  });
+
+  it("does not show for a trace skipped for another reason", () => {
+    render(
+      <TraceScorePanel run={skippedFor("over_limit")} scoreTrace={button} />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Score this trace" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+it("offers Try again on a failed run only when given a way to retry", async () => {
+  const failed: TraceScoringRun = {
+    run_uuid: "r-failed",
+    status: "failed",
+    created_at: "2026-08-29T12:00:00Z",
+    error: "Error code: 402",
+    results: [],
+  };
+  const onTryAgain = jest.fn();
+  const user = setupUser();
+  const { rerender } = render(<TraceScorePanel run={failed} />);
+  expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+  rerender(<TraceScorePanel run={failed} onTryAgain={onTryAgain} />);
+  await user.click(screen.getByRole("button", { name: "Try again" }));
+  expect(onTryAgain).toHaveBeenCalledTimes(1);
 });

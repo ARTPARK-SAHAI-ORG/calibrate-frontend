@@ -190,6 +190,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     onToggleSelected,
     selectedCount,
     evaluatorDescriptions,
+    scoringEvaluatorNames,
   }: {
     isOpen: boolean;
     traceUuid: string | null;
@@ -202,9 +203,13 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     onToggleSelected?: () => void;
     selectedCount?: number;
     evaluatorDescriptions?: Record<string, string>;
+    scoringEvaluatorNames?: string[];
   }) =>
     isOpen ? (
-      <div data-testid="trace-detail">
+      <div
+        data-testid="trace-detail"
+        data-scoring-names={(scoringEvaluatorNames ?? []).join(",")}
+      >
         {traceUuid}
         <span data-testid="trace-detail-descriptions">
           {Object.entries(evaluatorDescriptions ?? {})
@@ -2765,6 +2770,65 @@ describe("TracesTabContent", () => {
       // The selection survives so the reader can try again.
       expect(screen.getByText("Submit for labelling (1)")).toBeInTheDocument();
     });
+  });
+
+  it.each([
+    ["scoring is on and an evaluator can score traces", true, 1, "Tone"],
+    ["scoring is off", false, 1, ""],
+    ["no evaluator can score traces", true, 0, ""],
+    ["the evaluators that can score traces have not loaded", true, null, ""],
+  ])(
+    "names the evaluators that can score a skipped trace again when %s",
+    async (_name, enabled, eligibleCount, expected) => {
+      const user = setupUser();
+      mockUseTraces.mockReturnValue(tracesResult([trace({ input_preview: "Open me" })]));
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            enabled,
+            eligibility:
+              eligibleCount === null
+                ? null
+                : {
+                    eligible: traceScoring.eligibility.eligible.slice(0, eligibleCount),
+                    ineligible: [],
+                  },
+          }}
+        />,
+      );
+      await user.click(screen.getAllByText("Open me")[0]);
+      expect(screen.getByTestId("trace-detail")).toHaveAttribute(
+        "data-scoring-names",
+        expected,
+      );
+    },
+  );
+
+  it("names no evaluators to score a trace again once the workspace's scoring limit is reached", async () => {
+    const user = setupUser();
+    fetchTraceUsage.mockResolvedValue({
+      traces_stored: 5,
+      max_traces: 50000,
+      traces_scored: 100,
+      max_scored_traces: 100,
+    });
+    mockUseTraces.mockReturnValue(tracesResult([trace({ input_preview: "Open me" })]));
+    render(
+      <TracesTabContent
+        {...tabProps}
+        traceScoring={{ ...traceScoring, enabled: true }}
+      />,
+    );
+    await waitFor(() => expect(fetchTraceUsage).toHaveBeenCalled());
+    await user.click(screen.getAllByText("Open me")[0]);
+    await waitFor(() =>
+      expect(screen.getByTestId("trace-detail")).toHaveAttribute(
+        "data-scoring-names",
+        "",
+      ),
+    );
   });
 
   it("opens the detail view for the trace that was clicked", async () => {

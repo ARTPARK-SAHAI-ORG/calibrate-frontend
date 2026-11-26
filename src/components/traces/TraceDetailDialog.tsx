@@ -1,7 +1,8 @@
 "use client";
 
 import { StoppedEarlyNote } from "@/components/chat/StoppedEarlyNote";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Link } from "@/lib/nav";
 import {
@@ -27,6 +28,7 @@ import {
   fetchTrace,
   fetchTraces,
   fetchTraceScores,
+  scoreTrace,
   MAX_TRACES_PAGE_SIZE,
   traceInputTurns,
   TraceDetail,
@@ -41,6 +43,7 @@ import {
 import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
+import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 import {
   formatTraceDate,
   TraceFeedbackThumb,
@@ -64,6 +67,11 @@ type TraceDetailDialogProps = {
   evaluatorDescriptions?: Record<string, string>;
   /** The agent's evaluators that cannot score traces, and why. */
   ineligibleEvaluators?: TraceScoringIneligibleEvaluator[];
+  /** The agent's evaluators that can score this trace now. With any, a trace
+   *  skipped for lacking one can be scored again. */
+  scoringEvaluatorNames?: string[];
+  /** Told once a new scoring run was started, so the list can show it. */
+  onScored?: () => void;
   /** Whether this trace is ticked in the list behind the dialog. */
   isSelected?: boolean;
   /** Tick or untick this trace without closing the dialog and going back to
@@ -373,6 +381,8 @@ export function TraceDetailDialog({
   selectedCount = 0,
   conversation = null,
   ineligibleEvaluators,
+  scoringEvaluatorNames = [],
+  onScored,
 }: TraceDetailDialogProps) {
   useHideFloatingButton(isOpen);
   // Scores belong to one turn, not the conversation, so none are loaded for it.
@@ -484,6 +494,48 @@ export function TraceDetailDialog({
       window.clearInterval(timer);
     };
   }, [isOpen, traceUuid, accessToken, hasOpenScoreRun]);
+
+  // The trace being sent, so moving to another trace leaves its button on.
+  const [scoringUuid, setScoringUuid] = useState<string | null>(null);
+  const shownTraceRef = useRef(traceUuid);
+  shownTraceRef.current = traceUuid;
+  const startScoring = async () => {
+    if (!accessToken || !traceUuid || scoringUuid === traceUuid) return;
+    const scored = traceUuid;
+    setScoringUuid(scored);
+    try {
+      const run = await scoreTrace(accessToken, scored);
+      onScored?.();
+      // The reader may have moved to another trace while this was sent.
+      if (shownTraceRef.current !== scored) return;
+      // A pending run shows the spinner, and the poll above takes it from there.
+      setLatestRun({
+        run_uuid: run.run_uuid,
+        status: run.status,
+        created_at: new Date().toISOString(),
+        error: null,
+        results: [],
+      });
+    } catch (err) {
+      toast.error(
+        parseBackendErrorMessage(err, "Could not score this trace. Please try again."),
+      );
+    } finally {
+      setScoringUuid((current) => (current === scored ? null : current));
+    }
+  };
+  const scoreTraceButton = scoringEvaluatorNames.length > 0 ? (
+    <button
+      type="button"
+      onClick={() => void startScoring()}
+      disabled={scoringUuid === traceUuid}
+      className="h-8 px-2.5 rounded-md text-sm font-medium border bg-amber-500/12 border-amber-500/45 text-amber-950 dark:text-amber-100 transition-colors hover:bg-amber-500/22 dark:hover:bg-amber-500/18 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+    >
+      Score this trace
+    </button>
+  ) : undefined;
+  const tryAgain =
+    scoringEvaluatorNames.length > 0 ? () => void startScoring() : undefined;
 
   useDialogNavKeys({ isOpen, onClose, hasPrev, onPrev, hasNext, onNext });
   // Same width and limits as the evaluators column of the test results window.
@@ -668,6 +720,9 @@ export function TraceDetailDialog({
                   error={scoresError}
                   descriptions={evaluatorDescriptions}
                   ineligible={ineligibleEvaluators}
+                  scoreTrace={scoreTraceButton}
+                  scoringEvaluatorNames={scoringEvaluatorNames}
+                  onTryAgain={tryAgain}
                 />
               </div>
             )}
@@ -692,6 +747,9 @@ export function TraceDetailDialog({
                     error={scoresError}
                     descriptions={evaluatorDescriptions}
                     ineligible={ineligibleEvaluators}
+                    scoreTrace={scoreTraceButton}
+                    scoringEvaluatorNames={scoringEvaluatorNames}
+                    onTryAgain={tryAgain}
                   />
                 </div>
               </div>

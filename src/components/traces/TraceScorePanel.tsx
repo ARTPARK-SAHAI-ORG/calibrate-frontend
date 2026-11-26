@@ -1,6 +1,7 @@
 "use client";
 
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
+import { EVALUATOR_PILL_CLASSES } from "@/components/EvaluatorPillList";
 import { RunFailureBox } from "@/components/RunFailureBox";
 import { SpinnerIcon } from "@/components/icons";
 import { CONTACT_LINK } from "@/constants/limits";
@@ -10,6 +11,7 @@ import {
   isTraceScoringInProgress,
   scoringRunErrorCopy,
 } from "@/lib/traceScoring";
+import type React from "react";
 import type {
   TraceScoreResult,
   TraceScoringIneligibleEvaluator,
@@ -26,7 +28,16 @@ type TraceScorePanelProps = {
   /** The agent's evaluators that cannot score traces, and why. Named under
    *  "No evaluators could score this trace" so the reader knows what to fix. */
   ineligible?: TraceScoringIneligibleEvaluator[];
+  /** The button that scores the trace again, shown when it was skipped for
+   *  having no evaluator that could score it and the agent now has one. */
+  scoreTrace?: React.ReactNode;
+  /** The agent's evaluators that can score this trace now, named beside it. */
+  scoringEvaluatorNames?: string[];
+  /** Scores the trace again after its scoring failed. */
+  onTryAgain?: () => void;
 };
+
+const listNames = new Intl.ListFormat("en-GB", { type: "conjunction" });
 
 /** The verdict card keeps binary and rating displays apart, so the stored
  *  numeric `value` is split back into the field its output type reads. */
@@ -44,10 +55,16 @@ function RunBody({
   run,
   descriptions,
   ineligible = [],
+  scoreTrace,
+  scoringEvaluatorNames = [],
+  onTryAgain,
 }: {
   run: TraceScoringRun;
   descriptions?: Record<string, string>;
   ineligible?: TraceScoringIneligibleEvaluator[];
+  scoreTrace?: React.ReactNode;
+  scoringEvaluatorNames?: string[];
+  onTryAgain?: () => void;
 }) {
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
   if (isTraceScoringInProgress(run.status)) {
@@ -65,6 +82,7 @@ function RunBody({
         details={run.error ?? null}
         sentence="The evaluators could not score this trace."
         className="w-full"
+        onTryAgain={onTryAgain}
       />
     );
   }
@@ -73,14 +91,30 @@ function RunBody({
   // the same amber box the Traces tab uses. Only the limit has somewhere for
   // the reader to go next, so only it carries the link.
   if (run.status === "skipped") {
+    const canScore = !!scoreTrace && run.error === "no_usable_evaluators";
     return (
       <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
         <p className="text-sm text-amber-700 dark:text-amber-300">
-          {/* A lone reason takes no full stop. Only the limit one is followed
-              by a second sentence, so only it needs one. */}
-          {run.error === "over_limit" && usesOwnProviderKeys
-            ? "This trace was not scored because the workspace had reached its scoring limit at the time"
-            : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`}
+          {/* A lone reason takes no full stop. One followed by a second
+              sentence or a button takes one. */}
+          {canScore ? (
+            <>
+              This trace was not scored because none of the agent&apos;s
+              evaluators could score it then.{" "}
+              {listNames.formatToParts(scoringEvaluatorNames).map((part, i) =>
+                part.type === "element" ? (
+                  <span key={i} className={EVALUATOR_PILL_CLASSES}>
+                    {part.value}
+                  </span>
+                ) : (
+                  part.value
+                ),
+              )}{" "}
+              can score it now.
+            </>
+          ) : run.error === "over_limit" && usesOwnProviderKeys
+              ? "This trace was not scored because the workspace had reached its scoring limit at the time"
+              : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`}
           {run.error === "over_limit" && !usesOwnProviderKeys && (
             <>
               {" "}
@@ -96,7 +130,8 @@ function RunBody({
             </>
           )}
         </p>
-        {run.error === "no_usable_evaluators" && ineligible.length > 0 && (
+        {canScore && <div className="mt-2">{scoreTrace}</div>}
+        {run.error === "no_usable_evaluators" && !canScore && ineligible.length > 0 && (
           <ul className="mt-1 list-disc pl-5 text-sm text-amber-700 dark:text-amber-300">
             {ineligible.map((item) => (
               <li key={item.evaluator_uuid}>
@@ -148,6 +183,9 @@ export function TraceScorePanel({
   error = null,
   descriptions,
   ineligible,
+  scoreTrace,
+  scoringEvaluatorNames,
+  onTryAgain,
 }: TraceScorePanelProps) {
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -159,6 +197,9 @@ export function TraceScorePanel({
           run={run}
           descriptions={descriptions}
           ineligible={ineligible}
+          scoreTrace={scoreTrace}
+          scoringEvaluatorNames={scoringEvaluatorNames}
+          onTryAgain={onTryAgain}
         />
       ) : null}
     </div>
