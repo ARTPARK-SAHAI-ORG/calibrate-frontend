@@ -1,7 +1,8 @@
 "use client";
 
 import { StoppedEarlyNote } from "@/components/chat/StoppedEarlyNote";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Link } from "@/lib/nav";
 import {
@@ -28,6 +29,7 @@ import {
   fetchTraces,
   fetchTraceScores,
   MAX_TRACES_PAGE_SIZE,
+  scoreTrace,
   traceInputTurns,
   TraceDetail,
   TraceOutput,
@@ -41,6 +43,7 @@ import {
 import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
+import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 import {
   formatTraceDate,
   TraceFeedbackThumb,
@@ -69,6 +72,9 @@ type TraceDetailDialogProps = {
   addToolCallEvaluator?: React.ReactNode;
   /** Opens the agent's Evaluators tab, for a trace no evaluator fits. */
   onGoToEvaluators?: () => void;
+  /** The agent now has an evaluator that fits this trace, so a trace skipped
+   *  for lacking one can be scored again. */
+  canScoreTrace?: boolean;
   /** A window opened from inside this one is on screen, so Escape and the
    *  arrow keys belong to it. */
   keysPaused?: boolean;
@@ -378,6 +384,7 @@ export function TraceDetailDialog({
   evaluatorDescriptions,
   addToolCallEvaluator,
   onGoToEvaluators,
+  canScoreTrace = false,
   keysPaused = false,
   isSelected = false,
   onToggleSelected,
@@ -495,6 +502,44 @@ export function TraceDetailDialog({
       window.clearInterval(timer);
     };
   }, [isOpen, traceUuid, accessToken, hasOpenScoreRun]);
+
+  const [isScoring, setIsScoring] = useState(false);
+  const shownTraceRef = useRef(traceUuid);
+  shownTraceRef.current = traceUuid;
+  const startScoring = async () => {
+    if (!accessToken || !traceUuid || isScoring) return;
+    setIsScoring(true);
+    const scored = traceUuid;
+    try {
+      const run = await scoreTrace(accessToken, scored);
+      // The reader may have moved to another trace while this was sent.
+      if (shownTraceRef.current !== scored) return;
+      // A pending run shows the spinner, and the poll above takes it from there.
+      setLatestRun({
+        run_uuid: run.run_uuid,
+        status: run.status,
+        created_at: new Date().toISOString(),
+        error: null,
+        results: [],
+      });
+    } catch (err) {
+      toast.error(
+        parseBackendErrorMessage(err, "Could not score this trace. Please try again."),
+      );
+    } finally {
+      setIsScoring(false);
+    }
+  };
+  const scoreTraceButton = canScoreTrace ? (
+    <button
+      type="button"
+      onClick={() => void startScoring()}
+      disabled={isScoring}
+      className="h-8 px-2.5 rounded-md text-sm font-medium border bg-amber-500/12 border-amber-500/45 text-amber-950 dark:text-amber-100 transition-colors hover:bg-amber-500/22 dark:hover:bg-amber-500/18 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+    >
+      Score this trace
+    </button>
+  ) : undefined;
 
   useDialogNavKeys({
     isOpen: isOpen && !keysPaused,
@@ -688,6 +733,7 @@ export function TraceDetailDialog({
                   ineligible={ineligibleEvaluators}
                   addToolCallEvaluator={addToolCallEvaluator}
                   onGoToEvaluators={onGoToEvaluators}
+                  scoreTrace={scoreTraceButton}
                 />
               </div>
             )}
@@ -714,6 +760,7 @@ export function TraceDetailDialog({
                     ineligible={ineligibleEvaluators}
                     addToolCallEvaluator={addToolCallEvaluator}
                     onGoToEvaluators={onGoToEvaluators}
+                    scoreTrace={scoreTraceButton}
                   />
                 </div>
               </div>

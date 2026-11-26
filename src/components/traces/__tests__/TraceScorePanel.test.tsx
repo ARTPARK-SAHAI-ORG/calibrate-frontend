@@ -377,3 +377,47 @@ it("offers the button only beside the missing tool call evaluator reason", () =>
     screen.queryByRole("button", { name: "Add a tool call evaluator" }),
   ).not.toBeInTheDocument();
 });
+
+describe("the Score this trace button", () => {
+  const skippedFor = (error: string): TraceScoringRun => ({
+    run_uuid: "r-score",
+    status: "skipped",
+    created_at: "2026-08-29T12:00:00Z",
+    error,
+    results: [],
+  });
+  const button = <button type="button">Score this trace</button>;
+
+  it.each(["no_tool_call_evaluator", "no_usable_evaluators"])(
+    "shows under the %s reason in place of the way to add an evaluator",
+    (reason) => {
+      render(
+        <TraceScorePanel
+          run={skippedFor(reason)}
+          scoreTrace={button}
+          addToolCallEvaluator={
+            <button type="button">Add a tool call evaluator</button>
+          }
+          onGoToEvaluators={jest.fn()}
+        />,
+      );
+      expect(
+        screen.getByRole("button", { name: "Score this trace" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Add a tool call evaluator" }),
+      ).not.toBeInTheDocument();
+      expect(document.body).not.toHaveTextContent("Add one that can");
+      expect(document.body).toHaveTextContent(/\.\s*Score this trace$/);
+    },
+  );
+
+  it("does not show for a trace skipped for another reason", () => {
+    render(
+      <TraceScorePanel run={skippedFor("over_limit")} scoreTrace={button} />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Score this trace" }),
+    ).not.toBeInTheDocument();
+  });
+});

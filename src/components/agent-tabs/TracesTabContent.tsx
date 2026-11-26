@@ -787,6 +787,17 @@ export function TracesTabContent({
           ),
         )
       : ineligible;
+  const canScoreOpenTrace =
+    !!openTraceItem &&
+    !!evaluatorTypes &&
+    (eligibility?.eligible ?? []).some(
+      (item) =>
+        !!evaluatorTypes[item.evaluator_uuid] &&
+        evaluatorFitsItem(
+          evaluatorTypes[item.evaluator_uuid],
+          isToolCallTraceRow(openTraceItem),
+        ),
+    );
   const closeTrace = () => {
     itemPager.cancel();
     setOpenTraceUuid(null);
@@ -1271,6 +1282,7 @@ export function TracesTabContent({
         addToolCallEvaluator={
           missingToolCallEvaluator ? addToolCallEvaluatorButton(true) : undefined
         }
+        canScoreTrace={canScoreOpenTrace}
         onGoToEvaluators={() => {
           closeTrace();
           onGoToEvaluators();

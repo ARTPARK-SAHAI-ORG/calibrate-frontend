@@ -33,6 +33,9 @@ type TraceScorePanelProps = {
   addToolCallEvaluator?: React.ReactNode;
   /** Opens the agent's Evaluators tab, for a trace no evaluator fits. */
   onGoToEvaluators?: () => void;
+  /** The button that scores the trace again, shown when it was skipped for
+   *  having no evaluator that fits and the agent now has one. */
+  scoreTrace?: React.ReactNode;
 };
 
 /** The verdict card keeps binary and rating displays apart, so the stored
@@ -53,12 +56,14 @@ function RunBody({
   ineligible = [],
   addToolCallEvaluator,
   onGoToEvaluators,
+  scoreTrace,
 }: {
   run: TraceScoringRun;
   descriptions?: Record<string, string>;
   ineligible?: TraceScoringIneligibleEvaluator[];
   addToolCallEvaluator?: React.ReactNode;
   onGoToEvaluators?: () => void;
+  scoreTrace?: React.ReactNode;
 }) {
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
   if (isTraceScoringInProgress(run.status)) {
@@ -75,10 +80,16 @@ function RunBody({
   // a missing tool call evaluator and an agent with no evaluator that fits
   // have somewhere for the reader to go next, so only they carry a link.
   if (run.status === "failed" || run.status === "skipped") {
+    const canScore =
+      !!scoreTrace &&
+      (run.error === "no_tool_call_evaluator" ||
+        run.error === "no_usable_evaluators");
     return (
       <WarningBox
         after={
-          run.error === "no_tool_call_evaluator" && addToolCallEvaluator ? (
+          canScore ? (
+            <div className="mt-2">{scoreTrace}</div>
+          ) : run.error === "no_tool_call_evaluator" && addToolCallEvaluator ? (
             <div className="mt-2">{addToolCallEvaluator}</div>
           ) : (
             run.error === "no_usable_evaluators" &&
@@ -100,13 +111,17 @@ function RunBody({
         {run.error === "over_limit" && usesOwnProviderKeys
           ? "This trace was not scored because the workspace had reached its scoring limit at the time"
           : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`}
-        {run.error === "no_usable_evaluators" && onGoToEvaluators && (
+        {canScore && "."}
+        {run.error === "no_usable_evaluators" && onGoToEvaluators && !canScore && (
           <>
             . Add one that can in the{" "}
             <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
           </>
         )}
-        {run.error === "no_tool_call_evaluator" && addToolCallEvaluator && "."}
+        {run.error === "no_tool_call_evaluator" &&
+          addToolCallEvaluator &&
+          !canScore &&
+          "."}
         {run.error === "over_limit" && !usesOwnProviderKeys && (
           <>
             {" "}
@@ -157,6 +172,7 @@ export function TraceScorePanel({
   ineligible,
   addToolCallEvaluator,
   onGoToEvaluators,
+  scoreTrace,
 }: TraceScorePanelProps) {
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -170,6 +186,7 @@ export function TraceScorePanel({
           ineligible={ineligible}
           addToolCallEvaluator={addToolCallEvaluator}
           onGoToEvaluators={onGoToEvaluators}
+          scoreTrace={scoreTrace}
         />
       ) : null}
     </div>
