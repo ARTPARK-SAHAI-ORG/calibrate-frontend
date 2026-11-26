@@ -42,6 +42,8 @@ type ManageEvaluatorsDialogProps = {
   taskUuid: string;
   taskType?: EvaluatorType;
   currentEvaluatorIds: string[];
+  /** The task holds a tool call item, which only a tool call evaluator answers. */
+  hasToolCallItems?: boolean;
   currentOptionalIds: string[];
   onClose: () => void;
   onSaved: () => void;
@@ -52,6 +54,7 @@ export function ManageEvaluatorsDialog({
   taskUuid,
   taskType,
   currentEvaluatorIds,
+  hasToolCallItems = false,
   currentOptionalIds,
   onClose,
   onSaved,
@@ -108,12 +111,11 @@ export function ManageEvaluatorsDialog({
   }, [accessToken]);
 
   // Tool call items are answered only through a tool call evaluator, so a
-  // task that has one keeps at least one: the last one ticked is locked.
+  // task with one keeps at least one: the last one ticked is locked.
   const isToolCall = (uuid: string) =>
     evaluators.some((e) => e.uuid === uuid && e.evaluator_type === "tool-call");
-  const taskHasToolCallEvaluator = currentEvaluatorIds.some(isToolCall);
   const isLocked = (uuid: string) =>
-    taskHasToolCallEvaluator &&
+    hasToolCallItems &&
     selectedIds.has(uuid) &&
     isToolCall(uuid) &&
     ![...selectedIds].some((other) => other !== uuid && isToolCall(other));

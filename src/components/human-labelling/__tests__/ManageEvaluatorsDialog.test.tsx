@@ -109,7 +109,7 @@ describe("ManageEvaluatorsDialog", () => {
         { uuid: "ev-tc-2", name: "Booking calls", evaluator_type: "tool-call" },
       ],
     });
-    renderDialog({ currentEvaluatorIds: ["ev-1", "ev-tc"] });
+    renderDialog({ currentEvaluatorIds: ["ev-1", "ev-tc"], hasToolCallItems: true });
     await waitForCatalogueLoaded();
     const box = catalogueCheckbox("Tool call correctness");
     expect(box).toBeChecked();
@@ -131,14 +131,14 @@ describe("ManageEvaluatorsDialog", () => {
     expect(catalogueCheckbox("Booking calls")).toBeDisabled();
   });
 
-  it("locks nothing on a task with no tool call evaluator", async () => {
+  it("locks nothing on a task with no tool call items", async () => {
     mockApiClient.mockResolvedValue({
       items: [
         ...EVALUATORS,
         { uuid: "ev-tc", name: "Tool call correctness", evaluator_type: "tool-call" },
       ],
     });
-    renderDialog({ currentEvaluatorIds: ["ev-1"] });
+    renderDialog({ currentEvaluatorIds: ["ev-1", "ev-tc"] });
     await waitForCatalogueLoaded();
     expect(catalogueCheckbox("Tool call correctness")).not.toBeDisabled();
   });

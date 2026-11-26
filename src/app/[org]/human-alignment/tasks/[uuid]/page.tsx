@@ -4198,6 +4198,9 @@ function LabellingTaskPageInner() {
           taskUuid={task.uuid}
           taskType={taskType}
           currentEvaluatorIds={(task.evaluators ?? []).map((e) => e.uuid)}
+          hasToolCallItems={(task.items ?? []).some(
+            (it) => it.is_tool_call === true,
+          )}
           currentOptionalIds={(task.evaluators ?? [])
             .filter((e) => e.is_optional)
             .map((e) => e.uuid)}
