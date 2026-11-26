@@ -992,7 +992,7 @@ describe("BulkUploadTestsModal", () => {
       );
       await user.click(screen.getByText("Download CSV format guidelines"));
       const call = (generateGuidelinesPdf as jest.Mock).mock.calls[0][0];
-      expect(call.title).toBe("Bulk upload — Agent Response tests");
+      expect(call.title).toBe("Bulk upload — Conversation reply tests");
       expect(
         call.columns.some((c: any) => c.name === "conversation_history"),
       ).toBe(true);

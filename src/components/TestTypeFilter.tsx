@@ -14,14 +14,29 @@ export { matchesTestTypeFilter };
  * Options for the test-type filter, in display order. Labels come from
  * {@link testTypeLabel} so a rename only happens in one place.
  */
-const TEST_TYPE_FILTER_OPTIONS: {
-  value: TestTypeFilterValue;
-  label: string;
-}[] = [
-  { value: "all", label: "All" },
-  { value: "response", label: testTypeLabel("response") },
-  { value: "tool_call", label: testTypeLabel("tool_call") },
-];
+function testTypeFilterOptions(
+  agentNature?: "conversation" | "general",
+): { value: TestTypeFilterValue; label: string }[] {
+  // One agent holds only one kind of reply test; a list across agents holds both.
+  const replies: { value: TestTypeFilterValue; label: string }[] = agentNature
+    ? [
+        {
+          value: "response",
+          label: testTypeLabel(
+            agentNature === "general" ? "general" : "response",
+          ),
+        },
+      ]
+    : [
+        { value: "response", label: testTypeLabel("response") },
+        { value: "general", label: testTypeLabel("general") },
+      ];
+  return [
+    { value: "all", label: "All" },
+    ...replies,
+    { value: "tool_call", label: testTypeLabel("tool_call") },
+  ];
+}
 
 interface TestTypeFilterProps {
   value: TestTypeFilterValue;
@@ -34,6 +49,8 @@ interface TestTypeFilterProps {
   size?: "sm" | "md";
   /** Extra classes for the pill track (positioning, e.g. `mt-2`, `w-fit`). */
   className?: string;
+  /** The agent whose tests are listed; leave out for a list across agents. */
+  agentNature?: "conversation" | "general";
 }
 
 /**
@@ -46,12 +63,13 @@ export function TestTypeFilter({
   onChange,
   size = "md",
   className = "",
+  agentNature,
 }: TestTypeFilterProps) {
   return (
     <SegmentedFilter
       value={value}
       onChange={onChange}
-      options={TEST_TYPE_FILTER_OPTIONS}
+      options={testTypeFilterOptions(agentNature)}
       size={size}
       className={className}
       ariaLabel="Filter tests by type"

@@ -113,7 +113,7 @@ test.describe("Tests page (authenticated, real backend)", () => {
 
     // Pick the tool call option on the type picker, then press Next to reach
     // the upload step. Scope to the modal — the /tests page behind it also
-    // has "Tool Call" filter pills.
+    // has "Tool call" filter pills.
     const bulkModal = page.locator(".fixed.inset-0.z-50");
     await bulkModal
       .getByRole("button", { name: /Does the agent use the right tool\?/ })
@@ -132,7 +132,7 @@ test.describe("Tests page (authenticated, real backend)", () => {
       `"[{""tool"":""end_call"",""arguments"":{},""accept_any_arguments"":true}]"\n`;
 
     // The hidden <input type="file"> inside the drop zone. setInputFiles works
-    // on hidden inputs. Selecting the "Tool Call" type kicks off a background
+    // on hidden inputs. Selecting the "Tool call" type kicks off a background
     // GET /tools fetch; if it hasn't landed yet, handleFileChange stashes the
     // file and the deferred-parse effect re-runs once tools are fetched — so
     // the preview assertion below just polls until it appears.

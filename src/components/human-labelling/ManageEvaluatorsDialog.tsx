@@ -7,6 +7,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import {
   EVALUATOR_TYPE_LABELS,
+  EvaluatorTypePill,
   type EvaluatorType,
 } from "@/components/EvaluatorPills";
 import { apiClient, unwrapList } from "@/lib/api";
@@ -450,8 +451,15 @@ export function ManageEvaluatorsDialog({
                           />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium truncate">
-                            {ev.name}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium truncate">
+                              {ev.name}
+                            </span>
+                            {ev.evaluator_type && (
+                              <EvaluatorTypePill
+                                evaluatorType={ev.evaluator_type}
+                              />
+                            )}
                           </div>
                           {ev.description && (
                             <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
@@ -524,8 +532,15 @@ export function ManageEvaluatorsDialog({
                           />
                         </svg>
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium truncate">
-                            {ev?.name ?? uuid.slice(0, 8)}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium truncate">
+                              {ev?.name ?? uuid.slice(0, 8)}
+                            </span>
+                            {ev?.evaluator_type && (
+                              <EvaluatorTypePill
+                                evaluatorType={ev.evaluator_type}
+                              />
+                            )}
                           </div>
                         </div>
                         <label
@@ -594,11 +609,7 @@ export function ManageEvaluatorsDialog({
             </p>
           )}
 
-          {saveError && (
-            <ErrorNote>
-              {saveError}
-            </ErrorNote>
-          )}
+          {saveError && <ErrorNote>{saveError}</ErrorNote>}
         </div>
 
         <div className="flex items-center justify-end gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">

@@ -300,7 +300,7 @@ describe("CreateLabellingTaskDialog", () => {
     await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(
-        screen.getByText("No Agent reply evaluators yet."),
+        screen.getByText("No Conversation reply evaluators yet."),
       ).toBeInTheDocument(),
     );
   });
