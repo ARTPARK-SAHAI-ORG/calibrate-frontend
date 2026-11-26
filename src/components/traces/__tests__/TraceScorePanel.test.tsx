@@ -1030,6 +1030,72 @@ it("points at the Evaluators tab when a tool-only trace has no add button and no
   expect(onGoToEvaluators).toHaveBeenCalled();
 });
 
+describe("a tool-only trace skipped before a tool call evaluator with variables was added", () => {
+  const added = {
+    evaluator_uuid: "ev-7",
+    name: "Expected tool and arguments",
+    reason: "declares_variables" as const,
+  };
+  const unconfigured = [{ evaluator_uuid: "ev-7", name: added.name }];
+
+  it("asks to configure it, with its own card, when nothing can score the trace", async () => {
+    const onConfigure = jest.fn();
+    const user = setupUser();
+    render(
+      <TraceScorePanel
+        run={toolCallSkip}
+        ineligible={[added]}
+        unconfigured={unconfigured}
+        onConfigure={onConfigure}
+        onGoToEvaluators={jest.fn()}
+      />,
+    );
+    expect(document.body).toHaveTextContent(
+      "This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent. The tool call evaluator added since has variables. Configure it below, then score this trace.",
+    );
+    expect(
+      screen.queryByRole("button", { name: /Evaluators tab/ }),
+    ).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Configure for traces" }),
+    );
+    expect(onConfigure).toHaveBeenCalledWith("ev-7");
+  });
+
+  it("shows its card beside an evaluator that can score the trace now", () => {
+    render(
+      <TraceScorePanel
+        run={toolCallSkip}
+        ineligible={[added]}
+        unconfigured={unconfigured}
+        onConfigure={jest.fn()}
+        scoreTrace={<button type="button">Score this trace</button>}
+        scoringEvaluatorNames={["Tool call correctness"]}
+      />,
+    );
+    expect(document.body).toHaveTextContent(
+      "Tool call correctness can score it now.",
+    );
+    expect(document.body).toHaveTextContent(
+      "Expected tool and argumentsConfigure for tracesDid not run as it has not been configured for traces",
+    );
+  });
+
+  it("drops the card once it has been configured", () => {
+    render(
+      <TraceScorePanel
+        run={toolCallSkip}
+        ineligible={[added]}
+        unconfigured={[]}
+        onConfigure={jest.fn()}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Configure for traces" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("scoring a trace again with evaluators set up since", () => {
   const OFFER =
     /These evaluators were not set up when this trace was scored, and can score it now:/;

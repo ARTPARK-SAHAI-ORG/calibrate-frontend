@@ -235,6 +235,7 @@ function RunBody({
   onlyNeedValues = false,
   onConfigure,
   configuringUuid,
+  configureBelow = 0,
 }: {
   run: TraceScoringRun;
   descriptions?: Record<string, string>;
@@ -250,6 +251,8 @@ function RunBody({
   onlyNeedValues?: boolean;
   onConfigure?: (evaluatorUuid: string) => void;
   configuringUuid?: string | null;
+  /** How many evaluators below this box still need configuring for traces. */
+  configureBelow?: number;
 }) {
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
   const missingValues = run.missing_values ?? [];
@@ -365,13 +368,21 @@ function RunBody({
               )}
               .
             </>
+          ) : run.error === "no_tool_call_evaluator" && configureBelow > 0 ? (
+            `${scoringRunErrorCopy(run.error)}. ${
+              configureBelow === 1
+                ? "The tool call evaluator added since has variables. Configure it below"
+                : "The tool call evaluators added since have variables. Configure them below"
+            }, then score this trace.`
           ) : run.error === "over_limit" && usesOwnProviderKeys ? (
             "This trace was not scored because the workspace had reached its scoring limit at the time"
           ) : (
             `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`
           )}
           {(run.error === "no_usable_evaluators" ||
-            (run.error === "no_tool_call_evaluator" && !addToolCallEvaluator)) &&
+            (run.error === "no_tool_call_evaluator" &&
+              !addToolCallEvaluator &&
+              configureBelow === 0)) &&
             onGoToEvaluators &&
             !canScore &&
             !needValuesOnly && (
@@ -452,7 +463,13 @@ export function TraceScorePanel({
             !named.has(e.evaluator_uuid) &&
             stillUnconfigured.has(e.evaluator_uuid),
         )
-      : [];
+      : run?.status === "skipped" && run.error === "no_tool_call_evaluator"
+        ? (ineligible ?? []).filter(
+            (item) =>
+              item.reason === "declares_variables" &&
+              stillUnconfigured.has(item.evaluator_uuid),
+          )
+        : [];
   const setUpSince = error ? [] : evaluatorsSetUpSince(run, unconfigured);
   const hasCard = (uuid: string) =>
     cards.some((e) => e.evaluator_uuid === uuid);
@@ -475,6 +492,7 @@ export function TraceScorePanel({
           }
           onConfigure={onConfigure}
           configuringUuid={configuringUuid}
+          configureBelow={cards.length}
           addToolCallEvaluator={addToolCallEvaluator}
           onGoToEvaluators={onGoToEvaluators}
           scoreTrace={scoreTrace}
