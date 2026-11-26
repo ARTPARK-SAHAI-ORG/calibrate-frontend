@@ -1,5 +1,6 @@
 ## November 2026
 
+- You can now pick connection agents that have custom fields for a simulation and start a text simulation with them ([#900](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/900))
 - The form for adding or editing an item on an input and output labelling task now has columns you can drag wider or narrower, shows the evaluators column at all times, lets a tool call item drop its text reply, and takes you to the first field to fix when a save is refused ([#890](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/890))
 - The title of a shared page, such as an agent chat link or shared results, now sits on its own line under the top bar on a phone, and the Score this trace button has more space above it ([#892](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/892))
 - AI evaluators can now score tool calls on agents, traces and labelling tasks, so tool call items no longer need a person to judge them ([#854](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/854))
