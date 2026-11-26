@@ -74,12 +74,14 @@ export function PublicPageLayout({
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Minimal top bar */}
-      <header className="border-b border-border px-4 md:px-8 py-3 flex items-center justify-between shrink-0">
+      <header className="border-b border-border px-4 md:px-8 py-3 flex flex-wrap md:flex-nowrap items-center justify-between gap-y-2 shrink-0">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <span className="text-[15px] font-semibold tracking-tight">Calibrate</span>
         </Link>
         {(title || pills) && (
-          <div className="flex items-center gap-2 truncate max-w-[50%]">
+          // On a phone the bar has room only for its buttons, so the title
+          // wraps onto a line of its own under them.
+          <div className="order-last basis-full md:order-none md:basis-auto flex items-center gap-2 min-w-0 md:max-w-[50%] md:mx-4">
             {title && (
               <span className="text-sm font-semibold text-foreground truncate">{title}</span>
             )}

@@ -111,9 +111,9 @@ function RunBody({
       <WarningBox
         after={
           canScore ? (
-            <div className="mt-2">{scoreTrace}</div>
+            <div className="mt-3">{scoreTrace}</div>
           ) : run.error === "no_tool_call_evaluator" && addToolCallEvaluator ? (
-            <div className="mt-2">{addToolCallEvaluator}</div>
+            <div className="mt-3">{addToolCallEvaluator}</div>
           ) : (
             run.error === "no_usable_evaluators" &&
             ineligible.length > 0 && (

@@ -54,6 +54,13 @@ describe("PublicPageLayout", () => {
     );
     expect(screen.getByText("Run details")).toBeInTheDocument();
     expect(screen.getByText("Pill")).toBeInTheDocument();
+
+    // On a phone the title takes its own line under the buttons.
+    expect(screen.getByText("Run details").parentElement).toHaveClass(
+      "order-last",
+      "basis-full",
+      "md:order-none",
+    );
   });
 
   it("puts the page's own buttons on the right once mounted", async () => {
