@@ -233,15 +233,18 @@ export function ConvertTracesToTestsDialog({
 
         <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden p-5 md:p-6 flex flex-col gap-2">
           {naming && !showPicker && (
-            <div className="flex flex-col gap-1.5">
+            <div>
+              {/* Heading and description as in AddTestDialog. */}
               <label
                 htmlFor="convert-test-name"
-                className="text-sm font-medium text-foreground"
+                className={`block text-base font-medium text-foreground ${
+                  suggested.from ? "" : "mb-2"
+                }`}
               >
                 Name of the test
               </label>
               {suggested.from && (
-                <p className="text-xs md:text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground mt-1 mb-2">
                   {suggested.from === "comment"
                     ? "Automatically filled in from the comment left with the rating"
                     : "Automatically filled in from the user's message"}
