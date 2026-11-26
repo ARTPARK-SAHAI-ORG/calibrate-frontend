@@ -6,12 +6,17 @@ import {
   PublicNotFound,
   PublicPageLayout,
 } from "@/components/PublicPageLayout";
-import { EmptyState, ErrorNote, InfoNote } from "@/components/ui";
+import { Button, EmptyState, ErrorNote, InfoNote } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
+import { setActiveOrgUuid } from "@/lib/orgs";
+import type { ConvertTestType } from "@/lib/tracesApi";
 import {
   ChatIcon,
+  ExternalLinkIcon,
   InfoIcon,
+  PlusIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
 } from "@/components/icons";
@@ -124,6 +129,11 @@ export function PublicChatView({ token }: { token: string }) {
     isCorrect: boolean;
   } | null>(null);
   const [replaceBusy, setReplaceBusy] = useState(false);
+  const [converting, setConverting] = useState<{
+    traceUuid: string;
+    testType: ConvertTestType;
+  } | null>(null);
+  const [added, setAdded] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const messageRef = useRef<HTMLTextAreaElement>(null);
   // Bumped by New chat, so a reply still on its way to the old chat is dropped.
@@ -288,6 +298,26 @@ export function PublicChatView({ token }: { token: string }) {
     }
   };
 
+  // Only a member of the agent's workspace is sent these.
+  const { agent_id: agentId, org_uuid: orgUuid } = agent;
+  const addToTests =
+    agentId && orgUuid
+      ? (turn: Extract<Turn, { role: "agent" }>) => {
+          // The dialog's requests go to the agent's workspace.
+          setActiveOrgUuid(orgUuid);
+          setConverting({
+            traceUuid: turn.traceUuid!,
+            // The same rule as the Monitoring tab's Add to tests.
+            testType:
+              !turn.reply && turn.toolCalls.length > 0
+                ? "tool_call"
+                : agent.interaction_type === "general"
+                  ? "general"
+                  : "response",
+          });
+        }
+      : undefined;
+
   const replaceFeedback = async () => {
     if (!replacing) return;
     setReplaceBusy(true);
@@ -381,6 +411,7 @@ export function PublicChatView({ token }: { token: string }) {
                 patchFeedback(turn.traceUuid, { open: false, draft: "" })
               }
               onSave={() => turn.traceUuid && void saveComment(turn.traceUuid)}
+              onAddToTests={addToTests && (() => addToTests(turn))}
             />
           ),
         )}
@@ -496,6 +527,51 @@ export function PublicChatView({ token }: { token: string }) {
         busyText="Clearing..."
         isDeleting={clearBusy}
       />
+      {agentId && (
+        <ConvertTracesToTestsDialog
+          isOpen={converting !== null}
+          onClose={() => setConverting(null)}
+          accessToken={accessToken}
+          traceUuids={converting ? [converting.traceUuid] : []}
+          testType={converting?.testType ?? "response"}
+          agentUuid={agentId}
+          agentNature={agent.interaction_type}
+          onConverted={() => {
+            setConverting(null);
+            setAdded(true);
+          }}
+        />
+      )}
+      {added && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-background rounded-xl w-full max-w-md p-5 md:p-6 shadow-2xl">
+            <h2 className="text-base md:text-lg font-semibold text-foreground mb-2">
+              Added to tests
+            </h2>
+            <p className="text-sm md:text-base text-foreground mb-4">
+              This reply was added to the agent&apos;s tests.
+            </p>
+            <div className="flex items-center justify-end gap-2 md:gap-3">
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => setAdded(false)}
+              >
+                Close
+              </Button>
+              <a
+                href={`/${orgUuid}/agents/${agentId}?tab=tests`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-10 px-4 text-base inline-flex items-center gap-2 bg-foreground text-background hover:opacity-90 transition-opacity rounded-md font-medium cursor-pointer"
+              >
+                View tests
+                <ExternalLinkIcon className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </PublicPageLayout>
   );
 }
@@ -513,6 +589,7 @@ function AgentTurn({
   onDraft,
   onCancel,
   onSave,
+  onAddToTests,
 }: {
   turn: Extract<Turn, { role: "agent" }>;
   feedback: Feedback;
@@ -525,6 +602,8 @@ function AgentTurn({
   onDraft: (text: string) => void;
   onCancel: () => void;
   onSave: () => void;
+  /** Set only for a member of the agent's workspace. */
+  onAddToTests?: () => void;
 }) {
   const picked = feedback.isCorrect;
   // The comment box opens under the reply; bring it into view, clear of the
@@ -627,6 +706,16 @@ function AgentTurn({
                 <ChatIcon className="w-4 h-4" />
               </button>
             </Tooltip>
+          )}
+          {onAddToTests && picked !== null && (
+            <button
+              type="button"
+              onClick={onAddToTests}
+              className="ml-2 h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Add to tests
+            </button>
           )}
           {feedback.failed && (
             <span className="text-xs text-red-600 dark:text-red-400 ml-2">
