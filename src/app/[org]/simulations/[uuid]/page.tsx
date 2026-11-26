@@ -233,7 +233,6 @@ export default function SimulationDetailPage() {
       }
 
       if (!response.ok) {
-        // Surface the backend's message verbatim.
         let message = "Failed to launch simulation";
         try {
           const body = await response.json();
@@ -624,9 +623,13 @@ export default function SimulationDetailPage() {
       ? []
       : [
           {
-            label: isLoading ? "Loading..." : simulation?.name || "Simulation",
-            onClick: !isLoading && simulation ? handleOpenEditName : undefined,
-            title: !isLoading && simulation ? "Click to edit name" : undefined,
+            label: isLoading
+              ? "Loading..."
+              : simulation?.name || "Simulation",
+            onClick:
+              !isLoading && simulation ? handleOpenEditName : undefined,
+            title:
+              !isLoading && simulation ? "Click to edit name" : undefined,
           },
         ]),
   ];

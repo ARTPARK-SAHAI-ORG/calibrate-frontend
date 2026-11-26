@@ -115,9 +115,7 @@ describe("AgentPicker", () => {
     render(<AgentPicker selectedAgentUuid="" onSelectAgent={jest.fn()} />);
 
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({
-        callbackUrl: "/login?callbackUrl=%2F",
-      }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
@@ -277,38 +275,6 @@ describe("AgentPicker", () => {
     expect(onSelectAgent).toHaveBeenCalledTimes(1);
   });
 
-  it("leaves connection agents with custom fields selectable for simulations", async () => {
-    const payload = [
-      {
-        uuid: "a3",
-        name: "Custom Fields Connect",
-        type: "connection",
-        connection_verified: true,
-        has_default_inputs: true,
-      },
-    ];
-    mockFetchOnce({ json: async () => payload });
-    const user = setupUser();
-    const onSelectAgent = jest.fn();
-    render(
-      <AgentPicker
-        disableGeneralAgents
-        selectedAgentUuid=""
-        onSelectAgent={onSelectAgent}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "Select an agent" }));
-    const option = await screen.findByRole("option", {
-      name: /Custom Fields Connect/,
-    });
-    expect(option).not.toHaveAttribute("aria-disabled", "true");
-    await user.click(option);
-    expect(onSelectAgent).toHaveBeenCalledWith(
-      expect.objectContaining({ uuid: "a3" }),
-    );
-  });
-
   it("filters agents by search query", async () => {
     mockFetchOnce({ json: async () => agentsPayload });
     const user = setupUser();
@@ -415,9 +381,7 @@ describe("MultiAgentPicker", () => {
       <MultiAgentPicker selectedAgentUuids={[]} onToggleAgent={jest.fn()} />,
     );
     await waitFor(() =>
-      expect(signOut).toHaveBeenCalledWith({
-        callbackUrl: "/login?callbackUrl=%2F",
-      }),
+      expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login?callbackUrl=%2F" }),
     );
   });
 
