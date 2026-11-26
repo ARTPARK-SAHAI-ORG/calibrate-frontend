@@ -468,7 +468,13 @@ export function TraceVariablesDialog({
   const testStep = (
     <div className="p-4 md:p-6 space-y-4">
       <div className="space-y-2">
-        <p className="text-sm font-medium text-foreground">Select a trace</p>
+        <p className="text-sm text-muted-foreground">
+          Check your choices on an earlier trace, to be sure they will work on
+          new traces as they arrive.
+        </p>
+        <p className="text-sm font-medium text-foreground pt-2">
+          Select a trace
+        </p>
         {traces && traces.length > 0 && (
           <SingleSelectPicker
             compact
