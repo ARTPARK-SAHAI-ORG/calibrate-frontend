@@ -64,7 +64,11 @@ import { attachToolsToAgent } from "@/lib/agentTools";
 import { toast } from "sonner";
 import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { formatTurnTimestamp } from "@/components/test-results/shared";
+import {
+  formatTurnTimestamp,
+  ResizeHandle,
+} from "@/components/test-results/shared";
+import { useSavedColumnWidth } from "@/hooks/useSavedColumnWidth";
 import { readTurnExtras } from "@/lib/messageVersions";
 import {
   CustomFieldsEditor,
@@ -353,6 +357,23 @@ export function AddTestDialog({
   useHideFloatingButton(isOpen);
 
   const isLabelItem = mode === "labelItem";
+  // The form on the left and the evaluators or custom inputs on the right can
+  // be dragged wider or narrower; the conversation takes what is left. Saved
+  // per kind of form, so a test and a labelling item keep their own widths.
+  const widthKey = isLabelItem ? "calibrate:label-item-form" : "calibrate:test-form";
+  const leftColumn = useSavedColumnWidth(
+    `${widthKey}-left-width`,
+    isLabelItem ? 35 : 45,
+    20,
+    50,
+    "left",
+  );
+  const rightColumn = useSavedColumnWidth(
+    `${widthKey}-right-width`,
+    25,
+    15,
+    40,
+  );
   // Only an llm item is judged on a tool call, so only it has an answer key.
   const showsExpectedToolCalls = isLabelItem && requireAssistantLastMessage;
   const itemNoun = isLabelItem ? "item" : "test";
@@ -1979,9 +2000,13 @@ export function AddTestDialog({
   const selectedToolsInvalid = () => {
     const invalid = selectedToolsHaveInvalidParams(selectedTools);
     if (invalid) {
-      setToolValidationError(
-        "Please complete every highlighted parameter. Booleans need true or false, and numbers must be valid.",
-      );
+      // Each field says what is wrong under it. The highlight lands on the
+      // next render, so look for it after that.
+      requestAnimationFrame(() => {
+        const bad = document.querySelector<HTMLElement>("[data-param-error]");
+        bad?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+        bad?.focus();
+      });
     }
     return invalid;
   };
@@ -2992,13 +3017,12 @@ export function AddTestDialog({
           <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
             {/* Left Column - Form */}
             <div
-              className={`w-full ${
-                isLabelItem
-                  ? "md:w-[30%]"
-                  : hasCustomInputs
-                    ? "md:w-[35%]"
-                    : "md:w-1/2"
-              } flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-border`}
+              style={
+                {
+                  "--form-column-width": `${leftColumn.percent}%`,
+                } as React.CSSProperties
+              }
+              className="w-full md:w-[var(--form-column-width)] md:shrink-0 flex flex-col min-h-0 border-b md:border-b-0 border-border"
             >
               {/* Content */}
               <div
@@ -3156,16 +3180,13 @@ export function AddTestDialog({
               </div>
             </div>
 
+            <ResizeHandle
+              onMouseDown={leftColumn.startDrag}
+              label="Resize the form column"
+            />
+
             {/* Middle Column - Chat Messages */}
-            <div
-              className={`w-full ${
-                isLabelItem
-                  ? "md:w-[45%]"
-                  : hasCustomInputs
-                    ? "md:w-[40%]"
-                    : "md:w-1/2"
-              } flex flex-col min-h-0 bg-muted/30 overflow-visible`}
-            >
+            <div className="w-full md:flex-1 md:min-w-0 flex flex-col min-h-0 bg-muted/30 overflow-visible">
               {/* Info banner */}
               <div className="pl-4 md:pl-6 pr-12 py-3 md:py-4 border-b border-border bg-blue-500/5">
                 <div className="flex items-start gap-3">
@@ -4179,10 +4200,22 @@ export function AddTestDialog({
               </div>
             </div>
 
+            {(isLabelItem || hasCustomInputs) && (
+              <ResizeHandle
+                onMouseDown={rightColumn.startDrag}
+                label="Resize the right column"
+              />
+            )}
+
             {isLabelItem && (
               <div
                 data-testid="label-item-evaluators-column"
-                className="w-full md:w-[25%] flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 md:border-l border-border p-4 md:p-6"
+                style={
+                  {
+                    "--side-column-width": `${rightColumn.percent}%`,
+                  } as React.CSSProperties
+                }
+                className="w-full md:w-[var(--side-column-width)] md:shrink-0 flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 border-border p-4 md:p-6"
               >
                 {!isLoading && renderEvaluatorsSection()}
               </div>
@@ -4190,7 +4223,14 @@ export function AddTestDialog({
 
             {/* Right Column - Custom inputs (only when the agent has fields) */}
             {hasCustomInputs && (
-              <div className="w-full md:w-[25%] flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 md:border-l border-border p-4 md:p-6">
+              <div
+                style={
+                  {
+                    "--side-column-width": `${rightColumn.percent}%`,
+                  } as React.CSSProperties
+                }
+                className="w-full md:w-[var(--side-column-width)] md:shrink-0 flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 border-border p-4 md:p-6"
+              >
                 <div className="mb-2 shrink-0">
                   <label className="text-base font-medium text-foreground">
                     Custom inputs

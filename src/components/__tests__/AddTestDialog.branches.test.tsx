@@ -368,10 +368,42 @@ describe("AddTestDialog — additional branch coverage", () => {
       await user.click(screen.getByRole("button", { name: "Create" }));
 
       expect(onSubmit).not.toHaveBeenCalled();
-      expect(screen.getByText("Enter a valid integer.")).toBeInTheDocument();
+      expect(screen.getByText("Enter a valid integer")).toBeInTheDocument();
       expect(
-        screen.getByText(/Please complete every highlighted parameter/),
+        screen.queryByText(/Please complete every highlighted parameter/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("says under an empty parameter that it needs completing, and moves to it", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      (global as any).fetch = mockFetchImpl([STRUCTURED_TOOL]);
+      render(
+        <ControlledDialog
+          {...baseProps({ initialTab: "tool-invocation", onSubmit })}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Add tool" }));
+      await waitFor(() =>
+        expect(screen.getByText("Pick extract_data")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Pick extract_data"));
+      await user.click(screen.getByRole("button", { name: "+ Add parameter" }));
+      await user.type(screen.getByPlaceholderText("Parameter name"), "count");
+      await user.type(
+        screen.getByPlaceholderText("Your test name"),
+        "Empty value",
+      );
+      await fillHistory(user);
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(
+        screen.getByText("Enter the expected value"),
       ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByPlaceholderText("Expected value")).toHaveFocus(),
+      );
     });
 
     it("changes a custom param type to boolean, then to object (nested container)", async () => {
@@ -662,7 +694,11 @@ describe("AddTestDialog — additional branch coverage", () => {
             },
           ],
         },
-        { role: "tool", tool_call_id: "call-1", content: '{"status":"success"}' },
+        {
+          role: "tool",
+          tool_call_id: "call-1",
+          content: '{"status":"success"}',
+        },
       ],
       evaluation: { type: "response" },
     };

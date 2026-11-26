@@ -584,9 +584,7 @@ export function toolCallsToSelectedTools(
   if (!toolCalls || toolCalls.length === 0) return [];
   return toolCalls.map((toolCall, index) => {
     const expectation: "should-call" | "should-not-call" =
-      toolCall.is_called === false
-        ? "should-not-call"
-        : "should-call";
+      toolCall.is_called === false ? "should-not-call" : "should-call";
     const acceptAny = toolCall.accept_any_arguments === true;
 
     // Check if this is an inbuilt tool by matching tool id or name
@@ -608,8 +606,9 @@ export function toolCallsToSelectedTools(
     let allowCustomParameters = false;
     if (!acceptAny) {
       if (matchedTool && !inbuiltTool) {
-        const { params, allowCustom } =
-          buildExpectedParamsFromToolConfig(matchedTool.config);
+        const { params, allowCustom } = buildExpectedParamsFromToolConfig(
+          matchedTool.config,
+        );
         allowCustomParameters = allowCustom;
         expectedParameters = overlayArgsOntoParams(
           params,
@@ -741,18 +740,22 @@ export function useToolCallExpectations() {
   const applyToolSaved = (tool: AvailableTool, previousName: string) => {
     const edit = { uuid: tool.uuid, previousName, name: tool.name };
     const schema = buildExpectedParamsFromToolConfig(tool.config);
-    const nextTools = applyToolEditToSelectedTools(selectedTools, edit, (t) => ({
-      ...t,
-      allowCustomParameters: schema.allowCustom,
-      // A tool that accepts any values has no expected inputs to update.
-      expectedParameters: t.acceptAnyParameterValues
-        ? t.expectedParameters
-        : mergeExpectedParams(
-            t.expectedParameters,
-            schema.params,
-            (param) => defaultSelectedParams([param])[0],
-          ),
-    }));
+    const nextTools = applyToolEditToSelectedTools(
+      selectedTools,
+      edit,
+      (t) => ({
+        ...t,
+        allowCustomParameters: schema.allowCustom,
+        // A tool that accepts any values has no expected inputs to update.
+        expectedParameters: t.acceptAnyParameterValues
+          ? t.expectedParameters
+          : mergeExpectedParams(
+              t.expectedParameters,
+              schema.params,
+              (param) => defaultSelectedParams([param])[0],
+            ),
+      }),
+    );
     setSelectedTools(nextTools);
     // A card open in its JSON view shows text written when the view opened,
     // so rewrite it for the cards that changed or it would show old inputs.
@@ -914,7 +917,8 @@ export function ToolCallExpectationsEditor({
     if (!isPlainObject(parsed)) {
       setToolJsonError((prev) => ({
         ...prev,
-        [tool.cardId]: "The top-level value must be a JSON object of parameters.",
+        [tool.cardId]:
+          "The top-level value must be a JSON object of parameters.",
       }));
       return;
     }
@@ -1222,6 +1226,7 @@ export function ToolCallExpectationsEditor({
       className={`w-full h-9 px-3 rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground border focus:outline-none focus:ring-2 focus:ring-accent ${
         hasError ? "border-red-500" : "border-border"
       }`}
+      data-param-error={hasError || undefined}
     />
   );
 
@@ -1476,6 +1481,7 @@ export function ToolCallExpectationsEditor({
                       )
                     }
                     className={`${fieldClass} pr-10 cursor-pointer appearance-none`}
+                    data-param-error={valueError || undefined}
                   >
                     {/* Hidden placeholder so an unset boolean renders blank
                       without adding a selectable "Select…" entry to the list. */}
@@ -1519,6 +1525,7 @@ export function ToolCallExpectationsEditor({
                   }
                   placeholder="e.g. A friendly reminder with the date"
                   className={`${fieldClass} flex-1 min-w-0`}
+                  data-param-error={valueError || undefined}
                 />
               ) : isNull || isAny ? null : ( // "Is null" / "Is any" assert presence only — no value box.
                 <input
@@ -1536,20 +1543,24 @@ export function ToolCallExpectationsEditor({
                         : "Expected value"
                   }
                   className={`${fieldClass} flex-1 min-w-0`}
+                  data-param-error={valueError || undefined}
                 />
               )}
             </div>
           )}
           {showErrors && isLlm && missingValue && (
-            <p className="text-xs text-red-500">Enter judging criteria.</p>
+            <p className="text-xs text-red-500">Enter judging criteria</p>
+          )}
+          {showErrors && !isLlm && missingValue && !booleanUnset && (
+            <p className="text-xs text-red-500">Enter the expected value</p>
           )}
           {showErrors && booleanUnset && (
-            <p className="text-xs text-red-500">Select true or false.</p>
+            <p className="text-xs text-red-500">Select true or false</p>
           )}
           {showErrors && typeError && (
             <p className="text-xs text-red-500">
               Enter a valid{" "}
-              {param.dataType === "integer" ? "integer" : "number"}.
+              {param.dataType === "integer" ? "integer" : "number"}
             </p>
           )}
         </div>
@@ -1564,13 +1575,9 @@ export function ToolCallExpectationsEditor({
         </label>
         <div className="flex items-center gap-2">
           <button
-            onClick={() =>
-              setToolDropdownOpen(!toolDropdownOpen)
-            }
+            onClick={() => setToolDropdownOpen(!toolDropdownOpen)}
             className={`px-3 py-1.5 text-sm font-medium rounded-lg cursor-pointer border ${
-              showErrors &&
-              requireAtLeastOne &&
-              selectedTools.length === 0
+              showErrors && requireAtLeastOne && selectedTools.length === 0
                 ? "bg-red-500/10 text-red-500 border-red-500/40 hover:bg-red-500/20 transition-colors"
                 : "bg-foreground text-background border-transparent hover:opacity-90 transition-opacity"
             }`}
@@ -1616,9 +1623,7 @@ export function ToolCallExpectationsEditor({
 
       {selectedTools.length === 0 ? (
         <div className="bg-muted rounded-lg p-8 text-center ">
-          <p className="text-muted-foreground text-sm">
-            {emptyText}
-          </p>
+          <p className="text-muted-foreground text-sm">{emptyText}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -1642,13 +1647,13 @@ export function ToolCallExpectationsEditor({
                   {(() => {
                     const saved = tool.isInbuilt
                       ? undefined
-                      : availableTools.find((t) => t.uuid === tool.id || t.name === tool.name);
+                      : availableTools.find(
+                          (t) => t.uuid === tool.id || t.name === tool.name,
+                        );
                     return saved ? (
                       <OpenToolButton
                         tool={saved}
-                        accessToken={
-                          accessToken
-                        }
+                        accessToken={accessToken}
                         onToolSaved={onToolSaved}
                         className="w-10 h-10"
                       />
@@ -1746,9 +1751,7 @@ export function ToolCallExpectationsEditor({
                         <div className="inline-flex flex-shrink-0 items-center gap-0.5 rounded-lg bg-background border border-border p-0.5">
                           <button
                             type="button"
-                            onClick={() =>
-                              exitToolJsonMode(tool.cardId)
-                            }
+                            onClick={() => exitToolJsonMode(tool.cardId)}
                             className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                               jsonModeToolIds.has(tool.cardId)
                                 ? "text-muted-foreground hover:text-foreground"
@@ -1759,9 +1762,7 @@ export function ToolCallExpectationsEditor({
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
-                              enterToolJsonMode(tool)
-                            }
+                            onClick={() => enterToolJsonMode(tool)}
                             className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                               jsonModeToolIds.has(tool.cardId)
                                 ? "bg-foreground text-background"
@@ -1785,10 +1786,7 @@ export function ToolCallExpectationsEditor({
                           <textarea
                             value={toolJsonText[tool.cardId] ?? ""}
                             onChange={(e) =>
-                              handleToolJsonChange(
-                                tool,
-                                e.target.value,
-                              )
+                              handleToolJsonChange(tool, e.target.value)
                             }
                             spellCheck={false}
                             placeholder={
@@ -1799,12 +1797,14 @@ export function ToolCallExpectationsEditor({
                                 ? "border-red-500"
                                 : "border-border"
                             }`}
+                            data-param-error={
+                              toolJsonError[tool.cardId] ? true : undefined
+                            }
                           />
                         </div>
                       ) : (
                         <>
-                          {tool.expectedParameters.length >
-                            0 && (
+                          {tool.expectedParameters.length > 0 && (
                             <div className="space-y-3">
                               {renderExpectedParams(
                                 tool.cardId,
@@ -1819,10 +1819,7 @@ export function ToolCallExpectationsEditor({
                             {tool.allowCustomParameters && (
                               <button
                                 onClick={() =>
-                                  addCustomExpectedParam(
-                                    tool.cardId,
-                                    [],
-                                  )
+                                  addCustomExpectedParam(tool.cardId, [])
                                 }
                                 className="h-9 px-4 rounded-lg text-sm font-medium bg-background text-foreground border border-border hover:bg-muted transition-colors cursor-pointer"
                               >
