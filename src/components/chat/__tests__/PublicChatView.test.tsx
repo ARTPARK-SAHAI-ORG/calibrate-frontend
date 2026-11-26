@@ -30,7 +30,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     nameFrom?: { comment?: string | null; userMessage?: string | null };
     accessToken: string | null;
     onClose: () => void;
-    onConverted: () => void;
+    onConverted: (result: { created: number; test_uuids: string[] }) => void;
   }) =>
     props.isOpen ? (
       <div data-testid="convert-dialog">
@@ -43,7 +43,13 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
             nameFrom: props.nameFrom,
           })}
         </pre>
-        <button onClick={props.onConverted}>Convert</button>
+        <button
+          onClick={() =>
+            props.onConverted({ created: 1, test_uuids: ["test-1"] })
+          }
+        >
+          Convert
+        </button>
         <button onClick={props.onClose}>Dismiss</button>
       </div>
     ) : null,
@@ -742,7 +748,7 @@ describe("Add to tests", () => {
     });
   });
 
-  it("confirms once added, linking to the agent's tests", async () => {
+  it("confirms once added, linking to the test it made", async () => {
     const user = setupUser();
     mockSend.mockResolvedValue(reply());
     await open("conversation", member);
@@ -752,8 +758,14 @@ describe("Add to tests", () => {
     await user.click(screen.getByText("Convert"));
     expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
     expect(screen.getByText("Added to tests")).toBeInTheDocument();
-    const link = screen.getByRole("link", { name: /View tests/ });
-    expect(link).toHaveAttribute("href", "/o1/agents/a1?tab=tests");
+    expect(
+      screen.getByText("This reply was added to the agent's tests"),
+    ).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /View test/ });
+    expect(link).toHaveAttribute(
+      "href",
+      "/o1/agents/a1?tab=tests&testId=test-1",
+    );
     expect(link).toHaveAttribute("target", "_blank");
     expect(screen.getByText("Add to tests")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Close" }));
