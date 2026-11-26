@@ -27,7 +27,7 @@ export function reservedEvaluatorNameError(name: string): string {
 const KIND_WORDS: Record<EvaluatorType, string> = {
   llm: "conversation reply",
   conversation: "whole conversation",
-  "llm-general": "basic output",
+  "llm-general": "agent response",
   "tool-call": "tool call",
   stt: "speech to text",
   tts: "text to speech",

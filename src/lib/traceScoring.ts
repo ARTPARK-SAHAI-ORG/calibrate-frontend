@@ -85,11 +85,19 @@ const NOTHING_CAN_SCORE_BY_REASON: Record<
   },
 };
 
+// Said for a reason this app does not know yet, rather than failing.
+const UNKNOWN_REASON = {
+  one: "Cannot score traces",
+  every: "None of the evaluators added to this agent can score its traces.",
+  some: "some cannot score traces",
+  fix: "Add an evaluator that can in the",
+};
+
 /** Why a linked evaluator cannot score this agent's traces. */
 export function ineligibleReasonCopy(
   reason: TraceScoringIneligibleReason,
 ): string {
-  return NOTHING_CAN_SCORE_BY_REASON[reason]?.one ?? "Cannot score traces";
+  return (NOTHING_CAN_SCORE_BY_REASON[reason] ?? UNKNOWN_REASON).one;
 }
 
 /**
@@ -103,16 +111,13 @@ export function nothingCanScoreCopy(
   if (ineligible.length === 0) {
     return "This agent has no evaluators, so its traces are not scored. Add one in the";
   }
-  const copies = [...new Set(ineligible.map((item) => item.reason))].map(
-    (reason) =>
-      NOTHING_CAN_SCORE_BY_REASON[reason] ?? {
-        one: "Cannot score traces",
-        every:
-          "None of the evaluators added to this agent can score its traces.",
-        some: "some cannot score traces",
-        fix: "Add an evaluator that can in the",
-      },
-  );
+  const copies = [
+    ...new Set(
+      ineligible.map(
+        (item) => NOTHING_CAN_SCORE_BY_REASON[item.reason] ?? UNKNOWN_REASON,
+      ),
+    ),
+  ];
   if (copies.length === 1) {
     return `${copies[0].every} ${copies[0].fix}`;
   }

@@ -131,7 +131,7 @@ describe("ManageEvaluatorsDialog", () => {
       onSaved,
     });
     await waitForCatalogueLoaded();
-    const message = /select at least one tool call evaluator/;
+    const message = "Select at least one evaluator for the tool call items";
 
     const box = catalogueCheckbox("Tool call correctness");
     expect(box).not.toBeDisabled();
@@ -186,10 +186,27 @@ describe("ManageEvaluatorsDialog", () => {
     mockApiClient.mockClear();
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     expect(
-      screen.getByText(/items with a text reply, so select at least one evaluator/),
+      screen.getByText("Select at least one evaluator for the items with a text reply"),
     ).toBeInTheDocument();
     expect(mockApiClient).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it("does not refuse a save over an evaluator missing from the loaded list", async () => {
+    const user = setupUser();
+    const onSaved = jest.fn();
+    mockApiClient.mockResolvedValue({ items: EVALUATORS });
+    renderDialog({
+      currentEvaluatorIds: ["ev-1", "ev-gone"],
+      hasToolCallItems: true,
+      hasNonToolCallItems: true,
+      onSaved,
+    });
+    await waitForCatalogueLoaded();
+    await user.click(catalogueCheckbox("Helpfulness"));
+    mockApiClient.mockResolvedValue({ message: "ok" });
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
   });
 
   it("lets a task with no tool call items save without a tool call evaluator", async () => {

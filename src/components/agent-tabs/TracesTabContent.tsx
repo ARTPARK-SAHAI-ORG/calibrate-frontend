@@ -798,8 +798,9 @@ export function TracesTabContent({
       : ineligible;
   // The agent's evaluators that fit the open trace's kind of output. A type
   // not read yet must not count, since an unknown type fits a reply. A trace
-  // not on this page has no known kind, so every evaluator that can score is
-  // named; the backend skips it again if none fits.
+  // not on this page, or one seen before the kinds are read, has no known
+  // fit, so every evaluator that can score is named; the backend skips it
+  // again if none fits.
   const eligibleEvaluators = eligibility?.eligible ?? [];
   const scoringNamesForOpenTrace = !openTraceItem
     ? eligibleEvaluators.map((item) => item.name)
@@ -814,7 +815,7 @@ export function TracesTabContent({
               ),
           )
           .map((item) => item.name)
-      : [];
+      : eligibleEvaluators.map((item) => item.name);
   const closeTrace = () => {
     itemPager.cancel();
     setOpenTraceUuid(null);

@@ -732,8 +732,10 @@ export function TestsTabContent({
   // at a time, so the whole linked list is fetched separately here — a test
   // linked but sitting on another page must still be left out.
   const agentTestUuids = new Set(linkedTestUuids);
+  // A reply test of the other kind of agent cannot be linked here.
+  const otherReplyType = agentNature === "general" ? "response" : "general";
   const availableTests = allTests.filter(
-    (test) => !agentTestUuids.has(test.uuid),
+    (test) => !agentTestUuids.has(test.uuid) && test.type !== otherReplyType,
   );
 
   // Filter available tests by type AND search query. Both apply together (AND),

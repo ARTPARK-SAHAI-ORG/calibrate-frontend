@@ -1,6 +1,6 @@
 "use client";
 
-import { textItemsName } from "./itemConversation";
+import { missingEvaluatorMessage } from "./itemConversation";
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ErrorNote } from "@/components/ui";
@@ -209,18 +209,27 @@ export function ManageEvaluatorsDialog({
     optionalSelected.length === orderedSelected.length;
   const canSave = hasChanges && !wouldRemoveAll && !allWouldBeOptional;
 
-  // Each kind of item is answered only through an evaluator that fits it.
+  // Each kind of item is answered only through an evaluator that fits it. An
+  // evaluator not in the loaded list may fit either, so it never blocks.
   const missingToolCallEvaluator =
     hasToolCallItems &&
-    !orderedSelected.some((id) => answersToolCalls(id) === true);
+    !orderedSelected.some((id) => answersToolCalls(id) !== false);
   const missingOtherEvaluator =
     hasNonToolCallItems &&
-    !orderedSelected.some((id) => answersToolCalls(id) === false);
+    !orderedSelected.some((id) => answersToolCalls(id) !== true);
 
   const handleSave = async () => {
     if (!canSave || saving) return;
     setSaveAttempted(true);
-    if (missingToolCallEvaluator || missingOtherEvaluator) return;
+    if (missingToolCallEvaluator || missingOtherEvaluator) {
+      // The message sits at the top of the list, which may be scrolled away.
+      requestAnimationFrame(() =>
+        document
+          .querySelector("[data-missing-evaluator]")
+          ?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }),
+      );
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
@@ -363,18 +372,21 @@ export function ManageEvaluatorsDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
-          {saveAttempted && missingToolCallEvaluator && (
-            <ErrorNote>
-              This task has tool call items, so select at least one tool call
-              evaluator.
-            </ErrorNote>
-          )}
-          {saveAttempted && missingOtherEvaluator && (
-            <ErrorNote>
-              This task has {textItemsName(taskType)}, so select at least one
-              evaluator that is not a tool call evaluator.
-            </ErrorNote>
-          )}
+          {saveAttempted &&
+            (missingToolCallEvaluator || missingOtherEvaluator) && (
+              <div data-missing-evaluator className="space-y-2">
+                {missingToolCallEvaluator && (
+                  <ErrorNote>
+                    {missingEvaluatorMessage(true, taskType)}
+                  </ErrorNote>
+                )}
+                {missingOtherEvaluator && (
+                  <ErrorNote>
+                    {missingEvaluatorMessage(false, taskType)}
+                  </ErrorNote>
+                )}
+              </div>
+            )}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span>{orderedSelected.length} selected</span>

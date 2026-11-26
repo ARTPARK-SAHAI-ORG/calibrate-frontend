@@ -374,6 +374,11 @@ export function AddTestDialog({
     15,
     40,
   );
+  // The conversation keeps at least a quarter of the row.
+  const sideColumnPercent = Math.min(
+    rightColumn.percent,
+    75 - leftColumn.percent,
+  );
   // Only an llm item is judged on a tool call, so only it has an answer key.
   const showsExpectedToolCalls = isLabelItem && requireAssistantLastMessage;
   const itemNoun = isLabelItem ? "item" : "test";
@@ -2004,8 +2009,15 @@ export function AddTestDialog({
       // next render, so look for it after that.
       requestAnimationFrame(() => {
         const bad = document.querySelector<HTMLElement>("[data-param-error]");
-        bad?.scrollIntoView?.({ block: "center", behavior: "smooth" });
-        bad?.focus();
+        if (!bad) {
+          // A tool edited as JSON has no field to point at.
+          setToolValidationError(
+            "Some expected tool call values are missing or invalid. Switch to Form to see which",
+          );
+          return;
+        }
+        bad.scrollIntoView?.({ block: "center", behavior: "smooth" });
+        bad.focus();
       });
     }
     return invalid;
@@ -2018,12 +2030,6 @@ export function AddTestDialog({
     setSubmitRunAfterSave(runAfterSave);
     setLocalValidationAttempted(true);
     setToolValidationError(null);
-
-    // Auto-hide validation errors after 3 seconds
-    setTimeout(() => {
-      setLocalValidationAttempted(false);
-      setToolValidationError(null);
-    }, 3000);
 
     // Validate tool call params in conversation history (for both test types)
     if (hasEmptyToolCallParams()) {
@@ -4212,7 +4218,7 @@ export function AddTestDialog({
                 data-testid="label-item-evaluators-column"
                 style={
                   {
-                    "--side-column-width": `${rightColumn.percent}%`,
+                    "--side-column-width": `${sideColumnPercent}%`,
                   } as React.CSSProperties
                 }
                 className="w-full md:w-[var(--side-column-width)] md:shrink-0 flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 border-border p-4 md:p-6"
@@ -4226,7 +4232,7 @@ export function AddTestDialog({
               <div
                 style={
                   {
-                    "--side-column-width": `${rightColumn.percent}%`,
+                    "--side-column-width": `${sideColumnPercent}%`,
                   } as React.CSSProperties
                 }
                 className="w-full md:w-[var(--side-column-width)] md:shrink-0 flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 border-border p-4 md:p-6"

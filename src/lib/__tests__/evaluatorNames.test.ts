@@ -40,7 +40,7 @@ describe("defaultEvaluatorName", () => {
   it.each([
     ["llm", null, "New conversation reply evaluator"],
     ["conversation", null, "New whole conversation evaluator"],
-    ["llm-general", null, "New basic output evaluator"],
+    ["llm-general", null, "New agent response evaluator"],
     ["tool-call", "conversation", "New conversation tool call evaluator"],
     ["tool-call", "single", "New basic tool call evaluator"],
     ["tool-call", null, "New tool call evaluator"],

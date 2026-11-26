@@ -1,6 +1,6 @@
 "use client";
 
-import { textItemsName } from "./itemConversation";
+import { missingEvaluatorMessage } from "./itemConversation";
 import { ErrorNote } from "@/components/ui";
 import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
@@ -354,11 +354,7 @@ export function AssignAnnotatorsDialog({
   const evaluatorSelectionValid = kindsMissingLabel.length === 0;
   const missingLabelMessage =
     kindsMissingLabel.length === 1 && hasToolCallItems && hasNonToolCallItems
-      ? `Select at least one evaluator for the ${
-          kindsMissingLabel[0].isToolCall
-            ? "tool call items"
-            : textItemsName(taskType)
-        }`
+      ? missingEvaluatorMessage(kindsMissingLabel[0].isToolCall, taskType)
       : "Select at least one evaluator";
   const allEvaluatorsPicked =
     choosableEvaluators.length > 0 &&

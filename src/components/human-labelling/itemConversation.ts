@@ -471,3 +471,12 @@ export const textItemsName = (taskType?: string | null) =>
   taskType === "llm-general"
     ? "items with a text output"
     : "items with a text reply";
+
+/** Asks for an evaluator for one kind of item: tool call items, or the rest. */
+export const missingEvaluatorMessage = (
+  isToolCall: boolean,
+  taskType?: string | null,
+) =>
+  `Select at least one evaluator for the ${
+    isToolCall ? "tool call items" : textItemsName(taskType)
+  }`;

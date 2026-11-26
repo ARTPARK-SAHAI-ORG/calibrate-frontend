@@ -91,6 +91,7 @@ export function AddToolCallEvaluatorButton({
     setLibrary((prev) => [...prev, evaluator]);
     try {
       await add([evaluator.uuid]);
+      toast.success(`Added ${evaluator.name} to this agent`);
     } catch (err) {
       reportError("Error attaching created evaluator:", err);
       toast.error("Could not add the new evaluator to this agent.");

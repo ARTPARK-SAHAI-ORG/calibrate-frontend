@@ -6,8 +6,6 @@ export const DEFAULT_LLM_NEXT_REPLY_SLUG = "default-llm-next-reply";
  *  `default-llm-next-reply` judges a reply given the conversation before it. */
 export const DEFAULT_LLM_GENERAL_SLUG = "default-llm-general";
 
-export const DEFAULT_TOOL_CALL_CORRECTNESS_SLUG = "default-tool-call-correctness";
-
 /**
  * Anything carrying a default evaluator's origin identity. Forks null out
  * `slug` and put the seed slug in `source_default_slug`; legacy unforked seeds

@@ -136,7 +136,18 @@ it("falls back to a plain sentence for a reason the app does not know", () => {
   );
   expect(
     nothingCanScoreCopy([
-      { evaluator_uuid: "e1", name: "A", reason: "something_new" as never },
+      { reason: "something_new" as never },
+    ]),
+  ).toBe(
+    "None of the evaluators added to this agent can score its traces. Add an evaluator that can in the",
+  );
+});
+
+it("says an unknown reason once, however many unknown reasons there are", () => {
+  expect(
+    nothingCanScoreCopy([
+      { reason: "first_new" as never },
+      { reason: "second_new" as never },
     ]),
   ).toBe(
     "None of the evaluators added to this agent can score its traces. Add an evaluator that can in the",
