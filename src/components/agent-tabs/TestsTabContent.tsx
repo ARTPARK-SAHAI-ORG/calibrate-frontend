@@ -1593,6 +1593,7 @@ export function TestsTabContent({
             <TestTypeFilter
               size="sm"
               className="mt-2"
+              agentNature={agentNature}
               value={dropdownTypeFilter}
               onChange={(value) => {
                 setDropdownTypeFilter(value);
@@ -1934,7 +1935,11 @@ export function TestsTabContent({
               <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Type
               </span>
-              <TestTypeFilter value={typeFilter} onChange={setTypeFilter} />
+              <TestTypeFilter
+                value={typeFilter}
+                onChange={setTypeFilter}
+                agentNature={agentNature}
+              />
             </div>
 
             {/* Selection strip above the table: the count, "select every
@@ -2275,10 +2280,14 @@ export function TestsTabContent({
           // it covers this window, and an arrow key meant for it would step
           // the test underneath it.
           onPrev={
-            editingTestUuid && !agentDefaults.prompt ? testPager.prev : undefined
+            editingTestUuid && !agentDefaults.prompt
+              ? testPager.prev
+              : undefined
           }
           onNext={
-            editingTestUuid && !agentDefaults.prompt ? testPager.next : undefined
+            editingTestUuid && !agentDefaults.prompt
+              ? testPager.next
+              : undefined
           }
           hasPrev={testPager.hasPrev}
           hasNext={testPager.hasNext}

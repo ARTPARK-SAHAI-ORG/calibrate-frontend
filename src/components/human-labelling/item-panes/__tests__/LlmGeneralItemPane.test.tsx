@@ -78,6 +78,26 @@ describe("LlmGeneralItemPane", () => {
     expect(screen.getByText("Let me look that up")).toBeInTheDocument();
     expect(screen.getByText("book_flight")).toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("The reply and the tool calls are judged together"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no judged-together note when the output is only text", () => {
+    render(<LlmGeneralItemPane payload={{ input: "Hi", output: "Hello" }} />);
+    expect(
+      screen.queryByText("The reply and the tool calls are judged together"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says the agent made no tool call on a tool-call item with no output", () => {
+    render(
+      <LlmGeneralItemPane
+        payload={{ input: "Book a flight", output: "", actual_tool_calls: [] }}
+      />,
+    );
+    expect(screen.getByText("The agent made no tool call")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
 
   it("ignores an empty actual_tool_calls list", () => {
@@ -87,6 +107,19 @@ describe("LlmGeneralItemPane", () => {
       />,
     );
     expect(screen.getByText("Item payload")).toBeInTheDocument();
+  });
+
+  it("shows tool_calls when the item has no actual_tool_calls", () => {
+    render(
+      <LlmGeneralItemPane
+        payload={{
+          input: "Book it",
+          output: "",
+          tool_calls: [{ tool: "book_train", arguments: {} }],
+        }}
+      />,
+    );
+    expect(screen.getByText("book_train")).toBeInTheDocument();
   });
 
   const versioned = {

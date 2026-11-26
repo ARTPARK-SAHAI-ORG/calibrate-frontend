@@ -34,7 +34,11 @@ jest.mock("../../../lib/api", () => ({
   apiClient: (...args: unknown[]) => mockApiClient(...args),
   unwrapList: (data: unknown) => {
     if (Array.isArray(data)) return data;
-    if (data && typeof data === "object" && Array.isArray((data as { items?: unknown }).items)) {
+    if (
+      data &&
+      typeof data === "object" &&
+      Array.isArray((data as { items?: unknown }).items)
+    ) {
       return (data as { items: unknown[] }).items;
     }
     return [];
@@ -42,7 +46,12 @@ jest.mock("../../../lib/api", () => ({
 }));
 
 const EVALUATORS = [
-  { uuid: "ev-1", name: "Correctness", description: "Checks facts", evaluator_type: "llm" },
+  {
+    uuid: "ev-1",
+    name: "Correctness",
+    description: "Checks facts",
+    evaluator_type: "llm",
+  },
   { uuid: "ev-2", name: "Helpfulness", evaluator_type: "llm" },
   { uuid: "ev-3", name: "Tone", evaluator_type: "llm" },
   { uuid: "ev-4", name: "WER", evaluator_type: "stt" },
@@ -91,7 +100,9 @@ function optionalCheckbox(name: string): HTMLInputElement {
 }
 
 async function waitForCatalogueLoaded() {
-  await waitFor(() => expect(catalogueCheckbox("Correctness")).toBeInTheDocument());
+  await waitFor(() =>
+    expect(catalogueCheckbox("Correctness")).toBeInTheDocument(),
+  );
 }
 
 describe("ManageEvaluatorsDialog", () => {
@@ -100,10 +111,88 @@ describe("ManageEvaluatorsDialog", () => {
     mockApiClient.mockResolvedValue({ items: EVALUATORS });
   });
 
+  it("refuses to save a task with tool call items and no tool call evaluator, and says so", async () => {
+    const user = setupUser();
+    const onSaved = jest.fn();
+    mockApiClient.mockResolvedValue({
+      items: [
+        ...EVALUATORS,
+        {
+          uuid: "ev-tc",
+          name: "Tool call correctness",
+          evaluator_type: "tool-call",
+        },
+        { uuid: "ev-tc-2", name: "Booking calls", evaluator_type: "tool-call" },
+      ],
+    });
+    renderDialog({
+      currentEvaluatorIds: ["ev-1", "ev-tc"],
+      hasToolCallItems: true,
+      onSaved,
+    });
+    await waitForCatalogueLoaded();
+    const message = /select at least one tool call evaluator/;
+
+    const box = catalogueCheckbox("Tool call correctness");
+    expect(box).not.toBeDisabled();
+    await user.click(box);
+    expect(screen.queryByText(message)).not.toBeInTheDocument();
+    mockApiClient.mockClear();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByText(message)).toBeInTheDocument();
+    expect(mockApiClient).not.toHaveBeenCalled();
+
+    await user.click(catalogueCheckbox("Booking calls"));
+    expect(screen.queryByText(message)).not.toBeInTheDocument();
+    mockApiClient.mockResolvedValue({ message: "ok" });
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+  });
+
+  it("shows each evaluator's type next to its name", async () => {
+    mockApiClient.mockResolvedValue({
+      items: [
+        ...EVALUATORS,
+        {
+          uuid: "ev-tc",
+          name: "Tool call correctness",
+          evaluator_type: "tool-call",
+        },
+      ],
+    });
+    renderDialog({ currentEvaluatorIds: ["ev-tc"] });
+    await waitForCatalogueLoaded();
+    expect(screen.getAllByText("Conversation reply").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Tool call").length).toBeGreaterThan(0);
+  });
+
+  it("lets a task with no tool call items save without a tool call evaluator", async () => {
+    const user = setupUser();
+    const onSaved = jest.fn();
+    mockApiClient.mockResolvedValue({
+      items: [
+        ...EVALUATORS,
+        {
+          uuid: "ev-tc",
+          name: "Tool call correctness",
+          evaluator_type: "tool-call",
+        },
+      ],
+    });
+    renderDialog({ currentEvaluatorIds: ["ev-1", "ev-tc"], onSaved });
+    await waitForCatalogueLoaded();
+    await user.click(catalogueCheckbox("Tool call correctness"));
+    mockApiClient.mockResolvedValue({ message: "ok" });
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+  });
+
   it("renders with a generic subtitle when no taskType is given, and fetches evaluators", async () => {
     renderDialog();
     expect(screen.getByText("Manage evaluators")).toBeInTheDocument();
-    expect(screen.getByText("Choose evaluators to align with humans")).toBeInTheDocument();
+    expect(
+      screen.getByText("Choose evaluators to align with humans"),
+    ).toBeInTheDocument();
     await waitFor(() =>
       expect(mockApiClient).toHaveBeenCalledWith(
         "/evaluators?include_defaults=true",
@@ -127,17 +216,30 @@ describe("ManageEvaluatorsDialog", () => {
     await waitForCatalogueLoaded();
 
     await user.click(screen.getByRole("button", { name: "New evaluator" }));
-    // The task judges one kind of thing, so the flow is told which.
-    expect(screen.getByTestId("create-evaluator-types")).toHaveTextContent(
-      "llm",
+    // Any row of an llm task can be a tool call, so both kinds are offered.
+    expect(screen.getByTestId("create-evaluator-types").textContent).toBe(
+      "llm,tool-call",
     );
 
     await user.click(screen.getByRole("button", { name: "finish creating" }));
 
-    expect(screen.queryByTestId("create-evaluator-flow")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("create-evaluator-flow"),
+    ).not.toBeInTheDocument();
     // Two were already chosen, and the new one joins them.
     expect(screen.getByText("3 selected")).toBeInTheDocument();
     expect(screen.getAllByText("Made just now").length).toBeGreaterThan(0);
+  });
+
+  it("offers only the task's own kind when creating on an stt task", async () => {
+    const user = setupUser();
+    renderDialog({ taskType: "stt" });
+    await waitFor(() => expect(screen.getByText("WER")).toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "New evaluator" }));
+    expect(screen.getByTestId("create-evaluator-types").textContent).toBe(
+      "stt",
+    );
   });
 
   it("stays open while the new evaluator form is clicked", async () => {
@@ -208,11 +310,40 @@ describe("ManageEvaluatorsDialog", () => {
     expect(screen.getByText("No matching evaluators.")).toBeInTheDocument();
   });
 
+  it.each([
+    ["llm", true],
+    ["llm-general", true],
+    ["conversation", false],
+    ["stt", false],
+  ] as const)(
+    "offers tool call evaluators on a %s task: %s",
+    async (taskType, shown) => {
+      mockApiClient.mockResolvedValue({
+        items: [
+          ...EVALUATORS,
+          {
+            uuid: "ev-5",
+            name: "Tool call correctness",
+            evaluator_type: "tool-call",
+          },
+          { uuid: "ev-6", name: "Whole chat", evaluator_type: taskType },
+        ],
+      });
+      renderDialog({ taskType, currentEvaluatorIds: [] });
+      await waitFor(() =>
+        expect(screen.getByText("Whole chat")).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Tool call correctness") !== null).toBe(shown);
+    },
+  );
+
   it("shows a type-specific empty state and a generic one depending on taskType", async () => {
     mockApiClient.mockResolvedValue({ items: [] });
     const { rerender } = renderDialog({ taskType: "llm" });
     await waitFor(() =>
-      expect(screen.getByText("No Agent reply evaluators yet.")).toBeInTheDocument(),
+      expect(
+        screen.getByText("No Conversation reply evaluators yet."),
+      ).toBeInTheDocument(),
     );
     rerender(
       <ManageEvaluatorsDialog
@@ -224,7 +355,9 @@ describe("ManageEvaluatorsDialog", () => {
         onSaved={jest.fn()}
       />,
     );
-    await waitFor(() => expect(screen.getByText("No evaluators yet.")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("No evaluators yet.")).toBeInTheDocument(),
+    );
   });
 
   it("toggles an evaluator on: adds it to the right column, updates counts, and enables Save", async () => {
@@ -293,20 +426,26 @@ describe("ManageEvaluatorsDialog", () => {
     renderDialog({ currentEvaluatorIds: ["ev-1", "ev-2"] });
     await waitForCatalogueLoaded();
 
-    await user.click(screen.getByRole("button", { name: "Remove Correctness" }));
+    await user.click(
+      screen.getByRole("button", { name: "Remove Correctness" }),
+    );
     expect(screen.getByText("1 selected")).toBeInTheDocument();
     expect(screen.getByText("−1 to remove")).toBeInTheDocument();
   });
 
   it("shows the fallback uuid-slice label when a selected id has no matching evaluator loaded", async () => {
     renderDialog({ currentEvaluatorIds: ["ev-unknown-uuid"] });
-    await waitFor(() => expect(screen.getByText("1 selected")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("1 selected")).toBeInTheDocument(),
+    );
     expect(screen.getByText("ev-unkno")).toBeInTheDocument();
   });
 
   it("falls back to a placeholder aria-label when removing an evaluator with no loaded name", async () => {
     renderDialog({ currentEvaluatorIds: ["ev-unknown-uuid"] });
-    await waitFor(() => expect(screen.getByText("1 selected")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("1 selected")).toBeInTheDocument(),
+    );
     expect(
       screen.getByRole("button", { name: "Remove evaluator" }),
     ).toBeInTheDocument();
@@ -379,7 +518,11 @@ describe("ManageEvaluatorsDialog", () => {
     );
     expect(cards.length).toBe(2);
 
-    const dataTransfer = { effectAllowed: "", dropEffect: "", setData: jest.fn() };
+    const dataTransfer = {
+      effectAllowed: "",
+      dropEffect: "",
+      setData: jest.fn(),
+    };
 
     // Drag card 0 (Correctness) onto card 1 (Helpfulness) to swap order.
     fireEvent.dragStart(cards[0], { dataTransfer });
@@ -410,7 +553,11 @@ describe("ManageEvaluatorsDialog", () => {
     const cards = Array.from(
       document.querySelectorAll<HTMLElement>('div[draggable="true"]'),
     );
-    const dataTransfer = { effectAllowed: "", dropEffect: "", setData: jest.fn() };
+    const dataTransfer = {
+      effectAllowed: "",
+      dropEffect: "",
+      setData: jest.fn(),
+    };
 
     // dragOver with no active drag source is a no-op (dragSourceIdx === null).
     fireEvent.dragOver(cards[1], { dataTransfer });
@@ -428,7 +575,11 @@ describe("ManageEvaluatorsDialog", () => {
     const cards = Array.from(
       document.querySelectorAll<HTMLElement>('div[draggable="true"]'),
     );
-    const dataTransfer = { effectAllowed: "", dropEffect: "", setData: jest.fn() };
+    const dataTransfer = {
+      effectAllowed: "",
+      dropEffect: "",
+      setData: jest.fn(),
+    };
     fireEvent.dragStart(cards[0], { dataTransfer });
     fireEvent.dragOver(cards[0], { dataTransfer });
     fireEvent.drop(cards[0], { dataTransfer });
@@ -441,7 +592,9 @@ describe("ManageEvaluatorsDialog", () => {
       if (url === "/evaluators?include_defaults=true") {
         return Promise.resolve({ items: EVALUATORS });
       }
-      return Promise.reject(new Error('Request failed: 400 - {"detail":"nope"}'));
+      return Promise.reject(
+        new Error('Request failed: 400 - {"detail":"nope"}'),
+      );
     });
     renderDialog({ currentEvaluatorIds: ["ev-1"] });
     await waitForCatalogueLoaded();
@@ -463,7 +616,9 @@ describe("ManageEvaluatorsDialog", () => {
     await user.click(catalogueCheckbox("Helpfulness"));
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() =>
-      expect(screen.getByText("Failed to update evaluators")).toBeInTheDocument(),
+      expect(
+        screen.getByText("Failed to update evaluators"),
+      ).toBeInTheDocument(),
     );
   });
 
@@ -479,7 +634,10 @@ describe("ManageEvaluatorsDialog", () => {
       });
     });
     const onClose = jest.fn();
-    const { container } = renderDialog({ currentEvaluatorIds: ["ev-1"], onClose });
+    const { container } = renderDialog({
+      currentEvaluatorIds: ["ev-1"],
+      onClose,
+    });
     await waitForCatalogueLoaded();
 
     // Clicking inside the panel doesn't close (stopPropagation).
@@ -498,25 +656,35 @@ describe("ManageEvaluatorsDialog", () => {
     // While saving, backdrop click is a no-op.
     await user.click(catalogueCheckbox("Helpfulness"));
     await user.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(screen.getByRole("button", { name: "Saving..." })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Saving..." }),
+    ).toBeInTheDocument();
     await user.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(2);
     resolveSave({ message: "ok" });
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Saving..." })).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole("button", { name: "Saving..." }),
+      ).not.toBeInTheDocument(),
     );
   });
 
   it("falls back to the raw Error message when it doesn't match the 'Request failed' shape", async () => {
     mockApiClient.mockRejectedValue(new Error("network down"));
     renderDialog();
-    await waitFor(() => expect(screen.getByText("network down")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("network down")).toBeInTheDocument(),
+    );
   });
 
   it("falls back to the raw body when the 'Request failed' body isn't JSON", async () => {
-    mockApiClient.mockRejectedValue(new Error("Request failed: 500 - not json"));
+    mockApiClient.mockRejectedValue(
+      new Error("Request failed: 500 - not json"),
+    );
     renderDialog();
-    await waitFor(() => expect(screen.getByText("not json")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("not json")).toBeInTheDocument(),
+    );
   });
 
   it("marks an evaluator optional, enables Save, and sends it in optional_evaluator_ids", async () => {
@@ -601,7 +769,9 @@ describe("ManageEvaluatorsDialog", () => {
     });
     await waitForCatalogueLoaded();
 
-    await user.click(screen.getByRole("button", { name: "Remove Correctness" }));
+    await user.click(
+      screen.getByRole("button", { name: "Remove Correctness" }),
+    );
 
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() =>
@@ -630,7 +800,9 @@ describe("ManageEvaluatorsDialog", () => {
     });
     await waitForCatalogueLoaded();
 
-    await user.click(screen.getByRole("button", { name: "Remove Correctness" }));
+    await user.click(
+      screen.getByRole("button", { name: "Remove Correctness" }),
+    );
     await user.click(catalogueCheckbox("Correctness"));
 
     expect(optionalCheckbox("Correctness")).toBeChecked();

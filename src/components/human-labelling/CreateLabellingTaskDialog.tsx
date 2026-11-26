@@ -5,11 +5,13 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { ErrorNote } from "@/components/ui";
 import {
   EVALUATOR_TYPE_LABELS,
+  EvaluatorTypePill,
   type EvaluatorType,
 } from "@/components/EvaluatorPills";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { EvaluatorTypeQuestions } from "@/components/evaluators/EvaluatorTypeQuestions";
 import { apiClient, unwrapList } from "@/lib/api";
+import { evaluatorTypesForTask, fitsTaskType } from "@/lib/labellingItem";
 import { readNameConflictFromError } from "@/lib/parseBackendError";
 
 // Labelling tasks support every evaluator use case.
@@ -129,7 +131,7 @@ export function CreateLabellingTaskDialog({
     setSelectedEvaluatorIds((prev) => {
       const next = new Set<string>();
       for (const ev of evaluators) {
-        if (ev.evaluator_type === taskType && prev.has(ev.uuid)) {
+        if (fitsTaskType(ev.evaluator_type, taskType) && prev.has(ev.uuid)) {
           next.add(ev.uuid);
         }
       }
@@ -141,7 +143,7 @@ export function CreateLabellingTaskDialog({
     if (!taskType) return [];
     const q = evaluatorSearch.trim().toLowerCase();
     return evaluators
-      .filter((ev) => ev.evaluator_type === taskType)
+      .filter((ev) => fitsTaskType(ev.evaluator_type, taskType))
       .filter((ev) => (q ? ev.name.toLowerCase().includes(q) : true));
   }, [evaluators, taskType, evaluatorSearch]);
 
@@ -427,8 +429,15 @@ export function CreateLabellingTaskDialog({
                               />
                             </span>
                             <div className="min-w-0 flex-1">
-                              <div className="text-sm font-medium truncate">
-                                {ev.name}
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-sm font-medium truncate">
+                                  {ev.name}
+                                </span>
+                                {ev.evaluator_type && (
+                                  <EvaluatorTypePill
+                                    evaluatorType={ev.evaluator_type}
+                                  />
+                                )}
                               </div>
                               {ev.description && (
                                 <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
@@ -486,18 +495,21 @@ export function CreateLabellingTaskDialog({
         </div>
       </div>
 
-      {/* One kind is already chosen, so this opens straight on the form for
-          that kind rather than asking again. */}
+      {/* Offers the task's own kind, plus the tool calls on an llm or
+          llm-general task. */}
       {taskType && (
         <CreateEvaluatorFlow
           open={createFlowOpen}
           onClose={() => setCreateFlowOpen(false)}
           existingEvaluators={evaluators}
-          useCaseTypes={[taskType]}
+          useCaseTypes={evaluatorTypesForTask(taskType)}
           onCreated={(created) => {
             setCreateFlowOpen(false);
             setEvaluators((prev) => [
-              { ...created, evaluator_type: taskType },
+              {
+                ...created,
+                evaluator_type: created.evaluator_type ?? taskType,
+              },
               ...prev,
             ]);
             // Made for this task, so it starts ticked.

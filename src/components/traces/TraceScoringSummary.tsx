@@ -5,14 +5,27 @@ import { RunStateMark } from "@/components/ui";
 import { SpinnerIcon } from "@/components/icons";
 import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
 import {
+  isToolCallTraceRow,
   isTraceScoringInProgress,
   scoringFailedCopy,
   scoringRunErrorCopy,
 } from "@/lib/traceScoring";
 import type { TraceSummary } from "@/lib/tracesApi";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { defaultBinaryLabel } from "@/lib/binaryLabels";
+import type { EvaluatorType } from "@/components/EvaluatorPills";
 
-export type TraceScoreColumn = { evaluator_uuid: string; name: string };
+export type TraceScoreColumn = {
+  evaluator_uuid: string;
+  name: string;
+  /** Null while the agent's evaluators are still loading, so the cell waits.
+   * Undefined means unknown, and the column applies to every row. */
+  evaluator_type?: EvaluatorType | null;
+};
+
+// A tool-call evaluator scores only traces that just called a tool, and every
+// other evaluator scores only the rest, so the other kind of row gets nothing.
+const DOES_NOT_APPLY = <span className="text-sm text-muted-foreground">—</span>;
 
 // The same weight the Evaluations tab gives an empty cell, e.g. "Default"
 // under Models on a run that used the agent's own model.
@@ -29,7 +42,11 @@ const COULD_NOT_RUN = (
 type Props = {
   trace: Pick<
     TraceSummary,
-    "latest_run_status" | "latest_run_error" | "results"
+    | "latest_run_status"
+    | "latest_run_error"
+    | "results"
+    | "response_preview"
+    | "tool_call_count"
   >;
   columns: TraceScoreColumn[];
   /** "row" is one grid cell per evaluator; "card" is a labelled block each. */
@@ -77,11 +94,21 @@ function ReasoningInfo({
  */
 function ScoreValue({
   trace,
-  evaluatorUuid,
+  column,
 }: {
   trace: Props["trace"];
-  evaluatorUuid: string;
+  column: TraceScoreColumn;
 }) {
+  const score = trace.results?.find(
+    (s) => s.evaluator_uuid === column.evaluator_uuid,
+  );
+  if (
+    !score &&
+    column.evaluator_type &&
+    !evaluatorFitsItem(column.evaluator_type, isToolCallTraceRow(trace))
+  ) {
+    return DOES_NOT_APPLY;
+  }
   // A run still going says so in every column, rather than looking unscored.
   if (isTraceScoringInProgress(trace.latest_run_status)) {
     return (
@@ -92,7 +119,7 @@ function ScoreValue({
       </span>
     );
   }
-  const score = trace.results?.find((s) => s.evaluator_uuid === evaluatorUuid);
+  if (!score && column.evaluator_type === null) return null;
   if (!score) {
     // A trace nothing has tried to score, and a finished run that simply
     // carries no result for this evaluator, are both still waiting on one.
@@ -186,7 +213,7 @@ export function TraceScoreCells({ trace, columns, layout }: Props) {
             <div className="text-xs font-medium text-muted-foreground">
               {column.name}
             </div>
-            <ScoreValue trace={trace} evaluatorUuid={column.evaluator_uuid} />
+            <ScoreValue trace={trace} column={column} />
           </div>
         ))}
       </div>
@@ -196,7 +223,7 @@ export function TraceScoreCells({ trace, columns, layout }: Props) {
     <>
       {columns.map((column) => (
         <div key={column.evaluator_uuid} className="min-w-0">
-          <ScoreValue trace={trace} evaluatorUuid={column.evaluator_uuid} />
+          <ScoreValue trace={trace} column={column} />
         </div>
       ))}
     </>

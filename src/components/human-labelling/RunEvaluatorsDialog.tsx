@@ -7,9 +7,13 @@ import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { apiClient } from "@/lib/api";
 import { liveVersionOf } from "@/lib/evaluatorVersions";
-import { toolCallNotEvaluatedMessage } from "@/lib/labellingItem";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 
-type LinkedEvaluator = { uuid: string; name: string };
+type LinkedEvaluator = {
+  uuid: string;
+  name: string;
+  evaluator_type?: string | null;
+};
 
 type EvaluatorVersion = {
   uuid: string;
@@ -58,13 +62,10 @@ type RunEvaluatorsDialogProps = {
    * `GET /annotation-tasks/{taskUuid}/evaluators`. */
   taskUuid: string;
   evaluators: LinkedEvaluator[];
+  /** The items the run is for, to say how many no ticked evaluator fits. */
+  items?: { is_tool_call?: boolean }[];
   submitting: boolean;
   submitError: string | null;
-  /** How many of the chosen rows are tool calls that a run leaves out.
-   * Above zero, a note says so before the run is started. `null` means some
-   * are, but they cannot be counted: select-all reaches rows beyond the page
-   * in hand, so the note is shown without a number. */
-  toolCallSkipCount?: number | null;
   onClose: () => void;
   onConfirm: (selections: RunEvaluatorsSelection[]) => void | Promise<void>;
 };
@@ -109,9 +110,9 @@ export function RunEvaluatorsDialog({
   accessToken,
   taskUuid,
   evaluators,
+  items = [],
   submitting,
   submitError,
-  toolCallSkipCount = 0,
   onClose,
   onConfirm,
 }: RunEvaluatorsDialogProps) {
@@ -214,8 +215,19 @@ export function RunEvaluatorsDialog({
     setPicked(next);
   };
 
+  // The backend leaves these out of the run.
+  const unfittedCount = items.filter(
+    (it) =>
+      !evaluators.some(
+        (e) =>
+          picked[e.uuid] &&
+          evaluatorFitsItem(e.evaluator_type, it.is_tool_call === true),
+      ),
+  ).length;
+  const nothingFits = items.length > 0 && unfittedCount === items.length;
+
   const handleConfirm = async () => {
-    if (pickedCount === 0 || submitting) return;
+    if (pickedCount === 0 || nothingFits || submitting) return;
     const selections: RunEvaluatorsSelection[] = [];
     for (const e of evaluators) {
       if (!picked[e.uuid]) continue;
@@ -422,14 +434,13 @@ export function RunEvaluatorsDialog({
               })}
             </>
           )}
-          {toolCallSkipCount !== 0 && (
+          {pickedCount > 0 && unfittedCount > 0 && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground">
-              {toolCallNotEvaluatedMessage(
-                toolCallSkipCount === null
-                  ? "Any chosen item that evaluates"
-                  : `${toolCallSkipCount} of the chosen items evaluate`,
-                ", so they will be left out of this run",
-              )}
+              {nothingFits
+                ? "None of the chosen items fit the ticked evaluators"
+                : unfittedCount === 1
+                  ? "1 of the chosen items fits none of the ticked evaluators, so it will be left out of this run"
+                  : `${unfittedCount} of the chosen items fit none of the ticked evaluators, so they will be left out of this run`}
             </div>
           )}
           {submitError && <p className="text-sm text-red-500">{submitError}</p>}
@@ -444,7 +455,12 @@ export function RunEvaluatorsDialog({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={pickedCount === 0 || submitting || loading}
+            disabled={
+              pickedCount === 0 ||
+              nothingFits ||
+              submitting ||
+              loading
+            }
             className="h-10 px-4 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? "Starting..." : "Run"}

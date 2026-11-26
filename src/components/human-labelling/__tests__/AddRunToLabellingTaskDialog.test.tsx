@@ -5,7 +5,6 @@ import {
   isLabellableOutput,
   isLabellableTrace,
   isLabellingEligibleRaw,
-  isToolCallOutput,
   isToolCallTest,
   isToolCallTrace,
   itemNounForSource,
@@ -13,6 +12,7 @@ import {
   traceOutputFacts,
   type AddRunToLabellingTaskSource,
 } from "../AddRunToLabellingTaskDialog";
+import { isToolCallOutput } from "@/lib/traceScoring";
 
 const apiClientMock = jest.fn();
 const unwrapListMock = jest.fn();

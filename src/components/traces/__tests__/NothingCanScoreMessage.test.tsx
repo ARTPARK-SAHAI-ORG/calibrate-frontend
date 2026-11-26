@@ -11,9 +11,9 @@ it("says variables are the reason and offers the way to fix it", async () => {
     />,
   );
 
-  expect(
-    screen.getByText(/Every evaluator added to this agent uses variables/),
-  ).toBeInTheDocument();
+  expect(document.body).toHaveTextContent(
+    "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically. Add an evaluator without variables in the Evaluators tab.",
+  );
   await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
   expect(onGoToEvaluators).toHaveBeenCalled();
 });

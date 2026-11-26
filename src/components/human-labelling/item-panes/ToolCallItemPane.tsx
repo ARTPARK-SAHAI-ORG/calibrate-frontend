@@ -4,24 +4,20 @@ import {
 } from "@/components/test-results/shared";
 import { readTextField } from "@/lib/messageVersions";
 import { ExpectedToolCalls } from "./ExpectedToolCalls";
+import { agentToolCalls } from "@/lib/labellingItem";
 import { normaliseHistoryItem } from "./shared";
 
-/**
- * Renders the conversation side of a tool-call labelling item (a tool-call
- * item inside an `llm` task): the conversation and the agent's actual output
- * (its tool call, or the text it replied with when it made no call). This is
- * the "what happened" pane — the "what was expected" spec is the item's
- * evaluator-equivalent and renders right under this pane, in
- * `ExpectedToolCalls`, so the two can be compared.
- *
- * Follows the exact same pattern as `LlmItemPane`: the agent's actual output
- * is appended to `history` as its own trailing turn and highlighted with
- * `highlightEvalTarget`, instead of being passed through `TestDetailView`'s
- * separate `output` prop — that prop draws test-run pass/fail chrome (a
- * colored bar, a check or cross) that a labelling item, which nobody has
- * judged yet, should never show.
- */
 const AGENT_ANSWER = "Agent's answer";
+
+export const NO_TOOL_CALL = "The agent made no tool call";
+
+export function JudgedTogetherNote() {
+  return (
+    <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+      The reply and the tool calls are judged together
+    </div>
+  );
+}
 
 export function ToolCallItemPane({
   payload,
@@ -36,30 +32,34 @@ export function ToolCallItemPane({
     }
   }
 
-  const actualToolCalls = Array.isArray(payload.actual_tool_calls)
-    ? (payload.actual_tool_calls as TestCaseHistory["tool_calls"])
-    : undefined;
-  if (actualToolCalls && actualToolCalls.length > 0) {
-    history.push({ role: "assistant", tool_calls: actualToolCalls });
-  } else {
-    // A failed tool-call test: the agent replied with text instead of
-    // calling a tool. Show that reply so the annotator sees what the agent
-    // actually did.
-    const agentResponse = readTextField(payload.agent_response);
-    if (agentResponse && agentResponse.content.length > 0) {
-      history.push({
-        role: "assistant",
-        ...agentResponse,
-        label: agentResponse.label ?? AGENT_ANSWER,
-      });
-    }
+  const agentResponse = readTextField(payload.agent_response);
+  const hasReply = !!agentResponse && agentResponse.content.length > 0;
+  const actualToolCalls = agentToolCalls(payload) as NonNullable<
+    TestCaseHistory["tool_calls"]
+  >;
+  const hasCalls = actualToolCalls.length > 0;
+  // The agent's output is appended to `history`, not passed as `output`, which
+  // would draw pass/fail marks on an item nobody has judged yet.
+  if (hasReply) {
+    history.push({
+      role: "assistant",
+      ...agentResponse,
+      label: agentResponse.label ?? (hasCalls ? "Agent's reply" : AGENT_ANSWER),
+    });
+  }
+  if (hasCalls) {
+    history.push({
+      role: "assistant",
+      tool_calls: actualToolCalls,
+      label: hasReply ? "Agent's tool calls" : AGENT_ANSWER,
+    });
   }
 
   if (history.length === 0) {
     return (
       <div className="space-y-4">
         <div className="border border-border rounded-xl p-4">
-          <p className="text-sm text-muted-foreground">—</p>
+          <p className="text-sm text-muted-foreground">{NO_TOOL_CALL}</p>
         </div>
         <div className="pl-4">
           <ExpectedToolCalls payload={payload} />
@@ -72,9 +72,16 @@ export function ToolCallItemPane({
     <TestDetailView
       history={history}
       passed={true}
-      highlightEvalTarget
-      toolCallLabel={AGENT_ANSWER}
-      afterHistory={<ExpectedToolCalls payload={payload} />}
+      highlightEvalTarget={hasReply && hasCalls ? 2 : hasReply || hasCalls}
+      afterHistory={
+        <>
+          {!hasReply && !hasCalls && (
+            <p className="text-sm text-muted-foreground">{NO_TOOL_CALL}</p>
+          )}
+          {hasReply && hasCalls && <JudgedTogetherNote />}
+          <ExpectedToolCalls payload={payload} />
+        </>
+      }
     />
   );
 }

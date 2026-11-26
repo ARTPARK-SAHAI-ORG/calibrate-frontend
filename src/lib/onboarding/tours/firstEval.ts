@@ -405,7 +405,7 @@ async function resolveFreeName(
   }
 }
 
-// Only "Agent reply" evaluators (the pill label for `evaluator_type === "llm"`)
+// Only "Conversation reply" evaluators (the pill label for `evaluator_type === "llm"`)
 // actually grade a next-reply test: the test dialog seeds evaluators filtered to
 // that type and silently drops "Full conversation" / "Agent Response" ones. So the
 /**

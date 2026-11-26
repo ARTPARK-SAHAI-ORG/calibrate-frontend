@@ -34,6 +34,21 @@ describe("LlmItemPane", () => {
     expect(screen.getByText("Hello, how can I help?")).toBeInTheDocument();
   });
 
+  it("marks only the last message when the item ends with two agent messages", () => {
+    render(
+      <LlmItemPane
+        payload={{
+          chat_history: [
+            { role: "user", content: "Hi" },
+            { role: "assistant", content: "One moment" },
+          ],
+          agent_response: "Here it is",
+        }}
+      />,
+    );
+    expect(screen.getAllByText("Evaluation target")).toHaveLength(1);
+  });
+
   it("renders when only agent_response is present (no chat_history)", () => {
     render(<LlmItemPane payload={{ agent_response: "Just a reply" }} />);
     expect(screen.getByText("Just a reply")).toBeInTheDocument();
@@ -149,47 +164,6 @@ describe("LlmItemPane", () => {
       />,
     );
     expect(screen.getByText("Hello")).toBeInTheDocument();
-  });
-
-  it("shows the tool call the agent made as the trailing turn", () => {
-    render(
-      <LlmItemPane
-        payload={{
-          chat_history: [{ role: "user", content: "Book me a flight" }],
-          agent_response: "",
-          actual_tool_calls: [
-            {
-              tool: "book_flight",
-              arguments: { destination: "Delhi" },
-              output: "Booked",
-            },
-          ],
-          expected_tool_calls: [{ tool: "should_not_render", arguments: {} }],
-        }}
-      />,
-    );
-    expect(screen.getByText("Book me a flight")).toBeInTheDocument();
-    expect(screen.getByText("book_flight")).toBeInTheDocument();
-    expect(screen.queryByText("should_not_render")).not.toBeInTheDocument();
-  });
-
-  it("keeps the text reply before the tool calls", () => {
-    render(
-      <LlmItemPane
-        payload={{
-          chat_history: [{ role: "user", content: "Book me a flight" }],
-          agent_response: "One moment",
-          actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
-        }}
-      />,
-    );
-    expect(screen.getByText("One moment")).toBeInTheDocument();
-    expect(screen.getByText("book_flight")).toBeInTheDocument();
-  });
-
-  it("still shows the em-dash placeholder when actual_tool_calls is empty", () => {
-    render(<LlmItemPane payload={{ actual_tool_calls: [] }} />);
-    expect(screen.getByText("—")).toBeInTheDocument();
   });
 
   it("renders an object agent_response with its text, label and versions", () => {

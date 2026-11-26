@@ -29,10 +29,7 @@ import {
 } from "@/components/AddTestDialog";
 import { AppLayout } from "@/components/AppLayout";
 import { TabRow } from "@/components/ui/TabRow";
-import {
-  ExportResultsButton,
-  type ExportColumn,
-} from "@/components/ExportResultsButton";
+import { ExportResultsButton } from "@/components/ExportResultsButton";
 import { RefreshButton } from "@/components/RefreshButton";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
@@ -46,11 +43,19 @@ import {
 } from "@/components/human-labelling/MetadataFieldsEditor";
 import { sampleItem } from "@/components/human-labelling/sampleItem";
 import {
+  clearOldToolCallsField,
   historyToPayloadFields,
+  keepList,
   payloadToHistory,
   textFieldsToPayload,
 } from "@/components/human-labelling/itemConversation";
 import { textOf } from "@/lib/messageVersions";
+import {
+  buildItemsCsv,
+  sanitizeCsvName,
+  type SummaryRow,
+  type TaskSummaryResponse,
+} from "@/components/human-labelling/itemsCsv";
 import { BulkUploadSttItemsDialog } from "@/components/human-labelling/BulkUploadSttItemsDialog";
 import { BulkUploadTtsItemsDialog } from "@/components/human-labelling/BulkUploadTtsItemsDialog";
 import { BulkUploadConversationItemsDialog } from "@/components/human-labelling/BulkUploadConversationItemsDialog";
@@ -99,94 +104,19 @@ import {
 import { apiClient } from "@/lib/api";
 import { useSidebarState } from "@/lib/sidebar";
 import {
-  evaluatorsThatCanBeRun,
+  agentToolCalls,
+  evaluatorsFittingItems,
+  isToolCallContent,
   itemEditForm,
-  runEvaluatorsDecision,
+  selectedTaskItems,
   toItemDetailItem,
-  toolCallNotEvaluatedMessage,
   llmGeneralDialogRow,
   readEvaluatorVariables,
+  storesEmptyToolCallList,
 } from "@/lib/labellingItem";
 import { parseBackendTime } from "@/lib/relativeTime";
 
 type Tab = "overview" | "items" | "jobs" | "runs";
-
-// Denormalized one-row-per-(item × linked evaluator) view from
-// /annotation-tasks/{uuid}/summary. `annotators[]` provides the column
-// order (union of every annotator with ≥1 annotation on the task);
-// each `rows[i].annotations[annotator_uuid]` is that annotator's
-// latest annotation for the slot, or null when they didn't label it.
-//
-// Per-row evaluator metadata (name, output_type, scale_min/max,
-// version_number, is_live_version) was moved to the top-level
-// `evaluators[]` block. The page looks each row's evaluator up by
-// `evaluator_id` (and `evaluator_version_id` for version-specific
-// fields).
-type SummaryAnnotator = { uuid: string; name: string };
-type SummaryEvaluator = {
-  uuid: string;
-  name: string;
-  description?: string | null;
-  output_type: "binary" | "rating";
-  evaluator_type?: string;
-  data_type?: string;
-  live_version_id?: string | null;
-  live_version_index?: number | null;
-  versions?: {
-    uuid: string;
-    version_number: number;
-    output_config?: {
-      scale?: {
-        value: boolean | number | string;
-        name?: string | null;
-        description?: string | null;
-        color?: string | null;
-      }[];
-    } | null;
-    scale_min?: number | null;
-    scale_max?: number | null;
-    is_live?: boolean;
-  }[];
-  run_count?: number;
-};
-type SummaryAnnotation = {
-  value: boolean | number | null;
-  reasoning?: string | null;
-};
-type SummaryRow = {
-  item_id: string;
-  payload: Record<string, unknown> | null;
-  metadata?: MetadataEntry[] | null;
-  evaluator_id: string;
-  evaluator_version_id?: string | null;
-  evaluator_value: boolean | number | null;
-  evaluator_value_name?: string | null;
-  evaluator_reasoning?: string | null;
-  // Aggregate agreement scores in [0, 1] for this (item, evaluator) slot.
-  // human_agreement: null when <2 annotators labelled the slot.
-  // evaluator_agreement: null when no evaluator run / no annotators / types incomparable.
-  human_agreement: number | null;
-  evaluator_agreement: number | null;
-  annotations: Record<string, SummaryAnnotation | null>;
-};
-type TaskSummaryResponse = {
-  task_id: string;
-  task_type: "stt" | "tts" | "llm" | "llm-general" | "conversation";
-  evaluators: SummaryEvaluator[];
-  annotators: SummaryAnnotator[];
-  rows: SummaryRow[];
-  /** Sparse per-(item, annotator) free-text comments — the
-   * `evaluator_id IS NULL` annotation slot. Items / annotators
-   * without a non-empty comment don't appear. */
-  item_comments?: { [item_id: string]: { [annotator_uuid: string]: string } };
-  /** Item-level pagination metadata. `total` counts items in scope
-   * (narrowed by `q` / `item_id`), not row count. */
-  pagination?: {
-    total: number;
-    limit: number;
-    offset: number;
-  };
-};
 
 const ITEMS_SORT_KEY = "calibrate:items-sort-updated-at";
 /** Per-batch page size used by "Export CSV" to pull the full task
@@ -286,6 +216,7 @@ type LabellingTask = {
     name: string;
     description?: string | null;
     slug?: string | null;
+    source_default_slug?: string | null;
     evaluator_type?:
       "llm" | "llm-general" | "stt" | "tts" | "conversation" | "tool-call";
     output_type?: "binary" | "rating" | null;
@@ -360,213 +291,6 @@ function previewItemPayload(payload: unknown, kind: TaskKind): string {
   } catch {
     return "—";
   }
-}
-
-function sanitizeCsvName(s: string): string {
-  return s.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "unnamed";
-}
-
-function buildItemsCsv(
-  items: LabellingItem[],
-  taskSummary: TaskSummaryResponse | null,
-  taskType: TaskKind,
-): { columns: ExportColumn[]; rows: Record<string, unknown>[] } {
-  const evaluators = taskSummary?.evaluators ?? [];
-  const annotators = taskSummary?.annotators ?? [];
-
-  // Each (item, evaluator, version) tuple gets its own row in the
-  // summary response — keying without version_id would let later
-  // versions silently overwrite earlier ones in the export.
-  const rowByItemEvalVersion = new Map<string, SummaryRow>();
-  const versionsByEval = new Map<string, Set<string | null>>();
-  for (const row of taskSummary?.rows ?? []) {
-    const vid = row.evaluator_version_id ?? null;
-    rowByItemEvalVersion.set(
-      `${row.item_id}::${row.evaluator_id}::${vid ?? "live"}`,
-      row,
-    );
-    if (!versionsByEval.has(row.evaluator_id)) {
-      versionsByEval.set(row.evaluator_id, new Set());
-    }
-    versionsByEval.get(row.evaluator_id)!.add(vid);
-  }
-
-  const versionNumberById = new Map<string, number>();
-  for (const ev of evaluators) {
-    for (const v of ev.versions ?? []) {
-      versionNumberById.set(v.uuid, v.version_number);
-    }
-  }
-
-  // For each evaluator, the list of version_ids (sorted by version_number
-  // ascending) that actually appear in the summary rows. Evaluators with
-  // no run data still get one entry (null → "live") so annotator columns
-  // are emitted even when the evaluator hasn't run yet.
-  const versionsForEvaluator = (ev: SummaryEvaluator): (string | null)[] => {
-    const set = versionsByEval.get(ev.uuid);
-    if (!set || set.size === 0) return [null];
-    return [...set].sort((a, b) => {
-      const an: number = (a ? versionNumberById.get(a) : undefined) ?? -Infinity;
-      const bn: number = (b ? versionNumberById.get(b) : undefined) ?? -Infinity;
-      return an - bn;
-    });
-  };
-
-  const columns: ExportColumn[] = [{ key: "name", header: "name" }];
-  if (taskType !== "stt" && taskType !== "tts") {
-    columns.push({ key: "description", header: "description" });
-  }
-  if (taskType === "conversation") {
-    columns.push({
-      key: "conversation_history",
-      header: "conversation_history",
-    });
-  } else if (taskType === "stt") {
-    columns.push({
-      key: "reference_transcript",
-      header: "reference_transcript",
-    });
-    columns.push({
-      key: "predicted_transcript",
-      header: "predicted_transcript",
-    });
-  } else if (taskType === "tts") {
-    columns.push({ key: "text", header: "text" });
-    columns.push({ key: "audio_path", header: "audio_path" });
-  } else if (taskType === "llm") {
-    columns.push({
-      key: "conversation_history",
-      header: "conversation_history",
-    });
-    columns.push({ key: "agent_response", header: "agent_response" });
-  } else if (taskType === "llm-general") {
-    columns.push({ key: "input", header: "input" });
-    columns.push({ key: "output", header: "output" });
-  }
-
-  for (const ev of evaluators) {
-    const evName = sanitizeCsvName(ev.name);
-    // Annotator columns are emitted once per (annotator × evaluator) —
-    // a human's label of an item against an evaluator doesn't depend on
-    // which version of the evaluator ran.
-    for (const ann of annotators) {
-      const annName = sanitizeCsvName(ann.name);
-      const base = `${annName}_${evName}`;
-      columns.push({
-        key: `ann_${ann.uuid}_${ev.uuid}_value`,
-        header: `${base}/value`,
-      });
-      columns.push({
-        key: `ann_${ann.uuid}_${ev.uuid}_reasoning`,
-        header: `${base}/reasoning`,
-      });
-    }
-    for (const vid of versionsForEvaluator(ev)) {
-      const versionNumber = vid ? versionNumberById.get(vid) : undefined;
-      const verStr = versionNumber != null ? `v${versionNumber}` : "live";
-      columns.push({
-        key: `ev_${ev.uuid}_${vid ?? "live"}_value`,
-        header: `evaluator_${evName}_${verStr}/value`,
-      });
-      columns.push({
-        key: `ev_${ev.uuid}_${vid ?? "live"}_reasoning`,
-        header: `evaluator_${evName}_${verStr}/reasoning`,
-      });
-    }
-  }
-
-  // Item-level free-text comments — one column per annotator, not tied
-  // to any evaluator (`evaluator_id IS NULL` slot). Placed after all
-  // evaluator/annotator columns so the per-evaluator block stays
-  // contiguous and downstream consumers don't have to special-case
-  // mid-stream comment columns.
-  for (const ann of annotators) {
-    const annName = sanitizeCsvName(ann.name);
-    columns.push({
-      key: `ann_${ann.uuid}_comment`,
-      header: `${annName}/comment`,
-    });
-  }
-
-  const rows = items.map((item) => {
-    const p = (item.payload ?? {}) as Record<string, unknown>;
-    const out: Record<string, unknown> = {
-      name: typeof p.name === "string" ? p.name : "",
-    };
-    if (taskType !== "stt" && taskType !== "tts") {
-      out.description = typeof p.description === "string" ? p.description : "";
-    }
-    if (taskType === "conversation") {
-      out.conversation_history = Array.isArray(p.transcript)
-        ? JSON.stringify(p.transcript)
-        : "";
-    } else if (taskType === "stt") {
-      out.reference_transcript =
-        typeof p.reference_transcript === "string"
-          ? p.reference_transcript
-          : "";
-      out.predicted_transcript =
-        typeof p.predicted_transcript === "string"
-          ? p.predicted_transcript
-          : "";
-    } else if (taskType === "tts") {
-      out.text = typeof p.text === "string" ? p.text : "";
-      out.audio_path = typeof p.audio_path === "string" ? p.audio_path : "";
-    } else if (taskType === "llm") {
-      out.conversation_history = Array.isArray(p.chat_history)
-        ? JSON.stringify(p.chat_history)
-        : "";
-      out.agent_response = textOf(p.agent_response);
-    } else if (taskType === "llm-general") {
-      out.input = textOf(p.input);
-      out.output = textOf(p.output);
-    }
-
-    for (const ev of evaluators) {
-      const versionIds = versionsForEvaluator(ev);
-      // Annotations don't vary by version; take whichever version's row
-      // we find first that has a non-null annotation for each annotator.
-      const annotationSourceByAnn = new Map<string, SummaryAnnotation>();
-      for (const vid of versionIds) {
-        const row = rowByItemEvalVersion.get(
-          `${item.uuid}::${ev.uuid}::${vid ?? "live"}`,
-        );
-        if (!row) continue;
-        for (const ann of annotators) {
-          if (annotationSourceByAnn.has(ann.uuid)) continue;
-          const a = row.annotations?.[ann.uuid];
-          if (a && a.value !== null && a.value !== undefined) {
-            annotationSourceByAnn.set(ann.uuid, a);
-          }
-        }
-      }
-      for (const ann of annotators) {
-        const a = annotationSourceByAnn.get(ann.uuid) ?? null;
-        out[`ann_${ann.uuid}_${ev.uuid}_value`] =
-          a && a.value !== null && a.value !== undefined ? a.value : "";
-        out[`ann_${ann.uuid}_${ev.uuid}_reasoning`] = a?.reasoning ?? "";
-      }
-      for (const vid of versionIds) {
-        const row = rowByItemEvalVersion.get(
-          `${item.uuid}::${ev.uuid}::${vid ?? "live"}`,
-        );
-        out[`ev_${ev.uuid}_${vid ?? "live"}_value`] =
-          row?.evaluator_value_name ??
-          (row?.evaluator_value !== null && row?.evaluator_value !== undefined
-            ? row.evaluator_value
-            : "");
-        out[`ev_${ev.uuid}_${vid ?? "live"}_reasoning`] =
-          row?.evaluator_reasoning ?? "";
-      }
-    }
-    const commentsForItem = taskSummary?.item_comments?.[item.uuid];
-    for (const ann of annotators) {
-      out[`ann_${ann.uuid}_comment`] = commentsForItem?.[ann.uuid] ?? "";
-    }
-    return out;
-  });
-
-  return { columns, rows };
 }
 
 function parseApiError(err: unknown, fallback: string): string {
@@ -852,13 +576,29 @@ function formatItemUpdatedAt(item: {
   return d.toLocaleString();
 }
 
+function buildInitialConfig(
+  payload: Record<string, unknown> | null,
+  taskType: string | undefined,
+): TestConfig | undefined {
+  if (!payload) return undefined;
+  return {
+    history: payloadToHistory(payload, taskType),
+    evaluation: {
+      type: "response" as const,
+      criteria: "",
+      ...(Array.isArray(payload.expected_tool_calls)
+        ? { tool_calls: payload.expected_tool_calls }
+        : {}),
+    },
+  };
+}
+
 function ItemRowActions({
   itemUuid,
   onDelete,
   onLabel,
   onEdit,
   onEvaluate,
-  evaluateDisabled = false,
   onDuplicate,
 }: {
   itemUuid: string;
@@ -866,9 +606,6 @@ function ItemRowActions({
   onLabel?: (uuid: string) => void;
   onEdit?: (uuid: string) => void;
   onEvaluate?: (uuid: string) => void;
-  /** True on a tool-call row: an AI judge has no wording to read there, so
-   * the button is shown but cannot be pressed. */
-  evaluateDisabled?: boolean;
   onDuplicate?: (uuid: string) => void;
 }) {
   return (
@@ -886,30 +623,16 @@ function ItemRowActions({
           Label
         </button>
       )}
-      {onEvaluate &&
-        (() => {
-          const evaluateButton = (
-            <button
-              type="button"
-              onClick={() => onEvaluate(itemUuid)}
-              disabled={evaluateDisabled}
-              aria-label="Evaluate"
-              className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Evaluate
-            </button>
-          );
-          return evaluateDisabled ? (
-            <Tooltip
-              content={toolCallNotEvaluatedMessage("This item evaluates")}
-              position="top"
-            >
-              {evaluateButton}
-            </Tooltip>
-          ) : (
-            evaluateButton
-          );
-        })()}
+      {onEvaluate && (
+        <button
+          type="button"
+          onClick={() => onEvaluate(itemUuid)}
+          aria-label="Evaluate"
+          className="h-8 px-3 rounded-md text-sm font-medium border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/20 transition-colors cursor-pointer"
+        >
+          Evaluate
+        </button>
+      )}
       {onEdit && (
         <button
           type="button"
@@ -1488,23 +1211,7 @@ function LabellingTaskPageInner() {
   // raw count: a count with no usable value behind it (an evaluator missing
   // from the task's own list, or one whose output type is not recorded)
   // formats to nothing, and a card with nothing in it is worse than no card.
-  // Tool call correctness is not judged by a model, so there is nothing to
-  // compare its answers against. It gets no agreement card and is left out
-  // of the note about missing alignment numbers, where it would otherwise
-  // read as an evaluator that failed to run.
-  const toolCallEvaluatorIds = useMemo(
-    () =>
-      new Set(
-        (task?.evaluators ?? [])
-          .filter((e) => e.evaluator_type === "tool-call")
-          .map((e) => e.uuid),
-      ),
-    [task],
-  );
-  const judgedEvaluators = (agreement?.evaluators ?? []).filter(
-    (ev) => !toolCallEvaluatorIds.has(ev.evaluator_id),
-  );
-  const evaluatorsThatRan = judgedEvaluators.filter(
+  const evaluatorsThatRan = (agreement?.evaluators ?? []).filter(
     (ev) => evaluatorResultStats[ev.evaluator_id] != null,
   );
   const evaluatorScoreCards = useMemo(
@@ -1526,7 +1233,7 @@ function LabellingTaskPageInner() {
   // has labelled anything, "no human labels yet" is the truth. When labels do
   // exist, the missing alignment number means the evaluator did not run on the
   // items that were labelled, so say that instead.
-  const anyHumanLabels = judgedEvaluators.some(
+  const anyHumanLabels = (agreement?.evaluators ?? []).some(
     (ev) => (ev.human_result?.count ?? 0) > 0,
   );
   const allEvaluatorsMissing =
@@ -1728,6 +1435,7 @@ function LabellingTaskPageInner() {
               task_id: taskSummary.task_id,
               payload: row.payload,
               metadata: row.metadata,
+              is_tool_call: isToolCallContent(row.payload ?? {}),
               created_at: "",
               updated_at: undefined,
               deleted_at: null,
@@ -1801,6 +1509,28 @@ function LabellingTaskPageInner() {
    * search change, or on action success.
    */
   const [selectAllTotal, setSelectAllTotal] = useState(false);
+  // Empty when the chosen items are not loaded, and then every evaluator is offered.
+  const itemsForRun = (
+    selectAll: { q?: string } | null,
+    itemUuids: string[] | null,
+  ) =>
+    selectedTaskItems(
+      task?.items ?? [],
+      selectAll
+        ? { q: selectAll.q ?? "" }
+        : itemUuids
+          ? { ids: new Set(itemUuids) }
+          : { q: "" },
+    );
+  const selectedLoadedItems = selectAllTotal
+    ? itemsForRun({ q: itemsSearch }, null)
+    : itemsForRun(null, [...selectedItemIds]);
+  const selectedToolCall = selectedLoadedItems.some(
+    (it) => it.is_tool_call === true,
+  );
+  const selectedNonToolCall = selectedLoadedItems.some(
+    (it) => it.is_tool_call !== true,
+  );
 
   const toggleItem = (uuid: string) => {
     if (selectAllTotal) {
@@ -1982,58 +1712,34 @@ function LabellingTaskPageInner() {
   const [runDialogSubmitError, setRunDialogSubmitError] = useState<
     string | null
   >(null);
-  // How many of the chosen rows are tool calls that the AI judges skip. Shown
-  // in the run dialog before the run is confirmed.
-  const [runDialogToolCallSkipCount, setRunDialogToolCallSkipCount] = useState<
-    number | null
-  >(0);
+  const runDialogEvaluators = evaluatorsFittingItems(
+    task?.evaluators ?? [],
+    itemsForRun(runDialogSelectAll, runDialogItemUuids),
+  );
 
   const handleRunEvaluators = (
-    target?: string[] | string | { selectAll: true; q?: string },
+    target: string[] | { selectAll: true; q?: string },
   ) => {
     if (!accessToken || !uuid || startingRun) return;
-    // Tool call correctness is answered by people, so it is not something a
-    // run can start. A task holding nothing else has no run to offer.
-    const linked = evaluatorsThatCanBeRun(task?.evaluators ?? []);
-    if (linked.length === 0) {
-      toast.error("Link an evaluator that can be run before running.");
+    if ((task?.evaluators ?? []).length === 0) {
+      toast.error("Link an evaluator before running.");
       return;
     }
+    const selectAll = Array.isArray(target) ? null : { q: target.q };
+    const itemUuids = Array.isArray(target) ? target : null;
     if (
-      target &&
-      typeof target === "object" &&
-      !Array.isArray(target) &&
-      "selectAll" in target
+      evaluatorsFittingItems(
+        task?.evaluators ?? [],
+        itemsForRun(selectAll, itemUuids),
+      ).length === 0
     ) {
-      setRunDialogItemUuids(null);
-      setRunDialogSelectAll({ q: target.q });
-      // Select-all reaches rows beyond the page in hand, so the rows cannot
-      // be counted. The note is still shown, without a number: the backend
-      // leaves those rows out, and refuses a run with nothing else in it.
-      setRunDialogToolCallSkipCount(null);
-    } else {
-      const ids = Array.isArray(target) ? target : target ? [target] : null;
-      const decision = runEvaluatorsDecision(
-        (ids ?? []).map(
-          (id) =>
-            items.find((i) => i.uuid === id) ?? {
-              uuid: id,
-              is_tool_call: false,
-            },
-        ),
+      toast.error(
+        "None of this task's evaluators fit the chosen items. Tool-call items need a tool-call evaluator, and every other item needs an evaluator that is not a tool-call evaluator.",
       );
-      if (decision.blocked) {
-        toast.error(
-          toolCallNotEvaluatedMessage("The chosen items evaluate"),
-        );
-        return;
-      }
-      setRunDialogToolCallSkipCount(decision.toolCallSkipCount);
-      // Only the rows a run can score are sent. A tool-call row left in would
-      // sit in the finished run with nothing against it.
-      setRunDialogItemUuids(ids ? decision.runnable.map((r) => r.uuid) : null);
-      setRunDialogSelectAll(null);
+      return;
     }
+    setRunDialogItemUuids(itemUuids);
+    setRunDialogSelectAll(selectAll);
     setRunDialogSubmitError(null);
     setRunDialogOpen(true);
   };
@@ -2224,6 +1930,7 @@ function LabellingTaskPageInner() {
     uuid: e.uuid,
     name: e.name,
     description: e.description ?? null,
+    evaluator_type: e.evaluator_type,
     variables: e.variables ?? [],
   }));
 
@@ -2249,6 +1956,7 @@ function LabellingTaskPageInner() {
         slug: ev.slug ?? null,
         variables,
         variable_values: saved,
+        evaluator_type: ev.evaluator_type,
       };
     });
   };
@@ -2262,18 +1970,16 @@ function LabellingTaskPageInner() {
     ? buildInitialEvaluators(readEvaluatorVariables(duplicateSourcePayload))
     : buildInitialEvaluators({});
 
-  const buildInitialConfig = (
-    payload: Record<string, unknown> | null,
-  ): TestConfig | undefined => {
-    if (!payload) return undefined;
-    return {
-      history: payloadToHistory(
-        payload,
-        taskType,
-      ),
-      evaluation: { type: "response" as const, criteria: "" },
-    };
-  };
+  // Kept as the same object for as long as the same item is open: the dialog
+  // refills its form whenever this changes, which would wipe what was typed.
+  const editingInitialConfig = useMemo(
+    () => buildInitialConfig(editingPayload, taskType),
+    [editingPayload, taskType],
+  );
+  const addItemInitialConfig = useMemo(
+    () => buildInitialConfig(duplicateSourcePayload, taskType),
+    [duplicateSourcePayload, taskType],
+  );
 
   const openItemEdit = (uuid: string) => {
     const form = itemEditForm(taskType);
@@ -2310,9 +2016,6 @@ function LabellingTaskPageInner() {
     hasNext: editPager.hasNext,
     position: editPager.position,
   };
-
-  const editingInitialConfig = buildInitialConfig(editingPayload);
-  const addItemInitialConfig = buildInitialConfig(duplicateSourcePayload);
 
   // Sync the name field whenever a different item is opened for edit.
   useEffect(() => {
@@ -2867,10 +2570,6 @@ function LabellingTaskPageInner() {
                       <span>{humanLabelNote}</span>
                     </div>
                   )}
-                  {/* Every linked evaluator has a row here, the tool-call one
-                      included: its inter-annotator agreement is a real
-                      number even though no evaluator judges it, so this
-                      reads `agreement.evaluators`, not `judgedEvaluators`. */}
                   {hasReliabilityNumber(
                     agreement.human_human,
                     agreement.evaluators ?? [],
@@ -3457,7 +3156,6 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
-                            evaluateDisabled={item.is_tool_call === true}
                           />
                         </div>
                       </Fragment>
@@ -3579,6 +3277,7 @@ function LabellingTaskPageInner() {
                                   ? (p.name as string)
                                   : `Item ${item.id}`;
                               if (taskType === "llm-general") {
+                                setDuplicateSourcePayload(p);
                                 setDuplicateLlmGeneralRows([
                                   {
                                     ...llmGeneralDialogRow(item),
@@ -3612,7 +3311,6 @@ function LabellingTaskPageInner() {
                                   }
                                 : undefined
                             }
-                            evaluateDisabled={item.is_tool_call === true}
                           />
                         </div>
                       </Fragment>
@@ -3723,15 +3421,14 @@ function LabellingTaskPageInner() {
           isOpen={runDialogOpen}
           accessToken={accessToken}
           taskUuid={uuid}
-          evaluators={evaluatorsThatCanBeRun(task?.evaluators ?? []).map(
-            (e) => ({
-              uuid: e.uuid,
-              name: e.name,
-            }),
-          )}
+          evaluators={runDialogEvaluators.map((e) => ({
+            uuid: e.uuid,
+            name: e.name,
+            evaluator_type: e.evaluator_type,
+          }))}
+          items={itemsForRun(runDialogSelectAll, runDialogItemUuids)}
           submitting={startingRun}
           submitError={runDialogSubmitError}
-          toolCallSkipCount={runDialogToolCallSkipCount}
           onClose={() => {
             if (!startingRun) {
               setRunDialogOpen(false);
@@ -3765,6 +3462,9 @@ function LabellingTaskPageInner() {
           mode="labelItem"
           allowAgentLastMessage={taskType === "conversation"}
           requireAssistantLastMessage={taskType === "llm"}
+          storesEmptyToolCallList={storesEmptyToolCallList(
+            duplicateSourcePayload,
+          )}
           initialConfig={addItemInitialConfig}
           initialEvaluators={newItemInitialEvaluators}
           onSubmit={async (
@@ -3819,6 +3519,11 @@ function LabellingTaskPageInner() {
               ...historyToPayloadFields(
                 history,
                 taskType,
+                duplicateSourcePayload ?? undefined,
+              ),
+              expected_tool_calls: keepList(
+                duplicateSourcePayload?.expected_tool_calls,
+                config.evaluation.tool_calls ?? [],
               ),
               evaluator_variables,
             };
@@ -3874,6 +3579,9 @@ function LabellingTaskPageInner() {
           mode="labelItem"
           allowAgentLastMessage={taskType === "conversation"}
           requireAssistantLastMessage={taskType === "llm"}
+          storesEmptyToolCallList={storesEmptyToolCallList(
+            editingItem?.payload,
+          )}
           initialConfig={editingInitialConfig}
           initialEvaluators={editingInitialEvaluators}
           onSubmit={async (
@@ -3920,9 +3628,10 @@ function LabellingTaskPageInner() {
               ...existingPayload,
               name: editLlmItemName.trim(),
               ...descriptionField,
-              ...historyToPayloadFields(
-                history,
-                taskType,
+              ...historyToPayloadFields(history, taskType, existingPayload),
+              expected_tool_calls: keepList(
+                existingPayload.expected_tool_calls,
+                config.evaluation.tool_calls ?? [],
               ),
               evaluator_variables,
             };
@@ -4048,6 +3757,7 @@ function LabellingTaskPageInner() {
             uuid: e.uuid,
             name: e.name,
             slug: e.slug ?? null,
+            evaluator_type: e.evaluator_type,
             variables: e.variables ?? [],
             output_type: e.output_type ?? null,
             scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
@@ -4248,10 +3958,14 @@ function LabellingTaskPageInner() {
       <AddLlmGeneralItemsDialog
         isOpen={addLlmGeneralItemsOpen}
         evaluators={llmGeneralEvaluatorDefs}
+        storesEmptyToolCallList={storesEmptyToolCallList(
+          duplicateSourcePayload,
+        )}
         initialRows={duplicateLlmGeneralRows ?? undefined}
         onClose={() => {
           setAddLlmGeneralItemsOpen(false);
           setDuplicateLlmGeneralRows(null);
+          setDuplicateSourcePayload(null);
         }}
         onSubmit={async (rows) => {
           if (!accessToken) return;
@@ -4263,9 +3977,14 @@ function LabellingTaskPageInner() {
                   ...(r.name ? { name: r.name } : {}),
                   ...(r.description ? { description: r.description } : {}),
                   ...textFieldsToPayload(r),
-                  ...(r.toolCalls.length > 0
-                    ? { actual_tool_calls: r.toolCalls }
-                    : {}),
+                  actual_tool_calls: keepList(
+                    duplicateSourcePayload?.actual_tool_calls,
+                    r.toolCalls,
+                  ),
+                  expected_tool_calls: keepList(
+                    duplicateSourcePayload?.expected_tool_calls,
+                    r.expectedToolCalls,
+                  ),
                   ...(Object.keys(r.evaluator_variables).length > 0
                     ? { evaluator_variables: r.evaluator_variables }
                     : {}),
@@ -4278,6 +3997,7 @@ function LabellingTaskPageInner() {
           await Promise.all([fetchTask(), fetchTaskSummary()]);
           setAddLlmGeneralItemsOpen(false);
           setDuplicateLlmGeneralRows(null);
+          setDuplicateSourcePayload(null);
         }}
       />
 
@@ -4292,6 +4012,10 @@ function LabellingTaskPageInner() {
             }
           : {})}
         evaluators={llmGeneralEvaluatorDefs}
+        storesEmptyToolCallList={storesEmptyToolCallList(
+          items.find((it) => it.uuid === editLlmGeneralSingleItemUuid)
+            ?.payload,
+        )}
         initialRows={items
           .filter((it) => it.uuid === editLlmGeneralSingleItemUuid)
           .map(llmGeneralDialogRow)}
@@ -4310,10 +4034,8 @@ function LabellingTaskPageInner() {
                 updates: rows
                   .filter((r) => !!r.uuid)
                   .map((r) => {
-                    // The save replaces the whole item, so start from what
-                    // the item already holds. Without this, editing an item
-                    // whose answer was a tool call deletes the call: the
-                    // form has no field for it.
+                    // The save replaces the whole item, so start from what it
+                    // already holds.
                     const existing = (items.find((it) => it.uuid === r.uuid)
                       ?.payload ?? {}) as Record<string, unknown>;
                     return {
@@ -4323,12 +4045,18 @@ function LabellingTaskPageInner() {
                         name: r.name,
                         description: r.description,
                         ...textFieldsToPayload(r),
-                        // Only a real call goes on the item. An empty list
-                        // would make every screen read a plain text answer as
-                        // a tool call, so the key is dropped instead.
-                        ...(r.toolCalls.length > 0
-                          ? { actual_tool_calls: r.toolCalls }
-                          : { actual_tool_calls: undefined }),
+                        ...clearOldToolCallsField(
+                          existing,
+                          agentToolCalls(existing),
+                        ),
+                        actual_tool_calls: keepList(
+                          existing.actual_tool_calls,
+                          r.toolCalls,
+                        ),
+                        expected_tool_calls: keepList(
+                          existing.expected_tool_calls,
+                          r.expectedToolCalls,
+                        ),
                         evaluator_variables: r.evaluator_variables,
                       },
                       metadata: r.metadata,
@@ -4354,6 +4082,7 @@ function LabellingTaskPageInner() {
             uuid: e.uuid,
             name: e.name,
             slug: e.slug ?? null,
+            evaluator_type: e.evaluator_type,
             variables: e.variables ?? [],
             output_type: e.output_type ?? null,
             scale_min: typeof e.scale_min === "number" ? e.scale_min : null,
@@ -4378,20 +4107,8 @@ function LabellingTaskPageInner() {
           isOpen={assignOpen}
           accessToken={accessToken}
           evaluators={task?.evaluators ?? []}
-          // Select-all can reach items beyond the page in hand, so this is
-          // read off the ones loaded. Getting it wrong only changes whether
-          // the row is drawn: the backend adds the evaluator to a tool-call
-          // item either way.
-          hasToolCallItems={(task?.items ?? []).some(
-            (it) =>
-              it.is_tool_call === true &&
-              (selectAllTotal || selectedItemIds.has(it.uuid)),
-          )}
-          hasNonToolCallItems={(task?.items ?? []).some(
-            (it) =>
-              it.is_tool_call !== true &&
-              (selectAllTotal || selectedItemIds.has(it.uuid)),
-          )}
+          hasToolCallItems={selectedToolCall}
+          hasNonToolCallItems={selectedNonToolCall}
           onClose={() => setAssignOpen(false)}
           onConfirm={handleAssignAnnotators}
         />
@@ -4479,8 +4196,11 @@ function LabellingTaskPageInner() {
         <ManageEvaluatorsDialog
           accessToken={accessToken}
           taskUuid={task.uuid}
-          taskType={task.type ?? task.evaluators?.[0]?.evaluator_type}
+          taskType={taskType}
           currentEvaluatorIds={(task.evaluators ?? []).map((e) => e.uuid)}
+          hasToolCallItems={(task.items ?? []).some(
+            (it) => it.is_tool_call === true,
+          )}
           currentOptionalIds={(task.evaluators ?? [])
             .filter((e) => e.is_optional)
             .map((e) => e.uuid)}

@@ -478,14 +478,15 @@ export type TraceUsage = {
   max_scored_traces: number | null;
 };
 
-/** Whether any of the agent's traces carries feedback from the chat link. */
-export async function fetchHasTraceFeedback(
+/** Whether any of the agent's traces matches this filter. */
+export async function fetchHasTrace(
   accessToken: string,
   agentId: string,
+  filter: Pick<TraceListParams, "feedback" | "outputType">,
 ): Promise<boolean> {
   const page = await fetchTraces(accessToken, {
+    ...filter,
     agentId,
-    feedback: "any",
     limit: 1,
     offset: 0,
   });

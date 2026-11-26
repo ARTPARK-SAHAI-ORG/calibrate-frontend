@@ -4,17 +4,45 @@ import { TestTypeFilter, matchesTestTypeFilter } from "../TestTypeFilter";
 describe("TestTypeFilter", () => {
   it("renders all filter options with default md size", () => {
     render(<TestTypeFilter value="all" onChange={jest.fn()} />);
-    ["All", "Agent Response", "Tool Call"].forEach((label) => {
-      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
-    });
+    ["All", "Conversation reply", "Agent Response", "Tool call"].forEach(
+      (label) => {
+        expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+      },
+    );
     expect(
       screen.queryByRole("button", { name: "Conversation" }),
     ).not.toBeInTheDocument();
   });
 
+  it("shows one reply chip named after the agent's kind", () => {
+    const { unmount } = render(
+      <TestTypeFilter value="all" onChange={jest.fn()} agentNature="general" />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Agent Response" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Conversation reply" }),
+    ).not.toBeInTheDocument();
+    unmount();
+    render(
+      <TestTypeFilter
+        value="all"
+        onChange={jest.fn()}
+        agentNature="conversation"
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Conversation reply" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Agent Response" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("highlights the active option", () => {
     render(<TestTypeFilter value="tool_call" onChange={jest.fn()} />);
-    const active = screen.getByRole("button", { name: "Tool Call" });
+    const active = screen.getByRole("button", { name: "Tool call" });
     const inactive = screen.getByRole("button", { name: "All" });
     expect(active.className).toContain("bg-background");
     expect(inactive.className).not.toContain("bg-background");
@@ -24,7 +52,7 @@ describe("TestTypeFilter", () => {
     const user = setupUser();
     const onChange = jest.fn();
     render(<TestTypeFilter value="all" onChange={onChange} />);
-    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+    await user.click(screen.getByRole("button", { name: "Tool call" }));
     expect(onChange).toHaveBeenCalledWith("tool_call");
   });
 

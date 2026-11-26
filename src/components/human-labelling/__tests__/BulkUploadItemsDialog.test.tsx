@@ -6,6 +6,7 @@ import {
   type BulkLinkedEvaluator,
   type BulkSampleRow,
 } from "../BulkUploadItemsDialog";
+import { toolCallColumns } from "../bulk-upload-shared";
 
 // jspdf ships ESM-only and Jest's transform can't parse it. bulk-upload-shared
 // (imported transitively, un-mocked so we exercise the real preview/shell
@@ -1432,6 +1433,246 @@ describe("the whole name on hover", () => {
       expect(
         screen.getAllByText("Correctness/criteria").length,
       ).toBeGreaterThan(1),
+    );
+  });
+});
+
+describe("tool call columns", () => {
+  const TOOL_COLUMNS: BulkContentColumn[] = [
+    {
+      payloadKey: "output",
+      csvColumn: "output",
+      headerCandidates: ["output"],
+      previewLabel: "Output",
+      previewWidth: "minmax(120px, 200px)",
+      guidelineDescription: "The output.",
+      emptyWithToolCalls: true,
+      parse: (raw) => ({ value: raw }),
+      renderPreview: (value) => <div>{String(value ?? "")}</div>,
+    },
+    ...toolCallColumns("output"),
+  ];
+  const props = (
+    linked: BulkLinkedEvaluator[] = [],
+  ) =>
+    defaultProps({ contentColumns: TOOL_COLUMNS, linkedEvaluators: linked });
+
+  async function uploadAndGetPayload(
+    csv: string,
+    linked: BulkLinkedEvaluator[] = [],
+  ) {
+    apiClient.mockResolvedValue({});
+    const user = setupUser();
+    render(<BulkUploadItemsDialog {...props(linked)} />);
+    await uploadFile(csv);
+    await waitFor(() =>
+      expect(screen.getByText("1 item ready to upload")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole("button", { name: "Upload item" }));
+    await waitFor(() =>
+      expect(
+        apiClient.mock.calls.find((c) => c[2]?.method === "POST"),
+      ).toBeTruthy(),
+    );
+    return apiClient.mock.calls.find((c) => c[2]?.method === "POST")![2].body
+      .items[0].payload;
+  }
+
+  it("puts both lists on the payload", async () => {
+    const payload = await uploadAndGetPayload(
+      `name,output,actual_tool_calls,expected_tool_calls\n"A","","[{""tool"":""save"",""arguments"":{""months"":7}}]","[{""tool"":""save""}]"`,
+    );
+    expect(payload.actual_tool_calls).toEqual([
+      { tool: "save", arguments: { months: 7 } },
+    ]);
+    expect(payload.expected_tool_calls).toEqual([{ tool: "save" }]);
+    expect(payload.output).toBe("");
+  });
+
+  it("adds nothing for empty cells or missing columns", async () => {
+    const payload = await uploadAndGetPayload(
+      `name,output,actual_tool_calls\n"A","hi",""`,
+    );
+    expect(payload).toEqual({
+      name: "A",
+      output: "hi",
+      evaluator_variables: {},
+    });
+  });
+
+  it("allows an empty reply with only expected tool calls", async () => {
+    const payload = await uploadAndGetPayload(
+      `name,output,expected_tool_calls\n"A","","[]"`,
+    );
+    expect(payload.expected_tool_calls).toEqual([]);
+  });
+
+  it("allows an empty reply with an empty list of tool calls made", async () => {
+    const payload = await uploadAndGetPayload(
+      `name,output,actual_tool_calls\n"A","","[]"`,
+    );
+    expect(payload.actual_tool_calls).toEqual([]);
+    expect(payload.output).toBe("");
+  });
+
+  it("does not read a tool_calls column", async () => {
+    const payload = await uploadAndGetPayload(
+      `name,output,tool_calls\n"A","hi","[{""tool"":""save""}]"`,
+    );
+    expect(payload.actual_tool_calls).toBeUndefined();
+    expect(screen.getByText(/tool_calls/)).toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      '[{""tool"":""save"",""extra"":1}]',
+      'Row 1: call 1 in "actual_tool_calls" has a field that is not allowed: "extra". A call in "actual_tool_calls" can only have "tool", "arguments" and "output".',
+    ],
+    [
+      `[{""tool"":""${"x".repeat(256)}""}]`,
+      'Row 1: call 1 in "actual_tool_calls" has a "tool" name longer than 255 characters.',
+    ],
+    [
+      '[{""tool"":""save""},{""tool"":""save"",""arguments"":[1]}]',
+      'Row 1: call 2 in "actual_tool_calls" has "arguments" that is not a JSON object.',
+    ],
+    [
+      '[{""tool"":""save"",""accept_any_arguments"":""yes""}]',
+      'Row 1: call 1 in "expected_tool_calls" has "accept_any_arguments" that is not true or false.',
+      "expected_tool_calls",
+    ],
+  ])("refuses a call the backend would refuse: %s", async (cell, message, column = "actual_tool_calls") => {
+    render(<BulkUploadItemsDialog {...props()} />);
+    await uploadFile(`name,output,${column}\n"A","hi","${cell}"`);
+    await waitFor(() => expect(screen.getByText(message)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Upload item" })).toBeDisabled();
+  });
+
+  it("accepts every field the backend allows on a call", async () => {
+    const payload = await uploadAndGetPayload(
+      `name,output,actual_tool_calls,expected_tool_calls\n"A","","[{""tool"":""save"",""arguments"":null,""output"":[1]}]","[{""tool"":""save"",""accept_any_arguments"":true}]"`,
+    );
+    expect(payload.actual_tool_calls).toEqual([
+      { tool: "save", arguments: null, output: [1] },
+    ]);
+    expect(payload.expected_tool_calls).toEqual([
+      { tool: "save", accept_any_arguments: true },
+    ]);
+  });
+
+  describe("evaluator variables", () => {
+    const linked: BulkLinkedEvaluator[] = [
+      {
+        uuid: "ev-reply",
+        name: "Correctness",
+        slug: null,
+        variables: [{ name: "criteria" }],
+        output_type: "binary",
+        scale_min: null,
+        scale_max: null,
+        evaluator_type: "llm",
+      },
+      {
+        uuid: "ev-tool",
+        name: "Tool",
+        slug: null,
+        variables: [{ name: "rule" }],
+        output_type: "binary",
+        scale_min: null,
+        scale_max: null,
+        evaluator_type: "tool-call",
+      },
+    ];
+    const header = "name,output,expected_tool_calls,Correctness/criteria,Tool/rule";
+
+    it("skips a reply evaluator's blank variable on a tool call row", async () => {
+      const payload = await uploadAndGetPayload(
+        `${header}\n"A","","[]","","be exact"`,
+        linked,
+      );
+      expect(payload.evaluator_variables).toEqual({
+        "ev-tool": { rule: "be exact" },
+      });
+    });
+
+    it("skips a tool-call evaluator's blank variable on a reply row", async () => {
+      const payload = await uploadAndGetPayload(
+        `${header}\n"A","hi","","be kind",""`,
+        linked,
+      );
+      expect(payload.evaluator_variables).toEqual({
+        "ev-reply": { criteria: "be kind" },
+      });
+    });
+
+    it("still requires a tool-call evaluator's variable on a tool call row", async () => {
+      render(<BulkUploadItemsDialog {...props(linked)} />);
+      await uploadFile(`${header}\n"A","","[]","be kind",""`);
+      await waitFor(() =>
+        expect(
+          screen.getByText(/Row 1: missing value for "Tool\/rule"/),
+        ).toBeInTheDocument(),
+      );
+    });
+  });
+
+  it("requires the reply when the row has no tool calls", async () => {
+    render(<BulkUploadItemsDialog {...props()} />);
+    await uploadFile(`name,output,actual_tool_calls\n"A","",""`);
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'Row 1: "output" is required unless the row has tool calls.',
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("button", { name: "Upload item" })).toBeDisabled();
+  });
+
+  it("errors on invalid JSON", async () => {
+    render(<BulkUploadItemsDialog {...props()} />);
+    await uploadFile(`name,output,actual_tool_calls\n"A","hi","not json"`);
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Row 1: "actual_tool_calls" must be valid JSON/),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it.each([
+    ['[{""arguments"":{}}]'],
+    ['[{""tool"":""""}]'],
+    ['{""tool"":""save""}'],
+    ['[""save""]'],
+  ])("errors when a call has no tool name: %s", async (cell) => {
+    render(<BulkUploadItemsDialog {...props()} />);
+    await uploadFile(`name,output,expected_tool_calls\n"A","hi","${cell}"`);
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'Row 1: "expected_tool_calls" must be an array of objects, each with a non-empty "tool" name.',
+        ),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("does not list the tool call columns as required", async () => {
+    render(<BulkUploadItemsDialog {...props()} />);
+    await uploadFile(`foo\n1`);
+    await waitFor(() =>
+      expect(
+        screen.getByText(/CSV must include "name", "output" columns/),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("shows the tool calls in the preview", async () => {
+    render(<BulkUploadItemsDialog {...props()} />);
+    await uploadFile(
+      `name,output,actual_tool_calls\n"A","","[{""tool"":""save"",""arguments"":{""months"":7}}]"`,
+    );
+    await waitFor(() =>
+      expect(screen.getByText('save({"months":7})')).toBeInTheDocument(),
     );
   });
 });

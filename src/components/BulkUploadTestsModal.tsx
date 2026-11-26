@@ -3,6 +3,7 @@ import { reportError } from "@/lib/reportError";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "@/lib/nav";
+import { testTypeLabel } from "@/lib/testTypes";
 import { signOut } from "next-auth/react";
 import { loginPathAfterSignOut } from "@/lib/postLoginRedirect";
 import { useAccessToken } from "@/hooks";
@@ -25,7 +26,6 @@ import { INBUILT_TOOLS } from "@/constants/inbuilt-tools";
 import { parseJsonLenient } from "@/lib/jsonSanitize";
 import { Tooltip } from "@/components/Tooltip";
 import { ClippedText, ErrorNote } from "@/components/ui";
-
 
 // Inline link styling for the in-modal helper text. Tuned to read as a link
 // inside small muted body copy without shouting — `text-foreground` plus a
@@ -661,7 +661,7 @@ export function BulkUploadTestsModal({
       return {
         title: isConversationType
           ? "Bulk upload — Conversation tests"
-          : "Bulk upload — Agent Response tests",
+          : `Bulk upload — ${testTypeLabel(agentNature === "general" ? "general" : "response")} tests`,
         intro:
           "Upload a CSV with the following columns. Each row creates one test.",
         columns,

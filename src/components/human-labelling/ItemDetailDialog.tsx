@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { Tooltip } from "@/components/Tooltip";
 import { DialogNavHeader } from "@/components/ui";
 import { useDialogNavKeys } from "@/hooks";
@@ -322,15 +323,13 @@ export function ItemDetailDialog({
     // so different versions of the same evaluator render their own labels.
     const jobEvaluators: JobEvaluator[] = [];
 
-    // The same rule the labelling form uses: a tool-call item is answered by
-    // the tool call evaluator alone, every other item by everything else.
-    // Without this the item view showed columns for evaluators the annotator
-    // was never asked about, always empty.
+    // Only the evaluators the annotator was asked about on this item.
     const isToolCallItem = item.is_tool_call === true;
     const evaluatorApplies = (evaluatorId: string) =>
-      (summaryEvaluatorByUuid.get(evaluatorId)?.evaluator_type ===
-        "tool-call") ===
-      isToolCallItem;
+      evaluatorFitsItem(
+        summaryEvaluatorByUuid.get(evaluatorId)?.evaluator_type,
+        isToolCallItem,
+      );
 
     for (const row of summary.rows) {
       if (!evaluatorApplies(row.evaluator_id)) continue;

@@ -36,7 +36,7 @@ const TEST_TYPE_OPTIONS: Array<{
 }> = [
   {
     tab: "next-reply",
-    label: "Agent Response",
+    label: "Conversation reply",
     title: "Does the agent give the right reply?",
     description: "Evaluate the agent's response given a conversation history",
   },
@@ -164,6 +164,7 @@ export function TestTypePicker({
               opt.tab === "next-reply"
                 ? {
                     ...opt,
+                    label: "Agent Response",
                     title: "Does the agent give the right answer?",
                     description: "Evaluate the agent's output given the input",
                   }

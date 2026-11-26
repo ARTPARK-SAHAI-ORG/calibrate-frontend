@@ -4,20 +4,23 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TracesTable } from "@/components/traces/TracesTable";
+import type { TraceScoreColumn } from "@/components/traces/TraceScoringSummary";
 import { TraceDetailDialog } from "@/components/traces/TraceDetailDialog";
 import { TracesEmptyState } from "@/components/traces/TracesEmptyState";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
 import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
-import { NothingCanScoreMessage } from "@/components/traces/NothingCanScoreMessage";
+import {
+  EvaluatorsTabLink,
+  NothingCanScoreMessage,
+} from "@/components/traces/NothingCanScoreMessage";
+import { AddToolCallEvaluatorButton } from "@/components/traces/AddToolCallEvaluatorButton";
 import { TraceScoringChip } from "@/components/traces/TraceScoringChip";
 import {
   AddRunToLabellingTaskDialog,
   isLabellableOutput,
-  isToolCallOutput,
   type SourceEvaluatorRef,
   type TraceLabellingItem,
-  type TraceOutputFacts,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { AgentDefaultsPromptDialog } from "@/components/agent-tabs/AgentDefaultsPromptDialog";
 import {
@@ -54,13 +57,16 @@ import {
   useTraces,
 } from "@/hooks";
 import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
-import { CONTACT_LINK } from "@/constants/limits";
+import { ExtendLimitsLink } from "@/constants/limits";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
+import type { EvaluatorType } from "@/components/EvaluatorPills";
+import { isToolCallTraceRow, traceRowOutputFacts } from "@/lib/traceScoring";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
 import {
   fetchTrace,
-  fetchHasTraceFeedback,
+  fetchHasTrace,
   fetchTraceUsage,
   fetchTraces,
   traceFilterKey,
@@ -71,6 +77,7 @@ import {
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 import { fetchChatLink, type ChatLink } from "@/lib/chatLinkApi";
+import { WarningBox } from "@/components/traces/WarningBox";
 
 /**
  * A number of traces, said the way a person says it: "1 trace", "50,000
@@ -84,16 +91,6 @@ function traceCount(n: number): string {
  * The Monitoring tab on the agent detail page: the production conversations sent
  * in for this agent, one trace per turn. Every call is scoped to `agentUuid`.
  */
-/** The two facts the labelling rule needs, read off a list row. The row
- * carries a preview of the reply and a count of the calls, not the output
- * itself, so this is where that shape is turned into the shared one. */
-function traceRowOutputFacts(trace: TraceSummary): TraceOutputFacts {
-  return {
-    hasResponse: !!trace.response_preview?.trim(),
-    hasToolCalls: trace.tool_call_count > 0,
-  };
-}
-
 export function TracesTabContent({
   agentUuid,
   agentNature = "conversation",
@@ -221,10 +218,16 @@ export function TracesTabContent({
     createdBefore: everyTraceMatchingSince,
   };
 
+  // Refresh bumps this, since the chat link's count moves during the day. A
+  // delete bumps it too, since it can remove the last trace of a kind.
+  const [usageReads, setUsageReads] = useState(0);
+
   const deletion = useTraceDeletion({
     traces: items,
-    onDeleted: (uuids) =>
-      handleDeleted(everyTraceMatching ? total : uuids.length),
+    onDeleted: (uuids) => {
+      handleDeleted(everyTraceMatching ? total : uuids.length);
+      setUsageReads((n) => n + 1);
+    },
     accessToken,
     selectAll: everyTraceMatching ? selectAllFilters : null,
   });
@@ -251,9 +254,7 @@ export function TracesTabContent({
   // A trace either replied or only called a tool, and the two become different
   // kinds of test. One selection makes one kind, so a mix is refused rather
   // than quietly turned into the wrong thing.
-  const toolCallOnlyCount = selectedTraces.filter(
-    (trace) => !trace.response_preview && trace.tool_call_count > 0,
-  ).length;
+  const toolCallOnlyCount = selectedTraces.filter(isToolCallTraceRow).length;
   const isMixedSelection =
     toolCallOnlyCount > 0 && toolCallOnlyCount < selectedTraces.length;
   const selectedTestType =
@@ -272,12 +273,10 @@ export function TracesTabContent({
   );
   const labellableUuids = labellableTraces.map((trace) => trace.uuid);
   // A selection that is nothing but tool calls skips the evaluator step: a
-  // person marks each call correct or wrong, so there is no AI judge to pick.
+  // tool-call row is answered only against the tool-call evaluator, so there
+  // is nothing to pick.
   const labellingIsToolCallOnly =
-    labellableTraces.length > 0 &&
-    labellableTraces.every((trace) =>
-      isToolCallOutput(traceRowOutputFacts(trace)),
-    );
+    labellableTraces.length > 0 && labellableTraces.every(isToolCallTraceRow);
 
   // Send selected traces for labelling. Step one asks which evaluators the
   // annotators score against; step two needs the full traces, which the list
@@ -475,29 +474,45 @@ export function TracesTabContent({
   const eligibility = traceScoring.eligibility;
   const nothingCanScore =
     eligibility !== null && eligibility.eligible.length === 0;
+  // What each column's evaluator judges, so a row it does not apply to reads
+  // as empty rather than as waiting. Filled with the descriptions below.
+  // Null until a read succeeds. A failed re-read keeps the last known types,
+  // so cells and notes do not change on a passing error.
+  const [evaluatorTypes, setEvaluatorTypes] = useState<Record<
+    string,
+    EvaluatorType
+  > | null>(null);
+  // True during every read, the first and each one after. An evaluator linked
+  // since the last read has no type yet, so its cells wait for this one.
+  const [evaluatorTypesReading, setEvaluatorTypesReading] = useState(true);
   // One column per evaluator that can score now, plus any that scored a trace
   // on this page, so taking an evaluator off the agent does not hide the
   // scores it already gave.
   const scoreColumns = useMemo(() => {
-    const byId = new Map<string, { evaluator_uuid: string; name: string }>();
-    for (const item of eligibility?.eligible ?? []) {
-      byId.set(item.evaluator_uuid, {
-        evaluator_uuid: item.evaluator_uuid,
-        name: item.name,
+    const byId = new Map<string, TraceScoreColumn>();
+    // An evaluator that only scored past traces may be off the agent, so no
+    // read will give its type; its cells wait only for the first read.
+    const add = (evaluator_uuid: string, name: string, linked: boolean) => {
+      if (byId.has(evaluator_uuid)) return;
+      const waiting =
+        evaluatorTypesReading && (linked || evaluatorTypes === null);
+      byId.set(evaluator_uuid, {
+        evaluator_uuid,
+        name,
+        evaluator_type:
+          evaluatorTypes?.[evaluator_uuid] ?? (waiting ? null : undefined),
       });
+    };
+    for (const item of eligibility?.eligible ?? []) {
+      add(item.evaluator_uuid, item.name, true);
     }
     for (const trace of items) {
       for (const result of trace.results ?? []) {
-        if (!byId.has(result.evaluator_uuid)) {
-          byId.set(result.evaluator_uuid, {
-            evaluator_uuid: result.evaluator_uuid,
-            name: result.name,
-          });
-        }
+        add(result.evaluator_uuid, result.name, false);
       }
     }
     return [...byId.values()];
-  }, [eligibility, items]);
+  }, [eligibility, items, evaluatorTypes, evaluatorTypesReading]);
   // An evaluator taken off the agent takes its heading away with it, and with
   // no heading there is nothing left on screen to turn its ordering off.
   useEffect(() => {
@@ -548,30 +563,96 @@ export function TracesTabContent({
     return [...ids].flatMap((uuid) => knownEvaluators.get(uuid) ?? []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scoreColumns, facets.scores, scoreAverages, items]);
-  // The backend marks a trace it could not score for the workspace cap, so the
-  // page can say so without asking for the limit itself.
   // A trace's scores name each evaluator but not what it judges, so the words
-  // come from the agent's own evaluator list, read once for the tab.
+  // come from the agent's own evaluator list.
   const [evaluatorDescriptions, setEvaluatorDescriptions] = useState<
     Record<string, string>
   >({});
+  const [evaluatorsReloadKey, setEvaluatorsReloadKey] = useState(0);
+  const [toolCallPickerOpen, setToolCallPickerOpen] = useState(false);
+  // Read again each time the tab comes back on screen, the same moment the
+  // scoring eligibility is read again, so an evaluator linked meanwhile has a
+  // type for its column.
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || !isActive) return;
     let cancelled = false;
+    setEvaluatorTypesReading(true);
     fetchAgentEvaluators(agentUuid, accessToken)
       .then((list) => {
         if (cancelled) return;
         const byId: Record<string, string> = {};
+        const typeById: Record<string, EvaluatorType> = {};
         for (const item of list) {
           if (item.description) byId[item.uuid] = item.description;
+          if (item.evaluator_type) typeById[item.uuid] = item.evaluator_type;
         }
         setEvaluatorDescriptions(byId);
+        setEvaluatorTypes(typeById);
       })
-      .catch((err) => reportError("Error fetching agent evaluators:", err));
+      .catch((err) => reportError("Error fetching agent evaluators:", err))
+      .finally(() => {
+        if (!cancelled) setEvaluatorTypesReading(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, [agentUuid, accessToken]);
+  }, [agentUuid, accessToken, isActive, evaluatorsReloadKey]);
+
+  // Whether any trace, not only one on this page, is nothing but tool calls.
+  const [hasStoredToolCallTrace, setHasStoredToolCallTrace] = useState(false);
+  const [hasStoredReplyTrace, setHasStoredReplyTrace] = useState(false);
+  const hasToolCallTrace =
+    hasStoredToolCallTrace || items.some(isToolCallTraceRow);
+  const hasReplyTrace =
+    hasStoredReplyTrace ||
+    items.some((trace) => traceRowOutputFacts(trace).hasResponse);
+  const linkedTypes = evaluatorTypes ? Object.values(evaluatorTypes) : null;
+  // The evaluator list and the eligibility are read separately, so one can
+  // arrive before the other. Null until both name the same evaluators.
+  const eligibilityIds = eligibility
+    ? new Set(
+        [...eligibility.eligible, ...eligibility.ineligible].map(
+          (item) => item.evaluator_uuid,
+        ),
+      )
+    : null;
+  const scoringTypes =
+    eligibility &&
+    evaluatorTypes &&
+    Object.keys(evaluatorTypes).every((id) => eligibilityIds?.has(id))
+      ? eligibility.eligible.map((item) => evaluatorTypes[item.evaluator_uuid])
+      : null;
+  const knownScoringTypes = scoringTypes?.every(Boolean) ? scoringTypes : null;
+  // Matches the backend, which says a tool call trace was skipped for having
+  // no tool call evaluator only when none is linked at all.
+  const missingToolCallEvaluator =
+    linkedTypes !== null &&
+    hasToolCallTrace &&
+    !linkedTypes.includes("tool-call");
+  const toolCallEvaluatorCannotScore =
+    knownScoringTypes !== null &&
+    hasToolCallTrace &&
+    !!linkedTypes?.includes("tool-call") &&
+    !knownScoringTypes.includes("tool-call");
+  const outputsWord = isGeneral ? "outputs" : "responses";
+  const onlyToolCallEvaluators =
+    knownScoringTypes !== null &&
+    knownScoringTypes.length > 0 &&
+    knownScoringTypes.every((type) => type === "tool-call") &&
+    hasReplyTrace;
+  const addToolCallEvaluatorButton = (asButton = false) => (
+    <AddToolCallEvaluatorButton
+      asButton={asButton}
+      agentUuid={agentUuid}
+      accessToken={accessToken}
+      onAdded={() => {
+        setEvaluatorsReloadKey((key) => key + 1);
+        void traceScoring.refreshEligibility();
+        onAgentDefaultsAttached?.();
+      }}
+      onOpenChange={setToolCallPickerOpen}
+    />
+  );
 
   // The backend's own averages over every matching trace, not the page.
   const scoreCards = useMemo(
@@ -609,8 +690,6 @@ export function TracesTabContent({
   // Whether any of the agent's traces carries feedback from the chat link,
   // which is what puts the feedback section in the filter.
   const [hasFeedback, setHasFeedback] = useState(false);
-  // Refresh bumps this, since the chat link's count moves during the day.
-  const [usageReads, setUsageReads] = useState(0);
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
@@ -624,11 +703,21 @@ export function TracesTabContent({
         if (!cancelled) setChatLink(next);
       })
       .catch((err) => reportError("Error fetching the chat link:", err));
-    fetchHasTraceFeedback(accessToken, agentUuid)
+    fetchHasTrace(accessToken, agentUuid, { feedback: "any" })
       .then((has) => {
         if (!cancelled) setHasFeedback(has);
       })
       .catch((err) => reportError("Error checking for trace feedback:", err));
+    fetchHasTrace(accessToken, agentUuid, { outputType: "tool_call" })
+      .then((has) => {
+        if (!cancelled) setHasStoredToolCallTrace(has);
+      })
+      .catch((err) => reportError("Error checking for tool call traces:", err));
+    fetchHasTrace(accessToken, agentUuid, { outputType: "response" })
+      .then((has) => {
+        if (!cancelled) setHasStoredReplyTrace(has);
+      })
+      .catch((err) => reportError("Error checking for reply traces:", err));
     return () => {
       cancelled = true;
     };
@@ -692,6 +781,33 @@ export function TracesTabContent({
   // The trace on show, so it can be ticked from inside the dialog rather than
   // closing it and finding the row again.
   const openTraceItem = items.find((item) => item.uuid === openTraceUuid);
+  const openTraceIsToolCall =
+    !!openTraceItem && isToolCallTraceRow(openTraceItem);
+  // Only the evaluators that could have scored the open trace's kind of output.
+  const ineligibleForOpenTrace =
+    openTraceItem && evaluatorTypes
+      ? ineligible.filter((item) =>
+          evaluatorFitsItem(
+            evaluatorTypes[item.evaluator_uuid],
+            openTraceIsToolCall,
+          ),
+        )
+      : ineligible;
+  // The agent's evaluators that fit the open trace's kind of output. A type
+  // not read yet must not count, since an unknown type fits a reply.
+  const scoringNamesForOpenTrace =
+    openTraceItem && evaluatorTypes
+      ? (eligibility?.eligible ?? [])
+          .filter(
+            (item) =>
+              !!evaluatorTypes[item.evaluator_uuid] &&
+              evaluatorFitsItem(
+                evaluatorTypes[item.evaluator_uuid],
+                openTraceIsToolCall,
+              ),
+          )
+          .map((item) => item.name)
+      : [];
   const closeTrace = () => {
     itemPager.cancel();
     setOpenTraceUuid(null);
@@ -736,7 +852,12 @@ export function TracesTabContent({
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
 
-  const hasWarning = nothingCanScore || overLimit;
+  const hasWarning =
+    nothingCanScore ||
+    overLimit ||
+    missingToolCallEvaluator ||
+    toolCallEvaluatorCannotScore ||
+    onlyToolCallEvaluators;
 
   const integrationGuideButton = (
     <Button
@@ -845,40 +966,27 @@ export function TracesTabContent({
           those steps ask for cannot happen, and the reader would be left
           sending traces that are quietly turned away. */}
         {hasLoaded && storageFull && usage && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-            <p className="text-sm text-amber-700 dark:text-amber-300">
-              New traces are no longer being stored because this workspace has
-              reached its limit of {traceCount(usage.max_traces)}. Delete traces
-              to make room.{" "}
-              <a
-                href={CONTACT_LINK}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold"
-              >
-                Click here
-              </a>{" "}
-              to contact us to extend your limits.
-            </p>
-          </div>
+          <WarningBox>
+            New traces are no longer being stored because this workspace has
+            reached its limit of {traceCount(usage.max_traces)}. Delete traces
+            to make room. <ExtendLimitsLink />
+          </WarningBox>
         )}
 
         {hasLoaded && chatLimitReached && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-            <p className="text-sm text-amber-700 dark:text-amber-300">
-              Talking to this agent reached its limit of{" "}
-              {chatReplyCap.toLocaleString()}{" "}
-              {chatReplyCap === 1 ? "reply" : "replies"} today.{" "}
-              <button
-                type="button"
-                onClick={onGoToSettings}
-                className="font-bold cursor-pointer hover:opacity-80"
-              >
-                Click here
-              </button>{" "}
-              to increase the limit.
-            </p>
-          </div>
+          <WarningBox>
+            Talking to this agent reached its limit of{" "}
+            {chatReplyCap.toLocaleString()}{" "}
+            {chatReplyCap === 1 ? "reply" : "replies"} today.{" "}
+            <button
+              type="button"
+              onClick={onGoToSettings}
+              className="font-bold cursor-pointer hover:opacity-80"
+            >
+              Click here
+            </button>{" "}
+            to increase the limit.
+          </WarningBox>
         )}
 
         {/* Quiet while scoring works: the chip in the toolbar carries the state
@@ -886,32 +994,43 @@ export function TracesTabContent({
         {hasLoaded && !showEmptyState && hasWarning && (
           <div className="space-y-2">
             {nothingCanScore && (
-              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  <NothingCanScoreMessage
-                    ineligible={ineligible}
-                    onGoToEvaluators={onGoToEvaluators}
-                  />
-                </p>
-              </div>
+              <WarningBox>
+                <NothingCanScoreMessage
+                  ineligible={ineligible}
+                  onGoToEvaluators={onGoToEvaluators}
+                />
+              </WarningBox>
+            )}
+            {/* One warning for one problem: the line above already points
+              to the Evaluators tab, where a tool call evaluator can be added. */}
+            {missingToolCallEvaluator && !nothingCanScore && (
+              <WarningBox>
+                This agent has no tool call evaluator, so its tool calls are not
+                checked. {addToolCallEvaluatorButton()}
+              </WarningBox>
+            )}
+            {toolCallEvaluatorCannotScore && !nothingCanScore && (
+              <WarningBox>
+                No tool call evaluator on this agent can score traces, so its
+                tool calls are not checked. Add one that can in the{" "}
+                <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
+              </WarningBox>
+            )}
+            {onlyToolCallEvaluators && (
+              <WarningBox>
+                Only tool call evaluators can score this agent&apos;s traces, so
+                its {outputsWord} are not checked. Add an evaluator that checks{" "}
+                {outputsWord} in the{" "}
+                <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
+              </WarningBox>
             )}
             {overLimit && (
-              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  {usage?.max_scored_traces != null
-                    ? `Some traces were not scored because this workspace has reached its limit of scoring ${traceCount(usage.max_scored_traces)}.`
-                    : "Some traces were not scored because this workspace has reached its limit for scoring traces."}{" "}
-                  <a
-                    href={CONTACT_LINK}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold"
-                  >
-                    Click here
-                  </a>{" "}
-                  to contact us to extend your limits.
-                </p>
-              </div>
+              <WarningBox>
+                {usage?.max_scored_traces != null
+                  ? `Some traces were not scored because this workspace has reached its limit of scoring ${traceCount(usage.max_scored_traces)}.`
+                  : "Some traces were not scored because this workspace has reached its limit for scoring traces."}{" "}
+                <ExtendLimitsLink />
+              </WarningBox>
             )}
           </div>
         )}
@@ -1169,13 +1288,23 @@ export function TracesTabContent({
 
       <TraceDetailDialog
         evaluatorDescriptions={evaluatorDescriptions}
-        ineligibleEvaluators={ineligible}
+        ineligibleEvaluators={ineligibleForOpenTrace}
+        addToolCallEvaluator={
+          missingToolCallEvaluator
+            ? addToolCallEvaluatorButton(true)
+            : undefined
+        }
         scoringEvaluatorNames={
           traceScoring.enabled && !scoredTracesFull
-            ? (eligibility?.eligible ?? []).map((item) => item.name)
+            ? scoringNamesForOpenTrace
             : []
         }
         onScored={() => void refetch()}
+        onGoToEvaluators={() => {
+          closeTrace();
+          onGoToEvaluators();
+        }}
+        keysPaused={toolCallPickerOpen}
         isOpen={openTraceUuid != null}
         onClose={closeTrace}
         accessToken={accessToken}

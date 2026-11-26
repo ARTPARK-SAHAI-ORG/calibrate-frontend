@@ -7,8 +7,11 @@ import { ErrorNote } from "@/components/ui";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { apiClient } from "@/lib/api";
+import { parseJsonLenient } from "@/lib/jsonSanitize";
+import type { BulkContentColumn } from "./BulkUploadItemsDialog";
 import { AddAnnotatorInline } from "./AddAnnotatorInline";
 import { humaniseNameConflictDetail } from "./itemNameConflict";
+import { isPlainObject } from "./itemConversation";
 
 // ─── Shared types ─────────────────────────────────────────────────────────
 
@@ -1478,5 +1481,132 @@ export function FormatHelpToggle({
       </svg>
       {open ? "Hide CSV format details" : "Show CSV format details"}
     </button>
+  );
+}
+
+type BulkToolCall = {
+  tool: string;
+  arguments?: Record<string, any>;
+  accept_any_arguments?: boolean;
+  output?: unknown;
+};
+
+const TOOL_CALL_KEYS: Record<string, string[]> = {
+  actual_tool_calls: ["tool", "arguments", "output"],
+  expected_tool_calls: ["tool", "arguments", "accept_any_arguments"],
+};
+const MAX_TOOL_NAME_CHARS = 255;
+
+function parseToolCallsCell(
+  raw: string,
+  rowIndex: number,
+  column: string,
+): { value: BulkToolCall[] } | { error: string } {
+  let calls: unknown;
+  try {
+    calls = parseJsonLenient(raw);
+  } catch {
+    return {
+      error: `Row ${rowIndex + 1}: "${column}" must be valid JSON. Wrap the JSON in double quotes and escape inner double quotes by doubling them.`,
+    };
+  }
+  if (
+    !Array.isArray(calls) ||
+    !calls.every(
+      (c) =>
+        isPlainObject(c) && typeof c.tool === "string" && c.tool.trim() !== "",
+    )
+  ) {
+    return {
+      error: `Row ${rowIndex + 1}: "${column}" must be an array of objects, each with a non-empty "tool" name.`,
+    };
+  }
+  for (let k = 0; k < calls.length; k++) {
+    const call = calls[k] as Record<string, unknown>;
+    const where = `Row ${rowIndex + 1}: call ${k + 1} in "${column}"`;
+    const allowed = TOOL_CALL_KEYS[column];
+    const unknownKey = Object.keys(call).find((key) => !allowed.includes(key));
+    if (unknownKey) {
+      return {
+        error: `${where} has a field that is not allowed: "${unknownKey}". A call in "${column}" can only have ${allowed.slice(0, -1).map((key) => `"${key}"`).join(", ")} and "${allowed[allowed.length - 1]}".`,
+      };
+    }
+    if ((call.tool as string).length > MAX_TOOL_NAME_CHARS) {
+      return {
+        error: `${where} has a "tool" name longer than ${MAX_TOOL_NAME_CHARS} characters.`,
+      };
+    }
+    if (call.arguments != null && !isPlainObject(call.arguments)) {
+      return { error: `${where} has "arguments" that is not a JSON object.` };
+    }
+    if (
+      call.accept_any_arguments != null &&
+      typeof call.accept_any_arguments !== "boolean"
+    ) {
+      return {
+        error: `${where} has "accept_any_arguments" that is not true or false.`,
+      };
+    }
+  }
+  return { value: calls as BulkToolCall[] };
+}
+
+function ToolCallsPreview({ calls }: { calls: BulkToolCall[] }) {
+  return (
+    <div className="max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap">
+      {calls.length === 0
+        ? "No calls"
+        : calls
+          .map(
+            (c) =>
+              `${c.tool}(${
+                c.accept_any_arguments
+                  ? "any arguments"
+                  : c.arguments
+                    ? JSON.stringify(c.arguments)
+                    : ""
+              })`,
+          )
+          .join("\n")}
+    </div>
+  );
+}
+
+const TOOL_CALLS_EXAMPLE = `[
+  {"tool": "save", "arguments": {"months": 7}}
+]`;
+
+// The two optional tool-call columns shared by the llm and llm-general
+// uploads. `replyColumn` is the reply that may be left empty when they are set.
+export function toolCallColumns(replyColumn: string): BulkContentColumn[] {
+  const emptyReply = `Filling in this column or the other tool call column, even with an empty list [], makes the row a tool call row. Only tool call evaluators score a tool call row, and "${replyColumn}" can be left empty on it.`;
+  return (
+    [
+      [
+        "actual_tool_calls",
+        "Tool calls made",
+        `(optional) A JSON array of the tool calls the agent made. Each call is an object with only these fields: "tool", the name of the tool; "arguments", an object, if the tool takes any; and "output", what the tool returned, if you have it. ${emptyReply}`,
+      ],
+      [
+        "expected_tool_calls",
+        "Expected tool calls",
+        `(optional) A JSON array of the tool calls the agent should have made. Each call is an object with only these fields: "tool", the name of the tool; "arguments", an object, if the tool takes any; and "accept_any_arguments", set to true when any arguments count as correct. ${emptyReply}`,
+      ],
+    ] as const
+  ).map(
+    ([key, previewLabel, guidelineDescription]): BulkContentColumn => ({
+      payloadKey: key,
+      csvColumn: key,
+      headerCandidates: [key],
+      previewLabel,
+      previewWidth: "minmax(120px, 200px)",
+      guidelineDescription,
+      guidelineExample: TOOL_CALLS_EXAMPLE,
+      optional: true,
+      parse: (raw, rowIndex) => parseToolCallsCell(raw, rowIndex, key),
+      renderPreview: (value) => (
+        <ToolCallsPreview calls={(value as BulkToolCall[]) ?? []} />
+      ),
+    }),
   );
 }

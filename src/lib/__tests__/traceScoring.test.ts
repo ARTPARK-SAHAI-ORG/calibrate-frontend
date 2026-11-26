@@ -1,10 +1,40 @@
 import {
   ineligibleReasonCopy,
+  isToolCallTraceRow,
   isTraceScoringInProgress,
   nothingCanScoreCopy,
   scoringFailedCopy,
   scoringRunErrorCopy,
+  traceRowOutputFacts,
 } from "../traceScoring";
+
+describe("traceRowOutputFacts", () => {
+  it("reads a blank preview as no reply and a zero count as no calls", () => {
+    expect(
+      traceRowOutputFacts({ response_preview: "  ", tool_call_count: 1 }),
+    ).toEqual({ hasResponse: false, hasToolCalls: true });
+    expect(
+      traceRowOutputFacts({ response_preview: "Hi", tool_call_count: 0 }),
+    ).toEqual({
+      hasResponse: true,
+      hasToolCalls: false,
+    });
+  });
+});
+
+describe("isToolCallTraceRow", () => {
+  it("is true only for a row with calls and no reply", () => {
+    expect(
+      isToolCallTraceRow({ response_preview: " ", tool_call_count: 1 }),
+    ).toBe(true);
+    expect(
+      isToolCallTraceRow({ response_preview: "Hi", tool_call_count: 1 }),
+    ).toBe(false);
+    expect(
+      isToolCallTraceRow({ response_preview: null, tool_call_count: 0 }),
+    ).toBe(false);
+  });
+});
 
 describe("isTraceScoringInProgress", () => {
   it("treats waiting and in-flight runs as open", () => {
@@ -24,14 +54,14 @@ describe("copy", () => {
     expect(ineligibleReasonCopy("declares_variables")).toBe(
       "Uses variables, which cannot be filled for a trace automatically",
     );
-    expect(ineligibleReasonCopy("other")).toBe(
-      "Cannot score traces for this agent",
-    );
   });
 
   it("explains skip and failure reasons without averaging", () => {
     expect(scoringRunErrorCopy("no_usable_evaluators")).toBe(
-      "No evaluators could score this trace",
+      "No evaluator on this agent could score this trace",
+    );
+    expect(scoringRunErrorCopy("no_tool_call_evaluator")).toBe(
+      "This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent",
     );
     expect(scoringRunErrorCopy("unsupported_interaction_type")).toMatch(
       /cannot be scored yet/,
@@ -48,40 +78,44 @@ describe("copy", () => {
     );
     // The backend's trace_deleted and agent_deleted cannot reach a reader, so
     // they take the general line.
-    expect(scoringRunErrorCopy("trace_deleted")).toBe(
-      "Scoring did not finish",
-    );
+    expect(scoringRunErrorCopy("trace_deleted")).toBe("Scoring did not finish");
     expect(scoringRunErrorCopy("unknown-code")).toBe("Scoring did not finish");
   });
 });
 
 describe("nothingCanScoreCopy", () => {
-  it("names variables when that is the only thing in the way", () => {
+  it("says what is wrong and what to add when every evaluator has the same problem", () => {
     expect(
       nothingCanScoreCopy([
         { reason: "declares_variables" },
         { reason: "declares_variables" },
       ]),
     ).toBe(
-      "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically.",
+      "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically. Add an evaluator without variables in the",
+    );
+    expect(nothingCanScoreCopy([{ reason: "wrong_type_for_agent" }])).toBe(
+      "None of the evaluators added to this agent are the kind that can score its traces. Add an evaluator that fits this agent in the",
+    );
+    expect(nothingCanScoreCopy([{ reason: "no_live_version" }])).toBe(
+      "None of the evaluators added to this agent have a live version. Add an evaluator with a live version in the",
     );
   });
 
   it("says the agent has no evaluators when the list is empty", () => {
     expect(nothingCanScoreCopy([])).toBe(
-      "This agent has no evaluators, so its traces are not scored.",
+      "This agent has no evaluators, so its traces are not scored. Add one in the",
     );
   });
 
-  it("falls back to a general line when the reasons differ", () => {
+  it("lists each problem when the reasons differ", () => {
     expect(
       nothingCanScoreCopy([
         { reason: "declares_variables" },
         { reason: "no_live_version" },
+        { reason: "declares_variables" },
       ]),
-    ).toBe("None of this agent's evaluators can score traces.");
-    expect(nothingCanScoreCopy([{ reason: "wrong_type_for_agent" }])).toBe(
-      "None of this agent's evaluators can score traces.",
+    ).toBe(
+      "None of this agent's evaluators can score traces: some use variables, some have no live version. Add an evaluator that can score traces in the",
     );
   });
 });

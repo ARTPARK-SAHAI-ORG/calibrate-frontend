@@ -40,7 +40,7 @@ async function deleteAgent(page: Page, name: string): Promise<void> {
   await expect(row).toHaveCount(0, { timeout: 15000 });
 }
 
-// Create a standalone "Agent reply" evaluator via /evaluators, unattached to any
+// Create a standalone "Conversation reply" evaluator via /evaluators, unattached to any
 // agent. Its default prompt has no `{{variables}}` (a literal
 // "<ENTER EVALUATION CRITERIA HERE>" placeholder instead), so — like the
 // "Speech to Text" case evaluators.auth.spec.ts picks for the same reason — no

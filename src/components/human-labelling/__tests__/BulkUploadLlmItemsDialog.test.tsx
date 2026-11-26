@@ -17,10 +17,10 @@ jest.mock("../BulkUploadItemsDialog", () => ({
   },
 }));
 
-// bulk-upload-shared.tsx transitively imports jspdf (an ESM-only package
-// jest's transform can't parse). This file only needs ChatHistoryPreview /
-// TurnObject from it, so stub the module with a minimal equivalent.
+// jspdf is ESM-only and jest's transform cannot parse it.
+jest.mock("jspdf", () => ({ jsPDF: class {} }));
 jest.mock("../bulk-upload-shared", () => ({
+  ...jest.requireActual("../bulk-upload-shared"),
   ChatHistoryPreview: ({ turns }: { turns: { role: string; content?: string }[] }) => (
     <div data-testid="chat-history-preview">
       {turns.map((t, i) => (
@@ -74,7 +74,11 @@ describe("BulkUploadLlmItemsDialog", () => {
       "Bulk upload: LLM labelling items",
     );
     expect(capturedProps.sampleFilenameBase).toBe("llm_items");
-    expect(capturedProps.sampleRows).toHaveLength(2);
+    expect(capturedProps.sampleRows).toHaveLength(3);
+    const toolCallRow = capturedProps.sampleRows.find(
+      (r: { name: string }) => r.name === "Save plan",
+    );
+    expect(toolCallRow.variableValue).toBe("");
     expect(capturedProps.sampleFallbackEvaluators).toHaveLength(1);
   });
 
@@ -205,5 +209,37 @@ describe("BulkUploadLlmItemsDialog", () => {
       const { container } = render(column.renderPreview(undefined));
       expect(container.textContent).toBe("");
     });
+  });
+
+  it("adds the two optional tool-call columns and lets the reply be empty with them", () => {
+    render(
+      <BulkUploadLlmItemsDialog
+        isOpen
+        accessToken="tok"
+        taskUuid="task-1"
+        linkedEvaluators={linkedEvaluators}
+        onClose={jest.fn()}
+        onSuccess={jest.fn()}
+      />
+    );
+    const cols = capturedProps.contentColumns;
+    const keys = cols.map((c: any) => c.payloadKey);
+    expect(keys).toContain("actual_tool_calls");
+    expect(keys).toContain("expected_tool_calls");
+    for (const c of cols) {
+      if (c.payloadKey.endsWith("_tool_calls")) expect(c.optional).toBe(true);
+    }
+    const reply = cols.find((c: any) => c.payloadKey === "agent_response");
+    expect(reply.emptyWithToolCalls).toBe(true);
+    expect(
+      cols.find((c: any) => c.payloadKey === "actual_tool_calls")
+        .guidelineDescription,
+    ).toContain('"agent_response" can be left empty');
+    for (const c of cols.filter((c: any) => c.payloadKey.endsWith("_tool_calls"))) {
+      expect(c.guidelineDescription).toContain(
+        "Only tool call evaluators score a tool call row",
+      );
+      expect(c.headerCandidates).toEqual([c.payloadKey]);
+    }
   });
 });

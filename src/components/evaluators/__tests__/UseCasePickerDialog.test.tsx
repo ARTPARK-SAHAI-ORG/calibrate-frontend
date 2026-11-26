@@ -44,7 +44,7 @@ describe("UseCasePickerDialog", () => {
       <UseCasePickerDialog
         initialValue={null}
         options={EVALUATOR_USE_CASE_OPTIONS.filter(
-          (option) => option.value === "llm" || option.value === "llm-general",
+          (option) => option === "llm" || option === "llm-general",
         )}
         onCancel={jest.fn()}
         onSelect={jest.fn()}
@@ -90,7 +90,7 @@ describe("UseCasePickerDialog", () => {
     await user.click(screen.getByText("Speech to Text"));
     expect(screen.getByText("Continue")).not.toBeDisabled();
     await user.click(screen.getByText("Continue"));
-    expect(onSelect).toHaveBeenCalledWith("stt");
+    expect(onSelect).toHaveBeenCalledWith("stt", null);
   });
 
   it("clicking Continue while nothing is selected does not call onSelect", async () => {

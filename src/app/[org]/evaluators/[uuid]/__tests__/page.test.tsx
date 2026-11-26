@@ -194,9 +194,9 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
-// Tool call correctness is answered by Calibrate and by people, never by an
-// AI judge. Before this, its New version dialog still demanded a judge model,
-// which cannot be picked, so the dialog could not be saved at all.
+// Tool call correctness is judged by an AI judge like any other evaluator, so a
+// new version of it keeps its prompt and model. Saving one without them would
+// turn the judge off.
 const TOOL_CALL_EVALUATOR = {
   ...EVALUATOR,
   name: "Tool call correctness",
@@ -205,8 +205,8 @@ const TOOL_CALL_EVALUATOR = {
     {
       uuid: "ver-1",
       version_number: 1,
-      judge_model: "",
-      system_prompt: "",
+      judge_model: "openai/gpt-4.1",
+      system_prompt: "Check the tool calls",
       output_config: {
         scale: [
           { value: true, name: "Correct", description: "Right tool call." },
@@ -219,47 +219,63 @@ const TOOL_CALL_EVALUATOR = {
   ],
 };
 
-describe("a new version of an evaluator no AI judge runs", () => {
-  it("asks for the labels only, with no prompt and no model", async () => {
+function mockToolCallSave() {
+  const fetchMock = jest
+    .fn()
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => TOOL_CALL_EVALUATOR,
+    })
+    .mockResolvedValue({
+      ok: true,
+      status: 201,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ uuid: "ver-2" }),
+    });
+  global.fetch = fetchMock as unknown as typeof fetch;
+  return fetchMock;
+}
+
+function versionPost(fetchMock: jest.Mock) {
+  return fetchMock.mock.calls.find(
+    ([url, init]) =>
+      typeof url === "string" &&
+      url.includes("/versions") &&
+      (init as RequestInit | undefined)?.method === "POST",
+  );
+}
+
+describe("a new version of a tool call evaluator", () => {
+  it("asks for the prompt and model, filled in from the live version", async () => {
     const user = setupUser();
     mockEvaluator(TOOL_CALL_EVALUATOR);
     render(<EvaluatorDetailPage />);
 
     await user.click(await screen.findByRole("button", { name: "Edit" }));
 
+    expect(screen.getByText("Judge prompt")).toBeInTheDocument();
+    expect(screen.getByText("Judge model")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "New version" }),
+      screen.getByDisplayValue("Check the tool calls"),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Judge prompt/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Judge model/)).not.toBeInTheDocument();
-    // What is left: the labels, the summary of the change, the live tick.
+    expect(
+      screen.getByRole("button", { name: /openai\/gpt-4\.1/ }),
+    ).toBeInTheDocument();
     expect(screen.getByDisplayValue("Correct")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Wrong")).toBeInTheDocument();
     expect(
-      screen.getByPlaceholderText(/Briefly describe what changed/),
+      screen.getByText(
+        "New tests will use this prompt version after it is created",
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByRole("checkbox")).toBeInTheDocument();
   });
 
-  it("saves, sending an empty prompt and model rather than leaving them off", async () => {
+  it("saves the prompt and model with the labels", async () => {
     const user = setupUser();
-    const fetchMock = jest
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: new Headers({ "content-type": "application/json" }),
-        json: async () => TOOL_CALL_EVALUATOR,
-      })
-      .mockResolvedValue({
-        ok: true,
-        status: 201,
-        headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ uuid: "ver-2" }),
-      });
-    global.fetch = fetchMock as unknown as typeof fetch;
-
+    const fetchMock = mockToolCallSave();
     render(<EvaluatorDetailPage />);
+
     await user.click(await screen.findByRole("button", { name: "Edit" }));
     await user.click(
       screen.getByRole("button", {
@@ -267,18 +283,29 @@ describe("a new version of an evaluator no AI judge runs", () => {
       }),
     );
 
-    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(1));
-    const post = fetchMock.mock.calls.find(
-      ([url, init]) =>
-        typeof url === "string" &&
-        url.includes("/versions") &&
-        (init as RequestInit | undefined)?.method === "POST",
+    await waitFor(() => expect(versionPost(fetchMock)).toBeTruthy());
+    const body = JSON.parse(
+      (versionPost(fetchMock)![1] as RequestInit).body as string,
     );
-    expect(post).toBeTruthy();
-    const body = JSON.parse((post![1] as RequestInit).body as string);
-    expect(body.judge_model).toBe("");
-    expect(body.system_prompt).toBe("");
+    expect(body.judge_model).toBe("openai/gpt-4.1");
+    expect(body.system_prompt).toBe("Check the tool calls");
     expect(body.output_config.scale).toHaveLength(2);
+  });
+
+  it("does not save with the prompt left empty", async () => {
+    const user = setupUser();
+    const fetchMock = mockToolCallSave();
+    render(<EvaluatorDetailPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await user.clear(screen.getByDisplayValue("Check the tool calls"));
+    await user.click(
+      screen.getByRole("button", {
+        name: /Create and mark live|Create version/,
+      }),
+    );
+
+    expect(versionPost(fetchMock)).toBeUndefined();
   });
 });
 

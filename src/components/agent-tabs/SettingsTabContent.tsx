@@ -184,7 +184,7 @@ export function SettingsTabContent({
                 <div className="text-xs md:text-sm text-muted-foreground mt-0.5">
                   New traces for this agent are scored using the{" "}
                   <Tooltip
-                    content="Evaluators without any variables"
+                    content="Evaluators that fit this agent, have a live version, and use no variables"
                     position="top"
                     className="inline"
                   >

@@ -22,6 +22,7 @@ function scoring(
     saveError: null,
     enableBlocked: false,
     cannotEnable: false,
+    refreshEligibility: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   };
   // The hook works this out from the other two; a test that sets either of
@@ -253,7 +254,9 @@ describe("SettingsTabContent", () => {
     const validEvaluators = screen.getByText("valid evaluators");
     await user.hover(validEvaluators);
     expect(
-      await screen.findByText("Evaluators without any variables"),
+      await screen.findByText(
+        "Evaluators that fit this agent, have a live version, and use no variables",
+      ),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Evaluators tab" }));

@@ -1,5 +1,5 @@
 import { textFieldsToPayload } from "@/components/human-labelling/itemConversation";
-import { evaluatorsThatCanBeRun, isSkippedRunResult, runEvaluatorsDecision, toItemDetailItem, toolCallNotEvaluatedMessage, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables } from "../labellingItem";
+import { agentToolCalls, evaluatorFitsItem, evaluatorsFittingItems, evaluatorTypesForTask, fitsTaskType, toItemDetailItem, itemEditForm, llmGeneralDialogRow, readEvaluatorVariables, selectedTaskItems, storesEmptyToolCallList } from "../labellingItem";
 
 // Written after this exact mistake shipped: the object was built inline,
 // field by field, and is_tool_call was left off the list. The dialog then
@@ -41,91 +41,14 @@ describe("toItemDetailItem", () => {
   });
 });
 
-describe("runEvaluatorsDecision", () => {
-  it("refuses a set of nothing but tool calls", () => {
-    expect(
-      runEvaluatorsDecision([{ is_tool_call: true }, { is_tool_call: true }]),
-    ).toEqual({ blocked: true });
-  });
-
-  it("keeps the tool-call rows out of a mixed run and counts them", () => {
-    expect(
-      runEvaluatorsDecision([
-        { uuid: "a", is_tool_call: true },
-        { uuid: "b", is_tool_call: false },
-        { uuid: "c" },
-      ]),
-    ).toEqual({
-      blocked: false,
-      toolCallSkipCount: 1,
-      runnable: [{ uuid: "b", is_tool_call: false }, { uuid: "c" }],
-    });
-  });
-
-  it("runs a set with no tool calls and counts none", () => {
-    expect(runEvaluatorsDecision([{ is_tool_call: false }, {}])).toEqual({
-      blocked: false,
-      toolCallSkipCount: 0,
-      runnable: [{ is_tool_call: false }, {}],
-    });
-  });
-
-  it("does not refuse an empty set", () => {
-    expect(runEvaluatorsDecision([])).toEqual({
-      blocked: false,
-      toolCallSkipCount: 0,
-      runnable: [],
-    });
-  });
-});
-
-describe("isSkippedRunResult", () => {
-  it("is true only when the run recorded a skip", () => {
-    expect(isSkippedRunResult({ skipped: true })).toBe(true);
-    expect(isSkippedRunResult({ skipped: false })).toBe(false);
-    expect(isSkippedRunResult({ value: "yes" })).toBe(false);
-    expect(isSkippedRunResult(null)).toBe(false);
-    expect(isSkippedRunResult(undefined)).toBe(false);
-  });
-});
-
-describe("evaluatorsThatCanBeRun", () => {
-  it("leaves out tool call correctness, which people answer", () => {
-    expect(
-      evaluatorsThatCanBeRun([
-        { uuid: "a", evaluator_type: "llm" },
-        { uuid: "b", evaluator_type: "tool-call" },
-        { uuid: "c" },
-      ]),
-    ).toEqual([{ uuid: "a", evaluator_type: "llm" }, { uuid: "c" }]);
-  });
-
-  it("returns nothing when tool call correctness is all there is", () => {
-    expect(
-      evaluatorsThatCanBeRun([{ uuid: "b", evaluator_type: "tool-call" }]),
-    ).toEqual([]);
-  });
-});
-
-describe("toolCallNotEvaluatedMessage", () => {
-  it("says the same thing about one item and about the chosen ones", () => {
-    expect(toolCallNotEvaluatedMessage("This item evaluates")).toBe(
-      "This item evaluates one or more tool calls, which only supports human review today. Evaluators do not run on them.",
-    );
-    expect(toolCallNotEvaluatedMessage("The chosen items evaluate")).toBe(
-      "The chosen items evaluate one or more tool calls, which only supports human review today. Evaluators do not run on them.",
-    );
-  });
-
-  it("adds the run dialog's own ending", () => {
-    expect(
-      toolCallNotEvaluatedMessage(
-        "2 of the chosen items evaluate",
-        ", so they will be left out of this run",
-      ),
-    ).toBe(
-      "2 of the chosen items evaluate one or more tool calls, which only supports human review today. Evaluators do not run on them, so they will be left out of this run.",
-    );
+describe("evaluatorFitsItem", () => {
+  it("pairs tool-call evaluators with tool-call rows only", () => {
+    expect(evaluatorFitsItem("tool-call", true)).toBe(true);
+    expect(evaluatorFitsItem("tool-call", false)).toBe(false);
+    expect(evaluatorFitsItem("llm", true)).toBe(false);
+    expect(evaluatorFitsItem("llm", false)).toBe(true);
+    expect(evaluatorFitsItem(undefined, false)).toBe(true);
+    expect(evaluatorFitsItem(undefined, true)).toBe(false);
   });
 });
 
@@ -144,6 +67,13 @@ describe("itemEditForm", () => {
 // Duplicate once built this row inline and left the tool calls off, so a copy
 // of a tool-call item opened with no answer and Save stayed off.
 describe("llmGeneralDialogRow", () => {
+  it("reads the agent's calls stored under tool_calls", () => {
+    const calls = [{ tool: "book_flight", arguments: {} }];
+    expect(
+      llmGeneralDialogRow({ uuid: "i1", payload: { input: "hi", tool_calls: calls } }).toolCalls,
+    ).toEqual(calls);
+  });
+
   it("carries the input's and output's headings and versions", () => {
     const input = { content: "hi", label: "English", versions: { Hindi: "नमस्ते" } };
     const row = llmGeneralDialogRow({
@@ -164,9 +94,16 @@ describe("llmGeneralDialogRow", () => {
   it("carries the item's tool calls", () => {
     const row = llmGeneralDialogRow({
       uuid: "i1",
-      payload: { name: "A", input: "hi", output: "", actual_tool_calls: calls },
+      payload: {
+        name: "A",
+        input: "hi",
+        output: "",
+        actual_tool_calls: calls,
+        expected_tool_calls: calls,
+      },
     });
     expect(row.toolCalls).toEqual(calls);
+    expect(row.expectedToolCalls).toEqual(calls);
     expect(row.output).toBe("");
   });
 
@@ -193,6 +130,7 @@ describe("llmGeneralDialogRow", () => {
       inputExtras: { label: "English" },
       outputExtras: {},
       toolCalls: [],
+      expectedToolCalls: [],
       varValues: { ev: { x: "1" } },
       metadata,
     });
@@ -205,6 +143,7 @@ describe("llmGeneralDialogRow", () => {
       input: "",
       output: "",
       toolCalls: [],
+      expectedToolCalls: [],
       varValues: {},
     });
   });
@@ -214,5 +153,96 @@ describe("readEvaluatorVariables", () => {
   it("returns nothing for a missing payload or a malformed value", () => {
     expect(readEvaluatorVariables(null)).toEqual({});
     expect(readEvaluatorVariables({ evaluator_variables: [] })).toEqual({});
+  });
+});
+
+describe("evaluatorTypesForTask", () => {
+  it("adds the tool-call kind to llm and llm-general tasks only", () => {
+    expect(evaluatorTypesForTask("llm")).toEqual(["llm", "tool-call"]);
+    expect(evaluatorTypesForTask("llm-general")).toEqual([
+      "llm-general",
+      "tool-call",
+    ]);
+    expect(evaluatorTypesForTask("conversation")).toEqual(["conversation"]);
+    expect(evaluatorTypesForTask("stt")).toEqual(["stt"]);
+  });
+});
+
+describe("fitsTaskType", () => {
+  it("lets a tool-call evaluator onto llm and llm-general tasks", () => {
+    expect(fitsTaskType("llm", "llm")).toBe(true);
+    expect(fitsTaskType("tool-call", "llm")).toBe(true);
+    expect(fitsTaskType("tool-call", "llm-general")).toBe(true);
+    expect(fitsTaskType("tool-call", "conversation")).toBe(false);
+    expect(fitsTaskType("llm", "llm-general")).toBe(false);
+    expect(fitsTaskType(undefined, "llm")).toBe(false);
+  });
+});
+
+describe("storesEmptyToolCallList", () => {
+  it("is true only when an expected or actual tool call list is empty", () => {
+    expect(storesEmptyToolCallList({ actual_tool_calls: [] })).toBe(true);
+    expect(storesEmptyToolCallList({ expected_tool_calls: [] })).toBe(true);
+    expect(storesEmptyToolCallList({ actual_tool_calls: [{ tool: "x" }] })).toBe(false);
+    expect(storesEmptyToolCallList({ agent_response: "hi" })).toBe(false);
+    expect(storesEmptyToolCallList(null)).toBe(false);
+  });
+});
+
+describe("agentToolCalls", () => {
+  const calls = [{ tool: "a", arguments: {} }];
+  it("uses actual_tool_calls whenever it is a list, even an empty one", () => {
+    expect(agentToolCalls({ actual_tool_calls: calls, tool_calls: [] })).toEqual(calls);
+    expect(agentToolCalls({ actual_tool_calls: [], tool_calls: calls })).toEqual([]);
+  });
+  it("falls back to tool_calls, and to nothing", () => {
+    expect(agentToolCalls({ tool_calls: calls })).toEqual(calls);
+    expect(agentToolCalls({ tool_calls: "x" })).toEqual([]);
+    expect(agentToolCalls({})).toEqual([]);
+  });
+});
+
+describe("selectedTaskItems", () => {
+  const items = [
+    { uuid: "a", payload: { name: "Books a Flight" } },
+    { uuid: "b", payload: { name: "Plain reply" } },
+    { uuid: "c", payload: {} },
+  ];
+
+  it("narrows select all by a case-insensitive part of the item name", () => {
+    expect(selectedTaskItems(items, { q: " flight " }).map((i) => i.uuid)).toEqual(["a"]);
+  });
+
+  it("keeps every item for select all with no search", () => {
+    expect(selectedTaskItems(items, { q: "" })).toHaveLength(3);
+  });
+
+  it("keeps only the ticked items otherwise", () => {
+    expect(selectedTaskItems(items, { ids: new Set(["b"]) }).map((i) => i.uuid)).toEqual(["b"]);
+  });
+});
+
+describe("evaluatorsFittingItems", () => {
+  const evaluators = [
+    { uuid: "reply", evaluator_type: "llm" },
+    { uuid: "calls", evaluator_type: "tool-call" },
+  ];
+  const offered = (items: { is_tool_call?: boolean }[]) =>
+    evaluatorsFittingItems(evaluators, items).map((e) => e.uuid);
+
+  it("offers every evaluator when there are no items", () => {
+    expect(offered([])).toEqual(["reply", "calls"]);
+  });
+
+  it("offers only the tool call evaluator for tool call items", () => {
+    expect(offered([{ is_tool_call: true }])).toEqual(["calls"]);
+  });
+
+  it("leaves out the tool call evaluator for other items", () => {
+    expect(offered([{ is_tool_call: false }, {}])).toEqual(["reply"]);
+  });
+
+  it("offers both when the items are of both kinds", () => {
+    expect(offered([{ is_tool_call: true }, {}])).toEqual(["reply", "calls"]);
   });
 });

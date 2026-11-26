@@ -36,6 +36,8 @@ export type TraceScoringControls = {
   eligibility: TraceScoringEligibility | null;
   eligibilityError: string | null;
   saveError: string | null;
+  /** asks again which linked evaluators can score, after one is added */
+  refreshEligibility: () => Promise<void>;
   /** true when scoring is off and no linked evaluator can score */
   enableBlocked: boolean;
   /**
@@ -154,5 +156,6 @@ export function useAgentTraceScoring({
     saveError,
     enableBlocked,
     cannotEnable,
+    refreshEligibility: loadEligibility,
   };
 }

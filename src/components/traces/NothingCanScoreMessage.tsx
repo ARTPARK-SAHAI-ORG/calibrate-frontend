@@ -1,6 +1,24 @@
 "use client";
 
 import { nothingCanScoreCopy } from "@/lib/traceScoring";
+import type { TraceScoringIneligibleReason } from "@/lib/tracesApi";
+
+/** The words "Evaluators tab", as a button that opens that tab. */
+export function EvaluatorsTabLink({
+  onGoToEvaluators,
+}: {
+  onGoToEvaluators: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onGoToEvaluators}
+      className="font-semibold cursor-pointer hover:opacity-80"
+    >
+      Evaluators tab
+    </button>
+  );
+}
 
 /**
  * Why this agent's traces are not being scored, and where to fix it. The same
@@ -11,21 +29,13 @@ export function NothingCanScoreMessage({
   ineligible,
   onGoToEvaluators,
 }: {
-  ineligible: { reason: string }[];
+  ineligible: { reason: TraceScoringIneligibleReason }[];
   onGoToEvaluators: () => void;
 }) {
   return (
     <>
-      {nothingCanScoreCopy(ineligible)} Choose evaluators without variables in
-      the{" "}
-      <button
-        type="button"
-        onClick={onGoToEvaluators}
-        className="font-semibold cursor-pointer hover:opacity-80"
-      >
-        Evaluators tab
-      </button>
-      .
+      {nothingCanScoreCopy(ineligible)}{" "}
+      <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
     </>
   );
 }

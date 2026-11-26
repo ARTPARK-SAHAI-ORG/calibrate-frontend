@@ -819,7 +819,7 @@ describe("TestsTabContent — paging", () => {
     await screen.findAllByText("Paged test 1");
 
     // Every paged test is a response test, so this finds nothing.
-    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+    await user.click(screen.getByRole("button", { name: "Tool call" }));
 
     await screen.findByText("No tests match your search");
     // The reader has to be able to get back to All.
@@ -907,7 +907,7 @@ describe("TestsTabContent — paging", () => {
     await screen.findAllByText("Paged test 1");
 
     // 13 tests, 12 of them reply tests: the reply filter spans two pages.
-    await user.click(screen.getByRole("button", { name: "Agent Response" }));
+    await user.click(screen.getByRole("button", { name: "Conversation reply" }));
     await screen.findByText("1–10 of 12 tests");
     await user.click(screen.getByLabelText("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
@@ -941,7 +941,7 @@ describe("TestsTabContent — paging", () => {
     renderComponent();
     await screen.findAllByText("Paged test 1");
 
-    await user.click(screen.getByRole("button", { name: "Agent Response" }));
+    await user.click(screen.getByRole("button", { name: "Conversation reply" }));
     await screen.findByText("1–10 of 12 tests");
     await user.click(screen.getByLabelText("Select all"));
     await user.click(screen.getByText("Select all 12 tests"));
@@ -972,7 +972,7 @@ describe("TestsTabContent — paging", () => {
     renderComponent();
     await screen.findAllByText("Paged test 1");
 
-    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+    await user.click(screen.getByRole("button", { name: "Tool call" }));
 
     await screen.findAllByText("Weather tool test");
     expect(screen.queryAllByText("Paged test 1")).toHaveLength(0);
@@ -990,7 +990,7 @@ describe("TestsTabContent — populated table", () => {
     await screen.findAllByText("Greeting test");
     expect(screen.getAllByText("Weather tool test")[0]).toBeInTheDocument();
     expect(screen.getByText("2 tests")).toBeInTheDocument();
-    expect(screen.getAllByText("Agent Response").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Conversation reply").length).toBeGreaterThan(0);
   });
 
   it("asks the backend for the tests matching what was typed", async () => {
@@ -1070,7 +1070,7 @@ describe("TestsTabContent — populated table", () => {
     renderComponent();
     await screen.findAllByText("Greeting test");
 
-    await user.click(screen.getByRole("button", { name: "Tool Call" }));
+    await user.click(screen.getByRole("button", { name: "Tool call" }));
     await screen.findAllByText("Weather tool test");
 
     state.agentTestsInit = { ok: false, status: 500 };

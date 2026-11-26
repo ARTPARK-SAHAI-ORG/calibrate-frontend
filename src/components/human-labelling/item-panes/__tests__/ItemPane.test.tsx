@@ -2,13 +2,14 @@ import React from "react";
 import { render, screen } from "@/test-utils";
 import { ItemPane } from "../../AnnotationJobView";
 
-const item = (payload: Record<string, unknown>) => ({
+const item = (payload: Record<string, unknown>, is_tool_call = false) => ({
   id: 1,
   uuid: "i1",
   task_id: "task-1",
   payload,
   created_at: "2024-01-01",
   deleted_at: null,
+  is_tool_call,
 });
 
 describe("ItemPane picks the pane by task type first", () => {
@@ -45,7 +46,7 @@ describe("ItemPane picks the pane by task type first", () => {
           actual_tool_calls: [
             { tool: "book_appointment", arguments: { city: "Bengaluru" } },
           ],
-        })}
+        }, true)}
         taskType="llm"
       />,
     );
@@ -54,7 +55,7 @@ describe("ItemPane picks the pane by task type first", () => {
     expect(screen.queryByText("Input")).not.toBeInTheDocument();
   });
 
-  it("draws the expected answer when an item carries one but no tool-call flag", () => {
+  it("draws an item without the tool-call flag as a next reply", () => {
     render(
       <ItemPane
         item={item({
@@ -66,6 +67,7 @@ describe("ItemPane picks the pane by task type first", () => {
         taskType="llm"
       />,
     );
-    expect(screen.getByText("Expected answer")).toBeInTheDocument();
+    expect(screen.getByText("Hi")).toBeInTheDocument();
+    expect(screen.queryByText("Expected answer")).not.toBeInTheDocument();
   });
 });

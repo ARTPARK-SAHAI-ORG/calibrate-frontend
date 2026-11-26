@@ -50,6 +50,7 @@ import {
   TraceSourceLabel,
 } from "./TracesTable";
 import { TraceScorePanel } from "./TraceScorePanel";
+import { WARNING_BUTTON_CLASS } from "./AddToolCallEvaluatorButton";
 
 type TraceDetailDialogProps = {
   isOpen: boolean;
@@ -72,6 +73,14 @@ type TraceDetailDialogProps = {
   scoringEvaluatorNames?: string[];
   /** Told once a new scoring run was started, so the list can show it. */
   onScored?: () => void;
+  /** The button that adds a tool call evaluator, for a trace skipped because
+   *  the agent has none. */
+  addToolCallEvaluator?: React.ReactNode;
+  /** Opens the agent's Evaluators tab, for a trace no evaluator fits. */
+  onGoToEvaluators?: () => void;
+  /** A window opened from inside this one is on screen, so Escape and the
+   *  arrow keys belong to it. */
+  keysPaused?: boolean;
   /** Whether this trace is ticked in the list behind the dialog. */
   isSelected?: boolean;
   /** Tick or untick this trace without closing the dialog and going back to
@@ -383,6 +392,9 @@ export function TraceDetailDialog({
   ineligibleEvaluators,
   scoringEvaluatorNames = [],
   onScored,
+  addToolCallEvaluator,
+  onGoToEvaluators,
+  keysPaused = false,
 }: TraceDetailDialogProps) {
   useHideFloatingButton(isOpen);
   // Scores belong to one turn, not the conversation, so none are loaded for it.
@@ -518,26 +530,37 @@ export function TraceDetailDialog({
       });
     } catch (err) {
       toast.error(
-        parseBackendErrorMessage(err, "Could not score this trace. Please try again."),
+        parseBackendErrorMessage(
+          err,
+          "Could not score this trace. Please try again.",
+        ),
       );
     } finally {
       setScoringUuid((current) => (current === scored ? null : current));
     }
   };
-  const scoreTraceButton = scoringEvaluatorNames.length > 0 ? (
-    <button
-      type="button"
-      onClick={() => void startScoring()}
-      disabled={scoringUuid === traceUuid}
-      className="h-8 px-2.5 rounded-md text-sm font-medium border bg-amber-500/12 border-amber-500/45 text-amber-950 dark:text-amber-100 transition-colors hover:bg-amber-500/22 dark:hover:bg-amber-500/18 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-    >
-      Score this trace
-    </button>
-  ) : undefined;
+  const scoreTraceButton =
+    scoringEvaluatorNames.length > 0 ? (
+      <button
+        type="button"
+        onClick={() => void startScoring()}
+        disabled={scoringUuid === traceUuid}
+        className={`${WARNING_BUTTON_CLASS} disabled:opacity-60 disabled:cursor-not-allowed`}
+      >
+        Score this trace
+      </button>
+    ) : undefined;
   const tryAgain =
     scoringEvaluatorNames.length > 0 ? () => void startScoring() : undefined;
 
-  useDialogNavKeys({ isOpen, onClose, hasPrev, onPrev, hasNext, onNext });
+  useDialogNavKeys({
+    isOpen: isOpen && !keysPaused,
+    onClose,
+    hasPrev,
+    onPrev,
+    hasNext,
+    onNext,
+  });
   // Same width and limits as the evaluators column of the test results window.
   const scoresPanel = useResizableWidth(512, 320, 720, "grow-left");
 
@@ -720,6 +743,8 @@ export function TraceDetailDialog({
                   error={scoresError}
                   descriptions={evaluatorDescriptions}
                   ineligible={ineligibleEvaluators}
+                  addToolCallEvaluator={addToolCallEvaluator}
+                  onGoToEvaluators={onGoToEvaluators}
                   scoreTrace={scoreTraceButton}
                   scoringEvaluatorNames={scoringEvaluatorNames}
                   onTryAgain={tryAgain}
@@ -747,6 +772,8 @@ export function TraceDetailDialog({
                     error={scoresError}
                     descriptions={evaluatorDescriptions}
                     ineligible={ineligibleEvaluators}
+                    addToolCallEvaluator={addToolCallEvaluator}
+                    onGoToEvaluators={onGoToEvaluators}
                     scoreTrace={scoreTraceButton}
                     scoringEvaluatorNames={scoringEvaluatorNames}
                     onTryAgain={tryAgain}

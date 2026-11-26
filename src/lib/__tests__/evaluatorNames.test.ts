@@ -38,14 +38,22 @@ describe("reservedEvaluatorNameError", () => {
 
 describe("defaultEvaluatorName", () => {
   it.each([
-    ["llm", "New conversation reply evaluator"],
-    ["conversation", "New whole conversation evaluator"],
-    ["llm-general", "New basic output evaluator"],
-    ["tool-call", "New tool call evaluator"],
-    ["stt", "New speech to text evaluator"],
-    ["tts", "New text to speech evaluator"],
-  ] as const)("names %s as %s", (type, expected) => {
-    expect(defaultEvaluatorName(type, [])).toBe(expected);
+    ["llm", null, "New conversation reply evaluator"],
+    ["conversation", null, "New whole conversation evaluator"],
+    ["llm-general", null, "New basic output evaluator"],
+    ["tool-call", "conversation", "New conversation tool call evaluator"],
+    ["tool-call", "single", "New basic tool call evaluator"],
+    ["tool-call", null, "New tool call evaluator"],
+    ["stt", null, "New speech to text evaluator"],
+    ["tts", null, "New text to speech evaluator"],
+  ] as const)("names %s (%s) as %s", (type, textKind, expected) => {
+    expect(defaultEvaluatorName(type, [], textKind)).toBe(expected);
+  });
+
+  it("only says the agent kind for tool call evaluators", () => {
+    expect(defaultEvaluatorName("llm", [], "conversation")).toBe(
+      "New conversation reply evaluator",
+    );
   });
 
   it("adds the next free number when the name is taken, ignoring case and spaces", () => {

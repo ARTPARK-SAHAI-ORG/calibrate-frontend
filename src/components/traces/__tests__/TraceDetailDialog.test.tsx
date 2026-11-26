@@ -712,7 +712,7 @@ it("fetches scores and draws only the latest run in the right column, meta on th
   expect(screen.queryByText("Completed")).not.toBeInTheDocument();
   expect(screen.queryByText(/aaaaaaaa/)).not.toBeInTheDocument();
   expect(
-    screen.queryByText("No evaluators could score this trace"),
+    screen.queryByText("No evaluator on this agent could score this trace"),
   ).not.toBeInTheDocument();
 });
 
@@ -1430,7 +1430,8 @@ describe("Score this trace", () => {
     open(false);
     await waitFor(() =>
       expect(
-        screen.getAllByText(/No evaluators could score this trace/).length,
+        screen.getAllByText(/No evaluator on this agent could score this trace/)
+          .length,
       ).toBeGreaterThan(0),
     );
     expect(
@@ -1448,7 +1449,9 @@ describe("Score this trace", () => {
     });
     await user.click(button);
     expect(mockScoreTrace).toHaveBeenCalledWith("tok", "t1");
-    for (const b of screen.getAllByRole("button", { name: "Score this trace" })) {
+    for (const b of screen.getAllByRole("button", {
+      name: "Score this trace",
+    })) {
       expect(b).toBeDisabled();
     }
     expect(onScored).not.toHaveBeenCalled();
@@ -1482,9 +1485,13 @@ describe("Score this trace", () => {
         onScored={onScored}
       />,
     );
-    await waitFor(() => expect(mockFetchTrace).toHaveBeenCalledWith("tok", "t2"));
+    await waitFor(() =>
+      expect(mockFetchTrace).toHaveBeenCalledWith("tok", "t2"),
+    );
     // The other trace's own button is not held off by the first request.
-    const others = await screen.findAllByRole("button", { name: "Score this trace" });
+    const others = await screen.findAllByRole("button", {
+      name: "Score this trace",
+    });
     for (const b of others) expect(b).not.toBeDisabled();
     // Its own request stays marked as going when the first one returns.
     mockScoreTrace.mockReturnValue(new Promise(() => {}));
@@ -1493,7 +1500,9 @@ describe("Score this trace", () => {
     expect(
       screen.queryByText("Running the evaluators on this trace"),
     ).not.toBeInTheDocument();
-    for (const b of screen.getAllByRole("button", { name: "Score this trace" })) {
+    for (const b of screen.getAllByRole("button", {
+      name: "Score this trace",
+    })) {
       expect(b).toBeDisabled();
     }
   });
@@ -1502,10 +1511,15 @@ describe("Score this trace", () => {
     mockFetchTraceScores.mockResolvedValue({
       runs: [{ ...skipped, status: "failed", error: "Error code: 402" }],
     });
-    mockScoreTrace.mockResolvedValue({ run_uuid: "run-new", status: "pending" });
+    mockScoreTrace.mockResolvedValue({
+      run_uuid: "run-new",
+      status: "pending",
+    });
     const user = setupUser();
     open(true);
-    const [button] = await screen.findAllByRole("button", { name: "Try again" });
+    const [button] = await screen.findAllByRole("button", {
+      name: "Try again",
+    });
     await user.click(button);
     expect(mockScoreTrace).toHaveBeenCalledWith("tok", "t1");
     await waitFor(() =>
@@ -1534,5 +1548,30 @@ describe("Score this trace", () => {
       ),
     );
     expect(button).not.toBeDisabled();
+  });
+
+  it("leaves Escape and the arrow keys alone while a window opened from it is on screen", async () => {
+    mockFetchTrace.mockResolvedValue(detail);
+    const onClose = jest.fn();
+    const onNext = jest.fn();
+    render(
+      <TraceDetailDialog
+        isOpen
+        onClose={onClose}
+        accessToken="tok"
+        traceUuid="t1"
+        onNext={onNext}
+        hasNext={true}
+        keysPaused
+      />,
+    );
+    await waitFor(() => expect(screen.getByText("msg-1")).toBeInTheDocument());
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onNext).not.toHaveBeenCalled();
   });
 });

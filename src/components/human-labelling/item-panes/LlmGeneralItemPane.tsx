@@ -6,19 +6,17 @@ import {
 } from "@/components/test-results/shared";
 import { readTextField } from "@/lib/messageVersions";
 import { ExpectedToolCalls } from "./ExpectedToolCalls";
+import { agentToolCalls, isToolCallContent } from "@/lib/labellingItem";
 import { Section } from "./shared";
+import { JudgedTogetherNote, NO_TOOL_CALL } from "./ToolCallItemPane";
 
 /**
  * Renders a general (non-conversational) "llm-general" evaluation item.
  *
- * The backend payload shape for this task type is
- * `{ name, input, output, actual_tool_calls? }` (plus an optional
- * `evaluator_variables` map for per-item `{{variable}}` substitution, which
- * isn't shown here — it feeds the evaluator prompt, not the displayed item).
+ * The agent's calls are in `actual_tool_calls`, or in `tool_calls` when there is no reply.
  * `input` and `output` are a string or `{ content, label?, versions? }`.
- * A tool-call test usually has an empty `output` and the calls the agent made
- * in `actual_tool_calls`, drawn the same way the run results screen draws
- * them. We fall back to a raw JSON dump only when there is none of the three.
+ * The calls are drawn the same way the run results screen draws them, and a
+ * raw JSON dump is shown only when there is no input, output or call.
  */
 export function LlmGeneralItemPane({
   payload,
@@ -29,9 +27,7 @@ export function LlmGeneralItemPane({
   const outputField = readTextField(payload.output);
   const input = inputField?.content ?? "";
   const output = outputField?.content ?? "";
-  const toolCalls = Array.isArray(payload.actual_tool_calls)
-    ? payload.actual_tool_calls
-    : [];
+  const toolCalls = agentToolCalls(payload);
 
   if (!input && !output && toolCalls.length === 0) {
     return (
@@ -98,10 +94,13 @@ export function LlmGeneralItemPane({
             </div>
           )}
           {!output && toolCalls.length === 0 && (
-            <p className="text-sm text-muted-foreground">—</p>
+            <p className="text-sm text-muted-foreground">
+              {isToolCallContent(payload) ? NO_TOOL_CALL : "—"}
+            </p>
           )}
         </Section>
       </div>
+      {output && toolCalls.length > 0 && <JudgedTogetherNote />}
       <div className="pl-4">
         <ExpectedToolCalls payload={payload} />
       </div>
