@@ -1,5 +1,6 @@
 ## November 2026
 
+- Members of an agent's workspace can now add a rated reply to the agent's tests straight from its chat page, using a new Add to tests button beside the thumbs ([#898](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/898))
 - You can now pick connection agents that have custom fields for a simulation and start a text simulation with them ([#900](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/900))
 - The form for adding or editing an item on an input and output labelling task now has columns you can drag wider or narrower, shows the evaluators column at all times, lets a tool call item drop its text reply, and takes you to the first field to fix when a save is refused ([#890](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/890))
 - The title of a shared page, such as an agent chat link or shared results, now sits on its own line under the top bar on a phone, and the Score this trace button has more space above it ([#892](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/892))
