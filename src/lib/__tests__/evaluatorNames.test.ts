@@ -47,18 +47,18 @@ describe("defaultEvaluatorName", () => {
     ["stt", null, "New speech to text evaluator"],
     ["tts", null, "New text to speech evaluator"],
   ] as const)("names %s (%s) as %s", (type, textKind, expected) => {
-    expect(defaultEvaluatorName(type, textKind, [])).toBe(expected);
+    expect(defaultEvaluatorName(type, [], textKind)).toBe(expected);
   });
 
   it("only says the agent kind for tool call evaluators", () => {
-    expect(defaultEvaluatorName("llm", "conversation", [])).toBe(
+    expect(defaultEvaluatorName("llm", [], "conversation")).toBe(
       "New conversation reply evaluator",
     );
   });
 
   it("adds the next free number when the name is taken, ignoring case and spaces", () => {
     expect(
-      defaultEvaluatorName("stt", null, [
+      defaultEvaluatorName("stt", [
         " new speech to text evaluator ",
         "New speech to text evaluator 2",
       ]),

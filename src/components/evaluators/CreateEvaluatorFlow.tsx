@@ -212,7 +212,7 @@ export function CreateEvaluatorFlow({
       // to the form with that purpose already set.
       if (onlyUseCase) {
         setNewEvaluatorType(onlyUseCase);
-        setEvaluatorName(suggestedName(onlyUseCase, null));
+        setEvaluatorName(suggestedName(onlyUseCase));
         setUseCasePickerOpen(false);
         setSidebarOpen(true);
         void prefillDefaultPrompt(onlyUseCase);
@@ -238,12 +238,12 @@ export function CreateEvaluatorFlow({
 
   const suggestedName = (
     type: EvaluatorType,
-    textKind: TextKind | null,
+    textKind: TextKind | null = null,
   ): string =>
     defaultEvaluatorName(
       type,
-      textKind,
       existingEvaluators.map((e) => e.name),
+      textKind,
     );
 
   const isNameDuplicate = (name: string): boolean => {

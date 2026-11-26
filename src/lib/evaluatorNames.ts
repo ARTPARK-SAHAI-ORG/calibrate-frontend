@@ -39,8 +39,8 @@ const KIND_WORDS: Record<EvaluatorType, string> = {
 // workspace gets " 2", " 3" and so on.
 export function defaultEvaluatorName(
   type: EvaluatorType,
-  textKind: TextKind | null,
   existingNames: string[],
+  textKind: TextKind | null = null,
 ): string {
   const agentKind =
     type === "tool-call" && textKind
