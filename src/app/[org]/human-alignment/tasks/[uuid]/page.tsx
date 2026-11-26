@@ -4108,6 +4108,7 @@ function LabellingTaskPageInner() {
           evaluators={task?.evaluators ?? []}
           hasToolCallItems={selectedToolCall}
           hasNonToolCallItems={selectedNonToolCall}
+          taskType={task?.type}
           onClose={() => setAssignOpen(false)}
           onConfirm={handleAssignAnnotators}
         />

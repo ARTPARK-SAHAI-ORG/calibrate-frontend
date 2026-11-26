@@ -464,3 +464,10 @@ export function textFieldsToPayload(fields: {
     output: writeTextField(fields.output, fields.outputExtras),
   };
 }
+
+/** What a task's items that are not tool call items are called: a one-shot
+ *  task's agent writes an output, a next-reply task's agent a reply. */
+export const textItemsName = (taskType?: string | null) =>
+  taskType === "llm-general"
+    ? "items with a text output"
+    : "items with a text reply";

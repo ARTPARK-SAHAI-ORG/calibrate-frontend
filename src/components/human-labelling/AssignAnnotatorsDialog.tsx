@@ -1,5 +1,6 @@
 "use client";
 
+import { textItemsName } from "./itemConversation";
 import { ErrorNote } from "@/components/ui";
 import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
@@ -147,6 +148,8 @@ function SettingChoice<T extends string>({
 }
 
 type AssignAnnotatorsDialogProps = {
+  /** The task's type, which names its items in messages. */
+  taskType?: string;
   isOpen: boolean;
   accessToken: string;
   /** Evaluators linked to the task, the pool the job can show in labelling. */
@@ -172,6 +175,7 @@ export function AssignAnnotatorsDialog({
   accessToken,
   evaluators,
   hasToolCallItems,
+  taskType,
   hasNonToolCallItems,
   onClose,
   onConfirm,
@@ -353,7 +357,7 @@ export function AssignAnnotatorsDialog({
       ? `Select at least one evaluator for the ${
           kindsMissingLabel[0].isToolCall
             ? "tool call items"
-            : "items with a text reply"
+            : textItemsName(taskType)
         }`
       : "Select at least one evaluator";
   const allEvaluatorsPicked =

@@ -1194,6 +1194,28 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     ).toBeInTheDocument();
   });
 
+  it.each([
+    ["llm", "items with a text reply"],
+    ["llm-general", "items with a text output"],
+  ])(
+    "names the %s task's text items when none of their evaluators is ticked",
+    async (taskType, words) => {
+      const user = setupUser();
+      mockedApiClient.mockResolvedValue(annotators);
+      renderDialog({
+        evaluators: [...evaluators, CUSTOM_TOOL_CALL],
+        hasToolCallItems: true,
+        taskType,
+      });
+      await screen.findByText("Alice");
+      await user.click(screen.getByRole("checkbox", { name: /Relevance/ }));
+      await user.click(screen.getByRole("checkbox", { name: /Fluency/ }));
+      expect(
+        screen.getByText(`Select at least one evaluator for the ${words}`),
+      ).toBeInTheDocument();
+    },
+  );
+
   it("asks for a label without naming a kind when only one kind is chosen", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValue(annotators);

@@ -1,5 +1,6 @@
 "use client";
 
+import { textItemsName } from "./itemConversation";
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ErrorNote } from "@/components/ui";
@@ -370,7 +371,7 @@ export function ManageEvaluatorsDialog({
           )}
           {saveAttempted && missingOtherEvaluator && (
             <ErrorNote>
-              This task has items with a text reply, so select at least one
+              This task has {textItemsName(taskType)}, so select at least one
               evaluator that is not a tool call evaluator.
             </ErrorNote>
           )}
