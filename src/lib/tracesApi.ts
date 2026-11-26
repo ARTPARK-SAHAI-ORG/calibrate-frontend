@@ -592,8 +592,7 @@ export type ConvertTracesToTestsBody = {
 };
 
 /** The name a test made from one trace starts with: the comment left with the
- *  rating, else the user's message cut to 60 characters, the way the backend
- *  names a test it is not given a name for. */
+ *  rating, else the user's message cut to 60 characters. */
 export function defaultTestName(
   comment: string | null | undefined,
   userMessage: string | null | undefined,
@@ -602,8 +601,13 @@ export function defaultTestName(
   if (fromComment) return { name: fromComment, from: "comment" };
   const message = userMessage?.trim();
   if (!message) return { name: "", from: null };
+  // By character, so an emoji at the cut is not split in half.
+  const chars = Array.from(message);
   return {
-    name: message.length <= 60 ? message : `${message.slice(0, 60).trimEnd()}…`,
+    name:
+      chars.length <= 60
+        ? message
+        : `${chars.slice(0, 60).join("").trimEnd()}…`,
     from: "message",
   };
 }

@@ -723,6 +723,25 @@ describe("Add to tests", () => {
     expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
   });
 
+  it("names the test after a comment typed but not saved yet", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Bad reply"));
+    await user.type(
+      await screen.findByLabelText(
+        "What was wrong with this reply? (optional)",
+      ),
+      "Too short",
+    );
+    await user.click(screen.getByText("Add to tests"));
+    expect(dialogProps().nameFrom).toEqual({
+      comment: "Too short",
+      userMessage: "Hi",
+    });
+  });
+
   it("confirms once added, linking to the agent's tests", async () => {
     const user = setupUser();
     mockSend.mockResolvedValue(reply());

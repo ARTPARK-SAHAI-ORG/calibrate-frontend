@@ -542,7 +542,11 @@ export function PublicChatView({ token }: { token: string }) {
           nameFrom={
             converting
               ? {
-                  comment: feedback[converting.traceUuid]?.comment,
+                  // A comment typed but not saved yet is what is on screen.
+                  comment: (() => {
+                    const f = feedback[converting.traceUuid];
+                    return f?.open && f.draft.trim() ? f.draft : f?.comment;
+                  })(),
                   userMessage: converting.userMessage,
                 }
               : undefined

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
+import { CloseIcon } from "@/components/icons";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { EvaluatorPicker } from "@/components/evaluators/EvaluatorPicker";
 import { DialogStepper, LoadingState } from "@/components/ui";
@@ -212,19 +213,7 @@ export function ConvertTracesToTestsDialog({
                 aria-label="Close"
                 className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <CloseIcon className="w-5 h-5" />
               </button>
             )}
           </div>
@@ -236,7 +225,8 @@ export function ConvertTracesToTestsDialog({
               ]}
               current={step}
               isDone={(n) => (n === 1 ? name.length > 0 : false)}
-              onSelect={(n) => setStep(n as 1 | 2)}
+              // Leaving step 2 mid-save would hide an error it shows.
+              onSelect={(n) => !submitting && setStep(n as 1 | 2)}
             />
           )}
         </div>

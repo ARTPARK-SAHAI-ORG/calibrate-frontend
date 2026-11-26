@@ -543,6 +543,31 @@ describe("naming one trace's test", () => {
     ).toBeInTheDocument();
   });
 
+  it("never cuts an emoji in half", () => {
+    setup({
+      traceUuids: ["tr-1"],
+      nameFrom: { userMessage: `${"a".repeat(59)}😀😀` },
+    });
+    expect(screen.getByLabelText("Test name")).toHaveValue(
+      `${"a".repeat(59)}😀…`,
+    );
+  });
+
+  it("stays on the evaluators while adding", async () => {
+    mockConvert.mockReturnValue(new Promise(() => {}));
+    const user = setupUser();
+    setup({ traceUuids: ["tr-1"], nameFrom: { userMessage: "Hi" } });
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Add to tests" }),
+    );
+    await user.click(screen.getByRole("button", { name: "✓ Test name" }));
+    expect(screen.queryByLabelText("Test name")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Adding..." }),
+    ).toBeInTheDocument();
+  });
+
   it("starts empty with nothing to name it from", () => {
     setup({ traceUuids: ["tr-1"], nameFrom: {} });
     expect(screen.getByLabelText("Test name")).toHaveValue("");
