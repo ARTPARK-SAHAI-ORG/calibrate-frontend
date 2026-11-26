@@ -1010,7 +1010,7 @@ it("names what can score a tool-only trace now and offers only Score this trace,
     />,
   );
   expect(document.body).toHaveTextContent(
-    "This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent. Tool call correctness can score it now.",
+    "This trace was not scored because the agent had no tool call evaluator when the trace arrived. Tool call correctness can score it now.",
   );
   expect(
     screen.getByRole("button", { name: "Score this trace" }),
@@ -1051,7 +1051,7 @@ describe("a tool-only trace skipped before a tool call evaluator with variables 
       />,
     );
     expect(document.body).toHaveTextContent(
-      "This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent. The tool call evaluator added since has variables. Configure it below, then score this trace.",
+      "This trace was not scored because the agent had no tool call evaluator when the trace arrived. The tool call evaluator added since has variables. Configure it below, then score this trace.",
     );
     expect(
       screen.queryByRole("button", { name: /Evaluators tab/ }),

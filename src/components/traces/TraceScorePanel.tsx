@@ -314,6 +314,12 @@ function RunBody({
         run.error === "no_usable_evaluators");
     const needValuesOnly =
       !canScore && run.error === "no_usable_evaluators" && onlyNeedValues;
+    // Once the agent has a tool call evaluator, "none had been added" reads
+    // as if it still has none.
+    const reason =
+      run.error === "no_tool_call_evaluator" && (canScore || configureBelow > 0)
+        ? "This trace was not scored because the agent had no tool call evaluator when the trace arrived"
+        : scoringRunErrorCopy(run.error);
     const button = canScore
       ? scoreTrace
       : run.error === "no_tool_call_evaluator" && addToolCallEvaluator;
@@ -342,7 +348,7 @@ function RunBody({
             <>
               {run.error === "no_usable_evaluators"
                 ? "This trace was not scored because none of the agent's evaluators could score it then."
-                : `${scoringRunErrorCopy(run.error)}.`}{" "}
+                : `${reason}.`}{" "}
               {listNames.formatToParts(scoringEvaluatorNames).map((part, i) =>
                 part.type === "element" ? (
                   <span key={i} className={EVALUATOR_PILL_CLASSES}>
@@ -369,7 +375,7 @@ function RunBody({
               .
             </>
           ) : run.error === "no_tool_call_evaluator" && configureBelow > 0 ? (
-            `${scoringRunErrorCopy(run.error)}. ${
+            `${reason}. ${
               configureBelow === 1
                 ? "The tool call evaluator added since has variables. Configure it below"
                 : "The tool call evaluators added since have variables. Configure them below"
