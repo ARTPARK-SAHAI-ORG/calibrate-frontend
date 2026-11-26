@@ -1,5 +1,6 @@
 ## November 2026
 
+- A trace whose scoring failed now shows a red error with the reason it failed, instead of the amber note saying scoring did not finish ([#876](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/876))
 - A new evaluator now opens with its name already filled in from the kind you picked, so you can create it without typing a name ([#884](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/884))
 - An optional evaluator that nobody has answered now shows on a labelling task item and in the labelling job, with an Optional tag and a "Not answered" note, instead of being hidden ([#880](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/880))
 - Model lists now hide models that cannot be used and mark ones that will be removed soon, and an agent, evaluator or benchmark that still uses such a model shows a warning, with the benchmark refusing to start until it is swapped ([#874](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/874))
