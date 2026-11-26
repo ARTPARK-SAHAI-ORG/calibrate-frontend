@@ -1509,13 +1509,18 @@ describe("Score this trace", () => {
     );
     await waitFor(() => expect(mockFetchTrace).toHaveBeenCalledWith("tok", "t2"));
     // The other trace's own button is not held off by the first request.
-    for (const b of await screen.findAllByRole("button", { name: "Score this trace" })) {
-      expect(b).not.toBeDisabled();
-    }
+    const others = await screen.findAllByRole("button", { name: "Score this trace" });
+    for (const b of others) expect(b).not.toBeDisabled();
+    // Its own request stays marked as going when the first one returns.
+    mockScoreTrace.mockReturnValue(new Promise(() => {}));
+    await user.click(others[0]);
     await act(async () => resolve({ run_uuid: "run-new", status: "pending" }));
     expect(
       screen.queryByText("Running the evaluators on this trace"),
     ).not.toBeInTheDocument();
+    for (const b of screen.getAllByRole("button", { name: "Score this trace" })) {
+      expect(b).toBeDisabled();
+    }
   });
 
   it("shows the backend's reason when the request is refused", async () => {
