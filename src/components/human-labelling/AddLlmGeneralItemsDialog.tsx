@@ -10,6 +10,7 @@ import type { TurnExtras } from "@/lib/messageVersions";
 import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
+import { TrashIcon } from "@/components/icons";
 import { FieldError } from "@/components/ui/FieldError";
 import {
   DialogNavHeader,
@@ -118,6 +119,21 @@ let draftIdCounter = 0;
 function nextDraftId(): number {
   draftIdCounter += 1;
   return draftIdCounter;
+}
+
+/** A tool-call item saved with no text reply opens without the text box. */
+function seedHidesText(
+  s:
+    | { output: string; toolCalls?: unknown[]; expectedToolCalls?: unknown[] }
+    | undefined,
+  storesEmptyToolCallList: boolean,
+): boolean {
+  if (!s || s.output.trim()) return false;
+  return (
+    storesEmptyToolCallList ||
+    (s.toolCalls?.length ?? 0) > 0 ||
+    (s.expectedToolCalls?.length ?? 0) > 0
+  );
 }
 
 function seedToolCalls(raw: unknown): DraftToolCall[] {
@@ -255,6 +271,10 @@ export function AddLlmGeneralItemsDialog({
   const [toolCalls, setToolCalls] = useState<DraftToolCall[]>(() =>
     seedToolCalls(seed?.toolCalls),
   );
+  // A tool-call item can drop its text box and keep only the tool calls.
+  const [textRemoved, setTextRemoved] = useState(() =>
+    seedHidesText(seed, storesEmptyToolCallList),
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
   // Which list a tool made in the new-tool flow is added to.
   const [createToolFor, setCreateToolFor] = useState<
@@ -288,6 +308,7 @@ export function AddLlmGeneralItemsDialog({
       setInputExtras(s?.inputExtras ?? {});
       setOutputExtras(s?.outputExtras ?? {});
       setToolCalls(seedToolCalls(s?.toolCalls));
+      setTextRemoved(seedHidesText(s, storesEmptyToolCallList));
       const seeded = toolCallsToSelectedTools(
         s?.expectedToolCalls,
         availableTools,
@@ -503,6 +524,14 @@ export function AddLlmGeneralItemsDialog({
     expected.selectedTools.length > 0;
   const evaluatorFits = (e: LlmGeneralEvaluatorDef) =>
     evaluatorFitsItem(e.evaluator_type, isToolCallItem);
+  // An item needs a text reply or a tool call, so the box comes back once
+  // the last tool call goes.
+  const showsText = !textRemoved || !isToolCallItem;
+  const removeText = () => {
+    setOutput("");
+    setOutputExtras({});
+    setTextRemoved(true);
+  };
   const varsComplete = evaluatorsWithVariables
     .filter(evaluatorFits)
     .every((e) =>
@@ -756,21 +785,38 @@ export function AddLlmGeneralItemsDialog({
             </div>
             <div className="flex-1 min-w-0 flex flex-col min-h-0 p-4 md:p-6">
               <div className="flex-1 min-h-0 overflow-y-auto space-y-3 flex flex-col">
-                <TextVersionsEditor
-                  field="output"
-                  extras={outputExtras}
-                  onChange={setOutputExtras}
-                  onPendingChange={setOutputPending}
-                  disabled={submitting || !output.trim()}
-                >
-                  <textarea
-                    value={output}
-                    onChange={(e) => setOutput(e.target.value)}
-                    placeholder="The output the LLM produced"
-                    disabled={submitting}
-                    className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-                  />
-                </TextVersionsEditor>
+                {showsText && (
+                  <TextVersionsEditor
+                    field="output"
+                    headingAside={
+                      isToolCallItem && (
+                        <Tooltip content="Remove text reply" position="top">
+                          <button
+                            type="button"
+                            onClick={removeText}
+                            disabled={submitting}
+                            aria-label="Remove text reply"
+                            className="w-7 h-7 rounded-md border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </Tooltip>
+                      )
+                    }
+                    extras={outputExtras}
+                    onChange={setOutputExtras}
+                    onPendingChange={setOutputPending}
+                    disabled={submitting || !output.trim()}
+                  >
+                    <textarea
+                      value={output}
+                      onChange={(e) => setOutput(e.target.value)}
+                      placeholder="The output the LLM produced"
+                      disabled={submitting}
+                      className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                    />
+                  </TextVersionsEditor>
+                )}
                 {toolCalls.map((tc) => (
                   // Same card the test dialog draws a tool call with, in the
                   // conversation tab: header row with the wrench and the tool
@@ -882,6 +928,16 @@ export function AddLlmGeneralItemsDialog({
                 their rows and match. Outside the scrolling list, so the tool
                 list is never cut off. */}
               <div className="shrink-0 flex items-center justify-end gap-2 mt-3">
+                {!showsText && (
+                  <button
+                    type="button"
+                    onClick={() => setTextRemoved(false)}
+                    disabled={submitting}
+                    className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Add text reply
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setCreateToolFor("output")}

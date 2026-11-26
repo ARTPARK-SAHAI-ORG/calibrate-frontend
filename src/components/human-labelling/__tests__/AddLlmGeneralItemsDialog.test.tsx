@@ -238,9 +238,71 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     });
     expect(screen.getByText("dummy")).toBeInTheDocument();
     expect(screen.getByText("success")).toBeInTheDocument();
+    // Saved with no text reply, so it opens without the text box.
+    expect(
+      screen.queryByPlaceholderText("The output the LLM produced"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add text reply" }),
+    ).toBeInTheDocument();
+  });
+
+  it("removes the text reply from a tool call item and adds it back", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Booked",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Remove text reply" }));
+    expect(
+      screen.queryByPlaceholderText("The output the LLM produced"),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add text reply" }));
+    expect(
+      screen.getByPlaceholderText("The output the LLM produced"),
+    ).toHaveValue("");
+    await user.click(screen.getByRole("button", { name: "Remove text reply" }));
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].output).toBe("");
+  });
+
+  it("brings the text box back once the last tool call is removed", async () => {
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Remove dummy" }));
     expect(
       screen.getByPlaceholderText("The output the LLM produced"),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Remove text reply" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers no way to remove the text reply on a text item", () => {
+    renderDialog();
+    expect(
+      screen.queryByRole("button", { name: "Remove text reply" }),
+    ).not.toBeInTheDocument();
   });
 
   it("saves an edited argument value, with true kept as a yes/no", async () => {
