@@ -1,5 +1,6 @@
 "use client";
 
+import type { TraceSummary } from "@/lib/tracesApi";
 import React, { useRef, useState } from "react";
 import { toast } from "sonner";
 import { TraceVariablesDialog } from "@/components/agent-tabs/TraceVariablesDialog";
@@ -31,11 +32,12 @@ export function useConfigureTraceValues({
   // The evaluator being loaded for, or "" while loading for all of them.
   const [loadingFor, setLoadingFor] = useState<string | null>(null);
   const [evaluators, setEvaluators] = useState<EvaluatorData[] | null>(null);
+  const [fromTrace, setFromTrace] = useState<TraceSummary | undefined>();
 
   // Only the latest click's answer counts.
   const latestRequest = useRef(0);
 
-  const configure = async (onlyUuid?: string) => {
+  const configure = async (onlyUuid?: string, trace?: TraceSummary) => {
     if (!accessToken) return;
     const request = ++latestRequest.current;
     const isLatest = () => request === latestRequest.current;
@@ -46,7 +48,10 @@ export function useConfigureTraceValues({
           onlyUuid ? e.uuid === onlyUuid : needsTraceValues(e, agentNature),
       );
       if (!isLatest()) return;
-      if (missing.length > 0) setEvaluators(missing);
+      if (missing.length > 0) {
+        setFromTrace(trace);
+        setEvaluators(missing);
+      }
       else onRefresh();
     } catch (err) {
       if (!isLatest()) return;
@@ -78,7 +83,7 @@ export function useConfigureTraceValues({
         size="sm"
         className="shrink-0"
         isLoading={loadingFor === ""}
-        onClick={() => configure()}
+        onClick={() => void configure()}
       >
         Configure now
       </Button>
@@ -86,7 +91,10 @@ export function useConfigureTraceValues({
     /** Opens the dialog for one evaluator only. */
     configure,
     /** Opens the dialog for these evaluators, as they are. */
-    open: setEvaluators,
+    open: (list: EvaluatorData[] | null) => {
+      setFromTrace(undefined);
+      setEvaluators(list);
+    },
     loadingFor,
     isOpen: evaluators !== null,
     dialog: evaluators && (
@@ -94,6 +102,7 @@ export function useConfigureTraceValues({
         agentUuid={agentUuid}
         evaluators={evaluators}
         agentNature={agentNature}
+        fromTrace={fromTrace}
         onClose={() => setEvaluators(null)}
         onSave={handleSave}
       />

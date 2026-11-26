@@ -790,10 +790,12 @@ describe("evaluators not configured for traces", () => {
     expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
   });
 
-  it("hides the card of an evaluator configured since", () => {
+  it("names an evaluator configured since in the offer, not in a card", () => {
     render(<TraceScorePanel run={recorded} unconfigured={[]} />);
     expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
-    expect(screen.queryByText("Accuracy")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Accuracy").closest('[class*="border-orange-500"]'),
+    ).toBeNull();
   });
 
   it("shows no card for an evaluator the run did not leave out", () => {
@@ -813,7 +815,9 @@ describe("evaluators not configured for traces", () => {
       />,
     );
     expect(screen.getAllByText(NOTE)).toHaveLength(1);
-    expect(screen.queryByText("Accuracy")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Accuracy").closest('[class*="border-orange-500"]'),
+    ).toBeNull();
     const buttons = screen.getAllByRole("button", { name: "Configure for traces" });
     expect(buttons).toHaveLength(1);
     expect(
@@ -1024,4 +1028,89 @@ it("points at the Evaluators tab when a tool-only trace has no add button and no
   );
   await user.click(screen.getByRole("button", { name: /Evaluators tab/ }));
   expect(onGoToEvaluators).toHaveBeenCalled();
+});
+
+describe("scoring a trace again with evaluators set up since", () => {
+  const OFFER =
+    /These evaluators were not set up when this trace was scored, and can score it now:/;
+  const recorded: TraceScoringRun = {
+    ...completed,
+    unconfigured_evaluators: [
+      { evaluator_uuid: "ev-5", name: "Correctness" },
+      { evaluator_uuid: "ev-6", name: "Tone check" },
+      { evaluator_uuid: "ev-9", name: "Accuracy" },
+    ],
+  };
+  const again = <button type="button">Score this trace again</button>;
+
+  it("names the evaluators set up since in one box with one button, and keeps the card for the one still not set up", () => {
+    render(
+      <TraceScorePanel
+        run={recorded}
+        unconfigured={[{ evaluator_uuid: "ev-9", name: "Accuracy" }]}
+        scoreAgain={again}
+      />,
+    );
+    const box = screen.getByText(OFFER);
+    expect(box).toHaveTextContent(
+      "can score it now: Correctness Tone check",
+    );
+    expect(box).not.toHaveTextContent("Accuracy");
+    expect(screen.getByText("Correctness").className).toContain("rounded-md");
+    expect(
+      screen.getAllByRole("button", { name: "Score this trace again" }),
+    ).toHaveLength(1);
+    expect(
+      screen.getByText("Did not run as it has not been configured for traces"),
+    ).toBeInTheDocument();
+  });
+
+  it("offers nothing while every recorded evaluator is still not set up", () => {
+    render(
+      <TraceScorePanel
+        run={recorded}
+        unconfigured={recorded.unconfigured_evaluators}
+        scoreAgain={again}
+      />,
+    );
+    expect(screen.queryByText(OFFER)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Score this trace again" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the scores carried over and names the evaluators still running", () => {
+    render(
+      <TraceScorePanel
+        run={{
+          ...completed,
+          status: "processing",
+          completed_at: null,
+          limited_to_evaluators: [
+            { evaluator_uuid: "ev-5", name: "Correctness" },
+            { evaluator_uuid: "ev-6", name: "Tone check" },
+          ],
+        }}
+        unconfigured={[]}
+        scoreAgain={again}
+      />,
+    );
+    expect(screen.getByTestId("verdict-Tone")).toBeInTheDocument();
+    expect(screen.getByTestId("verdict-Helpfulness")).toBeInTheDocument();
+    expect(
+      screen.getByText("Running Correctness, Tone check on this trace"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(OFFER)).not.toBeInTheDocument();
+  });
+
+  it("keeps the plain running line for a normal run", () => {
+    render(
+      <TraceScorePanel
+        run={{ ...completed, status: "pending", results: [], limited_to_evaluators: [] }}
+      />,
+    );
+    expect(
+      screen.getByText("Running the evaluators on this trace"),
+    ).toBeInTheDocument();
+  });
 });

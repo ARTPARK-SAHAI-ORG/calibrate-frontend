@@ -1677,3 +1677,60 @@ describe("Score this trace", () => {
     expect(onNext).not.toHaveBeenCalled();
   });
 });
+
+it("scores a completed trace again for evaluators set up since, keeping its scores", async () => {
+  const user = setupUser();
+  mockScoreTrace.mockReset();
+  mockScoreTrace.mockResolvedValue({ run_uuid: "run-again", status: "pending" });
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-old",
+        status: "completed",
+        created_at: "2026-08-29T12:00:00Z",
+        error: null,
+        results: [
+          {
+            evaluator_uuid: "ev-1",
+            name: "Helpfulness",
+            output_type: "binary",
+            value: 1,
+            reasoning: "Fine.",
+            passed: true,
+          },
+        ],
+        unconfigured_evaluators: [
+          { evaluator_uuid: "ev-5", name: "Correctness" },
+          { evaluator_uuid: "ev-6", name: "Tone check" },
+        ],
+      },
+    ],
+  });
+
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+      unconfiguredEvaluators={[]}
+    />,
+  );
+
+  const buttons = await screen.findAllByRole("button", {
+    name: "Score this trace again",
+  });
+  // One in the mobile panel, one in the desktop column.
+  expect(buttons).toHaveLength(2);
+  await user.click(buttons[1]);
+  expect(mockScoreTrace).toHaveBeenCalledWith("tok", "t1");
+  expect(
+    (await screen.findAllByText("Running Correctness, Tone check on this trace"))
+      .length,
+  ).toBeGreaterThan(0);
+  expect(screen.getAllByText("Helpfulness").length).toBeGreaterThan(0);
+  expect(
+    screen.queryByRole("button", { name: "Score this trace again" }),
+  ).not.toBeInTheDocument();
+});

@@ -4054,7 +4054,9 @@ describe("TracesTabContent", () => {
     saveEvaluatorTraceVariables.mockResolvedValue(undefined);
     await user.click(screen.getByRole("button", { name: "Source for reply" }));
     await user.click(screen.getByRole("option", { name: "Conversation" }));
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    // Opened from a trace, so the dialog has a test step before Save.
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(await screen.findByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(traceScoring.refreshEligibility).toHaveBeenCalled(),
     );

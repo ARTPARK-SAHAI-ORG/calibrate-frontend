@@ -95,6 +95,9 @@ export type TraceScorePanelProps = {
   /** The button that scores the trace again, shown when it was skipped for
    *  having no evaluator that fits and the agent now has one. */
   scoreTrace?: React.ReactNode;
+  /** The button that scores a completed trace again, shown when evaluators
+   *  it left out for not being set up are set up now. */
+  scoreAgain?: React.ReactNode;
   /** The agent's evaluators that can score this trace now, named beside it. */
   scoringEvaluatorNames?: string[];
   /** Scores the trace again after its scoring failed. */
@@ -178,6 +181,47 @@ function MissingValueBlocks({
   );
 }
 
+function VerdictCards({
+  run,
+  descriptions,
+}: {
+  run: TraceScoringRun;
+  descriptions?: Record<string, string>;
+}) {
+  return (
+    <>
+      {run.results.map((result) => (
+        <EvaluatorVerdictCard
+          key={`${run.run_uuid}-${result.evaluator_uuid}`}
+          mode="read"
+          name={result.name}
+          description={descriptions?.[result.evaluator_uuid]}
+          outputType={result.output_type}
+          {...verdictFields(result)}
+          reasoning={result.reasoning}
+          scaleMin={result.scale_min ?? undefined}
+          scaleMax={result.scale_max ?? undefined}
+          evaluatorUuid={result.evaluator_uuid}
+          enableLink
+        />
+      ))}
+    </>
+  );
+}
+
+/** Evaluators a completed run left out for not being set up for traces,
+ *  that are set up now and so can score the trace if it is scored again. */
+export function evaluatorsSetUpSince(
+  run: TraceScoringRun | null,
+  unconfigured: TraceUnconfiguredEvaluator[] = [],
+): TraceUnconfiguredEvaluator[] {
+  if (run?.status !== "completed") return [];
+  const stillUnconfigured = new Set(unconfigured.map((e) => e.evaluator_uuid));
+  return (run.unconfigured_evaluators ?? []).filter(
+    (e) => !stillUnconfigured.has(e.evaluator_uuid),
+  );
+}
+
 function RunBody({
   run,
   descriptions,
@@ -210,11 +254,21 @@ function RunBody({
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
   const missingValues = run.missing_values ?? [];
   if (isTraceScoringInProgress(run.status)) {
-    return (
+    const limitedTo = run.limited_to_evaluators ?? [];
+    const running = (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <SpinnerIcon className="w-4 h-4 animate-spin text-amber-500" />
-        Running the evaluators on this trace
+        {limitedTo.length > 0
+          ? `Running ${limitedTo.map((e) => e.name).join(", ")} on this trace`
+          : "Running the evaluators on this trace"}
       </p>
+    );
+    if (limitedTo.length === 0) return running;
+    return (
+      <div className="space-y-3">
+        <VerdictCards run={run} descriptions={descriptions} />
+        {running}
+      </div>
     );
   }
 
@@ -352,21 +406,7 @@ function RunBody({
 
   return (
     <div className="space-y-3">
-      {run.results.map((result) => (
-        <EvaluatorVerdictCard
-          key={`${run.run_uuid}-${result.evaluator_uuid}`}
-          mode="read"
-          name={result.name}
-          description={descriptions?.[result.evaluator_uuid]}
-          outputType={result.output_type}
-          {...verdictFields(result)}
-          reasoning={result.reasoning}
-          scaleMin={result.scale_min ?? undefined}
-          scaleMax={result.scale_max ?? undefined}
-          evaluatorUuid={result.evaluator_uuid}
-          enableLink
-        />
-      ))}
+      <VerdictCards run={run} descriptions={descriptions} />
       <MissingValueBlocks
         values={missingValues}
         agentNature={agentNature}
@@ -389,6 +429,7 @@ export function TraceScorePanel({
   addToolCallEvaluator,
   onGoToEvaluators,
   scoreTrace,
+  scoreAgain,
   scoringEvaluatorNames,
   onTryAgain,
   agentNature,
@@ -412,6 +453,7 @@ export function TraceScorePanel({
             stillUnconfigured.has(e.evaluator_uuid),
         )
       : [];
+  const setUpSince = error ? [] : evaluatorsSetUpSince(run, unconfigured);
   const hasCard = (uuid: string) =>
     cards.some((e) => e.evaluator_uuid === uuid);
   return (
@@ -440,6 +482,21 @@ export function TraceScorePanel({
           onTryAgain={onTryAgain}
         />
       ) : null}
+      {setUpSince.length > 0 && (
+        <>
+          <WarningBox>
+            These evaluators were not set up when this trace was scored, and
+            can score it now:{" "}
+            {setUpSince.map(({ evaluator_uuid, name }, i) => (
+              <span key={evaluator_uuid}>
+                {i > 0 && " "}
+                <span className={EVALUATOR_PILL_CLASSES}>{name}</span>
+              </span>
+            ))}
+          </WarningBox>
+          {scoreAgain && <div className="flex">{scoreAgain}</div>}
+        </>
+      )}
       {cards.map(({ evaluator_uuid, name }) => (
         <DidNotRunCard
           key={evaluator_uuid}

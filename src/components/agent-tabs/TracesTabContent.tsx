@@ -1356,7 +1356,9 @@ export function TracesTabContent({
         onScored={() => void refetch()}
         agentNature={agentNature}
         unconfiguredEvaluators={traceScoring.enabled ? needValues : undefined}
-        onConfigureEvaluator={configureTraceValues.configure}
+        onConfigureEvaluator={(uuid) =>
+          configureTraceValues.configure(uuid, openTraceItem)
+        }
         configuringEvaluatorUuid={configureTraceValues.loadingFor}
         onGoToEvaluators={
           // Pointing at the Evaluators tab helps only when no evaluator that

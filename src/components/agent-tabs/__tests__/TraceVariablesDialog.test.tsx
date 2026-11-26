@@ -6,6 +6,7 @@ import {
   fetchTraces,
   previewTraceVariables,
   type TraceDetail,
+  type TraceSummary,
 } from "@/lib/tracesApi";
 
 jest.mock("../../../lib/tracesApi", () => ({
@@ -83,10 +84,12 @@ function setup({
   evaluators = [evaluator()],
   agentNature = "general",
   onSave = jest.fn().mockResolvedValue(undefined),
+  fromTrace,
 }: {
   evaluators?: EvaluatorData[];
   agentNature?: "conversation" | "general";
   onSave?: jest.Mock;
+  fromTrace?: TraceSummary;
 } = {}) {
   const onClose = jest.fn();
   const user = setupUser();
@@ -95,6 +98,7 @@ function setup({
       agentUuid="agent-1"
       agentNature={agentNature}
       evaluators={evaluators}
+      fromTrace={fromTrace}
       onClose={onClose}
       onSave={onSave}
     />,
@@ -514,4 +518,40 @@ describe("several evaluators", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(onSave).toHaveBeenCalledTimes(2);
   });
+});
+
+it("reads from and tests on the trace it was opened from", async () => {
+  const opened = {
+    uuid: "t2",
+    created_at: new Date(Date.now() - 30 * 3600_000).toISOString(),
+    input_preview: "Can I give honey?",
+  } as TraceSummary;
+  mockFetchTrace.mockResolvedValue({ ...LATEST, uuid: "t2" });
+  mockPreview.mockResolvedValue({ values: [] });
+  const { user } = setup({
+    evaluators: [evaluator({ nurse_reply: "input", language: "labels" })],
+    fromTrace: opened,
+  });
+  await loaded();
+  await waitFor(() => expect(mockFetchTrace).toHaveBeenCalledWith("tok", "t2"));
+
+  await user.click(source("nurse_reply"));
+  expect(await screen.findByText("Values from this trace")).toBeInTheDocument();
+  await user.keyboard("{Escape}");
+
+  await user.click(screen.getByRole("button", { name: "Next" }));
+  expect(
+    screen.getByText(/The trace you opened this from is selected\./),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Select a trace" }),
+  ).toHaveTextContent("Can I give honey?");
+  await waitFor(() =>
+    expect(mockPreview).toHaveBeenCalledWith(
+      "tok",
+      "agent-1",
+      "t2",
+      expect.anything(),
+    ),
+  );
 });

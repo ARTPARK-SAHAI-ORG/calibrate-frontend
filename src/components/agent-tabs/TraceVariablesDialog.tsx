@@ -46,6 +46,9 @@ type TraceVariablesDialogProps = {
   agentUuid: string;
   evaluators: EvaluatorData[];
   agentNature: "conversation" | "general";
+  /** The trace the dialog was opened from: its values are shown, and it is
+   *  the one tested on by default. */
+  fromTrace?: TraceSummary;
   onClose: () => void;
   onSave: (
     evaluatorUuid: string,
@@ -55,7 +58,6 @@ type TraceVariablesDialogProps = {
 
 const RECENT_TRACES = 20;
 const OTHER_KEY = "\u0000other";
-const LATEST_HEADING = "Values from your latest trace";
 
 const CHIP =
   "inline-block self-start max-w-full px-2 py-0.5 rounded-md text-sm font-mono font-semibold break-all bg-blue-500/10 text-blue-700 dark:text-blue-300";
@@ -91,9 +93,6 @@ const PICKER = {
   panelWidth: 300,
 };
 
-const latestHeading = () => (
-  <p className="text-xs text-muted-foreground">{LATEST_HEADING}</p>
-);
 
 /** An option's name, with the value it would take under it when there is one. */
 function OptionRow({
@@ -145,9 +144,12 @@ export function TraceVariablesDialog({
   agentUuid,
   evaluators,
   agentNature,
+  fromTrace: openedFrom,
   onClose,
   onSave,
 }: TraceVariablesDialogProps) {
+  // Kept from the first render: the trace window passes a fresh object each time.
+  const [fromTrace] = useState(openedFrom);
   // Hide the floating "Talk to Us" button while the modal is open.
   useHideFloatingButton(true);
   const accessToken = useAccessToken();
@@ -166,7 +168,7 @@ export function TraceVariablesDialog({
   const [step, setStep] = useState<1 | 2>(1);
   const [traces, setTraces] = useState<TraceSummary[] | null>(null);
   const [latest, setLatest] = useState<TraceDetail | null>(null);
-  const [traceUuid, setTraceUuid] = useState("");
+  const [traceUuid, setTraceUuid] = useState(fromTrace?.uuid ?? "");
   const [preview, setPreview] = useState<{
     key: string;
     values: TraceVariablePreview[];
@@ -195,6 +197,11 @@ export function TraceVariablesDialog({
   const metaKeys = [...new Set((latest?.metadata ?? []).map((m) => m.key))];
   const latestValue = (source: string) =>
     latest ? traceValue(latest, source) : undefined;
+  const valuesHeading = () => (
+    <p className="text-xs text-muted-foreground">
+      {fromTrace ? "Values from this trace" : "Values from your latest trace"}
+    </p>
+  );
 
   useEffect(() => {
     if (!accessToken) return;
@@ -207,9 +214,14 @@ export function TraceVariablesDialog({
           offset: 0,
         });
         if (!live) return;
-        setTraces(items);
-        if (items[0]) {
-          const detail = await fetchTrace(accessToken, items[0].uuid);
+        setTraces(
+          fromTrace && !items.some((t) => t.uuid === fromTrace.uuid)
+            ? [fromTrace, ...items]
+            : items,
+        );
+        const readFrom = fromTrace?.uuid ?? items[0]?.uuid;
+        if (readFrom) {
+          const detail = await fetchTrace(accessToken, readFrom);
           if (live) setLatest(detail);
         }
       } catch (err) {
@@ -221,7 +233,7 @@ export function TraceVariablesDialog({
     return () => {
       live = false;
     };
-  }, [accessToken, agentUuid]);
+  }, [accessToken, agentUuid, fromTrace]);
 
   const requestKey =
     step === 2 && traceUuid ? JSON.stringify([traceUuid, choices]) : null;
@@ -279,7 +291,7 @@ export function TraceVariablesDialog({
       setIndex(nextIndex);
       setValues(next[nextIndex].trace_variables ?? {});
       setTyped({});
-      setTraceUuid("");
+      setTraceUuid(fromTrace?.uuid ?? "");
       setStep(1);
     } catch (err) {
       setError(
@@ -349,7 +361,7 @@ export function TraceVariablesDialog({
             getId={(source) => source.value}
             placeholder="Not set"
             disabled={saving}
-            renderHeader={latest ? latestHeading : undefined}
+            renderHeader={latest ? valuesHeading : undefined}
             renderTrigger={(source) =>
               source?.value === METADATA_SOURCE
                 ? "Metadata"
@@ -380,7 +392,7 @@ export function TraceVariablesDialog({
               getId={(k) => k}
               placeholder="Choose a key"
               disabled={saving}
-              renderHeader={latestHeading}
+              renderHeader={valuesHeading}
               isItemSeparated={(k) => k === OTHER_KEY}
               renderTrigger={(k) => (k === OTHER_KEY ? "Other key" : k)}
               renderOption={(k) =>
@@ -471,6 +483,7 @@ export function TraceVariablesDialog({
         <p className="text-sm text-muted-foreground">
           Check your choices on an earlier trace, to be sure they will work on
           new traces as they arrive.
+          {fromTrace && " The trace you opened this from is selected."}
         </p>
         <p className="text-sm font-medium text-foreground pt-2">
           Select a trace

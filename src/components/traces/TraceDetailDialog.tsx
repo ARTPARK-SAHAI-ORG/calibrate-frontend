@@ -49,7 +49,11 @@ import {
   TraceFeedbackThumb,
   TraceSourceLabel,
 } from "./TracesTable";
-import { TraceScorePanel, type TraceScorePanelProps } from "./TraceScorePanel";
+import {
+  evaluatorsSetUpSince,
+  TraceScorePanel,
+  type TraceScorePanelProps,
+} from "./TraceScorePanel";
 
 type TraceDetailDialogProps = {
   isOpen: boolean;
@@ -530,12 +534,18 @@ export function TraceDetailDialog({
       // The reader may have moved to another trace while this was sent.
       if (shownTraceRef.current !== scored) return;
       // A pending run shows the spinner, and the poll above takes it from there.
-      setLatestRun({
-        run_uuid: run.run_uuid,
-        status: run.status,
-        created_at: new Date().toISOString(),
-        error: null,
-        results: [],
+      // Scoring a completed trace again keeps its scores and judges only the
+      // evaluators set up since, as the backend's new run does.
+      setLatestRun((previous) => {
+        const limitedTo = evaluatorsSetUpSince(previous, unconfiguredEvaluators);
+        return {
+          run_uuid: run.run_uuid,
+          status: run.status,
+          created_at: new Date().toISOString(),
+          error: null,
+          results: limitedTo.length > 0 ? (previous?.results ?? []) : [],
+          limited_to_evaluators: limitedTo,
+        };
       });
     } catch (err) {
       toast.error(
@@ -558,6 +568,15 @@ export function TraceDetailDialog({
         Score this trace
       </Button>
     ) : undefined;
+  const scoreAgainButton = (
+    <Button
+      size="sm"
+      onClick={() => void startScoring()}
+      isLoading={scoringUuid === traceUuid}
+    >
+      Score this trace again
+    </Button>
+  );
   const tryAgain =
     scoringEvaluatorNames.length > 0 ? () => void startScoring() : undefined;
 
@@ -754,6 +773,7 @@ export function TraceDetailDialog({
                   addToolCallEvaluator={addToolCallEvaluator}
                   onGoToEvaluators={onGoToEvaluators}
                   scoreTrace={scoreTraceButton}
+                  scoreAgain={scoreAgainButton}
                   scoringEvaluatorNames={scoringEvaluatorNames}
                   onTryAgain={tryAgain}
                   agentNature={agentNature}
@@ -787,6 +807,7 @@ export function TraceDetailDialog({
                     addToolCallEvaluator={addToolCallEvaluator}
                     onGoToEvaluators={onGoToEvaluators}
                     scoreTrace={scoreTraceButton}
+                    scoreAgain={scoreAgainButton}
                     scoringEvaluatorNames={scoringEvaluatorNames}
                     onTryAgain={tryAgain}
                     agentNature={agentNature}
