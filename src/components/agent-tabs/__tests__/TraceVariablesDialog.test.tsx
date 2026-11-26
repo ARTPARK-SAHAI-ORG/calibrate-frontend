@@ -359,6 +359,14 @@ describe("testing on a trace", () => {
     ).toBeInTheDocument();
     await user.click(button("Next"));
 
+    // Nothing is chosen until the user picks a trace.
+    expect(button("Select a trace")).toHaveTextContent("Choose a trace");
+    expect(
+      screen.queryByText("What the evaluator will be given from this trace"),
+    ).not.toBeInTheDocument();
+    expect(mockPreview).not.toHaveBeenCalled();
+
+    await pick(user, button("Select a trace"), "Input My child has loose motions");
     expect(await screen.findByText("Give ORS")).toBeInTheDocument();
     expect(screen.getByText("Hindi")).toBeInTheDocument();
     expect(mockPreview).toHaveBeenCalledWith("tok", "agent-1", "t1", chosen);
@@ -385,6 +393,7 @@ describe("testing on a trace", () => {
     });
     await loaded();
     await user.click(button("Next"));
+    await pick(user, button("Select a trace"), "Input My child has loose motions");
 
     expect(
       await screen.findByText("This trace has no labels"),
@@ -395,7 +404,7 @@ describe("testing on a trace", () => {
     expect(
       screen.getByText(/This evaluator will not score traces like this one/),
     ).toHaveTextContent(
-      "This evaluator will not score traces like this one. Send the labels in each trace and a language entry in each trace's metadata, or click Back to choose another value.",
+      "This evaluator will not score traces like this one. Send the labels in each trace and a language entry in each trace's metadata, or go back to the first step and choose a different value.",
     );
 
     await user.click(button("Back"));

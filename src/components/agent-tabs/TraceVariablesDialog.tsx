@@ -59,8 +59,7 @@ const LATEST_HEADING = "Values from your latest trace";
 
 const CHIP =
   "inline-flex self-start px-2 py-0.5 rounded-md text-sm font-mono font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300";
-const CODE =
-  "font-mono text-[13px] px-1 py-px rounded bg-amber-700/10";
+const CODE = "font-mono text-[13px] px-1 py-px rounded bg-amber-700/10";
 const PILL =
   "flex-shrink-0 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[11px] font-medium";
 const BACK_BUTTON =
@@ -209,7 +208,6 @@ export function TraceVariablesDialog({
         });
         if (!live) return;
         setTraces(items);
-        setTraceUuid(items[0]?.uuid ?? "");
         if (items[0]) {
           const detail = await fetchTrace(accessToken, items[0].uuid);
           if (live) setLatest(detail);
@@ -281,6 +279,7 @@ export function TraceVariablesDialog({
       setIndex(nextIndex);
       setValues(next[nextIndex].trace_variables ?? {});
       setTyped({});
+      setTraceUuid("");
       setStep(1);
     } catch (err) {
       setError(
@@ -461,9 +460,7 @@ export function TraceVariablesDialog({
 
   const missing = [
     ...new Set(
-      answer?.values
-        .filter((v) => v.value === null)
-        .map((v) => v.source) ?? [],
+      answer?.values.filter((v) => v.value === null).map((v) => v.source) ?? [],
     ),
   ];
   const selectedTrace = traces?.find((t) => t.uuid === traceUuid);
@@ -472,7 +469,7 @@ export function TraceVariablesDialog({
     <div className="p-4 md:p-6 space-y-4">
       <div className="space-y-2">
         <p className="text-sm font-medium text-foreground">Select a trace</p>
-        {selectedTrace && (
+        {traces && traces.length > 0 && (
           <SingleSelectPicker
             compact
             triggerClassName="h-10 px-3 rounded-md"
@@ -480,51 +477,54 @@ export function TraceVariablesDialog({
             items={traces ?? []}
             selectedId={traceUuid}
             getId={(trace) => trace.uuid}
+            placeholder="Choose a trace"
             renderTrigger={(trace) => trace && <TraceRow trace={trace} />}
             renderOption={(trace) => <TraceRow trace={trace} />}
             onSelect={(trace) => setTraceUuid(trace.uuid)}
           />
         )}
       </div>
-      <div className="space-y-2">
-        <p className="text-sm font-medium text-foreground">
-          What the evaluator will be given from this trace
-        </p>
-        <div className="border border-border rounded-md divide-y divide-border">
-          {variables.map(({ name }) => {
-            const source = choices[name];
-            const value = answer?.values.find((v) => v.variable === name);
-            return (
-              <div key={name} className="p-4 flex flex-col gap-2">
-                <code className={CHIP}>{chip(name)}</code>
-                {!answer ? (
-                  <Waiting />
-                ) : value?.value === null ? (
-                  <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
-                    <WarningTriangleIcon className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <p>
-                      {isMetadataSource(source) ? (
-                        <>
-                          This trace has no metadata entry called{" "}
-                          <code className={CODE}>{metadataKey(source)}</code>
-                        </>
-                      ) : (
-                        `This trace has no ${lowerFirst(traceSourceLabel(source, agentNature))}`
-                      )}
-                    </p>
-                  </div>
-                ) : (
-                  value && (
-                    <p className="text-sm text-foreground whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
-                      {value.value}
-                    </p>
-                  )
-                )}
-              </div>
-            );
-          })}
+      {selectedTrace && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-foreground">
+            What the evaluator will be given from this trace
+          </p>
+          <div className="border border-border rounded-md divide-y divide-border">
+            {variables.map(({ name }) => {
+              const source = choices[name];
+              const value = answer?.values.find((v) => v.variable === name);
+              return (
+                <div key={name} className="p-4 flex flex-col gap-2">
+                  <code className={CHIP}>{chip(name)}</code>
+                  {!answer ? (
+                    <Waiting />
+                  ) : value?.value === null ? (
+                    <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+                      <WarningTriangleIcon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <p>
+                        {isMetadataSource(source) ? (
+                          <>
+                            This trace has no metadata entry called{" "}
+                            <code className={CODE}>{metadataKey(source)}</code>
+                          </>
+                        ) : (
+                          `This trace has no ${lowerFirst(traceSourceLabel(source, agentNature))}`
+                        )}
+                      </p>
+                    </div>
+                  ) : (
+                    value && (
+                      <p className="text-sm text-foreground whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
+                        {value.value}
+                      </p>
+                    )
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
       {answer?.error && <ErrorNote>{answer.error}</ErrorNote>}
       {missing.length > 0 && (
         <WarningBox>
@@ -534,15 +534,15 @@ export function TraceVariablesDialog({
               {i > 0 && " and "}
               {isMetadataSource(source) ? (
                 <>
-                  a <code className={CODE}>{metadataKey(source)}</code> entry
-                  in each trace&apos;s metadata
+                  a <code className={CODE}>{metadataKey(source)}</code> entry in
+                  each trace&apos;s metadata
                 </>
               ) : (
                 `the ${lowerFirst(traceSourceLabel(source, agentNature))} in each trace`
               )}
             </React.Fragment>
           ))}
-          , or click Back to choose another value.
+          , or go back to the first step and choose a different value.
         </WarningBox>
       )}
     </div>
