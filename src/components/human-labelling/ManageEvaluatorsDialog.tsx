@@ -35,7 +35,7 @@ function parseApiError(err: unknown, fallback: string): string {
 }
 
 const TOOL_CALL_LOCK_REASON =
-  "This task's tool call items need a tool call evaluator. Add another one before removing this one.";
+  "This task's tool call items need a tool call evaluator. Since there are no other tool call evaluators, this evaluator cannot be removed. Once you add more custom tool call evaluators, you can select those instead.";
 
 type ManageEvaluatorsDialogProps = {
   accessToken: string;
