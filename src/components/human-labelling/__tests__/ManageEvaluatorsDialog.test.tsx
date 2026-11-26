@@ -166,6 +166,32 @@ describe("ManageEvaluatorsDialog", () => {
     expect(screen.getAllByText("Tool call").length).toBeGreaterThan(0);
   });
 
+  it("refuses to save a task with text items and only tool call evaluators, and says so", async () => {
+    const user = setupUser();
+    const onSaved = jest.fn();
+    mockApiClient.mockResolvedValue({
+      items: [
+        ...EVALUATORS,
+        { uuid: "ev-tc", name: "Tool call correctness", evaluator_type: "tool-call" },
+      ],
+    });
+    renderDialog({
+      currentEvaluatorIds: ["ev-1", "ev-tc"],
+      hasToolCallItems: true,
+      hasNonToolCallItems: true,
+      onSaved,
+    });
+    await waitForCatalogueLoaded();
+    await user.click(catalogueCheckbox("Correctness"));
+    mockApiClient.mockClear();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(
+      screen.getByText(/items with a text reply, so select at least one evaluator/),
+    ).toBeInTheDocument();
+    expect(mockApiClient).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
   it("lets a task with no tool call items save without a tool call evaluator", async () => {
     const user = setupUser();
     const onSaved = jest.fn();
