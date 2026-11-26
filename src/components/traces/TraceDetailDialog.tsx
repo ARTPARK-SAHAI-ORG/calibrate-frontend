@@ -1,8 +1,7 @@
 "use client";
 
 import { StoppedEarlyNote } from "@/components/chat/StoppedEarlyNote";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import React, { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Link } from "@/lib/nav";
 import {
@@ -29,7 +28,6 @@ import {
   fetchTraces,
   fetchTraceScores,
   MAX_TRACES_PAGE_SIZE,
-  scoreTrace,
   traceInputTurns,
   TraceDetail,
   TraceOutput,
@@ -43,14 +41,12 @@ import {
 import { isTraceScoringInProgress } from "@/lib/traceScoring";
 import { POLLING_INTERVAL_MS } from "@/constants/polling";
 import { reportError } from "@/lib/reportError";
-import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 import {
   formatTraceDate,
   TraceFeedbackThumb,
   TraceSourceLabel,
 } from "./TracesTable";
 import { TraceScorePanel } from "./TraceScorePanel";
-import { WARNING_BUTTON_CLASS } from "./AddToolCallEvaluatorButton";
 
 type TraceDetailDialogProps = {
   isOpen: boolean;
@@ -73,11 +69,6 @@ type TraceDetailDialogProps = {
   addToolCallEvaluator?: React.ReactNode;
   /** Opens the agent's Evaluators tab, for a trace no evaluator fits. */
   onGoToEvaluators?: () => void;
-  /** The agent now has an evaluator that fits this trace, so a trace skipped
-   *  for lacking one can be scored again. */
-  canScoreTrace?: boolean;
-  /** Told once a new scoring run was started, so the list can show it. */
-  onScored?: () => void;
   /** A window opened from inside this one is on screen, so Escape and the
    *  arrow keys belong to it. */
   keysPaused?: boolean;
@@ -387,8 +378,6 @@ export function TraceDetailDialog({
   evaluatorDescriptions,
   addToolCallEvaluator,
   onGoToEvaluators,
-  canScoreTrace = false,
-  onScored,
   keysPaused = false,
   isSelected = false,
   onToggleSelected,
@@ -506,46 +495,6 @@ export function TraceDetailDialog({
       window.clearInterval(timer);
     };
   }, [isOpen, traceUuid, accessToken, hasOpenScoreRun]);
-
-  // The trace being sent, so moving to another trace leaves its button on.
-  const [scoringUuid, setScoringUuid] = useState<string | null>(null);
-  const shownTraceRef = useRef(traceUuid);
-  shownTraceRef.current = traceUuid;
-  const startScoring = async () => {
-    if (!accessToken || !traceUuid) return;
-    const scored = traceUuid;
-    setScoringUuid(scored);
-    try {
-      const run = await scoreTrace(accessToken, scored);
-      onScored?.();
-      // The reader may have moved to another trace while this was sent.
-      if (shownTraceRef.current !== scored) return;
-      // A pending run shows the spinner, and the poll above takes it from there.
-      setLatestRun({
-        run_uuid: run.run_uuid,
-        status: run.status,
-        created_at: new Date().toISOString(),
-        error: null,
-        results: [],
-      });
-    } catch (err) {
-      toast.error(
-        parseBackendErrorMessage(err, "Could not score this trace. Please try again."),
-      );
-    } finally {
-      setScoringUuid((current) => (current === scored ? null : current));
-    }
-  };
-  const scoreTraceButton = canScoreTrace ? (
-    <button
-      type="button"
-      onClick={() => void startScoring()}
-      disabled={scoringUuid === traceUuid}
-      className={`${WARNING_BUTTON_CLASS} disabled:opacity-60 disabled:cursor-not-allowed`}
-    >
-      Score this trace
-    </button>
-  ) : undefined;
 
   useDialogNavKeys({
     isOpen: isOpen && !keysPaused,
@@ -739,7 +688,6 @@ export function TraceDetailDialog({
                   ineligible={ineligibleEvaluators}
                   addToolCallEvaluator={addToolCallEvaluator}
                   onGoToEvaluators={onGoToEvaluators}
-                  scoreTrace={scoreTraceButton}
                 />
               </div>
             )}
@@ -766,7 +714,6 @@ export function TraceDetailDialog({
                     ineligible={ineligibleEvaluators}
                     addToolCallEvaluator={addToolCallEvaluator}
                     onGoToEvaluators={onGoToEvaluators}
-                    scoreTrace={scoreTraceButton}
                   />
                 </div>
               </div>

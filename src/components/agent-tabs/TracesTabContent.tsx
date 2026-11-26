@@ -777,27 +777,16 @@ export function TracesTabContent({
   // The trace on show, so it can be ticked from inside the dialog rather than
   // closing it and finding the row again.
   const openTraceItem = items.find((item) => item.uuid === openTraceUuid);
-  const openTraceIsToolCall = !!openTraceItem && isToolCallTraceRow(openTraceItem);
   // Only the evaluators that could have scored the open trace's kind of output.
   const ineligibleForOpenTrace =
     openTraceItem && evaluatorTypes
       ? ineligible.filter((item) =>
           evaluatorFitsItem(
             evaluatorTypes[item.evaluator_uuid],
-            openTraceIsToolCall,
+            isToolCallTraceRow(openTraceItem),
           ),
         )
       : ineligible;
-  // A type not read yet must not count, since an unknown type fits a reply.
-  const canScoreOpenTrace =
-    traceScoring.enabled &&
-    !!openTraceItem &&
-    !!evaluatorTypes &&
-    (eligibility?.eligible ?? []).some(
-      (item) =>
-        !!evaluatorTypes[item.evaluator_uuid] &&
-        evaluatorFitsItem(evaluatorTypes[item.evaluator_uuid], openTraceIsToolCall),
-    );
   const closeTrace = () => {
     itemPager.cancel();
     setOpenTraceUuid(null);
@@ -1282,8 +1271,6 @@ export function TracesTabContent({
         addToolCallEvaluator={
           missingToolCallEvaluator ? addToolCallEvaluatorButton(true) : undefined
         }
-        canScoreTrace={canScoreOpenTrace}
-        onScored={() => void refetch()}
         onGoToEvaluators={() => {
           closeTrace();
           onGoToEvaluators();
