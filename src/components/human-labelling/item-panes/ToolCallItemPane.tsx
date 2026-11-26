@@ -2,7 +2,7 @@ import {
   TestDetailView,
   type TestCaseHistory,
 } from "@/components/test-results/shared";
-import { readTextField } from "@/lib/messageVersions";
+import { isBlank, readTextField } from "@/lib/messageVersions";
 import { ExpectedToolCalls } from "./ExpectedToolCalls";
 import { agentToolCalls } from "@/lib/labellingItem";
 import { normaliseHistoryItem } from "./shared";
@@ -11,10 +11,11 @@ const AGENT_ANSWER = "Agent's answer";
 
 export const NO_TOOL_CALL = "The agent made no tool call";
 
-export function JudgedByBothNote() {
+export function JudgedByBothNote({ reply = "the reply" }: { reply?: string }) {
   return (
     <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-      Tool call evaluators judge the tool calls, and the other evaluators judge the reply
+      Tool call evaluators judge the tool calls, and the other evaluators judge{" "}
+      {reply}.
     </div>
   );
 }
@@ -33,7 +34,7 @@ export function ToolCallItemPane({
   }
 
   const agentResponse = readTextField(payload.agent_response);
-  const hasReply = !!agentResponse && agentResponse.content.length > 0;
+  const hasReply = !!agentResponse && !isBlank(agentResponse.content);
   const actualToolCalls = agentToolCalls(payload) as NonNullable<
     TestCaseHistory["tool_calls"]
   >;

@@ -4,7 +4,7 @@ import {
   TurnVersionBubbles,
   normalizeToolCall,
 } from "@/components/test-results/shared";
-import { readTextField } from "@/lib/messageVersions";
+import { isBlank, readTextField } from "@/lib/messageVersions";
 import { ExpectedToolCalls } from "./ExpectedToolCalls";
 import { agentToolCalls, isToolCallContent } from "@/lib/labellingItem";
 import { Section } from "./shared";
@@ -100,7 +100,9 @@ export function LlmGeneralItemPane({
           )}
         </Section>
       </div>
-      {output && toolCalls.length > 0 && <JudgedByBothNote />}
+      {!isBlank(output) && toolCalls.length > 0 && (
+        <JudgedByBothNote reply="the output" />
+      )}
       <div className="pl-4">
         <ExpectedToolCalls payload={payload} />
       </div>

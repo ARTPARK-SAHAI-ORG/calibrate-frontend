@@ -1,7 +1,13 @@
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 import type { ExpectedToolCall } from "@/components/ToolCallExpectationsEditor";
 import type { MetadataEntry } from "@/components/ui";
-import { readTurnExtras, textOf, type TurnExtras } from "@/lib/messageVersions";
+import {
+  isBlank,
+  readTextField,
+  readTurnExtras,
+  textOf,
+  type TurnExtras,
+} from "@/lib/messageVersions";
 
 export type ItemDetailSourceItem = {
   id: number;
@@ -172,13 +178,17 @@ export function isToolCallContent(content: Record<string, unknown>): boolean {
 
 /** The item kind of a payload not yet saved, read the way the backend reads
  *  it: a tool call list from a tool call test, or any tool call the agent
- *  made, makes it a tool-call item; non-blank reply text is a reply. */
+ *  made, makes it a tool-call item; non-blank reply text is a reply, read
+ *  from `output` only when `agent_response` is missing. */
 export function payloadItemKind(payload: Record<string, unknown>): ItemKind {
   return {
     is_tool_call:
       isToolCallContent(payload) ||
       (Array.isArray(payload.tool_calls) && payload.tool_calls.length > 0),
-    has_reply: !!(textOf(payload.agent_response) || textOf(payload.output)).trim(),
+    has_reply: !isBlank(
+      (readTextField(payload.agent_response) ?? readTextField(payload.output))
+        ?.content,
+    ),
   };
 }
 

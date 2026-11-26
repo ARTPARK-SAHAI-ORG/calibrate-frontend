@@ -366,7 +366,9 @@ export function AssignAnnotatorsDialog({
   const missingLabelMessage =
     kindsMissingLabel.length === 1 && hasToolCallItems && hasNonToolCallItems
       ? `Pick at least one label for the ${
-          kindsMissingLabel[0].isToolCall ? "tool calls" : "replies"
+          kindsMissingLabel[0].isToolCall
+            ? "items with tool calls"
+            : "items with a reply"
         }`
       : "Pick at least one label";
   const allEvaluatorsPicked =

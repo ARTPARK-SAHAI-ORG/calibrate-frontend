@@ -729,8 +729,9 @@ export function buildItemsFromSource(
             continue;
           }
           // A trace that called a tool becomes a tool-call item here too,
-          // holding the call and any output beside the input that produced it. There is no
-          // expected call to compare against, so a person judges it on its own.
+          // holding the call and any output beside the input that produced
+          // it. There is no expected call to compare against, so a person
+          // judges it on its own.
           if (isToolCallTrace(t)) {
             items.push({
               ...buildToolCallItem({
@@ -770,8 +771,8 @@ export function buildItemsFromSource(
       }
       // Conversational traces all go to an `llm` task: a trace that called a
       // tool becomes a tool-call item, keeping any reply, and a trace that
-      // only replied becomes a response item. A trace has no expected calls, so that side stays
-      // empty and a person judges the call on its own.
+      // only replied becomes a response item. A trace has no expected calls,
+      // so that side stays empty and a person judges the call on its own.
       for (const t of source.traces) {
         if (!isLabellableTrace(t)) {
           skippedCount += 1;

@@ -67,6 +67,17 @@ describe("payloadItemKind", () => {
     expect(payloadItemKind({ expected_tool_calls: [], tool_calls: [] })).toEqual({ is_tool_call: true, has_reply: false });
     expect(payloadItemKind({ tool_calls: [] })).toEqual({ is_tool_call: false, has_reply: false });
   });
+
+  it("reads output only when agent_response is missing, as the backend does", () => {
+    expect(payloadItemKind({ agent_response: "", output: "ok" }).has_reply).toBe(false);
+    expect(payloadItemKind({ agent_response: null, output: "ok" }).has_reply).toBe(true);
+    expect(payloadItemKind({ agent_response: { content: "hi" } }).has_reply).toBe(true);
+  });
+
+  it("treats spaces, tabs and line breaks alone as no reply", () => {
+    expect(payloadItemKind({ agent_response: " \t\r\n" }).has_reply).toBe(false);
+    expect(payloadItemKind({ output: { content: "\n\n" } }).has_reply).toBe(false);
+  });
 });
 
 describe("itemEditForm", () => {

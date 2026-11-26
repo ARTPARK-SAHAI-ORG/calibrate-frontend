@@ -2326,6 +2326,26 @@ describe("AnnotationJobView picks the evaluators per row", () => {
       screen.getByRole("button", { name: /Submit & Next|Mark as complete/ }),
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getAllByRole("button", { name: "Correct" })[0]);
+    await user.click(screen.getByRole("button", { name: "3" }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ saved: [], count: 3, status: "completed" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /Submit & Next|Mark as complete/ }),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const post = fetchMock.mock.calls.find(
+      ([url, opts]) =>
+        typeof url === "string" &&
+        url.endsWith("/annotations") &&
+        (opts as RequestInit | undefined)?.method === "POST",
+    );
+    const body = JSON.parse((post![1] as RequestInit).body as string);
+    expect(
+      body.annotations.map((a: { evaluator_id: string }) => a.evaluator_id).sort(),
+    ).toEqual(["ev-1", "ev-2", "ev-tool"]);
   });
 });
 

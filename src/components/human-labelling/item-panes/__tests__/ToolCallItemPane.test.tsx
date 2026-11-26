@@ -109,7 +109,7 @@ describe("ToolCallItemPane", () => {
     expect(screen.getByText("Agent's reply")).toBeInTheDocument();
     expect(screen.getByText("Agent's tool calls")).toBeInTheDocument();
     expect(
-      screen.getByText("Tool call evaluators judge the tool calls, and the other evaluators judge the reply"),
+      screen.getByText("Tool call evaluators judge the tool calls, and the other evaluators judge the reply."),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Evaluation target")).toHaveLength(2);
   });
@@ -122,7 +122,23 @@ describe("ToolCallItemPane", () => {
     );
     expect(screen.getByText("Agent's answer")).toBeInTheDocument();
     expect(
-      screen.queryByText("Tool call evaluators judge the tool calls, and the other evaluators judge the reply"),
+      screen.queryByText("Tool call evaluators judge the tool calls, and the other evaluators judge the reply."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("treats a reply of only spaces and line breaks as no reply", () => {
+    render(
+      <ToolCallItemPane
+        payload={{
+          agent_response: " \t\r\n",
+          actual_tool_calls: [{ tool: "book_flight", arguments: {} }],
+        }}
+      />,
+    );
+    expect(screen.getByText("Agent's answer")).toBeInTheDocument();
+    expect(screen.queryByText("Agent's reply")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/the other evaluators judge the reply/),
     ).not.toBeInTheDocument();
   });
 
