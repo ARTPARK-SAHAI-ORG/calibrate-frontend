@@ -825,10 +825,16 @@ export function AddLlmGeneralItemsDialog({
                   {showsText && (
                     <>
                       {/* Remove sits beside the box, the same as on a tool
-                          call below it. The box keeps the column's height
-                          under its heading (3.25rem), so tool calls added
-                          below scroll the column rather than shrink it. */}
-                      <div className="flex shrink-0 w-full gap-2 h-[calc(100%-3.25rem)] min-h-[10rem]">
+                          call below it. The box fills the column under its
+                          heading (3.25rem), or half of it once the item has
+                          a tool call; either way a fixed height, so tool
+                          calls below scroll the column, never shrink it. */}
+                      <div
+                        data-testid="output-text-box"
+                        className={`flex shrink-0 w-full gap-2 min-h-[10rem] ${
+                          isToolCallItem ? "h-1/2" : "h-[calc(100%-3.25rem)]"
+                        }`}
+                      >
                         {isToolCallItem && (
                           <Tooltip
                             content="Remove text reply"

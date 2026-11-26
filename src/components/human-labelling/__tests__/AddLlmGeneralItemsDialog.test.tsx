@@ -303,6 +303,25 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("halves the text box once the item has a tool call", async () => {
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Booked",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    expect(screen.getByTestId("output-text-box")).toHaveClass("h-1/2");
+    await user.click(screen.getByRole("button", { name: "Remove dummy" }));
+    expect(screen.getByTestId("output-text-box")).not.toHaveClass("h-1/2");
+  });
+
   it("offers no way to remove the text reply on a text item", () => {
     renderDialog();
     expect(
