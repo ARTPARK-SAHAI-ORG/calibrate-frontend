@@ -54,16 +54,48 @@ describe("PublicPageLayout", () => {
     );
     expect(screen.getByText("Run details")).toBeInTheDocument();
     expect(screen.getByText("Pill")).toBeInTheDocument();
+
+    // On a phone the title takes its own line under the buttons.
+    // A phone's bar shows only the wordmark and the buttons.
+    expect(screen.getByText("Run details").parentElement).toHaveClass(
+      "hidden",
+      "md:flex",
+    );
   });
 
-  it("puts the page's own buttons on the right once mounted", async () => {
+  it("puts the page's own buttons in the bar on a wide screen, and behind a menu on a phone", async () => {
+    const onNewChat = jest.fn();
+    const user = setupUser();
     render(
-      <PublicPageLayout actions={<button type="button">New chat</button>}>
+      <PublicPageLayout actions={[{ label: "New chat", onClick: onNewChat }]}>
         <div>content</div>
       </PublicPageLayout>,
     );
+    // Wide screen: a plain button in the bar.
+    const inBar = await screen.findByRole("button", { name: "New chat" });
+    expect(inBar.parentElement).toHaveClass("hidden", "md:flex");
+    await user.click(inBar);
+    expect(onNewChat).toHaveBeenCalledTimes(1);
+
+    // Phone: the same button and the theme toggle sit behind the ⋯ menu,
+    // which comes after Go to app.
+    const more = screen.getByRole("button", { name: "More actions" });
+    const signIn = screen.getByRole("link", { name: /Sign in|Go to app/ });
     expect(
-      await screen.findByRole("button", { name: "New chat" }),
+      signIn.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(more.parentElement).toHaveClass("md:hidden");
+    await user.click(more);
+    await user.click(screen.getByRole("menuitem", { name: "New chat" }));
+    expect(onNewChat).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("menu")).toBeNull();
+
+    await user.click(more);
+    await user.click(screen.getByRole("menuitem", { name: /Dark mode/ }));
+    expect(document.documentElement).toHaveClass("dark");
+    await user.click(more);
+    expect(
+      screen.getByRole("menuitem", { name: /Light mode/ }),
     ).toBeInTheDocument();
   });
 
