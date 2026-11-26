@@ -41,8 +41,13 @@ export function nothingCanScoreCopy(ineligible: { reason: string }[]): string {
   return "None of this agent's evaluators can score traces.";
 }
 
+/** A failed run's `error` is the reason calibrate gave, not a code. */
+export function scoringFailedCopy(error: string | null | undefined): string {
+  return error ? `Scoring failed: ${error}` : "Scoring failed";
+}
+
 /**
- * Why a scoring run was skipped or failed.
+ * Why a scoring run was skipped.
  *
  * The backend also has `trace_deleted` and `agent_deleted`, which no reader
  * can reach: a run abandoned because its trace or its agent went away has no

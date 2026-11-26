@@ -125,11 +125,11 @@ describe("TraceScoreMark", () => {
     ).toBeInTheDocument();
   });
 
-  it("says why on a trace whose scoring broke", () => {
+  it("says why on a trace whose scoring was skipped", () => {
     render(
       <TraceScoreMark
         trace={{
-          latest_run_status: "failed",
+          latest_run_status: "skipped",
           latest_run_error: "scoring_disabled",
         }}
       />,
@@ -137,6 +137,22 @@ describe("TraceScoreMark", () => {
     expect(
       screen.getByRole("img", {
         name: "Monitoring was turned off before this trace was scored",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("gives the reason on a trace whose scoring failed", () => {
+    render(
+      <TraceScoreMark
+        trace={{
+          latest_run_status: "failed",
+          latest_run_error: "Error code: 402 - out of credits",
+        }}
+      />,
+    );
+    expect(
+      screen.getByRole("img", {
+        name: "Scoring failed: Error code: 402 - out of credits",
       }),
     ).toBeInTheDocument();
   });
@@ -215,7 +231,7 @@ describe("a run that could not be run", () => {
       <TraceScoreCells
         trace={{
           latest_run_status: "failed",
-          latest_run_error: "scoring_disabled",
+          latest_run_error: "Error code: 402 - out of credits",
         }}
         columns={columns}
         layout="row"

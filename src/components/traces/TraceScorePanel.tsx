@@ -1,6 +1,7 @@
 "use client";
 
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
+import { RunFailureBox } from "@/components/RunFailureBox";
 import { SpinnerIcon } from "@/components/icons";
 import { CONTACT_LINK } from "@/constants/limits";
 import { useUsesOwnProviderKeys } from "@/hooks";
@@ -58,10 +59,20 @@ function RunBody({
     );
   }
 
-  // A trace that could not be scored is a warning whatever the reason, so
-  // every reason gets the same amber box the Traces tab uses. Only the limit
-  // has somewhere for the reader to go next, so only it carries the link.
-  if (run.status === "failed" || run.status === "skipped") {
+  if (run.status === "failed") {
+    return (
+      <RunFailureBox
+        details={run.error ?? null}
+        sentence="The evaluators could not score this trace."
+        className="w-full"
+      />
+    );
+  }
+
+  // A skipped trace is a warning whatever the reason, so every reason gets
+  // the same amber box the Traces tab uses. Only the limit has somewhere for
+  // the reader to go next, so only it carries the link.
+  if (run.status === "skipped") {
     return (
       <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
         <p className="text-sm text-amber-700 dark:text-amber-300">
