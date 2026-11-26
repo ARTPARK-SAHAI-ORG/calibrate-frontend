@@ -27,6 +27,7 @@ export type ReviewItem = {
   payload?: unknown;
   /** True when this row's answer was a tool call. Set by the backend. */
   is_tool_call?: boolean;
+  has_reply?: boolean;
 };
 
 export type ReviewEvaluator = {
@@ -137,7 +138,9 @@ export function SendForReviewFlow({
         isOpen={assignOpen}
         accessToken={accessToken}
         hasToolCallItems={sendable.some((it) => it.is_tool_call === true)}
-        hasNonToolCallItems={sendable.some((it) => it.is_tool_call !== true)}
+        hasNonToolCallItems={sendable.some(
+          (it) => it.is_tool_call !== true || it.has_reply === true,
+        )}
         evaluators={evaluators}
         onClose={() => setAssignOpen(false)}
         onConfirm={handleConfirm}

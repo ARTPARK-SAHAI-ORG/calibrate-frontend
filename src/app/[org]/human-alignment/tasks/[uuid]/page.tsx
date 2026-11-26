@@ -106,7 +106,7 @@ import { useSidebarState } from "@/lib/sidebar";
 import {
   agentToolCalls,
   evaluatorsFittingItems,
-  isToolCallContent,
+  payloadItemKind,
   itemEditForm,
   selectedTaskItems,
   toItemDetailItem,
@@ -184,6 +184,8 @@ type LabellingItem = {
   /** True when this row's answer was a tool call rather than a written
    * reply. Set by the backend, the same field the labelling job sends. */
   is_tool_call?: boolean;
+  /** True when this row has reply text. Set by the backend. */
+  has_reply?: boolean;
   metadata?: MetadataEntry[] | null;
   created_at: string;
   updated_at?: string;
@@ -1435,7 +1437,7 @@ function LabellingTaskPageInner() {
               task_id: taskSummary.task_id,
               payload: row.payload,
               metadata: row.metadata,
-              is_tool_call: isToolCallContent(row.payload ?? {}),
+              ...payloadItemKind(row.payload ?? {}),
               created_at: "",
               updated_at: undefined,
               deleted_at: null,
@@ -1529,7 +1531,7 @@ function LabellingTaskPageInner() {
     (it) => it.is_tool_call === true,
   );
   const selectedNonToolCall = selectedLoadedItems.some(
-    (it) => it.is_tool_call !== true,
+    (it) => it.is_tool_call !== true || it.has_reply === true,
   );
 
   const toggleItem = (uuid: string) => {
@@ -1734,7 +1736,7 @@ function LabellingTaskPageInner() {
       ).length === 0
     ) {
       toast.error(
-        "None of this task's evaluators fit the chosen items. Tool-call items need a tool-call evaluator, and every other item needs an evaluator that is not a tool-call evaluator.",
+        "None of this task's evaluators fit the chosen items. Tool calls need a tool call evaluator. A reply, or an item with no tool calls, needs an evaluator that is not a tool call evaluator.",
       );
       return;
     }

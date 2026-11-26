@@ -324,11 +324,10 @@ export function ItemDetailDialog({
     const jobEvaluators: JobEvaluator[] = [];
 
     // Only the evaluators the annotator was asked about on this item.
-    const isToolCallItem = item.is_tool_call === true;
     const evaluatorApplies = (evaluatorId: string) =>
       evaluatorFitsItem(
         summaryEvaluatorByUuid.get(evaluatorId)?.evaluator_type,
-        isToolCallItem,
+        item,
       );
 
     for (const row of summary.rows) {

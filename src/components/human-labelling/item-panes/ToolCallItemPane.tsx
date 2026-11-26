@@ -11,10 +11,10 @@ const AGENT_ANSWER = "Agent's answer";
 
 export const NO_TOOL_CALL = "The agent made no tool call";
 
-export function JudgedTogetherNote() {
+export function JudgedByBothNote() {
   return (
     <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-      The reply and the tool calls are judged together
+      Tool call evaluators judge the tool calls, and the other evaluators judge the reply
     </div>
   );
 }
@@ -78,7 +78,7 @@ export function ToolCallItemPane({
           {!hasReply && !hasCalls && (
             <p className="text-sm text-muted-foreground">{NO_TOOL_CALL}</p>
           )}
-          {hasReply && hasCalls && <JudgedTogetherNote />}
+          {hasReply && hasCalls && <JudgedByBothNote />}
           <ExpectedToolCalls payload={payload} />
         </>
       }

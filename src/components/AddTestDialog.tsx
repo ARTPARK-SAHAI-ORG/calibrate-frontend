@@ -2190,22 +2190,27 @@ export function AddTestDialog({
     onNext: showRunUnsavedConfirm || roleChange ? undefined : navNext,
   });
 
-  // Only tool-call evaluators score a tool-call item, and only the others score the rest.
-  const isToolCallItem =
-    showsExpectedToolCalls &&
-    (storesEmptyToolCallList ||
-      chatActualCallsStart(chatMessages) >= 0 ||
-      selectedTools.length > 0);
-  const evaluatorFits = (e: { evaluator_type?: string }) =>
-    !showsExpectedToolCalls ||
-    evaluatorFitsItem(e.evaluator_type, isToolCallItem);
-
   const evalTargetStart = gradedAnswerStart(
     chatMessages,
     chatCallId,
     isChatResponse,
     (m) => m.role === "agent",
   );
+
+  const isToolCallItem =
+    showsExpectedToolCalls &&
+    (storesEmptyToolCallList ||
+      chatActualCallsStart(chatMessages) >= 0 ||
+      selectedTools.length > 0);
+  const evalTarget = chatMessages[evalTargetStart];
+  const hasReply =
+    evalTarget?.role === "agent" && evalTarget.content.trim().length > 0;
+  const evaluatorFits = (e: { evaluator_type?: string }) =>
+    !showsExpectedToolCalls ||
+    evaluatorFitsItem(e.evaluator_type, {
+      is_tool_call: isToolCallItem,
+      has_reply: hasReply,
+    });
 
   const evalTargetPill = (
     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-400">
@@ -2638,8 +2643,8 @@ export function AddTestDialog({
         data-tour="test-evaluators-area"
         className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1"
       >
-        {/* Only the evaluators that score this item: a tool call item is
-            scored only by tool call evaluators, any other item only by the rest. */}
+        {/* Only the evaluators that score this item: tool call evaluators
+            score its tool calls, the others score its reply. */}
         {attachedEvaluators.filter(evaluatorFits).map((ev) => (
           <div
             key={ev.evaluator_uuid}

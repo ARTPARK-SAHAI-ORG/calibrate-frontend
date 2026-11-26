@@ -177,7 +177,7 @@ describe("BulkUploadLlmGeneralItemsDialog", () => {
     ).toContain('"output" can be left empty');
     for (const c of cols.filter((c: any) => c.payloadKey.endsWith("_tool_calls"))) {
       expect(c.guidelineDescription).toContain(
-        "Only tool call evaluators score a tool call row",
+        "Tool call evaluators score its tool calls",
       );
       expect(c.headerCandidates).toEqual([c.payloadKey]);
     }

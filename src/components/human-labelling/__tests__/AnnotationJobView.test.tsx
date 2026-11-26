@@ -2289,6 +2289,44 @@ describe("AnnotationJobView picks the evaluators per row", () => {
     expect(screen.getByText("Quality")).toBeInTheDocument();
     expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
   });
+
+  it("shows the reply, the tool calls and both kinds of evaluator on a row that has both, and needs every answer", async () => {
+    const user = setupUser();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        mixedJob({
+          items: [
+            {
+              ...items[0],
+              is_tool_call: true,
+              has_reply: true,
+              payload: {
+                ...items[0].payload,
+                actual_tool_calls: [{ tool: "book", arguments: {} }],
+              },
+            },
+          ],
+        }),
+      ),
+    );
+    render(<AnnotationJobView token="tok" mode="public" />);
+    await waitFor(() =>
+      expect(screen.getByText("Tool call correctness")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Correctness")).toBeInTheDocument();
+    expect(screen.getByText("Quality")).toBeInTheDocument();
+    expect(screen.getByText("Agent's reply")).toBeInTheDocument();
+    expect(screen.getByText("Agent's tool calls")).toBeInTheDocument();
+
+    // The tool call evaluator is the last card, so its Correct is the last one.
+    await user.click(
+      screen.getAllByRole("button", { name: "Correct" }).at(-1)!,
+    );
+    await user.click(
+      screen.getByRole("button", { name: /Submit & Next|Mark as complete/ }),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("AnnotationJobView message versions", () => {

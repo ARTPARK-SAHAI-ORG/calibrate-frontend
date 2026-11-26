@@ -435,13 +435,39 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
           uuid: "i1",
           name: "Item one",
           input: "Hi",
-          output: "Sunny",
+          output: "",
           varValues: { "ev-tool": { rule: "Right tool" } },
         },
       ],
     });
     expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
+    expect(screen.getByText("Tool call correctness")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save item" })).toBeEnabled();
+  });
+
+  it("asks for the values of both kinds of evaluator on an item with an output and tool calls", async () => {
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      evaluators: [replyEvaluator, toolCallEvaluator],
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Sunny",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+          varValues: { "ev-tool": { rule: "Right tool" } },
+        },
+      ],
+    });
+    expect(screen.getByText("Correctness")).toBeInTheDocument();
+    expect(screen.getByText("Tool call correctness")).toBeInTheDocument();
+    const save = screen.getByRole("button", { name: "Save item" });
+    expect(save).toBeDisabled();
+    await user.type(screen.getByPlaceholderText("The criteria"), "Says sunny");
+    await user.type(screen.getByPlaceholderText("The extra"), "None");
+    expect(save).toBeEnabled();
   });
 
   it("saves an item that stores an empty tool call list and has no answer", () => {

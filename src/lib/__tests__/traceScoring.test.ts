@@ -4,6 +4,7 @@ import {
   isTraceScoringInProgress,
   nothingCanScoreCopy,
   scoringRunErrorCopy,
+  traceItemKind,
   traceRowOutputFacts,
 } from "../traceScoring";
 
@@ -32,6 +33,19 @@ describe("isToolCallTraceRow", () => {
     expect(
       isToolCallTraceRow({ response_preview: null, tool_call_count: 0 }),
     ).toBe(false);
+  });
+});
+
+describe("traceItemKind", () => {
+  it("marks tool calls and a reply separately, so a trace with both gets both", () => {
+    expect(traceItemKind({ hasResponse: true, hasToolCalls: true })).toEqual({
+      is_tool_call: true,
+      has_reply: true,
+    });
+    expect(traceItemKind({ hasResponse: false, hasToolCalls: true })).toEqual({
+      is_tool_call: true,
+      has_reply: false,
+    });
   });
 });
 

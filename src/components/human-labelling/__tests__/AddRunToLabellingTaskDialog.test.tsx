@@ -12,7 +12,6 @@ import {
   traceOutputFacts,
   type AddRunToLabellingTaskSource,
 } from "../AddRunToLabellingTaskDialog";
-import { isToolCallOutput } from "@/lib/traceScoring";
 
 const apiClientMock = jest.fn();
 const unwrapListMock = jest.fn();
@@ -692,7 +691,7 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
       hasResponse: true,
       hasToolCalls: true,
       labellable: true,
-      toolCall: false,
+      toolCall: true,
     },
     {
       hasResponse: false,
@@ -705,7 +704,6 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     ({ hasResponse, hasToolCalls, labellable, toolCall }) => {
       const facts = { hasResponse, hasToolCalls };
       expect(isLabellableOutput(facts)).toBe(labellable);
-      expect(isToolCallOutput(facts)).toBe(toolCall);
       // The traces list reads these two facts off a row, the dialog reads them
       // off the fetched trace. Same facts in, same answer out, which is what
       // stops the button's count and the dialog disagreeing.
@@ -822,53 +820,39 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     ]);
   });
 
-  it("appends output tool calls to chat_history for a trace that also replied", () => {
-    // A trace WITH a text reply is a response item; the call rides along in
-    // the conversation, because the reply is what gets labelled.
-    const source: AddRunToLabellingTaskSource = {
-      type: "traces",
-      agentUuid: "agent-uuid-1",
-      traces: [
-        {
-          name: "Books an appointment",
-          input: [{ role: "user", content: "book me in" }],
-          output: {
-            response: "Booked!",
-            tool_calls: [
-              {
-                tool: "book_appointment",
-                arguments: { day: "Monday" },
-                output: { ok: true },
-              },
-            ],
+  it.each(["conversation", "general"] as const)(
+    "keeps the reply and the tool calls of a %s trace that did both, so both kinds of evaluator judge it",
+    (agentNature) => {
+      const input =
+        agentNature === "general"
+          ? "book me in"
+          : [{ role: "user", content: "book me in" }];
+      const calls = [
+        { tool: "book_appointment", arguments: { day: "Monday" }, output: { ok: true } },
+      ];
+      const result = buildItemsFromSource({
+        type: "traces",
+        agentUuid: "agent-uuid-1",
+        agentNature,
+        traces: [
+          {
+            name: "Books an appointment",
+            input,
+            output: { response: "Booked!", tool_calls: calls },
           },
-        },
-      ],
-    };
-    const result = buildItemsFromSource(source);
-    const history = result.items[0].payload.chat_history as Array<
-      Record<string, unknown>
-    >;
-    expect(history).toHaveLength(3);
-    expect(history[0]).toEqual({ role: "user", content: "book me in" });
-    expect(history[1]).toMatchObject({
-      role: "assistant",
-      tool_calls: [
-        {
-          type: "function",
-          function: {
-            name: "book_appointment",
-            arguments: JSON.stringify({ day: "Monday" }),
-          },
-        },
-      ],
-    });
-    expect(history[2]).toMatchObject({
-      role: "tool",
-      content: JSON.stringify({ ok: true }),
-    });
-    expect(result.items[0].payload.agent_response).toBe("Booked!");
-  });
+        ],
+      });
+      const p = result.items[0].payload as Record<string, unknown>;
+      expect(p.actual_tool_calls).toEqual(calls);
+      expect(p.expected_tool_calls).toEqual([]);
+      if (agentNature === "general") {
+        expect(p.output).toBe("Booked!");
+      } else {
+        expect(p.agent_response).toBe("Booked!");
+        expect(p.chat_history).toEqual([{ role: "user", content: "book me in" }]);
+      }
+    },
+  );
 
   it("builds a trace that only called a tool as a tool-call item", () => {
     const source: AddRunToLabellingTaskSource = {

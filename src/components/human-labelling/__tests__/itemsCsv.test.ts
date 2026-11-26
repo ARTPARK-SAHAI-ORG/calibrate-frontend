@@ -36,9 +36,9 @@ it("writes a tool-call list as JSON, keeps an empty list, and leaves anything el
   expect(toolCallsCell(undefined)).toBe("");
 });
 
-it("reads the agent's tool calls from actual_tool_calls or a reply-less tool_calls list", () => {
+it("reads the agent's tool calls from actual_tool_calls or tool_calls", () => {
   expect(actualToolCallsCell({ actual_tool_calls: [] })).toBe("[]");
   expect(actualToolCallsCell({ tool_calls: calls })).toBe(JSON.stringify(calls));
-  expect(actualToolCallsCell({ agent_response: "Hi", tool_calls: calls })).toBe("");
+  expect(actualToolCallsCell({ agent_response: "Hi", tool_calls: calls })).toBe(JSON.stringify(calls));
   expect(actualToolCallsCell({})).toBe("");
 });

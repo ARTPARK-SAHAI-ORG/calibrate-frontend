@@ -1171,7 +1171,7 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     await user.click(screen.getByRole("checkbox", { name: "Unselect all labels" }));
     expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
     expect(
-      screen.getByText("Pick at least one label for the other items"),
+      screen.getByText("Pick at least one label for the replies"),
     ).toBeInTheDocument();
   });
 
@@ -1187,7 +1187,7 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     await user.click(screen.getByRole("checkbox", { name: /Right arguments/ }));
     expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
     expect(
-      screen.getByText("Pick at least one label for the tool-call items"),
+      screen.getByText("Pick at least one label for the tool calls"),
     ).toBeInTheDocument();
   });
 

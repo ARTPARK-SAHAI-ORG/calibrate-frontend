@@ -1506,6 +1506,18 @@ describe("TracesTabContent", () => {
         expect(screen.queryByText(new RegExp(NOTE))).not.toBeInTheDocument();
       });
 
+      it("shows for a trace on the page that replied and called a tool", async () => {
+        fetchHasTraceForToolCalls.mockResolvedValue(false);
+        fetchAgentEvaluators.mockResolvedValue([
+          { uuid: "ev-1", evaluator_type: "llm" },
+        ]);
+        mockUseTraces.mockReturnValue(
+          tracesResult([trace({ response_preview: "Booked", tool_call_count: 1 })]),
+        );
+        render(<TracesTabContent {...tabProps} />);
+        expect(await screen.findByText(new RegExp(NOTE))).toBeInTheDocument();
+      });
+
       it("stays away when a tool call evaluator is already added", async () => {
         fetchHasTraceForToolCalls.mockResolvedValue(true);
         fetchAgentEvaluators.mockResolvedValue([

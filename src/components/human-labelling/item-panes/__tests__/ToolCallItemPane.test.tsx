@@ -94,7 +94,7 @@ describe("ToolCallItemPane", () => {
     ).toBeInTheDocument();
   });
 
-  it("labels the reply and the calls apart and says they are judged together", () => {
+  it("labels the reply and the calls apart and says which evaluators judge each", () => {
     render(
       <ToolCallItemPane
         payload={{
@@ -109,7 +109,7 @@ describe("ToolCallItemPane", () => {
     expect(screen.getByText("Agent's reply")).toBeInTheDocument();
     expect(screen.getByText("Agent's tool calls")).toBeInTheDocument();
     expect(
-      screen.getByText("The reply and the tool calls are judged together"),
+      screen.getByText("Tool call evaluators judge the tool calls, and the other evaluators judge the reply"),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Evaluation target")).toHaveLength(2);
   });
@@ -122,7 +122,7 @@ describe("ToolCallItemPane", () => {
     );
     expect(screen.getByText("Agent's answer")).toBeInTheDocument();
     expect(
-      screen.queryByText("The reply and the tool calls are judged together"),
+      screen.queryByText("Tool call evaluators judge the tool calls, and the other evaluators judge the reply"),
     ).not.toBeInTheDocument();
   });
 

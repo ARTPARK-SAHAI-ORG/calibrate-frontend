@@ -5,8 +5,9 @@ import { RunStateMark } from "@/components/ui";
 import { SpinnerIcon } from "@/components/icons";
 import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
 import {
-  isToolCallTraceRow,
   isTraceScoringInProgress,
+  traceItemKind,
+  traceRowOutputFacts,
   scoringRunErrorCopy,
 } from "@/lib/traceScoring";
 import type { TraceSummary } from "@/lib/tracesApi";
@@ -22,8 +23,8 @@ export type TraceScoreColumn = {
   evaluator_type?: EvaluatorType | null;
 };
 
-// A tool-call evaluator scores only traces that just called a tool, and every
-// other evaluator scores only the rest, so the other kind of row gets nothing.
+// A tool call evaluator scores only traces that called a tool, and every other
+// evaluator only traces that replied or called no tool.
 const DOES_NOT_APPLY = <span className="text-sm text-muted-foreground">—</span>;
 
 // The same weight the Evaluations tab gives an empty cell, e.g. "Default"
@@ -104,7 +105,10 @@ function ScoreValue({
   if (
     !score &&
     column.evaluator_type &&
-    !evaluatorFitsItem(column.evaluator_type, isToolCallTraceRow(trace))
+    !evaluatorFitsItem(
+      column.evaluator_type,
+      traceItemKind(traceRowOutputFacts(trace)),
+    )
   ) {
     return DOES_NOT_APPLY;
   }

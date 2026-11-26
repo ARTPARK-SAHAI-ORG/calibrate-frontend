@@ -7,7 +7,7 @@ import { useIsNameClipped } from "@/hooks/useIsNameClipped";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { apiClient } from "@/lib/api";
 import { liveVersionOf } from "@/lib/evaluatorVersions";
-import { evaluatorFitsItem } from "@/lib/labellingItem";
+import { evaluatorFitsItem, type ItemKind } from "@/lib/labellingItem";
 
 type LinkedEvaluator = {
   uuid: string;
@@ -63,7 +63,7 @@ type RunEvaluatorsDialogProps = {
   taskUuid: string;
   evaluators: LinkedEvaluator[];
   /** The items the run is for, to say how many no ticked evaluator fits. */
-  items?: { is_tool_call?: boolean }[];
+  items?: ItemKind[];
   submitting: boolean;
   submitError: string | null;
   onClose: () => void;
@@ -221,7 +221,7 @@ export function RunEvaluatorsDialog({
       !evaluators.some(
         (e) =>
           picked[e.uuid] &&
-          evaluatorFitsItem(e.evaluator_type, it.is_tool_call === true),
+          evaluatorFitsItem(e.evaluator_type, it),
       ),
   ).length;
   const nothingFits = items.length > 0 && unfittedCount === items.length;

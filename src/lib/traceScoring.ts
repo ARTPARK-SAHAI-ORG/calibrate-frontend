@@ -1,4 +1,5 @@
 import type { EvaluatorType } from "@/components/EvaluatorPills";
+import type { ItemKind } from "./labellingItem";
 import type {
   TraceScoringIneligibleReason,
   TraceScoringStatus,
@@ -13,15 +14,13 @@ export type TraceOutputFacts = {
   hasToolCalls: boolean;
 };
 
-/** True when the output is a tool call and nothing else. Such a trace is built
- * as a tool-call item (judged by tool-call evaluators) rather than a
- * response item. A trace that also replied is a response item, and its call
- * rides along in the conversation. */
-export function isToolCallOutput({
+/** Which evaluators score a trace, in the shape `evaluatorFitsItem` reads:
+ * tool call evaluators score its tool calls, the others its reply. */
+export function traceItemKind({
   hasResponse,
   hasToolCalls,
-}: TraceOutputFacts): boolean {
-  return !hasResponse && hasToolCalls;
+}: TraceOutputFacts): ItemKind {
+  return { is_tool_call: hasToolCalls, has_reply: hasResponse };
 }
 
 /** The two facts the labelling and scoring rules need, read off a list row.
@@ -40,7 +39,8 @@ export function traceRowOutputFacts(
 export function isToolCallTraceRow(
   trace: Pick<TraceSummary, "response_preview" | "tool_call_count">,
 ): boolean {
-  return isToolCallOutput(traceRowOutputFacts(trace));
+  const { hasResponse, hasToolCalls } = traceRowOutputFacts(trace);
+  return !hasResponse && hasToolCalls;
 }
 
 /** The evaluator kind that judges this agent's replies. Full-conversation

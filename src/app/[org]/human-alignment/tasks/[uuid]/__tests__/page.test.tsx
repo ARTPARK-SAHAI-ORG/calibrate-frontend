@@ -310,7 +310,7 @@ it("says why and keeps Run evaluators closed when no linked evaluator fits the c
   render(<LabellingTaskPage />);
   await user.click(await screen.findByRole("button", { name: "Evaluate" }));
   expect(mockToastError).toHaveBeenCalledWith(
-    "None of this task's evaluators fit the chosen items. Tool-call items need a tool-call evaluator, and every other item needs an evaluator that is not a tool-call evaluator.",
+    "None of this task's evaluators fit the chosen items. Tool calls need a tool call evaluator. A reply, or an item with no tool calls, needs an evaluator that is not a tool call evaluator.",
   );
   expect(screen.queryByText("Run evaluators")).not.toBeInTheDocument();
 });
@@ -417,16 +417,19 @@ it("shows and saves llm-general calls stored under tool_calls", async () => {
   expect(payload).not.toHaveProperty("actual_tool_calls");
 });
 
-it("keeps old tool_calls an llm-general item with a text answer never showed", async () => {
+it("shows the old tool_calls of an llm-general item with a text answer, and saves them as actual_tool_calls", async () => {
   const user = setupUser();
   const calls = [{ tool: "book_flight", arguments: {} }];
   itemsTabWith("llm-general", { name: "Books", input: "Book it", output: "Booked", tool_calls: calls });
   render(<LabellingTaskPage />);
   await user.click(await screen.findByRole("button", { name: "Edit" }));
   const props = mockDialogProps.general.filter((p) => p.isOpen && p.mode === "edit").at(-1);
-  expect(props.initialRows[0].toolCalls).toEqual([]);
+  expect(props.initialRows[0].toolCalls).toEqual(calls);
   await props.onSubmit([{ ...props.initialRows[0], name: "Books a flight" }]);
-  expect(putPayload().tool_calls).toEqual(calls);
+  const payload = putPayload();
+  expect(payload.output).toBe("Booked");
+  expect(payload.tool_calls).toBeUndefined();
+  expect(payload.actual_tool_calls).toEqual(calls);
 });
 
 it("keeps an empty tool-call list the llm-general item already had", async () => {

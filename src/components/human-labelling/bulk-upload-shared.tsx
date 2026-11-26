@@ -1579,7 +1579,7 @@ const TOOL_CALLS_EXAMPLE = `[
 // The two optional tool-call columns shared by the llm and llm-general
 // uploads. `replyColumn` is the reply that may be left empty when they are set.
 export function toolCallColumns(replyColumn: string): BulkContentColumn[] {
-  const emptyReply = `Filling in this column or the other tool call column, even with an empty list [], makes the row a tool call row. Only tool call evaluators score a tool call row, and "${replyColumn}" can be left empty on it.`;
+  const emptyReply = `Filling in this column or the other tool call column, even with an empty list [], makes the row a tool call row. Tool call evaluators score its tool calls, and "${replyColumn}" can be left empty on it. When "${replyColumn}" is filled in, the other evaluators score it.`;
   return (
     [
       [

@@ -2371,7 +2371,7 @@ describe("AddTestDialog", () => {
       ]);
     });
 
-    it("treats an item that stores an empty tool call list as a tool-call item", async () => {
+    it("asks for both kinds of evaluator on an item with a reply and an empty tool call list", async () => {
       const user = setupUser();
       const onSubmit = jest.fn();
       render(
@@ -2397,9 +2397,18 @@ describe("AddTestDialog", () => {
       await waitFor(() =>
         expect(screen.getByDisplayValue("Sunny")).toBeInTheDocument(),
       );
-      expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
+      expect(screen.getByText("Correctness")).toBeInTheDocument();
+      expect(screen.getByText("Tool call correctness")).toBeInTheDocument();
+      await user.type(
+        screen.getByPlaceholderText("Enter value for {{criteria}}"),
+        "Says sunny",
+      );
       await user.click(screen.getByRole("button", { name: "Save" }));
       expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit.mock.calls[0][1]).toEqual([
+        { evaluator_uuid: "ev-correct", variable_values: { criteria: "Says sunny" } },
+        { evaluator_uuid: "ev-tool", variable_values: { rule: "Right tool" } },
+      ]);
     });
 
     it("still asks for a reply item's criteria, with a message on screen", async () => {
