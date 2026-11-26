@@ -39,6 +39,9 @@ type EvaluatorPickerProps = {
   fillHeight?: boolean;
   /** Permanently deletes the previewed evaluator. Omit to hide the button. */
   onDeleteEvaluator?: (evaluatorUuid: string) => void;
+  /** One list with the ticked evaluators at the top and how many are ticked,
+   *  instead of the "My evaluators" and "Default" sections. */
+  selectedFirst?: boolean;
 };
 
 /**
@@ -56,6 +59,7 @@ export function EvaluatorPicker({
   fillHeight = false,
   allowConversationType = false,
   onDeleteEvaluator,
+  selectedFirst = false,
 }: EvaluatorPickerProps) {
   const [search, setSearch] = useState("");
   // Everything this picker could offer, before the reader's own search.
@@ -132,6 +136,13 @@ export function EvaluatorPicker({
           No matching evaluators.
         </div>
       );
+    }
+
+    if (selectedFirst) {
+      return [
+        ...filteredEvaluators.filter((ev) => selectedIds.has(ev.uuid)),
+        ...filteredEvaluators.filter((ev) => !selectedIds.has(ev.uuid)),
+      ].map(renderEvaluatorRow);
     }
 
     if (!showSections) {
@@ -214,6 +225,20 @@ export function EvaluatorPicker({
             className="w-full h-9 pl-9 pr-3 rounded-md text-sm border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
+
+        {selectedFirst &&
+          (() => {
+            const count = offerable.filter((ev) =>
+              selectedIds.has(ev.uuid),
+            ).length;
+            // Styled like SelectedTestsStrip's count.
+            return (
+              <p className="text-sm text-foreground">
+                <span className="font-medium">{count}</span> evaluator
+                {count === 1 ? "" : "s"} selected
+              </p>
+            );
+          })()}
 
         {/* Checkbox list */}
         <div

@@ -7,6 +7,7 @@ import {
   fireEvent,
 } from "@/test-utils";
 import { PublicChatView } from "../PublicChatView";
+import { setActiveOrgUuid } from "@/lib/orgs";
 import {
   fetchChatAgent,
   sendChatMessage,
@@ -17,6 +18,46 @@ jest.mock("../../../lib/publicChatApi", () => ({
   fetchChatAgent: jest.fn(),
   sendChatMessage: jest.fn(),
   setChatFeedback: jest.fn(),
+}));
+
+jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
+  ConvertTracesToTestsDialog: (props: {
+    isOpen: boolean;
+    traceUuids: string[];
+    testType: string;
+    agentUuid: string;
+    agentNature: string;
+    nameFrom?: { comment?: string | null; userMessage?: string | null };
+    accessToken: string | null;
+    onClose: () => void;
+    onConverted: (result: { created: number; test_uuids: string[] }) => void;
+  }) =>
+    props.isOpen ? (
+      <div data-testid="convert-dialog">
+        <pre data-testid="convert-props">
+          {JSON.stringify({
+            traceUuids: props.traceUuids,
+            testType: props.testType,
+            agentUuid: props.agentUuid,
+            agentNature: props.agentNature,
+            nameFrom: props.nameFrom,
+          })}
+        </pre>
+        <button
+          onClick={() =>
+            props.onConverted({ created: 1, test_uuids: ["test-1"] })
+          }
+        >
+          Convert
+        </button>
+        <button onClick={props.onClose}>Dismiss</button>
+      </div>
+    ) : null,
+}));
+
+jest.mock("../../../lib/orgs", () => ({
+  ...jest.requireActual("../../../lib/orgs"),
+  setActiveOrgUuid: jest.fn(),
 }));
 
 const mockAgent = fetchChatAgent as jest.Mock;
@@ -35,10 +76,13 @@ const reply = (over: Record<string, unknown> = {}) => ({
   },
 });
 
-async function open(interaction_type = "conversation") {
+async function open(
+  interaction_type = "conversation",
+  extra: Record<string, unknown> = {},
+) {
   mockAgent.mockResolvedValue({
     ok: true,
-    data: { agent_name: "Support bot", interaction_type },
+    data: { agent_name: "Support bot", interaction_type, ...extra },
   });
   render(<PublicChatView token="tok" />);
   await screen.findByText("Talk to the agent");
@@ -625,4 +669,106 @@ it("switches to the other thumb after asking once", async () => {
   expect(
     screen.getByLabelText("What was good about this reply? (optional)"),
   ).toBeInTheDocument();
+});
+
+describe("Add to tests", () => {
+  const member = { agent_id: "a1", org_uuid: "o1" };
+  const dialogProps = () =>
+    JSON.parse(screen.getByTestId("convert-props").textContent!);
+
+  it("is not offered to a visitor outside the workspace", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    await open("conversation", { agent_id: null, org_uuid: null });
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Good reply"));
+    await screen.findByLabelText(/What was good/);
+    expect(screen.queryByText("Add to tests")).not.toBeInTheDocument();
+  });
+
+  it("appears for a member once a thumb is picked", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    await open("conversation", member);
+    await sendMessage(user);
+    await screen.findByLabelText("Good reply");
+    expect(screen.queryByText("Add to tests")).not.toBeInTheDocument();
+    await user.click(screen.getByLabelText("Bad reply"));
+    expect(await screen.findByText("Add to tests")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["a text reply", "conversation", {}, "response"],
+    [
+      "a reply with only tool calls",
+      "conversation",
+      {
+        reply: null,
+        tool_calls: [{ tool: "lookup", arguments: {}, output: "ok" }],
+      },
+      "tool_call",
+    ],
+    ["a basic agent", "general", {}, "general"],
+  ])("opens the dialog for %s", async (_name, kind, over, testType) => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply(over));
+    await open(kind, member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Good reply"));
+    await user.click(await screen.findByText("Add to tests"));
+    expect(setActiveOrgUuid).toHaveBeenCalledWith("o1");
+    expect(dialogProps()).toEqual({
+      traceUuids: ["t1"],
+      testType,
+      agentUuid: "a1",
+      agentNature: kind,
+      // The test is named after what was asked, there being no comment.
+      nameFrom: { comment: null, userMessage: "Hi" },
+    });
+    await user.click(screen.getByText("Dismiss"));
+    expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
+  });
+
+  it("names the test after a comment typed but not saved yet", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Bad reply"));
+    await user.type(
+      await screen.findByLabelText(
+        "What was wrong with this reply? (optional)",
+      ),
+      "Too short",
+    );
+    await user.click(screen.getByText("Add to tests"));
+    expect(dialogProps().nameFrom).toEqual({
+      comment: "Too short",
+      userMessage: "Hi",
+    });
+  });
+
+  it("confirms once added, linking to the test it made", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Good reply"));
+    await user.click(await screen.findByText("Add to tests"));
+    await user.click(screen.getByText("Convert"));
+    expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Added to tests")).toBeInTheDocument();
+    expect(
+      screen.getByText("This reply was added to the agent's tests"),
+    ).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /View test/ });
+    expect(link).toHaveAttribute(
+      "href",
+      "/o1/agents/a1?tab=tests&testId=test-1",
+    );
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(screen.getByText("Add to tests")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByText("Added to tests")).not.toBeInTheDocument();
+  });
 });
