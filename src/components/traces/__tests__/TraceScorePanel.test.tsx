@@ -202,7 +202,7 @@ it("shows a failed run as an error in red, with the reason calibrate gave", () =
 
   const box = container.querySelector(".border-red-500\\/30");
   expect(box).toHaveTextContent("Scoring failed: Error code: 402 - out of credits");
-  expect(box?.querySelector("p")?.className).toContain("text-red-700");
+  expect(box?.querySelector("p")?.className).toContain("text-red-600");
   expect(container.querySelector(".border-amber-500\\/40")).toBeNull();
 });
 

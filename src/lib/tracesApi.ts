@@ -52,7 +52,7 @@ export type TraceSummary = {
   created_at: string;
   /** Latest scoring run for this trace. Absent when scoring has never run. */
   latest_run_status?: TraceScoringStatus | null;
-  /** Why the latest run was skipped or failed, e.g. "over_limit". */
+  /** A skipped run's reason code, e.g. "over_limit", or a failed run's error text. */
   latest_run_error?: string | null;
   /** One entry per evaluator on the latest completed run, the same shape a
    *  scoring run carries. Empty until the run finishes. */

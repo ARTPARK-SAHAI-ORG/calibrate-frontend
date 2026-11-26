@@ -62,7 +62,7 @@ function RunBody({
   if (run.status === "failed") {
     return (
       <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
-        <p className="text-sm text-red-700 dark:text-red-400 break-words">
+        <p className="text-sm text-red-600 dark:text-red-400 break-words">
           {scoringFailedCopy(run.error)}
         </p>
       </div>

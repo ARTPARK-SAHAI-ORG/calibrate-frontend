@@ -231,7 +231,7 @@ describe("a run that could not be run", () => {
       <TraceScoreCells
         trace={{
           latest_run_status: "failed",
-          latest_run_error: "scoring_disabled",
+          latest_run_error: "Error code: 402 - out of credits",
         }}
         columns={columns}
         layout="row"
