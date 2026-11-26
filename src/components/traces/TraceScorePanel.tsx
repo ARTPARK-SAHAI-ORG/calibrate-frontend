@@ -4,23 +4,43 @@ import type React from "react";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { EVALUATOR_PILL_CLASSES } from "@/components/EvaluatorPillList";
 import { RunFailureBox } from "@/components/RunFailureBox";
-import { SpinnerIcon } from "@/components/icons";
+import type { AgentNature } from "@/components/traces/ingestSnippets";
+import { SpinnerIcon, WarningTriangleIcon } from "@/components/icons";
+import { Button } from "@/components/ui/Button";
 import { ExtendLimitsLink } from "@/constants/limits";
 import { useUsesOwnProviderKeys } from "@/hooks";
 import { EvaluatorsTabLink } from "./NothingCanScoreMessage";
 import { WarningBox } from "./WarningBox";
 import {
   ineligibleReasonCopy,
+  lowerFirst,
   isTraceScoringInProgress,
+  missingSourcePhrase,
   scoringRunErrorCopy,
 } from "@/lib/traceScoring";
 import type {
+  TraceMissingValue,
   TraceScoreResult,
   TraceScoringIneligibleEvaluator,
   TraceScoringRun,
+  TraceUnconfiguredEvaluator,
 } from "@/lib/tracesApi";
 
-type TraceScorePanelProps = {
+// Orange, not the amber a rating between pass and fail is drawn in.
+const DID_NOT_RUN_CARD =
+  "rounded-lg border shadow-md dark:shadow-lg transition-colors border-orange-500/45 bg-orange-500/[0.12] dark:border-orange-500/50 dark:bg-orange-500/[0.14] dark:shadow-orange-950/30 p-3";
+const DID_NOT_RUN_TEXT = "text-sm text-orange-700 dark:text-orange-300";
+
+function DidNotRunName({ name }: { name: string }) {
+  return (
+    <p className="flex items-center gap-1.5 text-sm font-medium text-foreground break-words min-w-0">
+      <WarningTriangleIcon className="w-4 h-4 flex-shrink-0 text-orange-600 dark:text-orange-400" />
+      {name}
+    </p>
+  );
+}
+
+export type TraceScorePanelProps = {
   /** The newest scoring run for this trace. The parent leaves the whole
    *  column out when there is none, so this is only null beside an error. */
   run: TraceScoringRun | null;
@@ -42,6 +62,14 @@ type TraceScorePanelProps = {
   scoringEvaluatorNames?: string[];
   /** Scores the trace again after its scoring failed. */
   onTryAgain?: () => void;
+  /** Picks the agent's own name for the trace's input. */
+  agentNature?: AgentNature;
+  /** Evaluators on the agent that still need configuring for traces. Only
+   *  decides which "did not run" cards carry a Configure button. */
+  unconfigured?: TraceUnconfiguredEvaluator[];
+  onConfigure?: (evaluatorUuid: string) => void;
+  /** The evaluator whose Configure button is loading. */
+  configuringUuid?: string | null;
 };
 
 const listNames = new Intl.ListFormat("en-GB", { type: "conjunction" });
@@ -58,6 +86,42 @@ function verdictFields(result: TraceScoreResult): {
   return { match: result.passed };
 }
 
+/** One block per evaluator, whichever variables of its could not be filled. */
+function MissingValueBlocks({
+  values,
+  agentNature,
+}: {
+  values: TraceMissingValue[];
+  agentNature?: AgentNature;
+}) {
+  const byEvaluator = new Map<string, TraceMissingValue[]>();
+  for (const value of values) {
+    byEvaluator.set(value.evaluator_uuid, [
+      ...(byEvaluator.get(value.evaluator_uuid) ?? []),
+      value,
+    ]);
+  }
+  return (
+    <>
+      {[...byEvaluator].map(([uuid, missing]) => (
+        <div key={uuid} className={`${DID_NOT_RUN_CARD} space-y-2`}>
+          <DidNotRunName name={missing[0].name} />
+          <div className="space-y-1">
+            {missing.map(({ variable, source }) => (
+              <p key={variable} className={DID_NOT_RUN_TEXT}>
+                Could not run.{" "}
+                <span className="font-mono break-all">{`{{${variable}}}`}</span>{" "}
+                reads from {missingSourcePhrase(source, agentNature)}, and this trace has
+                none.
+              </p>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function RunBody({
   run,
   descriptions,
@@ -67,6 +131,7 @@ function RunBody({
   scoreTrace,
   scoringEvaluatorNames = [],
   onTryAgain,
+  agentNature,
 }: {
   run: TraceScoringRun;
   descriptions?: Record<string, string>;
@@ -76,14 +141,28 @@ function RunBody({
   scoreTrace?: React.ReactNode;
   scoringEvaluatorNames?: string[];
   onTryAgain?: () => void;
+  agentNature?: AgentNature;
 }) {
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
+  const missingValues = run.missing_values ?? [];
   if (isTraceScoringInProgress(run.status)) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <SpinnerIcon className="w-4 h-4 animate-spin text-amber-500" />
         Running the evaluators on this trace
       </p>
+    );
+  }
+
+  if (
+    run.status === "skipped" &&
+    run.error === "missing_trace_values" &&
+    missingValues.length > 0
+  ) {
+    return (
+      <div className="space-y-3">
+        <MissingValueBlocks values={missingValues} agentNature={agentNature} />
+      </div>
     );
   }
 
@@ -121,7 +200,7 @@ function RunBody({
                 {ineligible.map((item) => (
                   <li key={item.evaluator_uuid}>
                     <span className="font-medium">{item.name}</span>:{" "}
-                    {ineligibleReasonCopy(item.reason).toLowerCase()}
+                    {lowerFirst(ineligibleReasonCopy(item.reason))}
                   </li>
                 ))}
               </ul>
@@ -175,7 +254,7 @@ function RunBody({
     );
   }
 
-  if (run.results.length === 0) {
+  if (run.results.length === 0 && missingValues.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
         This run produced no scores.
@@ -200,6 +279,7 @@ function RunBody({
           enableLink
         />
       ))}
+      <MissingValueBlocks values={missingValues} agentNature={agentNature} />
     </div>
   );
 }
@@ -218,7 +298,24 @@ export function TraceScorePanel({
   scoreTrace,
   scoringEvaluatorNames,
   onTryAgain,
+  agentNature,
+  unconfigured = [],
+  onConfigure,
+  configuringUuid = null,
 }: TraceScorePanelProps) {
+  // An evaluator this trace already names as missing a value has its own block.
+  const named = new Set(run?.missing_values?.map((v) => v.evaluator_uuid));
+  const recorded = run?.unconfigured_evaluators ?? [];
+  const stillUnconfigured = new Set(unconfigured.map((e) => e.evaluator_uuid));
+  const cards =
+    run &&
+    !error &&
+    (run.status === "completed" ||
+      (run.status === "skipped" &&
+        (run.error === "no_usable_evaluators" ||
+          run.error === "missing_trace_values")))
+      ? recorded.filter((e) => !named.has(e.evaluator_uuid))
+      : [];
   return (
     <div className="p-4 md:p-6 space-y-4">
       <h3 className="text-sm font-semibold text-foreground">Scores</h3>
@@ -228,7 +325,11 @@ export function TraceScorePanel({
         <RunBody
           run={run}
           descriptions={descriptions}
-          ineligible={ineligible}
+          agentNature={agentNature}
+          ineligible={ineligible?.filter(
+            (item) =>
+              !recorded.some((e) => e.evaluator_uuid === item.evaluator_uuid),
+          )}
           addToolCallEvaluator={addToolCallEvaluator}
           onGoToEvaluators={onGoToEvaluators}
           scoreTrace={scoreTrace}
@@ -236,6 +337,27 @@ export function TraceScorePanel({
           onTryAgain={onTryAgain}
         />
       ) : null}
+      {cards.map(({ evaluator_uuid, name }) => (
+        <div key={evaluator_uuid} className={`${DID_NOT_RUN_CARD} space-y-2`}>
+          <div className="flex items-center justify-between gap-3">
+            <DidNotRunName name={name} />
+            {stillUnconfigured.has(evaluator_uuid) && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                isLoading={configuringUuid === evaluator_uuid}
+                onClick={() => onConfigure?.(evaluator_uuid)}
+              >
+                Configure
+              </Button>
+            )}
+          </div>
+          <p className={DID_NOT_RUN_TEXT}>
+            Did not run as it has not been configured for traces
+          </p>
+        </div>
+      ))}
     </div>
   );
 }

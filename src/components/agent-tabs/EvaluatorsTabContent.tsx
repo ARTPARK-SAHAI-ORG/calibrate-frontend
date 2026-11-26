@@ -13,8 +13,8 @@ import {
   EVALUATOR_CARD_BUTTON_CLASS,
 } from "@/components/evaluators/DuplicateEvaluatorButton";
 import { XIcon } from "@/components/icons";
-import { evaluatorTypesForTask, fitsTaskType } from "@/lib/labellingItem";
-import { agentTaskType } from "@/lib/traceScoring";
+import { useConfigureTraceValues } from "@/components/traces/useConfigureTraceValues";
+import { evaluatorTypesForTask } from "@/lib/labellingItem";
 import {
   type EvaluatorData,
   fetchAllEvaluators,
@@ -25,6 +25,14 @@ import {
   deleteEvaluatorWarning,
   canDeleteEvaluator,
 } from "@/lib/evaluatorApi";
+import { fetchTraces } from "@/lib/tracesApi";
+import {
+  agentTaskType,
+  fitsAgent,
+  needsTraceValues,
+  NOT_CONFIGURED_FOR_TRACES,
+  takesTraceValues,
+} from "@/lib/traceScoring";
 
 // Two remove flavours share one confirmation dialog:
 //   "remove"     → detach from this agent only (evaluator stays in library).
@@ -42,10 +50,14 @@ const CREATE_BUTTON_CLASS =
 export function EvaluatorsTabContent({
   agentUuid,
   agentNature = "conversation",
+  traceScoringOn = false,
+  isActive = true,
 }: {
   agentUuid: string;
   agentName?: string;
   agentNature?: "conversation" | "general";
+  traceScoringOn?: boolean;
+  isActive?: boolean;
 }) {
   const backendAccessToken = useAccessToken();
 
@@ -61,6 +73,7 @@ export function EvaluatorsTabContent({
   // Dialog / flow state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
+  const [hasTraces, setHasTraces] = useState(false);
 
   // Shared destructive-confirmation dialog state.
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -70,10 +83,36 @@ export function EvaluatorsTabContent({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadAttached = useCallback(async () => {
-    if (!backendAccessToken) return;
+    if (!backendAccessToken) return [];
     const data = await fetchAgentEvaluators(agentUuid, backendAccessToken);
     setAttachedEvaluators(data);
+    return data;
   }, [agentUuid, backendAccessToken]);
+
+  const traceValues = useConfigureTraceValues({
+    agentUuid,
+    agentNature,
+    accessToken: backendAccessToken,
+    onRefresh: () =>
+      loadAttached().catch((err) =>
+        reportError("Error loading agent evaluators:", err),
+      ),
+  });
+  const openTraceValues = traceValues.open;
+
+  // Evaluators just added need their variables chosen before they can score
+  // traces, so ask straight away once traces are being scored. One dialog
+  // steps through all of them.
+  const askForTraceValues = useCallback(
+    (attached: EvaluatorData[], addedUuids: string[]) => {
+      if (!(traceScoringOn && hasTraces)) return;
+      const missing = attached.filter(
+        (e) => addedUuids.includes(e.uuid) && needsTraceValues(e, agentNature),
+      );
+      if (missing.length > 0) openTraceValues(missing);
+    },
+    [traceScoringOn, hasTraces, openTraceValues, agentNature],
+  );
 
   const loadLibrary = useCallback(async () => {
     if (!backendAccessToken) return;
@@ -106,6 +145,24 @@ export function EvaluatorsTabContent({
     };
   }, [agentUuid, backendAccessToken, loadAttached, loadLibrary]);
 
+  // The warning below only matters once traces are arriving to be scored.
+  useEffect(() => {
+    if (!isActive || !traceScoringOn || !backendAccessToken) return;
+    let cancelled = false;
+    fetchTraces(backendAccessToken, {
+      agentId: agentUuid,
+      limit: 1,
+      offset: 0,
+    })
+      .then((page) => {
+        if (!cancelled) setHasTraces(page.total > 0);
+      })
+      .catch((err) => reportError("Error checking for agent traces:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [agentUuid, backendAccessToken, traceScoringOn, isActive]);
+
   // Attach the newly-selected library evaluators to the agent in one add-only
   // POST (validated up front; leaves the rest of the list untouched), then
   // refresh.
@@ -118,7 +175,7 @@ export function EvaluatorsTabContent({
           selectedUuids,
           backendAccessToken,
         );
-        await loadAttached();
+        askForTraceValues(await loadAttached(), selectedUuids);
       } catch (err) {
         reportError("Error adding evaluators to agent:", err);
         // Re-throw so AddEvaluatorsDialog can surface the failure and stay open
@@ -126,7 +183,7 @@ export function EvaluatorsTabContent({
         throw err;
       }
     },
-    [agentUuid, backendAccessToken, loadAttached],
+    [agentUuid, backendAccessToken, loadAttached, askForTraceValues],
   );
 
   // A freshly-created evaluator: attach it to the agent, then refresh both
@@ -140,14 +197,15 @@ export function EvaluatorsTabContent({
           [evaluator.uuid],
           backendAccessToken,
         );
-        await Promise.all([loadAttached(), loadLibrary()]);
+        const [attached] = await Promise.all([loadAttached(), loadLibrary()]);
+        askForTraceValues(attached, [evaluator.uuid]);
       } catch (err) {
         reportError("Error attaching created evaluator:", err);
       } finally {
         setCreateFlowOpen(false);
       }
     },
-    [agentUuid, backendAccessToken, loadAttached, loadLibrary],
+    [agentUuid, backendAccessToken, loadAttached, loadLibrary, askForTraceValues],
   );
 
   const openRemoveDialog = (evaluator: EvaluatorData) => {
@@ -205,9 +263,7 @@ export function EvaluatorsTabContent({
   // Library minus already-attached — what the Add dialog can offer.
   const attachedUuids = new Set(attachedEvaluators.map((e) => e.uuid));
   const availableEvaluators = allEvaluators.filter(
-    (e) =>
-      !attachedUuids.has(e.uuid) &&
-      fitsTaskType(e.evaluator_type ?? undefined, agentTaskType(agentNature)),
+    (e) => !attachedUuids.has(e.uuid) && fitsAgent(e, agentNature),
   );
 
   const deleteDialogTitle =
@@ -339,12 +395,26 @@ export function EvaluatorsTabContent({
               evaluator={evaluator}
               data-tour="evaluator-card"
               data-evaluator-name={evaluator.name}
+              warning={
+                traceScoringOn && hasTraces && needsTraceValues(evaluator, agentNature)
+                  ? NOT_CONFIGURED_FOR_TRACES
+                  : undefined
+              }
               actions={
                 <>
                   <DuplicateEvaluatorButton
                     evaluator={evaluator}
                     onCreated={handleCreated}
                   />
+                  {takesTraceValues(evaluator, agentNature) && (
+                    <button
+                      type="button"
+                      onClick={() => openTraceValues([evaluator])}
+                      className={EVALUATOR_CARD_BUTTON_CLASS}
+                    >
+                      Configure
+                    </button>
+                  )}
                   <Tooltip content="Remove from agent" position="top">
                     <button
                       onClick={() => openRemoveDialog(evaluator)}
@@ -374,6 +444,8 @@ export function EvaluatorsTabContent({
         onCreateEvaluator={() => setCreateFlowOpen(true)}
         onAdd={handleAddEvaluators}
       />
+
+      {traceValues.dialog}
 
       {/* Create a new evaluator inline (drives its own multi-step flow) */}
       <CreateEvaluatorFlow

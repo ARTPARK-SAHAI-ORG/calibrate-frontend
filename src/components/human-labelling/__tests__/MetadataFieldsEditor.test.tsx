@@ -78,6 +78,6 @@ describe("MetadataFieldsEditor", () => {
     render(<Harness initial={full} />);
     expect(screen.queryByRole("button", { name: "Add field" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Metadata field name 1")).toHaveAttribute("maxlength", "256");
-    expect(screen.getByLabelText("Metadata value 1")).toHaveAttribute("maxlength", "8192");
+    expect(screen.getByLabelText("Metadata value 1")).toHaveAttribute("maxlength", "50000");
   });
 });

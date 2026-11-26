@@ -49,7 +49,7 @@ import {
   TraceFeedbackThumb,
   TraceSourceLabel,
 } from "./TracesTable";
-import { TraceScorePanel } from "./TraceScorePanel";
+import { TraceScorePanel, type TraceScorePanelProps } from "./TraceScorePanel";
 import { WARNING_BUTTON_CLASS } from "./AddToolCallEvaluatorButton";
 
 type TraceDetailDialogProps = {
@@ -93,6 +93,12 @@ type TraceDetailDialogProps = {
   /** Show this conversation instead of a single trace. Its newest trace's
    *  stored history plus its reply is the whole conversation. */
   conversation?: TraceConversation | null;
+  /** Passed to the scores panel to name the trace's input the agent's way. */
+  agentNature?: TraceScorePanelProps["agentNature"];
+  /** Passed to the scores panel, which offers Configure on each. */
+  unconfiguredEvaluators?: TraceScorePanelProps["unconfigured"];
+  onConfigureEvaluator?: (evaluatorUuid: string) => void;
+  configuringEvaluatorUuid?: string | null;
 };
 
 /** Last user turn, else a generic heading when the history has no user text. */
@@ -392,6 +398,10 @@ export function TraceDetailDialog({
   ineligibleEvaluators,
   scoringEvaluatorNames = [],
   onScored,
+  unconfiguredEvaluators,
+  onConfigureEvaluator,
+  configuringEvaluatorUuid,
+  agentNature,
   addToolCallEvaluator,
   onGoToEvaluators,
   keysPaused = false,
@@ -748,6 +758,10 @@ export function TraceDetailDialog({
                   scoreTrace={scoreTraceButton}
                   scoringEvaluatorNames={scoringEvaluatorNames}
                   onTryAgain={tryAgain}
+                  agentNature={agentNature}
+                  unconfigured={unconfiguredEvaluators}
+                  onConfigure={onConfigureEvaluator}
+                  configuringUuid={configuringEvaluatorUuid}
                 />
               </div>
             )}
@@ -777,6 +791,10 @@ export function TraceDetailDialog({
                     scoreTrace={scoreTraceButton}
                     scoringEvaluatorNames={scoringEvaluatorNames}
                     onTryAgain={tryAgain}
+                    agentNature={agentNature}
+                    unconfigured={unconfiguredEvaluators}
+                    onConfigure={onConfigureEvaluator}
+                    configuringUuid={configuringEvaluatorUuid}
                   />
                 </div>
               </div>

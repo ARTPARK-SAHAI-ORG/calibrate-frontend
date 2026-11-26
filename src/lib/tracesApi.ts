@@ -89,6 +89,17 @@ export type TraceScoreResult = {
   passed: boolean;
 };
 
+/** A variable that could not be filled because this trace lacks its source. */
+export type TraceUnconfiguredEvaluator = {
+  evaluator_uuid: string;
+  name: string;
+};
+
+export type TraceMissingValue = TraceUnconfiguredEvaluator & {
+  variable: string;
+  source: string;
+};
+
 export type TraceScoringRun = {
   run_uuid: string;
   status: TraceScoringStatus;
@@ -96,6 +107,11 @@ export type TraceScoringRun = {
   completed_at?: string | null;
   error?: string | null;
   results: TraceScoreResult[];
+  /** Absent on runs from before the backend reported these. */
+  missing_values?: TraceMissingValue[];
+  /** Evaluators left out of this run because they had not been configured
+   *  for traces. */
+  unconfigured_evaluators?: TraceUnconfiguredEvaluator[];
 };
 
 export type TraceScoringIneligibleReason =
@@ -414,6 +430,27 @@ export async function scoreTrace(
     `/traces/${encodeURIComponent(traceUuid)}/score`,
     accessToken,
     {},
+  );
+}
+
+export type TraceVariablePreview = {
+  variable: string;
+  source: string;
+  /** The text the variable would get. Null when the trace does not have it. */
+  value: string | null;
+};
+
+/** What these variables would read from one trace. Reads only, judges nothing. */
+export async function previewTraceVariables(
+  accessToken: string,
+  agentUuid: string,
+  traceId: string,
+  traceVariables: Record<string, string>,
+): Promise<{ values: TraceVariablePreview[] }> {
+  return apiPost<{ values: TraceVariablePreview[] }>(
+    `/agents/${encodeURIComponent(agentUuid)}/trace-variables/preview`,
+    accessToken,
+    { trace_id: traceId, trace_variables: traceVariables },
   );
 }
 

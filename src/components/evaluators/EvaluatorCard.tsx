@@ -4,13 +4,15 @@ import { useState, type HTMLAttributes, type ReactNode } from "react";
 import { EvaluatorTypePill, PreBuiltPill } from "@/components/EvaluatorPills";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
-import { EyeIcon } from "@/components/icons";
+import { EyeIcon, WarningTriangleIcon } from "@/components/icons";
 import { EVALUATOR_CARD_BUTTON_CLASS } from "./DuplicateEvaluatorButton";
 
 type Props = {
   evaluator: EvaluatorData;
   /** Drawn after View: Duplicate, then Remove on an agent or Delete in the library. */
   actions?: ReactNode;
+  /** One line under the description, for something the reader needs to fix. */
+  warning?: string;
 } & HTMLAttributes<HTMLDivElement>;
 
 /**
@@ -20,7 +22,7 @@ type Props = {
  * the evaluator's own page. Shared by the evaluator library pages and the
  * agent Evaluators tab, so the two read and behave the same.
  */
-export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
+export function EvaluatorCard({ evaluator, actions, warning, ...rest }: Props) {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
@@ -36,7 +38,7 @@ export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
         aria-label={`Open ${evaluator.name}`}
         className="absolute inset-0 rounded-xl z-0 cursor-pointer"
       />
-      <div className="relative z-10 pointer-events-none flex items-start justify-between gap-3">
+      <div className="relative z-10 pointer-events-none flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-base font-semibold text-foreground">
@@ -59,8 +61,14 @@ export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
               {evaluator.description}
             </p>
           )}
+          {warning && (
+            <p className="flex items-center gap-1.5 text-xs text-orange-700 dark:text-orange-300 mt-1">
+              <WarningTriangleIcon className="w-3.5 h-3.5 flex-shrink-0 text-orange-600 dark:text-orange-400" />
+              {warning}
+            </p>
+          )}
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0 pointer-events-auto">
+        <div className="flex flex-wrap items-center gap-1 sm:flex-shrink-0 pointer-events-auto">
           <button
             type="button"
             onClick={() => setPreviewOpen(true)}

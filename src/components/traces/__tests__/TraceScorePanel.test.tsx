@@ -14,6 +14,7 @@ beforeEach(() => {
 });
 
 jest.mock("../../EvaluatorVerdictCard", () => ({
+  evaluatorCardSurfaceClass: () => "evaluator-card",
   EvaluatorVerdictCard: ({
     name,
     description,
@@ -299,9 +300,9 @@ it("names each evaluator that could not score the trace, and why", () => {
     screen.getByText("No evaluator on this agent could score this trace"),
   ).toBeInTheDocument();
   expect(screen.getByText("Tone check")).toBeInTheDocument();
-  expect(
-    screen.getByText(/uses variables, which cannot be filled/),
-  ).toBeInTheDocument();
+  expect(screen.getByText("Tone check").closest("li")).toHaveTextContent(
+    "Tone check: has not been configured for traces. Configure it in the Evaluators tab",
+  );
 });
 
 describe("the Score this trace button", () => {
@@ -369,6 +370,401 @@ it("offers Try again on a failed run only when given a way to retry", async () =
   rerender(<TraceScorePanel run={failed} onTryAgain={onTryAgain} />);
   await user.click(screen.getByRole("button", { name: "Try again" }));
   expect(onTryAgain).toHaveBeenCalledTimes(1);
+});
+
+it("names an evaluator once when it is shown with a Configure button", () => {
+  render(
+    <TraceScorePanel
+      run={{
+        ...completed,
+        status: "skipped",
+        error: "no_usable_evaluators",
+        results: [],
+        unconfigured_evaluators: [{ evaluator_uuid: "e1", name: "Tone check" }],
+      }}
+      ineligible={[
+        {
+          evaluator_uuid: "e1",
+          name: "Tone check",
+          reason: "declares_variables",
+        },
+      ]}
+      unconfigured={[{ evaluator_uuid: "e1", name: "Tone check" }]}
+    />,
+  );
+  expect(screen.getAllByText("Tone check")).toHaveLength(1);
+  expect(screen.getByRole("button", { name: "Configure" })).toBeInTheDocument();
+});
+
+it("leaves out of the list only the evaluators the run recorded as not configured", () => {
+  render(
+    <TraceScorePanel
+      run={{
+        ...completed,
+        status: "skipped",
+        error: "no_usable_evaluators",
+        results: [],
+        unconfigured_evaluators: [{ evaluator_uuid: "e1", name: "Tone check" }],
+      }}
+      ineligible={[
+        {
+          evaluator_uuid: "e1",
+          name: "Tone check",
+          reason: "declares_variables",
+        },
+        {
+          evaluator_uuid: "e2",
+          name: "Politeness",
+          reason: "declares_variables",
+        },
+      ]}
+      unconfigured={[{ evaluator_uuid: "e2", name: "Politeness" }]}
+    />,
+  );
+  expect(screen.getAllByText("Tone check")).toHaveLength(1);
+  expect(screen.getByText("Tone check").closest("li")).toBeNull();
+  expect(screen.getByText("Politeness").closest("li")).not.toBeNull();
+});
+
+describe("variables a trace had no value for", () => {
+  const missing = (
+    evaluator_uuid: string,
+    name: string,
+    variable: string,
+    source: string,
+  ) => ({ evaluator_uuid, name, variable, source });
+  const skipped: TraceScoringRun = {
+    run_uuid: "r6",
+    status: "skipped",
+    created_at: "2026-08-29T12:00:00Z",
+    error: "missing_trace_values",
+    results: [],
+    missing_values: [
+      missing("ev-9", "Agrees with the nurse", "nurse_reply", "metadata.expert_answer"),
+    ],
+  };
+  const GENERIC = "This trace is missing a value that its evaluators need";
+
+  it("names the metadata entry, and shows no general line on a skipped run", () => {
+    const { container } = render(<TraceScorePanel run={skipped} />);
+
+    const block = container.querySelector('[class*="border-orange-500"]');
+    expect(block).toHaveTextContent(
+      "Agrees with the nurseCould not run. {{nurse_reply}} reads from the metadata entry expert_answer, and this trace has none.",
+    );
+    expect(block?.querySelector("p.text-orange-700")).not.toBeNull();
+    expect(block?.querySelector("svg")).not.toBeNull();
+    expect(screen.queryByText(GENERIC)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["input", "the input"],
+    ["output.response", "the agent reply"],
+    ["output.tool_calls", "the tool calls"],
+    ["labels", "the labels"],
+    ["conversation_id", "the conversation ID"],
+    ["message_id", "the message ID"],
+  ])("names %s in words", (source, words) => {
+    render(
+      <TraceScorePanel
+        run={{ ...skipped, missing_values: [missing("e", "E", "x", source)] }}
+      />,
+    );
+    expect(
+      screen.getByText(
+        (_, el) =>
+          el?.tagName === "P" &&
+          el.textContent ===
+            `Could not run. {{x}} reads from ${words}, and this trace has none.`,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["conversation", "input", "the conversation"],
+    ["conversation", "output.response", "the agent reply"],
+    ["general", "input", "the input"],
+    ["general", "output.response", "the output"],
+  ] as const)(
+    "names %s %s the way that agent's dropdown does",
+    (agentNature, source, words) => {
+      render(
+        <TraceScorePanel
+          agentNature={agentNature}
+          run={{ ...skipped, missing_values: [missing("e", "E", "x", source)] }}
+        />,
+      );
+      expect(
+        screen.getByText(
+          (_, el) =>
+            el?.tagName === "P" &&
+            el.textContent ===
+              `Could not run. {{x}} reads from ${words}, and this trace has none.`,
+        ),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("puts several variables of one evaluator in one block, one sentence each", () => {
+    const { container } = render(
+      <TraceScorePanel
+        run={{
+          ...skipped,
+          missing_values: [
+            missing("e1", "First", "a", "labels"),
+            missing("e2", "Second", "c", "input"),
+            missing("e1", "First", "b", "message_id"),
+          ],
+        }}
+      />,
+    );
+
+    const blocks = container.querySelectorAll('[class*="border-orange-500"]');
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]).toHaveTextContent("{{a}} reads from the labels");
+    expect(blocks[0]).toHaveTextContent("{{b}} reads from the message ID");
+    expect(blocks[0].querySelectorAll("p.text-orange-700")).toHaveLength(2);
+    expect(blocks[1]).toHaveTextContent("{{c}} reads from the input");
+  });
+
+  it("shows a block beside the scores of a completed run", () => {
+    const { container } = render(
+      <TraceScorePanel
+        run={{
+          ...completed,
+          missing_values: [missing("e3", "Third", "x", "labels")],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("verdict-Tone")).toBeInTheDocument();
+    expect(container.querySelector('[class*="border-orange-500"]')).toHaveTextContent(
+      "Third",
+    );
+  });
+
+  it("shows only the block when a completed run has no scores", () => {
+    const { container } = render(
+      <TraceScorePanel
+        run={{
+          ...completed,
+          results: [],
+          missing_values: [missing("e3", "Third", "x", "labels")],
+        }}
+      />,
+    );
+
+    expect(container.querySelector('[class*="border-orange-500"]')).not.toBeNull();
+    expect(
+      screen.queryByText("This run produced no scores."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the general line when the skipped run names nothing", () => {
+    const { container, rerender } = render(
+      <TraceScorePanel run={{ ...skipped, missing_values: [] }} />,
+    );
+    expect(screen.getByText(GENERIC)).toBeInTheDocument();
+    expect(container.querySelector('[class*="border-orange-500"]')).toBeNull();
+
+    // A run from before the backend reported these.
+    rerender(<TraceScorePanel run={{ ...skipped, missing_values: undefined }} />);
+    expect(screen.getByText(GENERIC)).toBeInTheDocument();
+  });
+
+  it("leaves other run states as they are", () => {
+    const values = skipped.missing_values;
+    const { container, rerender } = render(
+      <TraceScorePanel
+        run={{ ...skipped, error: "over_limit", missing_values: values }}
+      />,
+    );
+    expect(container.querySelector(".evaluator-card")).toBeNull();
+
+    rerender(
+      <TraceScorePanel run={{ ...skipped, status: "failed", missing_values: values }} />,
+    );
+    expect(
+      screen.getByText("The evaluators could not score this trace."),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".evaluator-card")).toBeNull();
+
+    rerender(<TraceScorePanel run={{ ...skipped, status: "pending" }} />);
+    expect(
+      screen.getByText("Running the evaluators on this trace"),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".evaluator-card")).toBeNull();
+  });
+});
+
+describe("evaluators not configured for traces", () => {
+  const NOTE = "Did not run as it has not been configured for traces";
+  const unconfigured = [
+    { evaluator_uuid: "ev-5", name: "Accuracy" },
+    { evaluator_uuid: "ev-9", name: "Agrees with the nurse" },
+  ];
+  const recorded: TraceScoringRun = {
+    ...completed,
+    unconfigured_evaluators: unconfigured,
+  };
+
+  it("shows one card per evaluator with the note and a Configure button for it", async () => {
+    const user = setupUser();
+    const onConfigure = jest.fn();
+    render(
+      <TraceScorePanel
+        run={recorded}
+        unconfigured={unconfigured}
+        onConfigure={onConfigure}
+      />,
+    );
+    expect(screen.getByText("Accuracy")).toBeInTheDocument();
+    expect(screen.getByText("Agrees with the nurse")).toBeInTheDocument();
+    expect(screen.getAllByText(NOTE)).toHaveLength(2);
+    expect(screen.getAllByText(NOTE)[0]).toHaveClass("text-orange-700");
+    expect(
+      screen.getByText("Accuracy").closest('[class*="border-orange-500"]'),
+    ).not.toBeNull();
+    expect(screen.getByText("Accuracy").querySelector("svg")).not.toBeNull();
+
+    await user.click(screen.getAllByRole("button", { name: "Configure" })[1]);
+    expect(onConfigure).toHaveBeenCalledWith("ev-9");
+  });
+
+  it("keeps the button on screen and busy while its evaluator loads", () => {
+    render(
+      <TraceScorePanel
+        run={recorded}
+        unconfigured={unconfigured}
+        configuringUuid="ev-5"
+      />,
+    );
+    const [first, second] = screen.getAllByRole("button", {
+      name: /Configure/,
+    });
+    expect(first).toBeDisabled();
+    expect(second).toBeEnabled();
+  });
+
+  it("leaves out an evaluator the run already names as missing a value", () => {
+    render(
+      <TraceScorePanel
+        run={{
+          ...recorded,
+          missing_values: [
+            {
+              evaluator_uuid: "ev-9",
+              name: "Agrees with the nurse",
+              variable: "nurse_reply",
+              source: "labels",
+            },
+          ],
+        }}
+        unconfigured={unconfigured}
+      />,
+    );
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    expect(screen.getAllByText("Agrees with the nurse")).toHaveLength(1);
+  });
+
+  it("shows no cards while the run is in progress, beside an error, or with none given", () => {
+    const { rerender } = render(
+      <TraceScorePanel
+        run={{ ...recorded, status: "processing" }}
+        unconfigured={unconfigured}
+      />,
+    );
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    rerender(
+      <TraceScorePanel
+        run={recorded}
+        error="Could not load"
+        unconfigured={unconfigured}
+      />,
+    );
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    rerender(<TraceScorePanel run={completed} />);
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
+
+  it("keeps a card for an evaluator configured since, with no Configure button", () => {
+    render(<TraceScorePanel run={recorded} unconfigured={[]} />);
+    expect(screen.getAllByText(NOTE)).toHaveLength(2);
+    expect(screen.getByText("Accuracy")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Configure" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows no card for an evaluator the run did not leave out", () => {
+    render(<TraceScorePanel run={completed} unconfigured={unconfigured} />);
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    expect(screen.queryByText("Accuracy")).not.toBeInTheDocument();
+  });
+
+  it("offers Configure only on the cards still not configured", () => {
+    render(
+      <TraceScorePanel
+        run={recorded}
+        unconfigured={[
+          { evaluator_uuid: "ev-9", name: "Agrees with the nurse" },
+        ]}
+      />,
+    );
+    expect(screen.getAllByText(NOTE)).toHaveLength(2);
+    const buttons = screen.getAllByRole("button", { name: "Configure" });
+    expect(buttons).toHaveLength(1);
+    expect(
+      screen
+        .getByText("Agrees with the nurse")
+        .closest('[class*="border-orange-500"]'),
+    ).toContainElement(buttons[0]);
+  });
+});
+
+describe("cards beside a skipped or failed run", () => {
+  const NOTE = "Did not run as it has not been configured for traces";
+  const unconfigured = [{ evaluator_uuid: "ev-5", name: "Accuracy" }];
+
+  it.each(["no_usable_evaluators", "missing_trace_values"])(
+    "shows them when the run was skipped for %s",
+    (reason) => {
+      render(
+        <TraceScorePanel
+          run={{
+            ...completed,
+            status: "skipped",
+            error: reason,
+            results: [],
+            unconfigured_evaluators: unconfigured,
+          }}
+          unconfigured={unconfigured}
+        />,
+      );
+      expect(screen.getByText(NOTE)).toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    ["skipped", "over_limit"],
+    ["skipped", "no_tool_call_evaluator"],
+    ["skipped", "scoring_disabled"],
+    ["failed", "missing_trace_values"],
+  ] as const)("leaves them out when the run is %s for %s", (status, reason) => {
+    render(
+      <TraceScorePanel
+        run={{
+          ...completed,
+          status,
+          error: reason,
+          results: [],
+          unconfigured_evaluators: unconfigured,
+        }}
+        unconfigured={unconfigured}
+      />,
+    );
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
 });
 
 it("points at the Evaluators tab when no evaluator fits and none is listed", async () => {

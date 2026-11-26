@@ -9,6 +9,7 @@ import {
   fetchAgentEvaluators,
   addEvaluatorsToAgent,
   detachEvaluatorFromAgent,
+  saveEvaluatorTraceVariables,
   deleteEvaluator,
   deleteEvaluatorVersion,
   supportsEvaluatorVariables,
@@ -359,6 +360,53 @@ describe("fetch helpers", () => {
       "http://test-backend/agents/agent-1/evaluators/ev-3",
       expect.objectContaining({ method: "DELETE" }),
     );
+  });
+
+  it("saveEvaluatorTraceVariables PUTs the whole map", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(mockResponse());
+
+    await saveEvaluatorTraceVariables(
+      "agent-1",
+      "ev-3",
+      { ai_reply: "output.response" },
+      "token",
+    );
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://test-backend/agents/agent-1/evaluators/ev-3/trace-variables",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({
+          trace_variables: { ai_reply: "output.response" },
+        }),
+      }),
+    );
+  });
+
+  it("saveEvaluatorTraceVariables signs out on 401 without throwing", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      mockResponse({ ok: false, status: 401 }),
+    );
+
+    await expect(
+      saveEvaluatorTraceVariables("agent-1", "ev-3", {}, "token"),
+    ).resolves.toBeUndefined();
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("saveEvaluatorTraceVariables throws the backend's detail", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      mockResponse({
+        ok: false,
+        status: 422,
+        headers: { "content-type": "application/json" },
+        jsonBody: { detail: "Unknown trace value" },
+      }),
+    );
+
+    await expect(
+      saveEvaluatorTraceVariables("agent-1", "ev-3", {}, "token"),
+    ).rejects.toThrow("Unknown trace value");
   });
 
   it("deleteEvaluator DELETEs the evaluator record", async () => {
