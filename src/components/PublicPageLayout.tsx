@@ -100,14 +100,13 @@ export function PublicPageLayout({
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Minimal top bar */}
-      <header className="border-b border-border px-4 md:px-8 py-3 flex flex-wrap md:flex-nowrap items-center justify-between gap-y-2 shrink-0">
+      <header className="border-b border-border px-4 md:px-8 py-3 flex items-center justify-between gap-3 shrink-0">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <span className="text-[15px] font-semibold tracking-tight">Calibrate</span>
         </Link>
+        {/* A phone's bar has room only for the wordmark and the buttons. */}
         {(title || pills) && (
-          // On a phone the bar has room only for its buttons, so the title
-          // wraps onto a line of its own under them.
-          <div className="order-last basis-full md:order-none md:basis-auto flex items-center justify-center md:justify-start gap-2 min-w-0 md:max-w-[50%] md:mx-4">
+          <div className="hidden md:flex items-center gap-2 min-w-0 max-w-[50%] mx-4">
             {title && (
               <span className="text-sm font-semibold text-foreground truncate">{title}</span>
             )}
@@ -140,6 +139,24 @@ export function PublicPageLayout({
                 {themeIcon}
               </button>
             </div>
+            {/* Auth link */}
+            {!isLoading && (
+              isAuthenticated ? (
+                <Link
+                  href="/agents"
+                  className="inline-flex items-center h-8 px-4 rounded-lg text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+                >
+                  Go to app
+                </Link>
+              ) : (
+                <Link
+                  href="/login"
+                  className="inline-flex items-center h-8 px-4 rounded-lg text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
+                >
+                  Sign in
+                </Link>
+              )
+            )}
             {/* Phone: the same, behind one ⋯ button, so the bar fits */}
             <div className="relative md:hidden" ref={menuRef}>
               <button
@@ -187,24 +204,6 @@ export function PublicPageLayout({
               )}
             </div>
 
-            {/* Auth link */}
-            {!isLoading && (
-              isAuthenticated ? (
-                <Link
-                  href="/agents"
-                  className="inline-flex items-center h-8 px-4 rounded-lg text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-                >
-                  Go to app
-                </Link>
-              ) : (
-                <Link
-                  href="/login"
-                  className="inline-flex items-center h-8 px-4 rounded-lg text-[13px] font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
-                >
-                  Sign in
-                </Link>
-              )
-            )}
           </div>
         )}
       </header>

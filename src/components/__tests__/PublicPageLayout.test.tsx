@@ -56,12 +56,10 @@ describe("PublicPageLayout", () => {
     expect(screen.getByText("Pill")).toBeInTheDocument();
 
     // On a phone the title takes its own line under the buttons.
+    // A phone's bar shows only the wordmark and the buttons.
     expect(screen.getByText("Run details").parentElement).toHaveClass(
-      "order-last",
-      "basis-full",
-      "md:order-none",
-      "justify-center",
-      "md:justify-start",
+      "hidden",
+      "md:flex",
     );
   });
 
@@ -79,8 +77,13 @@ describe("PublicPageLayout", () => {
     await user.click(inBar);
     expect(onNewChat).toHaveBeenCalledTimes(1);
 
-    // Phone: the same button and the theme toggle sit behind the ⋯ menu.
+    // Phone: the same button and the theme toggle sit behind the ⋯ menu,
+    // which comes after Go to app.
     const more = screen.getByRole("button", { name: "More actions" });
+    const signIn = screen.getByRole("link", { name: /Sign in|Go to app/ });
+    expect(
+      signIn.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(more.parentElement).toHaveClass("md:hidden");
     await user.click(more);
     await user.click(screen.getByRole("menuitem", { name: "New chat" }));
