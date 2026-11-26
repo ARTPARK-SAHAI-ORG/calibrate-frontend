@@ -85,9 +85,11 @@ function RunBody({
         <p className="text-sm text-amber-700 dark:text-amber-300">
           {/* A lone reason takes no full stop. Only the limit one is followed
               by a second sentence, so only it needs one. */}
-          {run.error === "over_limit" && usesOwnProviderKeys
-            ? "This trace was not scored because the workspace had reached its scoring limit at the time"
-            : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" || canScore ? "." : ""}`}
+          {canScore
+            ? "No evaluator could score this trace when it came in. The agent has one that can now."
+            : run.error === "over_limit" && usesOwnProviderKeys
+              ? "This trace was not scored because the workspace had reached its scoring limit at the time"
+              : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`}
           {run.error === "over_limit" && !usesOwnProviderKeys && (
             <>
               {" "}

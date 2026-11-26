@@ -328,7 +328,9 @@ describe("the Score this trace button", () => {
       screen.getByRole("button", { name: "Score this trace" }),
     ).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent("Tone");
-    expect(document.body).toHaveTextContent(/\.\s*Score this trace$/);
+    expect(document.body).toHaveTextContent(
+      /No evaluator could score this trace when it came in\. The agent has one that can now\.\s*Score this trace$/,
+    );
   });
 
   it("does not show for a trace skipped for another reason", () => {
