@@ -1,5 +1,6 @@
 ## November 2026
 
+- The title of a shared page, such as an agent chat link or shared results, now sits on its own line under the top bar on a phone, and the Score this trace button has more space above it ([#892](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/892))
 - AI evaluators can now score tool calls on agents, traces and labelling tasks, so tool call items no longer need a person to judge them ([#854](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/854))
 - A trace that was skipped because no evaluator could score it now has a Score this trace button in its window, so you can run the evaluators on it once the agent has one that can score traces ([#888](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/888))
 - The Analytics page now shows how many messages agents' chat links answered, in a card, in the workspace table and on the traces chart ([#887](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/887))
