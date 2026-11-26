@@ -1,3 +1,5 @@
+import type { EvaluatorType } from "@/components/EvaluatorPills";
+
 // Evaluator names that collide with reserved bulk-upload CSV columns.
 //
 // In `BulkUploadTestsModal`, each attached evaluator gets a per-row "include"
@@ -18,4 +20,27 @@ export function isReservedEvaluatorName(name: string): boolean {
 // User-facing error message shown when a reserved name is entered.
 export function reservedEvaluatorNameError(name: string): string {
   return `"${name.trim()}" is a reserved keyword and can't be used as an evaluator name`;
+}
+
+// What each kind of evaluator judges, as it reads inside a suggested name.
+const KIND_WORDS: Record<EvaluatorType, string> = {
+  llm: "conversation reply",
+  conversation: "whole conversation",
+  "llm-general": "basic output",
+  "tool-call": "tool call",
+  stt: "speech to text",
+  tts: "text to speech",
+};
+
+// The name a new evaluator opens with, so it can be created without typing
+// one. A name already in the workspace gets " 2", " 3" and so on.
+export function defaultEvaluatorName(
+  type: EvaluatorType,
+  existingNames: string[],
+): string {
+  const base = `New ${KIND_WORDS[type]} evaluator`;
+  const taken = new Set(existingNames.map((n) => n.trim().toLowerCase()));
+  let name = base;
+  for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${base} ${n}`;
+  return name;
 }

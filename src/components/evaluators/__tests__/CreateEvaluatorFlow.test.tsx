@@ -179,11 +179,6 @@ describe("CreateEvaluatorFlow", () => {
     ).not.toBeInTheDocument();
     expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
 
-    // Nothing is created until the reader names it.
-    await user.click(screen.getByText("Submit create"));
-    expect(onCreated).not.toHaveBeenCalled();
-
-    await user.type(screen.getByLabelText("Name"), "Refund policy");
     await user.click(screen.getByText("Submit create"));
 
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
@@ -195,12 +190,12 @@ describe("CreateEvaluatorFlow", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("leaves the name empty for the reader to fill in", async () => {
+  it("opens with a name that says what the evaluator judges, numbered past names already taken", async () => {
     render(
       <CreateEvaluatorFlow
         open
         onClose={jest.fn()}
-        existingEvaluators={[]}
+        existingEvaluators={[{ name: "New conversation reply evaluator" }]}
         onCreated={jest.fn()}
         useCaseGroups={["conversation"]}
         useCaseTypes={["llm"]}
@@ -213,8 +208,41 @@ describe("CreateEvaluatorFlow", () => {
         "Judge the reply",
       ),
     );
-    // The name the backend suggests is not put in the box.
-    expect(screen.getByLabelText("Name")).toHaveValue("");
+    // The name the backend suggests is not used.
+    expect(screen.getByLabelText("Name")).toHaveValue(
+      "New conversation reply evaluator 2",
+    );
+  });
+
+  it("names the evaluator after the answer picked, and posts that name", async () => {
+    const user = setupUser();
+    render(
+      <CreateEvaluatorFlow
+        open
+        onClose={jest.fn()}
+        existingEvaluators={[]}
+        onCreated={jest.fn()}
+      />,
+    );
+
+    await user.click(screen.getByText("Voice"));
+    await user.click(screen.getByText("Speech to Text"));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByLabelText("Name")).toHaveValue(
+      "New speech to text evaluator",
+    );
+
+    await user.click(screen.getByText("Submit create"));
+    const fetchMock = global.fetch as jest.Mock;
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, init]) =>
+          String(url).endsWith("/evaluators") && init?.method === "POST",
+      );
+      expect(JSON.parse(post![1].body as string).name).toBe(
+        "New speech to text evaluator",
+      );
+    });
   });
 
   it("says the name is needed and puts the cursor back on the box", async () => {
@@ -233,6 +261,7 @@ describe("CreateEvaluatorFlow", () => {
     );
 
     expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
+    await user.clear(screen.getByLabelText("Name"));
     await user.click(screen.getByText("Submit create"));
 
     expect(await screen.findByText("Name is required")).toBeInTheDocument();

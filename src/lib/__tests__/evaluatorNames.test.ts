@@ -1,5 +1,6 @@
 import {
   RESERVED_EVALUATOR_NAMES,
+  defaultEvaluatorName,
   isReservedEvaluatorName,
   reservedEvaluatorNameError,
 } from "../evaluatorNames";
@@ -32,5 +33,27 @@ describe("reservedEvaluatorNameError", () => {
     expect(reservedEvaluatorNameError("  name  ")).toBe(
       `"name" is a reserved keyword and can't be used as an evaluator name`,
     );
+  });
+});
+
+describe("defaultEvaluatorName", () => {
+  it.each([
+    ["llm", "New conversation reply evaluator"],
+    ["conversation", "New whole conversation evaluator"],
+    ["llm-general", "New basic output evaluator"],
+    ["tool-call", "New tool call evaluator"],
+    ["stt", "New speech to text evaluator"],
+    ["tts", "New text to speech evaluator"],
+  ] as const)("names %s as %s", (type, expected) => {
+    expect(defaultEvaluatorName(type, [])).toBe(expected);
+  });
+
+  it("adds the next free number when the name is taken, ignoring case and spaces", () => {
+    expect(
+      defaultEvaluatorName("stt", [
+        " new speech to text evaluator ",
+        "New speech to text evaluator 2",
+      ]),
+    ).toBe("New speech to text evaluator 3");
   });
 });
