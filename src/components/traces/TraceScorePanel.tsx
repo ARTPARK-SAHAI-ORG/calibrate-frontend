@@ -33,6 +33,8 @@ type TraceScorePanelProps = {
   scoreTrace?: React.ReactNode;
   /** The agent's evaluators that can score this trace now, named beside it. */
   scoringEvaluatorNames?: string[];
+  /** Scores the trace again after its scoring failed. */
+  onTryAgain?: () => void;
 };
 
 const listNames = new Intl.ListFormat("en-GB", { type: "conjunction" });
@@ -55,12 +57,14 @@ function RunBody({
   ineligible = [],
   scoreTrace,
   scoringEvaluatorNames = [],
+  onTryAgain,
 }: {
   run: TraceScoringRun;
   descriptions?: Record<string, string>;
   ineligible?: TraceScoringIneligibleEvaluator[];
   scoreTrace?: React.ReactNode;
   scoringEvaluatorNames?: string[];
+  onTryAgain?: () => void;
 }) {
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
   if (isTraceScoringInProgress(run.status)) {
@@ -78,6 +82,7 @@ function RunBody({
         details={run.error ?? null}
         sentence="The evaluators could not score this trace."
         className="w-full"
+        onTryAgain={onTryAgain}
       />
     );
   }
@@ -180,6 +185,7 @@ export function TraceScorePanel({
   ineligible,
   scoreTrace,
   scoringEvaluatorNames,
+  onTryAgain,
 }: TraceScorePanelProps) {
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -193,6 +199,7 @@ export function TraceScorePanel({
           ineligible={ineligible}
           scoreTrace={scoreTrace}
           scoringEvaluatorNames={scoringEvaluatorNames}
+          onTryAgain={onTryAgain}
         />
       ) : null}
     </div>

@@ -500,7 +500,7 @@ export function TraceDetailDialog({
   const shownTraceRef = useRef(traceUuid);
   shownTraceRef.current = traceUuid;
   const startScoring = async () => {
-    if (!accessToken || !traceUuid) return;
+    if (!accessToken || !traceUuid || scoringUuid === traceUuid) return;
     const scored = traceUuid;
     setScoringUuid(scored);
     try {
@@ -534,6 +534,8 @@ export function TraceDetailDialog({
       Score this trace
     </button>
   ) : undefined;
+  const tryAgain =
+    scoringEvaluatorNames.length > 0 ? () => void startScoring() : undefined;
 
   useDialogNavKeys({ isOpen, onClose, hasPrev, onPrev, hasNext, onNext });
   // Same width and limits as the evaluators column of the test results window.
@@ -720,6 +722,7 @@ export function TraceDetailDialog({
                   ineligible={ineligibleEvaluators}
                   scoreTrace={scoreTraceButton}
                   scoringEvaluatorNames={scoringEvaluatorNames}
+                  onTryAgain={tryAgain}
                 />
               </div>
             )}
@@ -746,6 +749,7 @@ export function TraceDetailDialog({
                     ineligible={ineligibleEvaluators}
                     scoreTrace={scoreTraceButton}
                     scoringEvaluatorNames={scoringEvaluatorNames}
+                    onTryAgain={tryAgain}
                   />
                 </div>
               </div>

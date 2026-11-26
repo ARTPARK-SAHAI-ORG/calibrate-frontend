@@ -1498,6 +1498,23 @@ describe("Score this trace", () => {
     }
   });
 
+  it("tries a failed run again from the failure box", async () => {
+    mockFetchTraceScores.mockResolvedValue({
+      runs: [{ ...skipped, status: "failed", error: "Error code: 402" }],
+    });
+    mockScoreTrace.mockResolvedValue({ run_uuid: "run-new", status: "pending" });
+    const user = setupUser();
+    open(true);
+    const [button] = await screen.findAllByRole("button", { name: "Try again" });
+    await user.click(button);
+    expect(mockScoreTrace).toHaveBeenCalledWith("tok", "t1");
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("Running the evaluators on this trace").length,
+      ).toBeGreaterThan(0),
+    );
+  });
+
   it("shows the backend's reason when the request is refused", async () => {
     const { toast } = jest.requireMock("sonner");
     mockScoreTrace.mockRejectedValue(

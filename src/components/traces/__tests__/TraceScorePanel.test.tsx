@@ -1,4 +1,4 @@
-import { render, screen } from "@/test-utils";
+import { render, screen, setupUser } from "@/test-utils";
 import { CONTACT_LINK } from "@/constants/limits";
 import { TraceScorePanel } from "../TraceScorePanel";
 import type { TraceScoringRun } from "@/lib/tracesApi";
@@ -346,4 +346,21 @@ describe("the Score this trace button", () => {
       screen.queryByRole("button", { name: "Score this trace" }),
     ).not.toBeInTheDocument();
   });
+});
+
+it("offers Try again on a failed run only when given a way to retry", async () => {
+  const failed: TraceScoringRun = {
+    run_uuid: "r-failed",
+    status: "failed",
+    created_at: "2026-08-29T12:00:00Z",
+    error: "Error code: 402",
+    results: [],
+  };
+  const onTryAgain = jest.fn();
+  const user = setupUser();
+  const { rerender } = render(<TraceScorePanel run={failed} />);
+  expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+  rerender(<TraceScorePanel run={failed} onTryAgain={onTryAgain} />);
+  await user.click(screen.getByRole("button", { name: "Try again" }));
+  expect(onTryAgain).toHaveBeenCalledTimes(1);
 });
