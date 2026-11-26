@@ -3,7 +3,9 @@ import { AddToolCallEvaluatorButton } from "../AddToolCallEvaluatorButton";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 import { toast } from "sonner";
 
-jest.mock("sonner", () => ({ toast: { error: jest.fn() } }));
+jest.mock("sonner", () => ({
+  toast: { error: jest.fn(), success: jest.fn() },
+}));
 
 // The real create flow is a multi-step form, which these tests are not about.
 jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
@@ -18,10 +20,13 @@ jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
   }) => (
     <div data-testid="create-flow">
       {useCaseTypes?.join(",")}
-      <button type="button" onClick={() => {
+      <button
+        type="button"
+        onClick={() => {
           onCreated({ uuid: "ev-new" });
           onClose();
-        }}>
+        }}
+      >
         Finish creating
       </button>
     </div>
@@ -70,6 +75,40 @@ beforeEach(() => {
     }),
   ]);
   addEvaluatorsToAgent.mockResolvedValue({ linked: [], already_linked: [] });
+});
+
+it("adds the only tool call evaluator straight away, with no picker", async () => {
+  const user = setupUser();
+  const onAdded = jest.fn();
+  fetchAllEvaluators.mockResolvedValue([
+    evaluator({ uuid: "ev-llm", name: "Tone" }),
+    evaluator({
+      uuid: "ev-tc",
+      name: "Tool call correctness",
+      evaluator_type: "tool-call",
+    }),
+  ]);
+  render(
+    <AddToolCallEvaluatorButton
+      agentUuid="agent-1"
+      accessToken="token"
+      onAdded={onAdded}
+    />,
+  );
+
+  await user.click(
+    screen.getByRole("button", { name: "Add a tool call evaluator" }),
+  );
+
+  await waitFor(() =>
+    expect(addEvaluatorsToAgent).toHaveBeenCalledWith(
+      "agent-1",
+      ["ev-tc"],
+      "token",
+    ),
+  );
+  expect(onAdded).toHaveBeenCalled();
+  expect(screen.queryByText("Add evaluators")).not.toBeInTheDocument();
 });
 
 it("lists only the tool call evaluators, and adds the ones picked", async () => {

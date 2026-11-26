@@ -45,12 +45,34 @@ export function AddToolCallEvaluatorButton({
     return () => onOpenChange?.(false);
   }, [windowOpen, onOpenChange]);
 
+  const add = async (uuids: string[]) => {
+    if (!accessToken) return;
+    await addEvaluatorsToAgent(agentUuid, uuids, accessToken);
+    onAdded();
+  };
+
   const [loading, setLoading] = useState(false);
+  // With exactly one tool call evaluator there is nothing to choose, so it is
+  // added straight away. With none or several, the picker opens.
   const open = async () => {
     if (!accessToken || loading) return;
     setLoading(true);
     try {
-      setLibrary(await fetchAllEvaluators(accessToken));
+      const all = await fetchAllEvaluators(accessToken);
+      setLibrary(all);
+      const toolCall = all.filter((e) => e.evaluator_type === "tool-call");
+      if (toolCall.length === 1) {
+        try {
+          await add([toolCall[0].uuid]);
+          toast.success(`Added ${toolCall[0].name} to this agent`);
+        } catch (err) {
+          reportError("Error adding the tool call evaluator:", err);
+          toast.error(
+            "Could not add the tool call evaluator. Please try again.",
+          );
+        }
+        return;
+      }
     } catch (err) {
       reportError("Error fetching tool call evaluators:", err);
       toast.error("Could not load your evaluators. Please try again.");
@@ -59,12 +81,6 @@ export function AddToolCallEvaluatorButton({
       setLoading(false);
     }
     setPickerOpen(true);
-  };
-
-  const add = async (uuids: string[]) => {
-    if (!accessToken) return;
-    await addEvaluatorsToAgent(agentUuid, uuids, accessToken);
-    onAdded();
   };
 
   const addCreated = async (evaluator: EvaluatorData) => {
