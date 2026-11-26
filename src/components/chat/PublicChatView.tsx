@@ -6,15 +6,15 @@ import {
   PublicNotFound,
   PublicPageLayout,
 } from "@/components/PublicPageLayout";
-import { Button, EmptyState, ErrorNote, InfoNote } from "@/components/ui";
+import { EmptyState, ErrorNote, InfoNote } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { AddedToTestsDialog } from "@/components/traces/AddedToTestsDialog";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
 import { setActiveOrgUuid } from "@/lib/orgs";
 import type { ConvertTestType } from "@/lib/tracesApi";
 import {
   ChatIcon,
-  ExternalLinkIcon,
   InfoIcon,
   PlusIcon,
   ThumbsDownIcon,
@@ -134,8 +134,8 @@ export function PublicChatView({ token }: { token: string }) {
     testType: ConvertTestType;
     userMessage: string | null;
   } | null>(null);
-  // The test just made from a reply, for the confirmation to link to.
-  const [addedTestUuid, setAddedTestUuid] = useState<string | null>(null);
+  // The tests just made from a reply, for the confirmation to link to.
+  const [addedTests, setAddedTests] = useState<string[] | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const messageRef = useRef<HTMLTextAreaElement>(null);
   // Bumped by New chat, so a reply still on its way to the old chat is dropped.
@@ -554,39 +554,18 @@ export function PublicChatView({ token }: { token: string }) {
           }
           onConverted={(result) => {
             setConverting(null);
-            setAddedTestUuid(result.test_uuids[0] ?? null);
+            setAddedTests(result.test_uuids);
           }}
         />
       )}
-      {addedTestUuid && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-background rounded-xl w-full max-w-md p-5 md:p-6 shadow-2xl">
-            <h2 className="text-base md:text-lg font-semibold text-foreground mb-2">
-              Added to tests
-            </h2>
-            <p className="text-sm md:text-base text-foreground mb-4">
-              This reply was added to the agent&apos;s tests
-            </p>
-            <div className="flex items-center justify-end gap-2 md:gap-3">
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => setAddedTestUuid(null)}
-              >
-                Close
-              </Button>
-              <a
-                href={`/${orgUuid}/agents/${agentId}?tab=tests&testId=${addedTestUuid}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="h-10 px-4 text-base inline-flex items-center gap-2 bg-foreground text-background hover:opacity-90 transition-opacity rounded-md font-medium cursor-pointer"
-              >
-                View test
-                <ExternalLinkIcon className="w-4 h-4" />
-              </a>
-            </div>
-          </div>
-        </div>
+      {addedTests && agentId && (
+        <AddedToTestsDialog
+          testUuids={addedTests}
+          orgUuid={orgUuid}
+          agentUuid={agentId}
+          noun="reply"
+          onClose={() => setAddedTests(null)}
+        />
       )}
     </PublicPageLayout>
   );

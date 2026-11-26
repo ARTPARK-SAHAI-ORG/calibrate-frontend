@@ -7,6 +7,7 @@ import { TracesTable } from "@/components/traces/TracesTable";
 import type { TraceScoreColumn } from "@/components/traces/TraceScoringSummary";
 import { TraceDetailDialog } from "@/components/traces/TraceDetailDialog";
 import { TracesEmptyState } from "@/components/traces/TracesEmptyState";
+import { AddedToTestsDialog } from "@/components/traces/AddedToTestsDialog";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
 import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
@@ -48,6 +49,7 @@ import {
 import { useAgentDefaultsPrompt } from "@/hooks/useAgentDefaultsPrompt";
 import {
   useAccessToken,
+  useActiveOrgUuid,
   useDialogUrlParam,
   useItemPager,
   usePageSize,
@@ -99,7 +101,6 @@ export function TracesTabContent({
   onGoToSettings,
   isActive = true,
   onTestsCreated,
-  onViewTests,
   onAgentDefaultsAttached,
 }: {
   agentUuid: string;
@@ -116,8 +117,6 @@ export function TracesTabContent({
   isActive?: boolean;
   /** Called after traces are turned into tests, so the Tests tab reloads. */
   onTestsCreated: () => void;
-  /** Opens the Tests tab, where the created tests are listed. */
-  onViewTests: () => void;
   /** Called after evaluators are attached here, so the Evaluators tab reloads. */
   onAgentDefaultsAttached?: () => void;
 }) {
@@ -368,6 +367,11 @@ export function TracesTabContent({
     accessToken,
     onAttached: () => onAgentDefaultsAttached?.(),
   });
+  const [orgUuid] = useActiveOrgUuid();
+  // The tests just added, for the confirmation window, and the offer to add
+  // their evaluators to the agent, which waits until that window closes.
+  const [addedTests, setAddedTests] = useState<string[] | null>(null);
+  const afterAdded = useRef<(() => void) | null>(null);
   const offerAgentDefaults = (
     chosen: { uuid: string; name?: string }[],
     lead: (isOne: boolean) => string,
@@ -1383,24 +1387,34 @@ export function TracesTabContent({
           // The created tests belong to this agent, so reload the Tests tab
           // and send the reader there rather than to the whole test library.
           onTestsCreated();
-          toast.success(`Created ${created} test${created === 1 ? "" : "s"}`, {
-            action: {
-              label: "View tests",
-              onClick: onViewTests,
-            },
-          });
+          setAddedTests(result.test_uuids);
           // Saved tests with no evaluator, or not added to the agent's Tests
           // tab. These stay until the reader closes them.
           for (const warning of result.warnings ?? []) {
             toast.warning(warning, { duration: Infinity });
           }
-          offerAgentDefaults(evaluatorsUsed, (isOne) =>
-            created === 1
-              ? `The test you just added uses ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`
-              : `The tests you just added use ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`,
-          );
+          afterAdded.current = () =>
+            offerAgentDefaults(evaluatorsUsed, (isOne) =>
+              created === 1
+                ? `The test you just added uses ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`
+                : `The tests you just added use ${isOne ? "an evaluator" : "evaluators"} that ${isOne ? "is" : "are"} not yet attached to this agent.`,
+            );
         }}
       />
+
+      {addedTests && (
+        <AddedToTestsDialog
+          testUuids={addedTests}
+          orgUuid={orgUuid}
+          agentUuid={agentUuid}
+          noun="trace"
+          onClose={() => {
+            setAddedTests(null);
+            afterAdded.current?.();
+            afterAdded.current = null;
+          }}
+        />
+      )}
 
       {/* Mounted only while open, so each visit starts from the agent's own
           evaluators rather than the last visit's ticks. */}

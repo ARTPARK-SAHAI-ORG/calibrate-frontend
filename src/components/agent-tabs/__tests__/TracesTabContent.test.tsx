@@ -16,6 +16,7 @@ const handleDeleted = jest.fn();
 
 jest.mock("../../../hooks", () => ({
   useAccessToken: () => "test-token",
+  useActiveOrgUuid: () => ["org-1", jest.fn()],
   useTraces: (args: unknown) => mockUseTraces(args),
   useTraceLabels: () => mockUseTraceLabels(),
   useTraceConversationIds: () => ({
@@ -374,6 +375,17 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
         <button
           type="button"
           onClick={() =>
+            onConverted({ created: 2, test_uuids: ["t1", "t2"] }, [
+              { uuid: "ev-9", name: "Tone check" },
+              { uuid: "ev-8", name: "Warmth" },
+            ])
+          }
+        >
+          finish adding two with new evaluators
+        </button>
+        <button
+          type="button"
+          onClick={() =>
             onConverted({
               created: 2,
               test_uuids: ["t1", "t2"],
@@ -450,7 +462,6 @@ function tracesResult(
 // The tab is only ever rendered by the agent detail page, which passes both
 // callbacks: one to reload the Tests tab, one to open it.
 const onTestsCreated = jest.fn();
-const onViewTests = jest.fn();
 const onGoToEvaluators = jest.fn();
 const onGoToSettings = jest.fn();
 const setEnabled = jest.fn(async () => {});
@@ -474,7 +485,6 @@ const traceScoring = {
 const tabProps = {
   agentUuid: "agent-1",
   onTestsCreated,
-  onViewTests,
   onGoToEvaluators,
   onGoToSettings,
   traceScoring,
@@ -2176,7 +2186,7 @@ describe("TracesTabContent", () => {
     expect(lastTracesArgs()).not.toHaveProperty("createdBefore");
   });
 
-  it("names one trace's test from its comment, else its message, and leaves a batch unnamed", async () => {
+  it("names one trace's test from its message when it has no comment", async () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
 
@@ -2185,6 +2195,32 @@ describe("TracesTabContent", () => {
     expect(
       JSON.parse(screen.getByTestId("convert-name-from").textContent!),
     ).toEqual({ userMessage: "When is the next vaccination?" });
+  });
+
+  it("hands over the comment left with a trace's feedback", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([
+        trace({
+          feedback: {
+            is_correct: false,
+            comment: "Skipped rotavirus",
+            at: "2026-11-26",
+          },
+        }),
+        trace({ uuid: "trace-2", message_id: null, input_preview: "Second" }),
+      ]),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Add to tests (1)"));
+    expect(
+      JSON.parse(screen.getByTestId("convert-name-from").textContent!),
+    ).toEqual({
+      comment: "Skipped rotavirus",
+      userMessage: "When is the next vaccination?",
+    });
   });
 
   it("keeps the ticks when Apply is pressed with nothing changed", async () => {
@@ -2983,12 +3019,11 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByText("Add to tests (1)"));
     await user.click(screen.getByText("finish adding"));
 
-    // Two uuids came back, so the message says two. The ticks stay on, so the
+    // Two uuids came back, so the window says two. The ticks stay on, so the
     // same traces can be sent for labelling without picking them again.
-    expect(toast.success).toHaveBeenCalledWith(
-      "Created 2 tests",
-      expect.anything(),
-    );
+    expect(
+      screen.getByText("2 traces were added to the agent's tests"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Add to tests (1)")).toBeInTheDocument();
   });
 
@@ -3018,6 +3053,16 @@ describe("TracesTabContent", () => {
     await user.click(screen.getAllByLabelText("Select trace")[0]);
     await user.click(screen.getByText("Add to tests (1)"));
     await user.click(screen.getByText("finish adding with a new evaluator"));
+    // The offer waits until the window saying the test was added is closed.
+    expect(
+      screen.queryByText("Attach this evaluator to the agent?"),
+    ).not.toBeInTheDocument();
+    const viewTest = screen.getByRole("link", { name: /View test/ });
+    expect(viewTest).toHaveAttribute(
+      "href",
+      "/org-1/agents/agent-1?tab=tests&testId=t1",
+    );
+    await user.click(screen.getByRole("button", { name: "Close" }));
 
     expect(
       await screen.findByText("Attach this evaluator to the agent?"),
@@ -3044,6 +3089,22 @@ describe("TracesTabContent", () => {
     );
   });
 
+  it("offers to attach evaluators in the plural after adding two tests", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Add to tests (1)"));
+    await user.click(screen.getByText("finish adding two with new evaluators"));
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(
+      await screen.findByText(
+        /The tests you just added use evaluators that are/,
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("does not offer to attach an evaluator the agent already has", async () => {
     const user = setupUser();
     fetchAgentEvaluators.mockResolvedValue([{ uuid: "ev-9" }]);
@@ -3059,7 +3120,7 @@ describe("TracesTabContent", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("reloads the Tests tab and sends View tests there", async () => {
+  it("reloads the Tests tab and links View tests to it", async () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
 
@@ -3068,10 +3129,10 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByText("finish adding"));
 
     expect(onTestsCreated).toHaveBeenCalledTimes(1);
-    const options = (toast.success as jest.Mock).mock.calls[0][1];
-    expect(options.action.label).toBe("View tests");
-    options.action.onClick();
-    expect(onViewTests).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("link", { name: /View tests/ })).toHaveAttribute(
+      "href",
+      "/org-1/agents/agent-1?tab=tests",
+    );
   });
 
   it("opens the add dialog with response type when a selected trace has a response", async () => {

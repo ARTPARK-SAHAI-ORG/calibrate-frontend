@@ -350,10 +350,15 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     await expect(dialog.getByText("Link to agents")).toHaveCount(0);
     await submit.click();
 
-    // Success toast with a link to the tests page.
-    await expect(page.getByText(/Created \d+ test/)).toBeVisible({
-      timeout: 15000,
-    });
+    // A window says it was added, with a link that opens the one test.
+    await expect(
+      page.getByText("This trace was added to the agent's tests"),
+    ).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("link", { name: /View test/ })).toHaveAttribute(
+      "href",
+      new RegExp(`/agents/${agentUuid}\\?tab=tests&testId=`),
+    );
+    await page.getByRole("button", { name: "Close" }).click();
 
     // The converted test is linked to this agent, so it shows on its Tests tab
     // under the name typed in the dialog.
