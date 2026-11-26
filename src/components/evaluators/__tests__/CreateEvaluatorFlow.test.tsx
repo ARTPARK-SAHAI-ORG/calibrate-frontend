@@ -336,6 +336,37 @@ describe("CreateEvaluatorFlow", () => {
     },
   );
 
+  it("names the evaluator after the answer picked, and posts that name", async () => {
+    const user = setupUser();
+    render(
+      <CreateEvaluatorFlow
+        open
+        onClose={jest.fn()}
+        existingEvaluators={[]}
+        onCreated={jest.fn()}
+      />,
+    );
+
+    await user.click(screen.getByText("Voice"));
+    await user.click(screen.getByText("Speech to Text"));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByLabelText("Name")).toHaveValue(
+      "New speech to text evaluator",
+    );
+
+    await user.click(screen.getByText("Submit create"));
+    const fetchMock = global.fetch as jest.Mock;
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, init]) =>
+          String(url).endsWith("/evaluators") && init?.method === "POST",
+      );
+      expect(JSON.parse(post![1].body as string).name).toBe(
+        "New speech to text evaluator",
+      );
+    });
+  });
+
   it("keeps a tool call evaluator's name plain when the agent kind was never asked", async () => {
     render(
       <CreateEvaluatorFlow
