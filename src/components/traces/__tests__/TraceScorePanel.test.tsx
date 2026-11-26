@@ -395,7 +395,7 @@ it("names an evaluator once when it is shown with a Configure button", () => {
     />,
   );
   expect(screen.getAllByText("Tone check")).toHaveLength(1);
-  expect(screen.getByRole("button", { name: "Configure" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Configure for traces" })).toBeInTheDocument();
 });
 
 describe("a trace skipped because every evaluator needs trace values", () => {
@@ -435,7 +435,7 @@ describe("a trace skipped because every evaluator needs trace values", () => {
     expect(
       screen.getAllByText("Did not run as it has not been configured for traces"),
     ).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "Configure" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Configure for traces" })).toHaveLength(2);
     const link = screen.getByRole("button", { name: "Evaluators tab" });
     expect(link.className).toContain("font-semibold");
     expect(link.className).not.toContain("underline");
@@ -729,7 +729,7 @@ describe("evaluators not configured for traces", () => {
     ).not.toBeNull();
     expect(screen.getByText("Accuracy").querySelector("svg")).not.toBeNull();
 
-    await user.click(screen.getAllByRole("button", { name: "Configure" })[1]);
+    await user.click(screen.getAllByRole("button", { name: "Configure for traces" })[1]);
     expect(onConfigure).toHaveBeenCalledWith("ev-9");
   });
 
@@ -814,7 +814,7 @@ describe("evaluators not configured for traces", () => {
     );
     expect(screen.getAllByText(NOTE)).toHaveLength(1);
     expect(screen.queryByText("Accuracy")).not.toBeInTheDocument();
-    const buttons = screen.getAllByRole("button", { name: "Configure" });
+    const buttons = screen.getAllByRole("button", { name: "Configure for traces" });
     expect(buttons).toHaveLength(1);
     expect(
       screen

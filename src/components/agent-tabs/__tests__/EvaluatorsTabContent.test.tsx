@@ -590,7 +590,7 @@ describe("EvaluatorsTabContent", () => {
 
   describe("choosing trace values", () => {
     const AMBER = "bg-amber-400";
-    const configure = () => screen.getByRole("button", { name: "Configure" });
+    const configure = () => screen.getByRole("button", { name: "Configure for traces" });
     const setUpButton = async () => {
       await waitFor(() => expect(configure()).toHaveClass(AMBER));
       return configure();
@@ -627,7 +627,7 @@ describe("EvaluatorsTabContent", () => {
 
       expect(await screen.findByText("Remove")).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: "Configure" }),
+        screen.queryByRole("button", { name: "Configure for traces" }),
       ).not.toBeInTheDocument();
     });
 
@@ -638,7 +638,7 @@ describe("EvaluatorsTabContent", () => {
       render(<EvaluatorsTabContent agentUuid="agent-1" />);
 
       expect(
-        await screen.findByRole("button", { name: "Configure" }),
+        await screen.findByRole("button", { name: "Configure for traces" }),
       ).toBeInTheDocument();
       expect(configure()).not.toHaveClass(AMBER);
     });
@@ -649,7 +649,7 @@ describe("EvaluatorsTabContent", () => {
 
       render(<EvaluatorsTabContent agentUuid="agent-1" />);
 
-      await screen.findByRole("button", { name: "Configure" });
+      await screen.findByRole("button", { name: "Configure for traces" });
       expect(mockFetchTraces).not.toHaveBeenCalled();
     });
 
@@ -660,7 +660,7 @@ describe("EvaluatorsTabContent", () => {
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
 
-      await screen.findByRole("button", { name: "Configure" });
+      await screen.findByRole("button", { name: "Configure for traces" });
       await waitFor(() =>
         expect(mockFetchTraces).toHaveBeenCalledWith(
           expect.anything(),
@@ -677,7 +677,7 @@ describe("EvaluatorsTabContent", () => {
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
 
-      await screen.findByRole("button", { name: "Configure" });
+      await screen.findByRole("button", { name: "Configure for traces" });
       await waitFor(() => expect(mockFetchTraces).toHaveBeenCalled());
       expect(configure()).not.toHaveClass(AMBER);
     });
@@ -690,7 +690,7 @@ describe("EvaluatorsTabContent", () => {
       const { rerender } = render(
         <EvaluatorsTabContent agentUuid="agent-1" traceScoringOn isActive />,
       );
-      await screen.findByRole("button", { name: "Configure" });
+      await screen.findByRole("button", { name: "Configure for traces" });
       await waitFor(() => expect(mockFetchTraces).toHaveBeenCalledTimes(1));
       expect(configure()).not.toHaveClass(AMBER);
 
@@ -726,7 +726,7 @@ describe("EvaluatorsTabContent", () => {
 
       await screen.findByText("Tone check");
       expect(await setUpButton()).toBeInTheDocument();
-      expect(screen.getAllByRole("button", { name: "Configure" })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: "Configure for traces" })).toHaveLength(1);
     });
 
     it("warns while any variable has no value, and not once they all do", async () => {
@@ -763,7 +763,7 @@ describe("EvaluatorsTabContent", () => {
       await waitFor(() => expect(dialogTitle()).not.toBeInTheDocument());
       expect(mockFetchAgentEvaluators).toHaveBeenCalledTimes(2);
       expect(configure()).not.toHaveClass(AMBER);
-      expect(screen.getByRole("button", { name: "Configure" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Configure for traces" })).toBeInTheDocument();
     });
 
     it("keeps the dialog open with the error when saving fails", async () => {

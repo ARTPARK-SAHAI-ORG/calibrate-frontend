@@ -829,7 +829,7 @@ it("hands the evaluators not configured for traces to both score panels", async 
     />,
   );
 
-  const buttons = await screen.findAllByRole("button", { name: "Configure" });
+  const buttons = await screen.findAllByRole("button", { name: "Configure for traces" });
   expect(buttons).toHaveLength(2);
   await user.click(buttons[1]);
   expect(onConfigure).toHaveBeenCalledWith("ev-5");

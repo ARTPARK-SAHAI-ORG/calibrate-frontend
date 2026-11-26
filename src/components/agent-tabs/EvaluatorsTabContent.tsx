@@ -412,7 +412,7 @@ export function EvaluatorsTabContent({
                           : EVALUATOR_CARD_BUTTON_CLASS
                       }
                     >
-                      Configure
+                      Configure for traces
                     </button>
                   )}
                   <Tooltip content="Remove from agent" position="top">

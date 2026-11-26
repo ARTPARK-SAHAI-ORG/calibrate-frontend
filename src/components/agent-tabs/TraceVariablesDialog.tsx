@@ -572,9 +572,15 @@ export function TraceVariablesDialog({
         {/* Header + stepper */}
         <div className="px-5 md:px-6 py-4 border-b border-border">
           <div className="flex items-start justify-between gap-3">
-            <h2 className="text-base md:text-lg font-semibold text-foreground">
-              Configure for traces
-            </h2>
+            <div>
+              <h2 className="text-base md:text-lg font-semibold text-foreground">
+                Configure for traces
+              </h2>
+              <p className="text-xs md:text-sm text-muted-foreground mt-1">
+                This evaluator has variables. Map each one to a part of the
+                trace so it can run on traces.
+              </p>
+            </div>
             <button
               onClick={handleClose}
               disabled={saving}

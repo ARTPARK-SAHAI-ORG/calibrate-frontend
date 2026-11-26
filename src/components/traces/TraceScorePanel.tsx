@@ -68,7 +68,7 @@ function DidNotRunCard({
             isLoading={configuringUuid === uuid}
             onClick={() => onConfigure(uuid)}
           >
-            Configure
+            Configure for traces
           </Button>
         )}
       </div>
