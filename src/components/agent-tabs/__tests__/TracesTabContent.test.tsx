@@ -3537,13 +3537,14 @@ describe("TracesTabContent", () => {
   });
 
   it.each([
-    ["a tool-only trace with a tool call evaluator", true, "tool-call", true],
-    ["a tool-only trace with only a reply evaluator", true, "llm", false],
-    ["a reply trace with a reply evaluator", false, "llm", true],
-    ["a reply trace with only a tool call evaluator", false, "tool-call", false],
+    ["a tool-only trace with a tool call evaluator", true, "tool-call", true, true],
+    ["a tool-only trace with only a reply evaluator", true, "llm", true, false],
+    ["a reply trace with a reply evaluator", false, "llm", true, true],
+    ["a reply trace with only a tool call evaluator", false, "tool-call", true, false],
+    ["a reply trace with a reply evaluator but scoring off", false, "llm", false, false],
   ])(
     "lets %s be scored again only when an evaluator fits it",
-    async (_name, toolOnly, evaluatorType, expected) => {
+    async (_name, toolOnly, evaluatorType, enabled, expected) => {
       const user = setupUser();
       mockUseTraces.mockReturnValue(
         tracesResult([
@@ -3560,6 +3561,7 @@ describe("TracesTabContent", () => {
           {...tabProps}
           traceScoring={{
             ...traceScoring,
+            enabled,
             eligibility: {
               eligible: [{ evaluator_uuid: "ev-1", name: "Judge" }],
               ineligible: [],

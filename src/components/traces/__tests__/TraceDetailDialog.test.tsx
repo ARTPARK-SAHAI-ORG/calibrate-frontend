@@ -1431,6 +1431,7 @@ describe("Score this trace", () => {
     error: "no_tool_call_evaluator",
     results: [],
   };
+  const onScored = jest.fn();
   const open = (canScoreTrace: boolean) =>
     render(
       <TraceDetailDialog
@@ -1439,10 +1440,12 @@ describe("Score this trace", () => {
         accessToken="tok"
         traceUuid="t1"
         canScoreTrace={canScoreTrace}
+        onScored={onScored}
       />,
     );
 
   beforeEach(() => {
+    onScored.mockReset();
     mockScoreTrace.mockReset();
     mockFetchTrace.mockResolvedValue(detail);
     mockFetchTraceScores.mockResolvedValue({ runs: [skipped] });
@@ -1473,7 +1476,9 @@ describe("Score this trace", () => {
     for (const b of screen.getAllByRole("button", { name: "Score this trace" })) {
       expect(b).toBeDisabled();
     }
+    expect(onScored).not.toHaveBeenCalled();
     await act(async () => resolve({ run_uuid: "run-new", status: "pending" }));
+    expect(onScored).toHaveBeenCalledTimes(1);
     expect(
       screen.getAllByText("Running the evaluators on this trace").length,
     ).toBeGreaterThan(0);
@@ -1499,9 +1504,14 @@ describe("Score this trace", () => {
         accessToken="tok"
         traceUuid="t2"
         canScoreTrace
+        onScored={onScored}
       />,
     );
     await waitFor(() => expect(mockFetchTrace).toHaveBeenCalledWith("tok", "t2"));
+    // The other trace's own button is not held off by the first request.
+    for (const b of await screen.findAllByRole("button", { name: "Score this trace" })) {
+      expect(b).not.toBeDisabled();
+    }
     await act(async () => resolve({ run_uuid: "run-new", status: "pending" }));
     expect(
       screen.queryByText("Running the evaluators on this trace"),
