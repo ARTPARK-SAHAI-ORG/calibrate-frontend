@@ -95,8 +95,8 @@ function RunBody({
     return (
       <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
         <p className="text-sm text-amber-700 dark:text-amber-300">
-          {/* A lone reason takes no full stop. Only the limit one is followed
-              by a second sentence, so only it needs one. */}
+          {/* A lone reason takes no full stop. One followed by a second
+              sentence or a button takes one. */}
           {canScore ? (
             <>
               This trace was not scored because none of the agent&apos;s

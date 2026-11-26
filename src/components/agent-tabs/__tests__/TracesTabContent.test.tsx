@@ -2806,6 +2806,31 @@ describe("TracesTabContent", () => {
     },
   );
 
+  it("names no evaluators to score a trace again once the workspace's scoring limit is reached", async () => {
+    const user = setupUser();
+    fetchTraceUsage.mockResolvedValue({
+      traces_stored: 5,
+      max_traces: 50000,
+      traces_scored: 100,
+      max_scored_traces: 100,
+    });
+    mockUseTraces.mockReturnValue(tracesResult([trace({ input_preview: "Open me" })]));
+    render(
+      <TracesTabContent
+        {...tabProps}
+        traceScoring={{ ...traceScoring, enabled: true }}
+      />,
+    );
+    await waitFor(() => expect(fetchTraceUsage).toHaveBeenCalled());
+    await user.click(screen.getAllByText("Open me")[0]);
+    await waitFor(() =>
+      expect(screen.getByTestId("trace-detail")).toHaveAttribute(
+        "data-scoring-names",
+        "",
+      ),
+    );
+  });
+
   it("opens the detail view for the trace that was clicked", async () => {
     const user = setupUser();
     mockUseTraces.mockReturnValue(

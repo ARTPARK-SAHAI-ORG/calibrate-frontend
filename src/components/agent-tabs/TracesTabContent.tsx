@@ -642,6 +642,10 @@ export function TracesTabContent({
     items.some((t) => t.latest_run_error === "over_limit");
   const storageFull = usage != null && usage.traces_stored >= usage.max_traces;
   const isScoringLive = traceScoring.enabled && !overLimit && !storageFull;
+  // Scoring a stored trace again uses a scoring slot but no storage.
+  const scoredTracesFull =
+    usage?.max_scored_traces != null &&
+    usage.traces_scored >= usage.max_scored_traces;
   const chatReplyCap = chatLink?.daily_message_limit ?? null;
   const chatLimitReached =
     chatReplyCap !== null && chatLink!.messages_today >= chatReplyCap;
@@ -1167,7 +1171,7 @@ export function TracesTabContent({
         evaluatorDescriptions={evaluatorDescriptions}
         ineligibleEvaluators={ineligible}
         scoringEvaluatorNames={
-          traceScoring.enabled
+          traceScoring.enabled && !scoredTracesFull
             ? (eligibility?.eligible ?? []).map((item) => item.name)
             : []
         }
