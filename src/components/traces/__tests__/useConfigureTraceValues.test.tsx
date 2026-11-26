@@ -11,6 +11,9 @@ jest.mock("../../../lib/evaluatorApi", () => ({
   saveEvaluatorTraceVariables: (...args: unknown[]) =>
     saveEvaluatorTraceVariables(...args),
 }));
+jest.mock("../../../lib/tracesApi", () => ({
+  fetchTraces: () => Promise.resolve({ total: 0, items: [] }),
+}));
 const reportError = jest.fn();
 jest.mock("../../../lib/reportError", () => ({
   reportError: (...args: unknown[]) => reportError(...args),
@@ -58,9 +61,37 @@ function Harness({ accessToken = "token" }: { accessToken?: string | null }) {
 const configureNow = () =>
   screen.getByRole("button", { name: "Configure now" });
 const dialogTitle = () =>
-  screen.queryByRole("heading", { name: "Choose trace values" });
+  screen.queryByRole("heading", { name: "Configure for traces" });
+const source = () => screen.findByRole("button", { name: "Source for reply" });
 
-beforeEach(() => jest.clearAllMocks());
+async function pick(user: ReturnType<typeof setupUser>, option: string) {
+  await user.click(await source());
+  await user.click(screen.getByRole("option", { name: option }));
+}
+
+// With one evaluator the dialog does not name it, so the save says which it was.
+async function saveAndExpect(
+  user: ReturnType<typeof setupUser>,
+  uuid: string,
+) {
+  saveEvaluatorTraceVariables.mockResolvedValue(undefined);
+  await pick(user, "Input");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() =>
+    expect(saveEvaluatorTraceVariables).toHaveBeenCalledWith(
+      "agent-1",
+      uuid,
+      { reply: "input" },
+      "token",
+    ),
+  );
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  localStorage.setItem("access_token", "token");
+});
+afterEach(() => localStorage.removeItem("access_token"));
 
 it("opens the dialog with only the evaluators still missing values", async () => {
   const user = setupUser();
@@ -73,12 +104,17 @@ it("opens the dialog with only the evaluators still missing values", async () =>
 
   await user.click(configureNow());
 
-  await screen.findByRole("button", { name: /^needs-one/ });
-  expect(fetchAgentEvaluators).toHaveBeenCalledWith("agent-1", "token");
-  expect(screen.getByRole("button", { name: /^needs-two/ })).toBeInTheDocument();
   expect(
-    screen.queryByRole("button", { name: /^finished/ }),
-  ).not.toBeInTheDocument();
+    await screen.findByText("Evaluator 1 of 2: needs-one"),
+  ).toBeInTheDocument();
+  expect(fetchAgentEvaluators).toHaveBeenCalledWith("agent-1", "token");
+
+  saveEvaluatorTraceVariables.mockResolvedValue(undefined);
+  await pick(user, "Input");
+  await user.click(screen.getByRole("button", { name: "Save and next" }));
+  expect(
+    await screen.findByText("Evaluator 2 of 2: needs-two"),
+  ).toBeInTheDocument();
 });
 
 it("hands the agent type to the dialog", async () => {
@@ -88,10 +124,10 @@ it("hands the agent type to the dialog", async () => {
 
   await user.click(configureNow());
 
-  const select = await screen.findByLabelText("{{reply}}");
-  expect(
-    Array.from((select as HTMLSelectElement).options).map((o) => o.text),
-  ).toContain("Output");
+  await user.click(await source());
+  const options = screen.getAllByRole("option").map((o) => o.textContent);
+  expect(options).toContain("Output");
+  expect(options).not.toContain("Agent reply");
 });
 
 it("keeps the button on screen and busy while loading", async () => {
@@ -162,7 +198,7 @@ it("saves, checks eligibility again after each save, and closes after the last",
   render(<Harness />);
 
   await user.click(configureNow());
-  await user.selectOptions(await screen.findByLabelText("{{reply}}"), "input");
+  await pick(user, "Input");
   await user.click(screen.getByRole("button", { name: "Save and next" }));
 
   await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1));
@@ -173,7 +209,7 @@ it("saves, checks eligibility again after each save, and closes after the last",
     "token",
   );
 
-  await user.selectOptions(screen.getByLabelText("{{reply}}"), "labels");
+  await pick(user, "Labels");
   await user.click(screen.getByRole("button", { name: "Save" }));
 
   await waitFor(() => expect(dialogTitle()).not.toBeInTheDocument());
@@ -187,7 +223,7 @@ it("does not check eligibility again when a save fails, and stays open", async (
   render(<Harness />);
 
   await user.click(configureNow());
-  await user.selectOptions(await screen.findByLabelText("{{reply}}"), "input");
+  await pick(user, "Input");
   await user.click(screen.getByRole("button", { name: "Save" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent("Bad value");
@@ -195,14 +231,14 @@ it("does not check eligibility again when a save fails, and stays open", async (
   expect(dialogTitle()).toBeInTheDocument();
 });
 
-it("closes from the dialog's Close button", async () => {
+it("closes from the dialog's header Close button", async () => {
   const user = setupUser();
   fetchAgentEvaluators.mockResolvedValue([evaluator("one", null)]);
   render(<Harness />);
 
   await user.click(configureNow());
-  await screen.findByRole("heading", { name: "Choose trace values" });
-  await user.click(screen.getAllByRole("button", { name: "Close" })[1]);
+  await screen.findByRole("heading", { name: "Configure for traces" });
+  await user.click(screen.getByRole("button", { name: "Close" }));
 
   expect(dialogTitle()).not.toBeInTheDocument();
 });
@@ -222,9 +258,10 @@ it("opens the dialog with only the one evaluator asked for, loading for it alone
   expect(screen.getByTestId("loading-for")).toHaveTextContent("needs-two");
   expect(configureNow()).toBeEnabled();
   finish([evaluator("needs-one", null), evaluator("needs-two", null)]);
-  await screen.findByRole("heading", { name: "needs-two" });
-  expect(screen.queryByText("needs-one")).not.toBeInTheDocument();
+  await screen.findByRole("heading", { name: "Configure for traces" });
+  expect(screen.queryByText(/^Evaluator \d of/)).not.toBeInTheDocument();
   expect(screen.getByTestId("loading-for")).toHaveTextContent("null");
+  await saveAndExpect(user, "needs-two");
 });
 
 it("counts only the latest click's answer, and keeps loading for it until it lands", async () => {
@@ -244,7 +281,22 @@ it("counts only the latest click's answer, and keeps loading for it until it lan
   expect(screen.getByTestId("loading-for")).toHaveTextContent("needs-two");
 
   finishers[1](list);
-  await screen.findByRole("heading", { name: "needs-two" });
+  await screen.findByRole("heading", { name: "Configure for traces" });
+  expect(screen.queryByText(/^Evaluator \d of/)).not.toBeInTheDocument();
   expect(screen.getByTestId("loading-for")).toHaveTextContent("null");
   expect(screen.getByTestId("is-open")).toHaveTextContent("true");
+  await saveAndExpect(user, "needs-two");
+});
+
+it("opens the one evaluator asked for even when all its values are already chosen", async () => {
+  const user = setupUser();
+  fetchAgentEvaluators.mockResolvedValue([
+    evaluator("needs-one", { reply: "input" }),
+  ]);
+  render(<Harness />);
+
+  await user.click(screen.getByRole("button", { name: "Only needs-one" }));
+
+  expect(await screen.findByRole("heading", { name: "Configure for traces" })).toBeInTheDocument();
+  expect(onRefresh).not.toHaveBeenCalled();
 });

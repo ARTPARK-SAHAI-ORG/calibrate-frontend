@@ -43,7 +43,7 @@ export function useConfigureTraceValues({
       setLoadingFor(onlyUuid ?? "");
       const missing = (await fetchAgentEvaluators(agentUuid, accessToken)).filter(
         (e) =>
-          needsTraceValues(e, agentNature) && (!onlyUuid || e.uuid === onlyUuid),
+          onlyUuid ? e.uuid === onlyUuid : needsTraceValues(e, agentNature),
       );
       if (!isLatest()) return;
       if (missing.length > 0) setEvaluators(missing);

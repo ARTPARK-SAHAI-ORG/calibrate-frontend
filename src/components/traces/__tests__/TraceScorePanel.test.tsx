@@ -330,9 +330,10 @@ describe("the Score this trace button", () => {
         ]}
       />,
     );
-    expect(
-      screen.getByRole("button", { name: "Score this trace" }),
-    ).toBeInTheDocument();
+    const scoreButton = screen.getByRole("button", { name: "Score this trace" });
+    expect(document.querySelector(".border-amber-500\\/40")).not.toContainElement(
+      scoreButton,
+    );
     expect(document.body).not.toHaveTextContent("Clarity");
     for (const name of ["Helpfulness", "Tone", "Safety"]) {
       expect(screen.getByText(name).tagName).toBe("SPAN");
@@ -390,13 +391,78 @@ it("names an evaluator once when it is shown with a Configure button", () => {
         },
       ]}
       unconfigured={[{ evaluator_uuid: "e1", name: "Tone check" }]}
+      onConfigure={jest.fn()}
     />,
   );
   expect(screen.getAllByText("Tone check")).toHaveLength(1);
   expect(screen.getByRole("button", { name: "Configure" })).toBeInTheDocument();
 });
 
-it("leaves out of the list only the evaluators the run recorded as not configured", () => {
+describe("a trace skipped because every evaluator needs trace values", () => {
+  const MESSAGE =
+    "This trace was not scored. None of the evaluators added to this agent have been configured for traces: each one has variables that need to be mapped to a value from the trace. Configure them below, then score this trace again, or add an evaluator without variables in the Evaluators tab.";
+  const both = [
+    { evaluator_uuid: "e1", name: "Tone check" },
+    { evaluator_uuid: "e2", name: "Politeness" },
+  ];
+  const run: TraceScoringRun = {
+    ...completed,
+    status: "skipped",
+    error: "no_usable_evaluators",
+    results: [],
+    unconfigured_evaluators: both,
+  };
+  const ineligible = both.map((e) => ({
+    ...e,
+    reason: "declares_variables" as const,
+  }));
+
+  it("says so in one sentence, with no list, and a card with Configure for each", async () => {
+    const onGoToEvaluators = jest.fn();
+    const user = setupUser();
+    const { container } = render(
+      <TraceScorePanel
+        run={run}
+        ineligible={ineligible}
+        unconfigured={both}
+        onConfigure={jest.fn()}
+        onGoToEvaluators={onGoToEvaluators}
+      />,
+    );
+    const box = container.querySelector(".border-amber-500\\/40");
+    expect(box).toHaveTextContent(new RegExp(`^${MESSAGE.replace(/[.()]/g, "\\$&")}$`));
+    expect(box?.querySelector("li")).toBeNull();
+    expect(
+      screen.getAllByText("Did not run as it has not been configured for traces"),
+    ).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Configure" })).toHaveLength(2);
+    const link = screen.getByRole("button", { name: "Evaluators tab" });
+    expect(link.className).toContain("font-semibold");
+    expect(link.className).not.toContain("underline");
+    await user.click(link);
+    expect(onGoToEvaluators).toHaveBeenCalled();
+  });
+
+  it("keeps the old message and list when another reason is mixed in", () => {
+    const { container } = render(
+      <TraceScorePanel
+        run={run}
+        ineligible={[
+          ...ineligible,
+          { evaluator_uuid: "e3", name: "Clarity", reason: "no_live_version" },
+        ]}
+        unconfigured={both}
+      />,
+    );
+    const box = container.querySelector(".border-amber-500\\/40");
+    expect(box).toHaveTextContent(
+      "No evaluator on this agent could score this trace",
+    );
+    expect(screen.getByText("Clarity").closest("li")).not.toBeNull();
+  });
+});
+
+it("leaves out of the list only the evaluators shown as a card", () => {
   render(
     <TraceScorePanel
       run={{
@@ -418,7 +484,10 @@ it("leaves out of the list only the evaluators the run recorded as not configure
           reason: "declares_variables",
         },
       ]}
-      unconfigured={[{ evaluator_uuid: "e2", name: "Politeness" }]}
+      unconfigured={[
+        { evaluator_uuid: "e1", name: "Tone check" },
+        { evaluator_uuid: "e2", name: "Politeness" },
+      ]}
     />,
   );
   expect(screen.getAllByText("Tone check")).toHaveLength(1);
@@ -445,12 +514,21 @@ describe("variables a trace had no value for", () => {
   };
   const GENERIC = "This trace is missing a value that its evaluators need";
 
-  it("names the metadata entry, and shows no general line on a skipped run", () => {
+  it("names the metadata key, and shows no general line on a skipped run", () => {
     const { container } = render(<TraceScorePanel run={skipped} />);
 
     const block = container.querySelector('[class*="border-orange-500"]');
     expect(block).toHaveTextContent(
-      "Agrees with the nurseCould not run. {{nurse_reply}} reads from the metadata entry expert_answer, and this trace has none.",
+      "Agrees with the nurseCould not run. The variable {{nurse_reply}} is mapped to the metadata key expert_answer, and this trace has no value for it.",
+    );
+    expect(screen.getByText("{{nurse_reply}}")).toHaveClass(
+      "bg-blue-500/10",
+      "text-blue-700",
+      "font-mono",
+    );
+    expect(screen.getByText("expert_answer")).toHaveClass(
+      "font-mono",
+      "bg-amber-700/10",
     );
     expect(block?.querySelector("p.text-orange-700")).not.toBeNull();
     expect(block?.querySelector("svg")).not.toBeNull();
@@ -458,12 +536,12 @@ describe("variables a trace had no value for", () => {
   });
 
   it.each([
-    ["input", "the input"],
-    ["output.response", "the agent reply"],
-    ["output.tool_calls", "the tool calls"],
-    ["labels", "the labels"],
-    ["conversation_id", "the conversation ID"],
-    ["message_id", "the message ID"],
+    ["input", "the trace's input"],
+    ["output.response", "the trace's agent reply"],
+    ["output.tool_calls", "the trace's tool calls"],
+    ["labels", "the trace's labels"],
+    ["conversation_id", "the trace's conversation ID"],
+    ["message_id", "the trace's message ID"],
   ])("names %s in words", (source, words) => {
     render(
       <TraceScorePanel
@@ -475,16 +553,16 @@ describe("variables a trace had no value for", () => {
         (_, el) =>
           el?.tagName === "P" &&
           el.textContent ===
-            `Could not run. {{x}} reads from ${words}, and this trace has none.`,
+            `Could not run. The variable {{x}} is mapped to ${words}, and this trace has no value for it.`,
       ),
     ).toBeInTheDocument();
   });
 
   it.each([
-    ["conversation", "input", "the conversation"],
-    ["conversation", "output.response", "the agent reply"],
-    ["general", "input", "the input"],
-    ["general", "output.response", "the output"],
+    ["conversation", "input", "the trace's conversation"],
+    ["conversation", "output.response", "the trace's agent reply"],
+    ["general", "input", "the trace's input"],
+    ["general", "output.response", "the trace's output"],
   ] as const)(
     "names %s %s the way that agent's dropdown does",
     (agentNature, source, words) => {
@@ -499,7 +577,7 @@ describe("variables a trace had no value for", () => {
           (_, el) =>
             el?.tagName === "P" &&
             el.textContent ===
-              `Could not run. {{x}} reads from ${words}, and this trace has none.`,
+              `Could not run. The variable {{x}} is mapped to ${words}, and this trace has no value for it.`,
         ),
       ).toBeInTheDocument();
     },
@@ -521,10 +599,34 @@ describe("variables a trace had no value for", () => {
 
     const blocks = container.querySelectorAll('[class*="border-orange-500"]');
     expect(blocks).toHaveLength(2);
-    expect(blocks[0]).toHaveTextContent("{{a}} reads from the labels");
-    expect(blocks[0]).toHaveTextContent("{{b}} reads from the message ID");
+    expect(blocks[0]).toHaveTextContent("{{a}} is mapped to the trace's labels");
+    expect(blocks[0]).toHaveTextContent(
+      "{{b}} is mapped to the trace's message ID",
+    );
     expect(blocks[0].querySelectorAll("p.text-orange-700")).toHaveLength(2);
-    expect(blocks[1]).toHaveTextContent("{{c}} reads from the input");
+    expect(blocks[1]).toHaveTextContent("{{c}} is mapped to the trace's input");
+  });
+
+  it("offers Configure on each block, which opens that evaluator", async () => {
+    const user = setupUser();
+    const onConfigure = jest.fn();
+    const { container } = render(
+      <TraceScorePanel
+        run={{
+          ...skipped,
+          missing_values: [
+            missing("e1", "First", "a", "labels"),
+            missing("e2", "Second", "c", "input"),
+          ],
+        }}
+        onConfigure={onConfigure}
+        configuringUuid="e1"
+      />,
+    );
+    const blocks = container.querySelectorAll('[class*="border-orange-500"]');
+    expect(blocks[0].querySelector("button")).toBeDisabled();
+    await user.click(blocks[1].querySelector("button")!);
+    expect(onConfigure).toHaveBeenCalledWith("e2");
   });
 
   it("shows a block beside the scores of a completed run", () => {
@@ -636,6 +738,7 @@ describe("evaluators not configured for traces", () => {
       <TraceScorePanel
         run={recorded}
         unconfigured={unconfigured}
+        onConfigure={jest.fn()}
         configuringUuid="ev-5"
       />,
     );
@@ -687,13 +790,10 @@ describe("evaluators not configured for traces", () => {
     expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
   });
 
-  it("keeps a card for an evaluator configured since, with no Configure button", () => {
+  it("hides the card of an evaluator configured since", () => {
     render(<TraceScorePanel run={recorded} unconfigured={[]} />);
-    expect(screen.getAllByText(NOTE)).toHaveLength(2);
-    expect(screen.getByText("Accuracy")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Configure" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    expect(screen.queryByText("Accuracy")).not.toBeInTheDocument();
   });
 
   it("shows no card for an evaluator the run did not leave out", () => {
@@ -702,16 +802,18 @@ describe("evaluators not configured for traces", () => {
     expect(screen.queryByText("Accuracy")).not.toBeInTheDocument();
   });
 
-  it("offers Configure only on the cards still not configured", () => {
+  it("shows only the cards still not configured, each with Configure", () => {
     render(
       <TraceScorePanel
         run={recorded}
         unconfigured={[
           { evaluator_uuid: "ev-9", name: "Agrees with the nurse" },
         ]}
+        onConfigure={jest.fn()}
       />,
     );
-    expect(screen.getAllByText(NOTE)).toHaveLength(2);
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    expect(screen.queryByText("Accuracy")).not.toBeInTheDocument();
     const buttons = screen.getAllByRole("button", { name: "Configure" });
     expect(buttons).toHaveLength(1);
     expect(
@@ -838,8 +940,10 @@ it("says the agent has no tool call evaluator and offers the button to add one",
   const button = screen.getByRole("button", {
     name: "Add a tool call evaluator",
   });
-  // The button sits on its own line under the sentence, not inside it.
-  expect(sentence).not.toContainElement(button);
+  // The button sits under the amber box, not inside it.
+  expect(sentence.closest(".border-amber-500\\/40")).not.toContainElement(
+    button,
+  );
 });
 
 it("says the trace was skipped before a tool call evaluator was added, with no button, once the agent has one", () => {

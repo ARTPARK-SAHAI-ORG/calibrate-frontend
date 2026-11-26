@@ -62,24 +62,12 @@ export function traceSourceLabel(
 
 export const lowerFirst = (text: string) => text[0].toLowerCase() + text.slice(1);
 
-/** The part of a trace a variable reads from, to follow "reads from". */
+/** The part of a trace a variable is mapped to, to follow "is mapped to". */
 export function missingSourcePhrase(
   source: string,
   agentNature?: AgentNature,
 ): string {
-  return isMetadataSource(source)
-    ? `the metadata entry ${metadataKey(source)}`
-    : `the ${lowerFirst(traceSourceLabel(source, agentNature))}`;
-}
-
-/** What a trace is missing, when it has nothing for a variable to read. */
-export function emptyValueCopy(
-  source: string,
-  agentNature?: AgentNature,
-): string {
-  return isMetadataSource(source)
-    ? `This trace has no metadata entry called ${metadataKey(source)}`
-    : `This trace has no ${lowerFirst(traceSourceLabel(source, agentNature))}`;
+  return `the trace's ${lowerFirst(traceSourceLabel(source, agentNature))}`;
 }
 
 /**
@@ -97,44 +85,6 @@ export function traceChoices(
     if (source && source !== METADATA_SOURCE) choices[name] = source;
   }
   return choices;
-}
-
-/**
- * The `POST /traces` body that fills these variables, each one named at the
- * place it reads from. The rest is example text. A real request also names its
- * agent, which is no part of what these variables need.
- */
-export function traceBodyExample(
-  agentNature: AgentNature,
-  choices: Record<string, string>,
-): Record<string, unknown> {
-  const parts = new Map<string, string>();
-  for (const [variable, source] of Object.entries(choices)) {
-    const earlier = parts.get(source);
-    parts.set(source, `${earlier ? `${earlier} ` : ""}<${variable}>`);
-  }
-  const input = parts.get("input") ?? "The user's message";
-  const toolCalls = parts.get("output.tool_calls");
-  const messageId = parts.get("message_id");
-  const conversationId = parts.get("conversation_id");
-  const labels = parts.get("labels");
-  const metadata = [...parts]
-    .filter(([source]) => isMetadataSource(source))
-    .map(([source, value]) => ({ key: metadataKey(source), value }));
-  return {
-    input:
-      agentNature === "general" ? input : [{ role: "user", content: input }],
-    output: {
-      response: parts.get("output.response") ?? "The agent's reply",
-      ...(toolCalls && {
-        tool_calls: [{ tool: toolCalls, arguments: { date: "2026-03-14" } }],
-      }),
-    },
-    ...(messageId && { message_id: messageId }),
-    ...(conversationId && { conversation_id: conversationId }),
-    ...(labels && { labels: [labels] }),
-    ...(metadata.length > 0 && { metadata }),
-  };
 }
 
 /** The only two things about a trace's output that decide how it is labelled.

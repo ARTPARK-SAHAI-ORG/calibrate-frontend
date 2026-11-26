@@ -50,7 +50,6 @@ import {
   TraceSourceLabel,
 } from "./TracesTable";
 import { TraceScorePanel, type TraceScorePanelProps } from "./TraceScorePanel";
-import { WARNING_BUTTON_CLASS } from "./AddToolCallEvaluatorButton";
 
 type TraceDetailDialogProps = {
   isOpen: boolean;
@@ -551,14 +550,13 @@ export function TraceDetailDialog({
   };
   const scoreTraceButton =
     scoringEvaluatorNames.length > 0 ? (
-      <button
-        type="button"
+      <Button
+        size="sm"
         onClick={() => void startScoring()}
-        disabled={scoringUuid === traceUuid}
-        className={`${WARNING_BUTTON_CLASS} disabled:opacity-60 disabled:cursor-not-allowed`}
+        isLoading={scoringUuid === traceUuid}
       >
         Score this trace
-      </button>
+      </Button>
     ) : undefined;
   const tryAgain =
     scoringEvaluatorNames.length > 0 ? () => void startScoring() : undefined;

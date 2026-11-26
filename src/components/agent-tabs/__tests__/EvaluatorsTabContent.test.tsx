@@ -489,7 +489,7 @@ describe("EvaluatorsTabContent", () => {
 
     await screen.findByText("Follows Refund Policy");
     expect(
-      screen.getByText("LLM judges for evaluating the agent’s output and tool calls"),
+      screen.getByText("Evaluators that score the agent’s output and tool calls"),
     ).toBeInTheDocument();
     expect(
       screen.queryByText(/evaluating the agent.s responses/),
@@ -557,7 +557,7 @@ describe("EvaluatorsTabContent", () => {
 
     await screen.findByText("Follows Refund Policy");
     expect(
-      screen.getByText("LLM judges for evaluating the agent’s responses and tool calls"),
+      screen.getByText("Evaluators that score the agent’s responses and tool calls"),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Create evaluator" }));
@@ -589,7 +589,22 @@ describe("EvaluatorsTabContent", () => {
   });
 
   describe("choosing trace values", () => {
-    const SET_UP = "Set up for traces";
+    const AMBER = "bg-amber-400";
+    const configure = () => screen.getByRole("button", { name: "Configure" });
+    const setUpButton = async () => {
+      await waitFor(() => expect(configure()).toHaveClass(AMBER));
+      return configure();
+    };
+    const pick = async (
+      user: ReturnType<typeof setupUser>,
+      variable: string,
+      option: string,
+    ) => {
+      await user.click(
+        screen.getByRole("button", { name: `Source for ${variable}` }),
+      );
+      await user.click(screen.getByRole("option", { name: option }));
+    };
     const withVariables = (over: Partial<EvaluatorData> = {}) =>
       evaluator({
         live_version: { variables: [{ name: "nurse_reply" }, { name: "ai" }] },
@@ -600,7 +615,7 @@ describe("EvaluatorsTabContent", () => {
       mockFetchTraces.mockResolvedValue({ total: 1, items: [] });
     });
     const dialogTitle = () =>
-      screen.queryByRole("heading", { name: "Choose trace values" });
+      screen.queryByRole("heading", { name: "Configure for traces" });
 
     it("offers no Configure button on an evaluator that cannot score this agent's traces", async () => {
       mockFetchAgentEvaluators.mockResolvedValue([
@@ -625,7 +640,7 @@ describe("EvaluatorsTabContent", () => {
       expect(
         await screen.findByRole("button", { name: "Configure" }),
       ).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: SET_UP })).not.toBeInTheDocument();
+      expect(configure()).not.toHaveClass(AMBER);
     });
 
     it("does not look for traces while trace scoring is off", async () => {
@@ -652,7 +667,7 @@ describe("EvaluatorsTabContent", () => {
           expect.objectContaining({ agentId: "agent-1", limit: 1 }),
         ),
       );
-      expect(screen.queryByRole("button", { name: SET_UP })).not.toBeInTheDocument();
+      expect(configure()).not.toHaveClass(AMBER);
     });
 
     it("does not warn when the check for traces fails", async () => {
@@ -664,7 +679,7 @@ describe("EvaluatorsTabContent", () => {
 
       await screen.findByRole("button", { name: "Configure" });
       await waitFor(() => expect(mockFetchTraces).toHaveBeenCalled());
-      expect(screen.queryByRole("button", { name: SET_UP })).not.toBeInTheDocument();
+      expect(configure()).not.toHaveClass(AMBER);
     });
 
     it("checks for traces again each time the tab is opened", async () => {
@@ -677,7 +692,7 @@ describe("EvaluatorsTabContent", () => {
       );
       await screen.findByRole("button", { name: "Configure" });
       await waitFor(() => expect(mockFetchTraces).toHaveBeenCalledTimes(1));
-      expect(screen.queryByRole("button", { name: SET_UP })).not.toBeInTheDocument();
+      expect(configure()).not.toHaveClass(AMBER);
 
       rerender(
         <EvaluatorsTabContent
@@ -691,7 +706,7 @@ describe("EvaluatorsTabContent", () => {
         <EvaluatorsTabContent agentUuid="agent-1" traceScoringOn isActive />,
       );
 
-      expect(await screen.findByRole("button", { name: SET_UP })).toBeInTheDocument();
+      expect(await setUpButton()).toBeInTheDocument();
       expect(mockFetchTraces).toHaveBeenCalledTimes(2);
     });
 
@@ -710,7 +725,8 @@ describe("EvaluatorsTabContent", () => {
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
 
       await screen.findByText("Tone check");
-      expect(await screen.findAllByRole("button", { name: SET_UP })).toHaveLength(1);
+      expect(await setUpButton()).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Configure" })).toHaveLength(1);
     });
 
     it("warns while any variable has no value, and not once they all do", async () => {
@@ -732,14 +748,8 @@ describe("EvaluatorsTabContent", () => {
       const user = setupUser();
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
-      const setUp = await screen.findByRole("button", { name: SET_UP });
-      expect(setUp).toHaveClass("bg-amber-400");
-
-      await user.click(setUp);
-      await user.selectOptions(
-        screen.getByLabelText("{{ai}}"),
-        "output.response",
-      );
+      await user.click(await setUpButton());
+      await pick(user, "ai", "Agent reply");
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       await waitFor(() =>
@@ -752,7 +762,7 @@ describe("EvaluatorsTabContent", () => {
       );
       await waitFor(() => expect(dialogTitle()).not.toBeInTheDocument());
       expect(mockFetchAgentEvaluators).toHaveBeenCalledTimes(2);
-      expect(screen.queryByRole("button", { name: SET_UP })).not.toBeInTheDocument();
+      expect(configure()).not.toHaveClass(AMBER);
       expect(screen.getByRole("button", { name: "Configure" })).toBeInTheDocument();
     });
 
@@ -763,11 +773,9 @@ describe("EvaluatorsTabContent", () => {
       const user = setupUser();
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
-      await user.click(
-        await screen.findByRole("button", { name: SET_UP }),
-      );
-      await user.selectOptions(screen.getByLabelText("{{nurse_reply}}"), "input");
-      await user.selectOptions(screen.getByLabelText("{{ai}}"), "output.response");
+      await user.click(await setUpButton());
+      await pick(user, "nurse_reply", "Conversation");
+      await pick(user, "ai", "Agent reply");
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       expect(await screen.findByRole("alert")).toHaveTextContent("Bad source");
@@ -780,9 +788,7 @@ describe("EvaluatorsTabContent", () => {
       const user = setupUser();
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
-      await user.click(
-        await screen.findByRole("button", { name: SET_UP }),
-      );
+      await user.click(await setUpButton());
 
       expect(dialogTitle()).toBeInTheDocument();
       expect(mockFetchEvaluatorDetail).not.toHaveBeenCalled();
@@ -808,8 +814,10 @@ describe("EvaluatorsTabContent", () => {
       await user.click(screen.getByRole("button", { name: "Add evaluators" }));
       await user.click(screen.getByRole("button", { name: "Confirm add" }));
 
-      await screen.findByRole("heading", { name: "Choose trace values" });
-      expect(screen.getByLabelText("{{nurse_reply}}")).toBeInTheDocument();
+      await screen.findByRole("heading", { name: "Configure for traces" });
+      expect(
+        screen.getByRole("button", { name: "Source for nurse_reply" }),
+      ).toBeInTheDocument();
       await waitFor(() =>
         expect(mockFetchTraces).toHaveBeenCalledWith("test-token", {
           limit: 20,
@@ -832,6 +840,7 @@ describe("EvaluatorsTabContent", () => {
       ]);
       mockFetchAllEvaluators.mockResolvedValue([]);
       mockAttach.mockResolvedValue({ linked: [], already_linked: [] });
+      mockSaveTraceVariables.mockResolvedValue(undefined);
       const user = setupUser();
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
@@ -841,14 +850,18 @@ describe("EvaluatorsTabContent", () => {
         screen.getByRole("button", { name: "Confirm add three" }),
       );
 
-      await screen.findByRole("heading", { name: "Choose trace values" });
-      expect(screen.getByText("Evaluator 1 of 2")).toBeInTheDocument();
+      await screen.findByRole("heading", { name: "Configure for traces" });
       expect(
-        screen.getByRole("button", { name: /^Uses the guideline/ }),
+        screen.getByText("Evaluator 1 of 2: Agrees with the nurse"),
       ).toBeInTheDocument();
+
+      await pick(user, "nurse_reply", "Conversation");
+      await pick(user, "ai", "Agent reply");
+      await user.click(screen.getByRole("button", { name: "Save and next" }));
+
       expect(
-        screen.queryByRole("button", { name: /^Already set/ }),
-      ).not.toBeInTheDocument();
+        await screen.findByText("Evaluator 2 of 2: Uses the guideline"),
+      ).toBeInTheDocument();
     });
 
     it("does not open after re-adding an evaluator whose values are all set", async () => {
@@ -882,11 +895,9 @@ describe("EvaluatorsTabContent", () => {
       const user = setupUser();
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
-      await user.click(
-        await screen.findByRole("button", { name: SET_UP }),
-      );
-      await user.selectOptions(screen.getByLabelText("{{nurse_reply}}"), "input");
-      await user.selectOptions(screen.getByLabelText("{{ai}}"), "output.response");
+      await user.click(await setUpButton());
+      await pick(user, "nurse_reply", "Conversation");
+      await pick(user, "ai", "Agent reply");
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       await waitFor(() => expect(dialogTitle()).not.toBeInTheDocument());
@@ -936,7 +947,7 @@ describe("EvaluatorsTabContent", () => {
         await screen.findByRole("button", { name: "Duplicate Tone check" }),
       );
 
-      await screen.findByRole("heading", { name: "Choose trace values" });
+      await screen.findByRole("heading", { name: "Configure for traces" });
     });
 
     it.each([

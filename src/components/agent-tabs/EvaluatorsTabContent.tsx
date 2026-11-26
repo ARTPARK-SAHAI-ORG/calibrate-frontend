@@ -308,7 +308,7 @@ export function EvaluatorsTabContent({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 md:mb-6">
           {/* No heading: the tab strip above already says Evaluators. */}
           <p className="text-sm md:text-base text-muted-foreground">
-            LLM judges for evaluating the agent&rsquo;s{" "}
+            Evaluators that score the agent&rsquo;s{" "}
             {agentNature === "general" ? "output" : "responses"} and tool calls
           </p>
           {renderHeaderButtons()}
@@ -365,7 +365,7 @@ export function EvaluatorsTabContent({
             No evaluators added yet
           </h3>
           <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-md">
-            Choose the LLM judges to evaluate the agent&rsquo;s{" "}
+            Choose the evaluators that score the agent&rsquo;s{" "}
             {agentNature === "general" ? "output" : "responses"} and tool
             calls. Add an
             existing one from your list of evaluators or create a new one.
@@ -412,7 +412,7 @@ export function EvaluatorsTabContent({
                           : EVALUATOR_CARD_BUTTON_CLASS
                       }
                     >
-                      {notSetUp(evaluator) ? "Set up for traces" : "Configure"}
+                      Configure
                     </button>
                   )}
                   <Tooltip content="Remove from agent" position="top">

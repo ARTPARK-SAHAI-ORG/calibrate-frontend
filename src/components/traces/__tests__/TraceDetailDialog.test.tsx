@@ -867,7 +867,7 @@ it("keeps the scores column for a run skipped over a missing value", async () =>
   );
 
   expect(
-    (await screen.findAllByText(/reads from the metadata entry k/)).length,
+    (await screen.findAllByText(/and this trace has no value for it/)).length,
   ).toBeGreaterThan(0);
 });
 

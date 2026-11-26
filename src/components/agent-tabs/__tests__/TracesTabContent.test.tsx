@@ -35,6 +35,9 @@ jest.mock("../../../hooks", () => ({
   usePageSize: jest.requireActual("../../../hooks/usePageSize").usePageSize,
   PAGE_SIZE_OPTIONS: jest.requireActual("../../../hooks/usePageSize")
     .PAGE_SIZE_OPTIONS,
+  // Real, so the trace values dialog's source lists open and close.
+  useDismissOnOutside: jest.requireActual("../../../hooks/useDismissOnOutside")
+    .useDismissOnOutside,
 }));
 
 const fetchTrace = jest.fn();
@@ -2077,7 +2080,7 @@ describe("TracesTabContent", () => {
         />,
       );
       await user.click(configureNow());
-      await screen.findByRole("heading", { name: "Choose trace values" });
+      await screen.findByRole("heading", { name: "Configure for traces" });
       await waitFor(() =>
         expect(fetchTraces).toHaveBeenCalledWith("test-token", {
           limit: 20,
@@ -2086,7 +2089,10 @@ describe("TracesTabContent", () => {
         }),
       );
 
-      await user.selectOptions(screen.getByLabelText("{{reply}}"), "input");
+      await user.click(
+        screen.getByRole("button", { name: "Source for reply" }),
+      );
+      await user.click(screen.getByRole("option", { name: "Conversation" }));
       await user.click(screen.getByRole("button", { name: "Save and next" }));
       await waitFor(() =>
         expect(saveEvaluatorTraceVariables).toHaveBeenCalledWith(
@@ -2125,7 +2131,7 @@ describe("TracesTabContent", () => {
         screen.queryByRole("button", { name: "Configure now" }),
       ).not.toBeInTheDocument();
       expect(
-        await screen.findByRole("button", { name: /^Bravo/, current: true }),
+        await screen.findByText("Evaluator 2 of 2: Bravo"),
       ).toBeInTheDocument();
     });
   });
@@ -2234,7 +2240,7 @@ describe("TracesTabContent", () => {
       await user.click(screen.getByRole("button", { name: "Configure now" }));
 
       expect(
-        await screen.findByRole("heading", { name: "Choose trace values" }),
+        await screen.findByRole("heading", { name: "Configure for traces" }),
       ).toBeInTheDocument();
     });
   });
@@ -4035,21 +4041,28 @@ describe("TracesTabContent", () => {
     );
     await user.click(screen.getByText("configure Gamma"));
     expect(
-      await screen.findByRole("heading", { name: "Choose trace values" }),
+      await screen.findByRole("heading", { name: "Configure for traces" }),
     ).toBeInTheDocument();
     // The trace window keeps its keys off while the configure window is on top.
     expect(screen.getByTestId("trace-detail")).toHaveAttribute(
       "data-keys-paused",
       "true",
     );
-    expect(screen.getByRole("heading", { name: "Gamma" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Alpha" })).not.toBeInTheDocument();
+    // Only Gamma is handed over, so the dialog does not count evaluators.
+    expect(screen.queryByText(/^Evaluator \d of/)).not.toBeInTheDocument();
 
     saveEvaluatorTraceVariables.mockResolvedValue(undefined);
-    await user.selectOptions(screen.getByLabelText("{{reply}}"), "input");
+    await user.click(screen.getByRole("button", { name: "Source for reply" }));
+    await user.click(screen.getByRole("option", { name: "Conversation" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(traceScoring.refreshEligibility).toHaveBeenCalled(),
+    );
+    expect(saveEvaluatorTraceVariables).toHaveBeenCalledWith(
+      "agent-1",
+      "ev-3",
+      { reply: "input" },
+      "test-token",
     );
     const refreshed = scoring(true);
     refreshed.eligibility.ineligible = refreshed.eligibility.ineligible.filter(
