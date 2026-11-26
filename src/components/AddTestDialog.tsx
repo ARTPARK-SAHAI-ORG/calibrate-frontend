@@ -2005,6 +2005,8 @@ export function AddTestDialog({
   const selectedToolsInvalid = () => {
     const invalid = selectedToolsHaveInvalidParams(selectedTools);
     if (invalid) {
+      // A tool shown as JSON has no field to point at, so show them as forms.
+      toolExpectations.showFormViews();
       // Each field says what is wrong under it. The highlight lands on the
       // next render, so look for it after that.
       requestAnimationFrame(() => {

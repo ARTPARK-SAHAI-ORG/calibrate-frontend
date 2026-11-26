@@ -568,6 +568,8 @@ export function AddLlmGeneralItemsDialog({
     if (selectedToolsHaveInvalidParams(expected.selectedTools)) {
       setExpectedAttempted(true);
       setError(null);
+      // A tool shown as JSON has no field to point at, so show them as forms.
+      expected.showFormViews();
       // Each field says what is wrong under it. The highlight lands on the
       // next render, so look for it after that.
       requestAnimationFrame(() => {
@@ -650,7 +652,12 @@ export function AddLlmGeneralItemsDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={handleBackdropClick}
+      // Only a click on the dark area itself. Clicks inside the windows this
+      // form opens on top of it (Create tool, discard changes) reach here
+      // too, and must not close the form.
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleBackdropClick();
+      }}
     >
       <div
         className="bg-background border border-border rounded-xl md:rounded-2xl w-full max-w-[90rem] h-[95vh] md:h-[85vh] mx-2 md:mx-4 shadow-2xl flex flex-col overflow-hidden"

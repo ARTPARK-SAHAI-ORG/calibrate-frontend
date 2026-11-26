@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ToolPicker, type AvailableTool } from "@/components/ToolPicker";
 import { OpenToolButton } from "@/components/tools/OpenToolButton";
 import {
@@ -712,6 +712,16 @@ export function useToolCallExpectations() {
       return next;
     });
 
+  // The card just added, so the editor can bring it into view. Never set by
+  // `reset`, so opening a dialog with tools already there scrolls nowhere.
+  const [lastAddedCardId, setLastAddedCardId] = useState<string | null>(null);
+
+  // Every tool back in its form view, so a field with a problem can show it.
+  const showFormViews = () => {
+    setJsonModeToolIds(new Set());
+    setToolJsonError({});
+  };
+
   const addToolFromSelection = (tool: AvailableTool) => {
     // Webhook tools default to "accept any arguments".
     const isWebhook = tool.config?.type === "webhook";
@@ -731,6 +741,7 @@ export function useToolCallExpectations() {
     };
 
     setSelectedTools([...selectedTools, newTool]);
+    setLastAddedCardId(newTool.cardId);
     setToolDropdownOpen(false);
   };
 
@@ -787,6 +798,7 @@ export function useToolCallExpectations() {
     setToolJsonText({});
     setToolJsonError({});
     setCollapsedParamIds(new Set());
+    setLastAddedCardId(null);
   };
 
   return {
@@ -805,12 +817,25 @@ export function useToolCallExpectations() {
     toggleParamCollapsed,
     addToolFromSelection,
     applyToolSaved,
+    lastAddedCardId,
+    setLastAddedCardId,
+    showFormViews,
   };
 }
 
 /** Pick the tools a call should be made to and the parameters it should be
  * made with. Used for a tool-call test and for a labelling item's expected
  * tool calls. */
+/** Where the tool list opens: under the button, or above it when the window
+ * has too little room below. */
+function listPlacement(button: HTMLElement): React.CSSProperties {
+  const rect = button.getBoundingClientRect();
+  const right = window.innerWidth - rect.right;
+  return window.innerHeight - rect.bottom < 360
+    ? { right, bottom: window.innerHeight - rect.top + 8 }
+    : { right, top: rect.bottom + 8 };
+}
+
 export function ToolCallExpectationsEditor({
   editor,
   heading,
@@ -842,6 +867,9 @@ export function ToolCallExpectationsEditor({
   /** A fuller name for the Create tool button when the screen has another. */
   createToolLabel?: string;
 }) {
+  const [toolListAt, setToolListAt] = useState<React.CSSProperties | null>(
+    null,
+  );
   const {
     selectedTools,
     setSelectedTools,
@@ -856,7 +884,19 @@ export function ToolCallExpectationsEditor({
     collapsedParamIds,
     toggleParamCollapsed,
     addToolFromSelection,
+    lastAddedCardId,
+    setLastAddedCardId,
   } = editor;
+
+  // A tool just added goes at the bottom of the list, which may be off
+  // screen, so bring it into view.
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!lastAddedCardId) return;
+    listRef.current
+      ?.querySelector(`[data-card-id="${lastAddedCardId}"]`)
+      ?.scrollIntoView?.({ block: "end", behavior: "smooth" });
+  }, [lastAddedCardId]);
 
   const selectInbuiltTool = (toolId: string, toolName: string) => {
     const newTool: SelectedToolConfig = {
@@ -870,6 +910,7 @@ export function ToolCallExpectationsEditor({
       expectedParameters: [],
     };
     setSelectedTools([...selectedTools, newTool]);
+    setLastAddedCardId(newTool.cardId);
     setToolDropdownOpen(false);
   };
 
@@ -1568,14 +1609,17 @@ export function ToolCallExpectationsEditor({
     });
 
   return (
-    <div className="relative">
+    <div ref={listRef} className="relative">
       <div className="flex items-center justify-between mb-2">
         <label className="text-base font-medium text-foreground">
           {heading}
         </label>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setToolDropdownOpen(!toolDropdownOpen)}
+            onClick={(e) => {
+              setToolListAt(listPlacement(e.currentTarget));
+              setToolDropdownOpen(!toolDropdownOpen);
+            }}
             className={`px-3 py-1.5 text-sm font-medium rounded-lg cursor-pointer border ${
               showErrors && requireAtLeastOne && selectedTools.length === 0
                 ? "bg-red-500/10 text-red-500 border-red-500/40 hover:bg-red-500/20 transition-colors"
@@ -1603,7 +1647,14 @@ export function ToolCallExpectationsEditor({
               setToolDropdownOpen(false);
             }}
           />
-          <div className="absolute right-0 top-8 mt-2 w-72 bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden">
+          {/* Fixed to the window, so a scrolling column the editor sits in
+              never cuts the list off. */}
+          <div
+            style={toolListAt ?? undefined}
+            className={`${
+              toolListAt ? "fixed" : "absolute right-0 top-8 mt-2"
+            } w-72 bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden`}
+          >
             <ToolPicker
               availableTools={availableTools}
               isLoading={availableToolsLoading}
@@ -1637,6 +1688,7 @@ export function ToolCallExpectationsEditor({
             return (
               <div
                 key={tool.cardId}
+                data-card-id={tool.cardId}
                 className="bg-muted rounded-lg p-4 border border-border"
               >
                 {/* Tool header with name and delete button */}

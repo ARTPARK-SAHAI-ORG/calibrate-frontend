@@ -172,20 +172,25 @@ jest.mock("../../tools/CreateToolFlow", () => ({
   CreateToolFlow: (props: CreateToolFlowStubProps) => {
     createToolFlowProps = props;
     return props.isOpen ? (
-      <button
-        type="button"
-        onClick={() =>
-          props.onCreated(
-            { uuid: "tool-new", name: "book_flight", config: {} },
-            [
-              ...props.knownTools,
+      <>
+        <button type="button" onClick={props.onClose}>
+          Back out of creating a tool
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            props.onCreated(
               { uuid: "tool-new", name: "book_flight", config: {} },
-            ],
-          )
-        }
-      >
-        Finish creating tool
-      </button>
+              [
+                ...props.knownTools,
+                { uuid: "tool-new", name: "book_flight", config: {} },
+              ],
+            )
+          }
+        >
+          Finish creating tool
+        </button>
+      </>
     ) : null;
   },
 }));
@@ -827,7 +832,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     Element.prototype.scrollIntoView = realScroll;
   });
 
-  it("says to switch to Form when the bad expected parameter is edited as JSON", async () => {
+  it("switches a tool shown as JSON back to Form and goes to the bad field", async () => {
     withTools();
     const user = setupUser();
     const { onSubmit } = renderDialog({
@@ -853,11 +858,10 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     await user.clear(screen.getByDisplayValue("Pune"));
     await user.click(screen.getByRole("button", { name: "JSON" }));
     await user.click(screen.getByRole("button", { name: "Save item" }));
-    expect(
-      await screen.findByText(
-        "Some expected tool call values are missing or invalid. Switch to Form to see which",
-      ),
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("data-param-error"),
+    );
+    expect(screen.queryByText(/Switch to Form/)).not.toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
     accessTokenMock.mockReturnValue(null);
   });
@@ -980,6 +984,49 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     rerender(<AddLlmGeneralItemsDialog isOpen {...props} />);
     expect(screen.queryByDisplayValue(/"city"/)).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Pune")).toBeInTheDocument();
+  });
+
+  it("stays open when the Create tool window is backed out of", async () => {
+    const user = setupUser();
+    const { onClose } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    await user.click(
+      screen.getByRole("button", { name: "Create tool for expected tool calls" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Back out of creating a tool" }),
+    );
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Save item" })).toBeInTheDocument();
+  });
+
+  it("scrolls to an expected tool just added", async () => {
+    const scrolled: Element[] = [];
+    const realScroll = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    const user = setupUser();
+    renderDialog();
+    await user.click(screen.getByRole("button", { name: "Add tool" }));
+    await user.click(screen.getByRole("button", { name: "Pick End conversation" }));
+    expect(scrolled.some((el) => el.hasAttribute("data-card-id"))).toBe(true);
+    Element.prototype.scrollIntoView = realScroll;
+  });
+
+  it("opens the expected tool list over the form, not inside its column", async () => {
+    const user = setupUser();
+    renderDialog();
+    await user.click(screen.getByRole("button", { name: "Add tool" }));
+    const list = screen
+      .getByRole("button", { name: "Pick book_flight" })
+      .closest(".w-72") as HTMLElement;
+    expect(list).toHaveClass("fixed");
+    expect(list.style.right).not.toBe("");
   });
 
   it("scrolls to a tool call just added, and not to one already there", async () => {
