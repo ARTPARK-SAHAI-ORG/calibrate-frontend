@@ -100,11 +100,13 @@ describe("ManageEvaluatorsDialog", () => {
     mockApiClient.mockResolvedValue({ items: EVALUATORS });
   });
 
-  it("keeps the protected tool call evaluator on the task once it is there", async () => {
+  it("keeps the last tool call evaluator on the task, and frees it once another is ticked", async () => {
+    const user = setupUser();
     mockApiClient.mockResolvedValue({
       items: [
         ...EVALUATORS,
-        { uuid: "ev-tc", name: "Tool call correctness", evaluator_type: "tool-call", is_protected: true },
+        { uuid: "ev-tc", name: "Tool call correctness", evaluator_type: "tool-call" },
+        { uuid: "ev-tc-2", name: "Booking calls", evaluator_type: "tool-call" },
       ],
     });
     renderDialog({ currentEvaluatorIds: ["ev-1", "ev-tc"] });
@@ -116,9 +118,29 @@ describe("ManageEvaluatorsDialog", () => {
       screen.getByRole("button", { name: "Remove Tool call correctness" }),
     ).toBeDisabled();
     expect(catalogueCheckbox("Correctness")).not.toBeDisabled();
+
+    await user.hover(screen.getAllByText("Tool call correctness")[0]);
     expect(
-      screen.getByText(/Cannot be removed: annotators answer this task.s tool call items with it/),
-    ).toBeInTheDocument();
+      await screen.findAllByText(/tool call items need a tool call evaluator/),
+    ).not.toHaveLength(0);
+
+    await user.click(catalogueCheckbox("Booking calls"));
+    expect(catalogueCheckbox("Tool call correctness")).not.toBeDisabled();
+    await user.click(catalogueCheckbox("Tool call correctness"));
+    expect(catalogueCheckbox("Tool call correctness")).not.toBeChecked();
+    expect(catalogueCheckbox("Booking calls")).toBeDisabled();
+  });
+
+  it("locks nothing on a task with no tool call evaluator", async () => {
+    mockApiClient.mockResolvedValue({
+      items: [
+        ...EVALUATORS,
+        { uuid: "ev-tc", name: "Tool call correctness", evaluator_type: "tool-call" },
+      ],
+    });
+    renderDialog({ currentEvaluatorIds: ["ev-1"] });
+    await waitForCatalogueLoaded();
+    expect(catalogueCheckbox("Tool call correctness")).not.toBeDisabled();
   });
 
   it("renders with a generic subtitle when no taskType is given, and fetches evaluators", async () => {

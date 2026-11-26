@@ -17,7 +17,6 @@ type EvaluatorListItem = {
   name: string;
   description?: string;
   evaluator_type?: EvaluatorType;
-  is_protected?: boolean | null;
 };
 
 function parseApiError(err: unknown, fallback: string): string {
@@ -34,6 +33,9 @@ function parseApiError(err: unknown, fallback: string): string {
   }
   return err.message || fallback;
 }
+
+const TOOL_CALL_LOCK_REASON =
+  "This task's tool call items need a tool call evaluator. Add another one before removing this one.";
 
 type ManageEvaluatorsDialogProps = {
   accessToken: string;
@@ -105,11 +107,16 @@ export function ManageEvaluatorsDialog({
     };
   }, [accessToken]);
 
-  // The built-in Tool call correctness evaluator answers tool call items, so
-  // once it is on the task it stays.
+  // Tool call items are answered only through a tool call evaluator, so a
+  // task that has one keeps at least one: the last one ticked is locked.
+  const isToolCall = (uuid: string) =>
+    evaluators.some((e) => e.uuid === uuid && e.evaluator_type === "tool-call");
+  const taskHasToolCallEvaluator = currentEvaluatorIds.some(isToolCall);
   const isLocked = (uuid: string) =>
-    currentEvaluatorIds.includes(uuid) &&
-    evaluators.some((e) => e.uuid === uuid && e.is_protected === true);
+    taskHasToolCallEvaluator &&
+    selectedIds.has(uuid) &&
+    isToolCall(uuid) &&
+    ![...selectedIds].some((other) => other !== uuid && isToolCall(other));
 
   const filteredEvaluators = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -426,7 +433,7 @@ export function ManageEvaluatorsDialog({
                 ) : (
                   filteredEvaluators.map((ev) => {
                     const checked = selectedIds.has(ev.uuid);
-                    return (
+                    const row = (
                       <label
                         key={ev.uuid}
                         className="flex items-start gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
@@ -449,14 +456,15 @@ export function ManageEvaluatorsDialog({
                               {ev.description}
                             </div>
                           )}
-                          {isLocked(ev.uuid) && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Cannot be removed: annotators answer this
-                              task&rsquo;s tool call items with it
-                            </div>
-                          )}
                         </div>
                       </label>
+                    );
+                    return isLocked(ev.uuid) ? (
+                      <Tooltip key={ev.uuid} content={TOOL_CALL_LOCK_REASON}>
+                        {row}
+                      </Tooltip>
+                    ) : (
+                      row
                     );
                   })
                 )}
@@ -545,7 +553,11 @@ export function ManageEvaluatorsDialog({
                           Optional
                         </label>
                         <Tooltip
-                          content="Remove from selection"
+                          content={
+                            isLocked(uuid)
+                              ? TOOL_CALL_LOCK_REASON
+                              : "Remove from selection"
+                          }
                           className="flex-shrink-0"
                         >
                           <button
