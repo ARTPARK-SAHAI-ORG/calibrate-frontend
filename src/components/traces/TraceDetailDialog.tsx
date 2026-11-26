@@ -50,6 +50,7 @@ import {
   TraceSourceLabel,
 } from "./TracesTable";
 import { TraceScorePanel } from "./TraceScorePanel";
+import { WARNING_BUTTON_CLASS } from "./AddToolCallEvaluatorButton";
 
 type TraceDetailDialogProps = {
   isOpen: boolean;
@@ -75,6 +76,8 @@ type TraceDetailDialogProps = {
   /** The agent now has an evaluator that fits this trace, so a trace skipped
    *  for lacking one can be scored again. */
   canScoreTrace?: boolean;
+  /** Told once a new scoring run was started, so the list can show it. */
+  onScored?: () => void;
   /** A window opened from inside this one is on screen, so Escape and the
    *  arrow keys belong to it. */
   keysPaused?: boolean;
@@ -385,6 +388,7 @@ export function TraceDetailDialog({
   addToolCallEvaluator,
   onGoToEvaluators,
   canScoreTrace = false,
+  onScored,
   keysPaused = false,
   isSelected = false,
   onToggleSelected,
@@ -503,15 +507,17 @@ export function TraceDetailDialog({
     };
   }, [isOpen, traceUuid, accessToken, hasOpenScoreRun]);
 
-  const [isScoring, setIsScoring] = useState(false);
+  // The trace being sent, so moving to another trace leaves its button on.
+  const [scoringUuid, setScoringUuid] = useState<string | null>(null);
   const shownTraceRef = useRef(traceUuid);
   shownTraceRef.current = traceUuid;
   const startScoring = async () => {
-    if (!accessToken || !traceUuid || isScoring) return;
-    setIsScoring(true);
+    if (!accessToken || !traceUuid) return;
     const scored = traceUuid;
+    setScoringUuid(scored);
     try {
       const run = await scoreTrace(accessToken, scored);
+      onScored?.();
       // The reader may have moved to another trace while this was sent.
       if (shownTraceRef.current !== scored) return;
       // A pending run shows the spinner, and the poll above takes it from there.
@@ -527,15 +533,15 @@ export function TraceDetailDialog({
         parseBackendErrorMessage(err, "Could not score this trace. Please try again."),
       );
     } finally {
-      setIsScoring(false);
+      setScoringUuid((current) => (current === scored ? null : current));
     }
   };
   const scoreTraceButton = canScoreTrace ? (
     <button
       type="button"
       onClick={() => void startScoring()}
-      disabled={isScoring}
-      className="h-8 px-2.5 rounded-md text-sm font-medium border bg-amber-500/12 border-amber-500/45 text-amber-950 dark:text-amber-100 transition-colors hover:bg-amber-500/22 dark:hover:bg-amber-500/18 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+      disabled={scoringUuid === traceUuid}
+      className={`${WARNING_BUTTON_CLASS} disabled:opacity-60 disabled:cursor-not-allowed`}
     >
       Score this trace
     </button>

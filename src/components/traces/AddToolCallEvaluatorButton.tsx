@@ -12,6 +12,10 @@ import {
 } from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
 
+/** The amber button that sits under a warning in the trace window. */
+export const WARNING_BUTTON_CLASS =
+  "h-8 px-2.5 rounded-md text-sm font-medium border bg-amber-500/12 border-amber-500/45 text-amber-950 dark:text-amber-100 transition-colors hover:bg-amber-500/22 dark:hover:bg-amber-500/18 cursor-pointer";
+
 /**
  * "Add a tool call evaluator", and the picker it opens: every tool-call
  * evaluator in the workspace, or a way to create one when there are none.
@@ -100,7 +104,7 @@ export function AddToolCallEvaluatorButton({
         onClick={() => void open()}
         className={
           asButton
-            ? "h-8 px-2.5 rounded-md text-sm font-medium border bg-amber-500/12 border-amber-500/45 text-amber-950 dark:text-amber-100 transition-colors hover:bg-amber-500/22 dark:hover:bg-amber-500/18 cursor-pointer"
+            ? WARNING_BUTTON_CLASS
             : "font-semibold cursor-pointer hover:opacity-80"
         }
       >
