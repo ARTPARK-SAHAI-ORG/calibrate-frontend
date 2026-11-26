@@ -1457,6 +1457,23 @@ describe("AddLlmGeneralItemsDialog", () => {
       );
     });
 
+    it("names the input and output only in their heading boxes", () => {
+      renderDialog();
+      expect(screen.queryByText("Input")).not.toBeInTheDocument();
+      expect(screen.queryByText("Output")).not.toBeInTheDocument();
+      expect(screen.getByLabelText("Heading for the input")).toHaveAttribute(
+        "placeholder",
+        "Input",
+      );
+    });
+
+    it("puts Expected tool calls in the left column, under metadata", () => {
+      renderDialog();
+      expect(leftColumn()).toContainElement(
+        screen.getByText("Expected tool calls"),
+      );
+    });
+
     it("keeps the evaluators column when no evaluator scores the item", () => {
       renderDialog({ evaluators: [] });
       expect(

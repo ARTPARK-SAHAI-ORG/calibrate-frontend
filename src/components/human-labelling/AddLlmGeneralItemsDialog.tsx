@@ -11,7 +11,11 @@ import { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 import { FieldError } from "@/components/ui/FieldError";
-import { DialogNavHeader, ErrorNote, type MetadataEntry } from "@/components/ui";
+import {
+  DialogNavHeader,
+  ErrorNote,
+  type MetadataEntry,
+} from "@/components/ui";
 import {
   ToolPicker,
   getToolParams,
@@ -197,7 +201,7 @@ export function AddLlmGeneralItemsDialog({
   // narrower; the input and output take what is left, at least a quarter.
   const leftColumn = useSavedColumnWidth(
     "calibrate:one-shot-item-form-left-width",
-    20,
+    30,
     15,
     50,
     "left",
@@ -707,6 +711,22 @@ export function AddLlmGeneralItemsDialog({
               onRowsChange={setMetadataRows}
               disabled={submitting}
             />
+
+            {/* Below metadata, the same place the next-reply item form has it. */}
+            <div className="shrink-0">
+              <ToolCallExpectationsEditor
+                editor={expected}
+                heading="Expected tool calls"
+                emptyText={EXPECTED_TOOL_CALLS_HELP}
+                availableTools={availableTools}
+                availableToolsLoading={toolsLoading}
+                accessToken={accessToken ?? undefined}
+                onToolSaved={handleToolSaved}
+                onCreateTool={() => setCreateToolFor("expected")}
+                showErrors={expectedAttempted}
+                createToolLabel="Create tool for expected tool calls"
+              />
+            </div>
           </div>
 
           <ResizeHandle
@@ -718,13 +738,6 @@ export function AddLlmGeneralItemsDialog({
               the full dialog height. */}
           <div className="w-full md:flex-1 md:min-w-0 flex flex-col md:flex-row bg-muted/30 min-h-0">
             <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-4 md:p-6 border-b md:border-b-0 md:border-r border-border">
-              {/* As tall as the Output row beside it, which holds the tool
-                  buttons, so both headings start on the same line. */}
-              <div className="flex items-center min-h-9 mb-3">
-                <label className="block text-base font-medium text-foreground">
-                  Input
-                </label>
-              </div>
               <TextVersionsEditor
                 field="input"
                 extras={inputExtras}
@@ -742,71 +755,68 @@ export function AddLlmGeneralItemsDialog({
               </TextVersionsEditor>
             </div>
             <div className="flex-1 flex flex-col min-h-0 p-4 md:p-6">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <label className="block text-base font-medium text-foreground">
-                  Output
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCreateToolFor("output")}
-                    disabled={submitting}
-                    className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Create tool
-                  </button>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setPickerOpen((open) => !open)}
-                      disabled={submitting}
-                      className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap bg-foreground text-background hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 4.5v15m7.5-7.5h-15"
-                        />
-                      </svg>
-                      Add tool call
-                    </button>
-                    {pickerOpen && (
-                      <>
-                        {/* Click anywhere else to close, the same invisible
-                          sheet the test dialog's tool menu uses. */}
-                        <div
-                          className="fixed inset-0 z-40"
-                          onClick={() => setPickerOpen(false)}
-                        />
-                        <div className="absolute right-0 z-50 mt-2 min-w-[280px] rounded-xl border border-border bg-background shadow-xl overflow-hidden">
-                          <ToolPicker
-                            availableTools={availableTools}
-                            isLoading={toolsLoading}
-                            onSelectInbuiltTool={(toolId) =>
-                              addToolCall(toolId, [])
-                            }
-                            onSelectCustomTool={(tool) =>
-                              addToolCall(tool.name, getToolParams(tool))
-                            }
-                            accessToken={accessToken ?? undefined}
-                            onToolSaved={handleToolSaved}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
               <div className="flex-1 min-h-0 overflow-y-auto space-y-3 flex flex-col">
                 <TextVersionsEditor
                   field="output"
+                  headingAside={
+                    <div className="flex items-center gap-2 ml-1">
+                      <button
+                        type="button"
+                        onClick={() => setCreateToolFor("output")}
+                        disabled={submitting}
+                        className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Create tool
+                      </button>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setPickerOpen((open) => !open)}
+                          disabled={submitting}
+                          className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap bg-foreground text-background hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <svg
+                            className="w-3.5 h-3.5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M12 4.5v15m7.5-7.5h-15"
+                            />
+                          </svg>
+                          Add tool call
+                        </button>
+                        {pickerOpen && (
+                          <>
+                            {/* Click anywhere else to close, the same invisible
+                              sheet the test dialog's tool menu uses. */}
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => setPickerOpen(false)}
+                            />
+                            <div className="absolute right-0 z-50 mt-2 min-w-[280px] rounded-xl border border-border bg-background shadow-xl overflow-hidden">
+                              <ToolPicker
+                                availableTools={availableTools}
+                                isLoading={toolsLoading}
+                                onSelectInbuiltTool={(toolId) =>
+                                  addToolCall(toolId, [])
+                                }
+                                onSelectCustomTool={(tool) =>
+                                  addToolCall(tool.name, getToolParams(tool))
+                                }
+                                accessToken={accessToken ?? undefined}
+                                onToolSaved={handleToolSaved}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  }
                   extras={outputExtras}
                   onChange={setOutputExtras}
                   onPendingChange={setOutputPending}
@@ -926,20 +936,6 @@ export function AddLlmGeneralItemsDialog({
                     </div>
                   </div>
                 ))}
-              </div>
-              <div className="shrink-0 max-h-[50%] overflow-y-auto mt-6 pt-6 border-t border-border">
-                <ToolCallExpectationsEditor
-                  editor={expected}
-                  heading="Expected tool calls"
-                  emptyText={EXPECTED_TOOL_CALLS_HELP}
-                  availableTools={availableTools}
-                  availableToolsLoading={toolsLoading}
-                  accessToken={accessToken ?? undefined}
-                  onToolSaved={handleToolSaved}
-                  onCreateTool={() => setCreateToolFor("expected")}
-                  showErrors={expectedAttempted}
-                  createToolLabel="Create tool for expected tool calls"
-                />
               </div>
             </div>
           </div>

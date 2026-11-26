@@ -73,6 +73,7 @@ export function TextVersionsEditor({
   onChange,
   onPendingChange,
   disabled = false,
+  headingAside,
   children,
 }: {
   field: "input" | "output";
@@ -81,6 +82,8 @@ export function TextVersionsEditor({
   /** Told whether a typed heading or name is waiting for its tick. */
   onPendingChange?: (pending: boolean) => void;
   disabled?: boolean;
+  /** Drawn at the end of the heading's row. */
+  headingAside?: ReactNode;
   children: ReactNode;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -118,16 +121,21 @@ export function TextVersionsEditor({
   });
 
   const label = extras.label ?? "";
+  // What annotators see when there is no heading, shown in the box so it is
+  // clear what goes there. Keeping it stores no heading.
+  const defaultHeading = field === "input" ? "Input" : "Output";
   const headingDraft = drafts.heading;
+  const headingUnchanged = (to: string) =>
+    to === label || (!label && to === defaultHeading);
   const headingDirty =
-    headingDraft !== undefined && headingDraft.trim() !== label;
+    headingDraft !== undefined && !headingUnchanged(headingDraft.trim());
   const headingTaken =
     headingDirty && Object.hasOwn(versions, headingDraft.trim());
   const confirmHeading = () => {
     if (headingDraft === undefined || headingTaken) return;
     dropDraft("heading");
     const to = headingDraft.trim();
-    if (to === label) return;
+    if (headingUnchanged(to)) return;
     onChange({
       ...(to ? { label: to } : {}),
       ...(extras.versions ? { versions: extras.versions } : {}),
@@ -166,13 +174,19 @@ export function TextVersionsEditor({
 
   return (
     <>
-      <div className="flex items-center gap-1 mb-3">
+      {/* As tall as the buttons a caller may add, so the heading rows of
+          two boxes side by side line up. */}
+      <div className="flex items-center gap-1 min-h-9 mb-3">
         <input
           type="text"
           value={headingDraft ?? label}
-          placeholder="Add a heading for annotators"
+          placeholder={defaultHeading}
           aria-label={`Heading for the ${field}`}
           disabled={disabled}
+          onFocus={() => {
+            if (headingDraft === undefined)
+              setDraft("heading", label || defaultHeading);
+          }}
           onChange={(e) => setDraft("heading", e.target.value)}
           onBlur={() => {
             if (headingDraft !== undefined && !headingDirty)
@@ -189,6 +203,7 @@ export function TextVersionsEditor({
             canConfirm={!headingTaken}
           />
         )}
+        {headingAside}
       </div>
       {headingTaken && (
         <p className="text-xs text-red-500 px-4 -mt-1 mb-3">{TAKEN_MESSAGE}</p>
