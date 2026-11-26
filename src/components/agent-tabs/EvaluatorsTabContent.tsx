@@ -408,7 +408,7 @@ export function EvaluatorsTabContent({
                       onClick={() => openTraceValues([evaluator])}
                       className={
                         notSetUp(evaluator)
-                          ? `${EVALUATOR_CARD_BUTTON_CLASS} border-amber-500/40 text-amber-600 dark:text-amber-400`
+                          ? "h-8 md:h-9 px-3 rounded-md text-xs md:text-sm font-medium border border-amber-400 bg-amber-400 text-amber-950 hover:bg-amber-300 transition-colors cursor-pointer inline-flex items-center gap-1.5"
                           : EVALUATOR_CARD_BUTTON_CLASS
                       }
                     >

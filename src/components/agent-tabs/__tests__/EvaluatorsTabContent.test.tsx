@@ -733,7 +733,7 @@ describe("EvaluatorsTabContent", () => {
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
       const setUp = await screen.findByRole("button", { name: SET_UP });
-      expect(setUp).toHaveClass("text-amber-600");
+      expect(setUp).toHaveClass("bg-amber-400");
 
       await user.click(setUp);
       await user.selectOptions(
