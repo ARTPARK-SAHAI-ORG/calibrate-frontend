@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, type HTMLAttributes, type ReactNode } from "react";
-import { EvaluatorTypePill, PreBuiltPill } from "@/components/EvaluatorPills";
+import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
-import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
+import { type EvaluatorData } from "@/lib/evaluatorApi";
 import { EyeIcon } from "@/components/icons";
 import { EVALUATOR_CARD_BUTTON_CLASS } from "./DuplicateEvaluatorButton";
 
@@ -53,7 +53,6 @@ export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
                 <EvaluatorTypePill evaluatorType={evaluator.evaluator_type} />
               </span>
             )}
-            {isDefaultEvaluator(evaluator) && <PreBuiltPill />}
           </div>
           {evaluator.description && (
             <p className="text-sm text-muted-foreground mt-0.5">

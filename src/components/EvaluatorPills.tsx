@@ -11,15 +11,6 @@ export type EvaluatorType =
 const baseClasses =
   "inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-medium uppercase tracking-wide";
 
-/** Marks an evaluator that came with the product rather than being written here. */
-export function PreBuiltPill() {
-  return (
-    <span className={`${baseClasses} bg-foreground text-background`}>
-      Pre-built
-    </span>
-  );
-}
-
 export const EVALUATOR_TYPE_LABELS: Record<EvaluatorType, string> = {
   tts: "Text to Speech",
   stt: "Speech to Text",
