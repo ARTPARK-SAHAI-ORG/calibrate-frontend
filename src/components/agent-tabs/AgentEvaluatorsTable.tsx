@@ -13,10 +13,10 @@ import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
 
 // One grid for the header and every row, so the columns line up. The last
 // column fits View, Duplicate and Remove, which leaves the name and the
-// description too little room below `lg`, so until then a row is the tick box
-// beside the name and description, with the buttons on a line of their own.
+// description too little room below `xl`. Until then a row is the tick box
+// beside the name, with the description and the buttons below the name.
 const ROW_GRID =
-  "grid grid-cols-[20px_minmax(0,1fr)] lg:grid-cols-[20px_minmax(0,1fr)_minmax(0,1.4fr)_320px] gap-x-4 gap-y-2 items-center px-4";
+  "grid grid-cols-[20px_minmax(0,1fr)] xl:grid-cols-[20px_minmax(0,1fr)_minmax(0,1.4fr)_320px] gap-x-4 gap-y-2 items-center px-4";
 
 type Props = {
   evaluators: EvaluatorData[];
@@ -65,7 +65,7 @@ export function AgentEvaluatorsTable({
           {evaluators.length === 1 ? "evaluator" : "evaluators"}
         </p>
         {/* Without the full header row, the button sits here instead. */}
-        <div className="lg:hidden">{removeSelectedButton}</div>
+        <div className="xl:hidden">{removeSelectedButton}</div>
       </div>
 
       <div className="border border-border rounded-xl overflow-hidden">
@@ -76,10 +76,10 @@ export function AgentEvaluatorsTable({
             label="Select all evaluators"
           />
           <div className="text-sm font-medium text-muted-foreground">Name</div>
-          <div className="hidden lg:block text-sm font-medium text-muted-foreground">
+          <div className="hidden xl:block text-sm font-medium text-muted-foreground">
             Description
           </div>
-          <div className="hidden lg:flex justify-end h-8">
+          <div className="hidden xl:flex justify-end h-8">
             {removeSelectedButton}
           </div>
         </div>
@@ -111,8 +111,8 @@ export function AgentEvaluatorsTable({
             </button>
             {/* Holds its column on a wide screen even when empty. */}
             <p
-              className={`col-start-2 lg:col-start-auto text-sm text-muted-foreground ${
-                evaluator.description ? "" : "hidden lg:block"
+              className={`col-start-2 xl:col-start-auto text-sm text-muted-foreground ${
+                evaluator.description ? "" : "hidden xl:block"
               }`}
             >
               {evaluator.description}
@@ -120,7 +120,7 @@ export function AgentEvaluatorsTable({
             {/* The row opens the evaluator on a click; these buttons, and
                 any window they open, do their own thing. */}
             <div
-              className="col-span-2 lg:col-span-1 flex items-center lg:justify-end gap-1"
+              className="col-start-2 xl:col-start-auto flex flex-wrap items-center xl:justify-end gap-1"
               onClick={(e) => e.stopPropagation()}
             >
               <button
