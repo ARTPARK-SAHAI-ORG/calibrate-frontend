@@ -1,5 +1,6 @@
 ## November 2026
 
+- A trace that was skipped because no evaluator could score it now has a Score this trace button in its window, so you can run the evaluators on it once the agent has one that can score traces ([#888](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/888))
 - The Analytics page now shows how many messages agents' chat links answered, in a card, in the workspace table and on the traces chart ([#887](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/887))
 - A trace whose scoring failed now shows a red error with the reason it failed, instead of the amber note saying scoring did not finish ([#876](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/876))
 - A new evaluator now opens with its name already filled in from the kind you picked, so you can create it without typing a name ([#884](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/884))
