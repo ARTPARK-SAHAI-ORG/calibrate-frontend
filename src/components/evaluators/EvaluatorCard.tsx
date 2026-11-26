@@ -4,7 +4,7 @@ import { useState, type HTMLAttributes, type ReactNode } from "react";
 import { EvaluatorTypePill, PreBuiltPill } from "@/components/EvaluatorPills";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
-import { EyeIcon, WarningTriangleIcon } from "@/components/icons";
+import { EyeIcon } from "@/components/icons";
 import { EVALUATOR_CARD_BUTTON_CLASS } from "./DuplicateEvaluatorButton";
 
 type Props = {
@@ -12,7 +12,6 @@ type Props = {
   /** Drawn after View: Duplicate, then Remove on an agent or Delete in the library. */
   actions?: ReactNode;
   /** One line under the description, for something the reader needs to fix. */
-  warning?: string;
 } & HTMLAttributes<HTMLDivElement>;
 
 /**
@@ -22,7 +21,7 @@ type Props = {
  * the evaluator's own page. Shared by the evaluator library pages and the
  * agent Evaluators tab, so the two read and behave the same.
  */
-export function EvaluatorCard({ evaluator, actions, warning, ...rest }: Props) {
+export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
@@ -59,12 +58,6 @@ export function EvaluatorCard({ evaluator, actions, warning, ...rest }: Props) {
           {evaluator.description && (
             <p className="text-sm text-muted-foreground mt-0.5">
               {evaluator.description}
-            </p>
-          )}
-          {warning && (
-            <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-              <WarningTriangleIcon className="w-3 h-3 flex-shrink-0 opacity-70" />
-              {warning}
             </p>
           )}
         </div>

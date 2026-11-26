@@ -301,7 +301,7 @@ it("names each evaluator that could not score the trace, and why", () => {
   ).toBeInTheDocument();
   expect(screen.getByText("Tone check")).toBeInTheDocument();
   expect(screen.getByText("Tone check").closest("li")).toHaveTextContent(
-    "Tone check: has not been configured for traces. Configure it in the Evaluators tab",
+    "Tone check: has not been configured for traces. Set it up in the Evaluators tab",
   );
 });
 

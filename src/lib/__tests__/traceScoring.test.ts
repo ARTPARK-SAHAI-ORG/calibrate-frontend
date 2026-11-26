@@ -62,7 +62,7 @@ describe("copy", () => {
     );
     expect(ineligibleReasonCopy("no_live_version")).toBe("Has no live version");
     expect(ineligibleReasonCopy("declares_variables")).toBe(
-      "Has not been configured for traces. Configure it in the Evaluators tab",
+      "Has not been configured for traces. Set it up in the Evaluators tab",
     );
   });
 

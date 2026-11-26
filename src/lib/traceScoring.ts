@@ -243,7 +243,7 @@ const NOTHING_CAN_SCORE_BY_REASON: Record<
   { one: string; every: string; some: string; fix: string }
 > = {
   declares_variables: {
-    one: `${NOT_CONFIGURED_FOR_TRACES}. Configure it in the Evaluators tab`,
+    one: `${NOT_CONFIGURED_FOR_TRACES}. Set it up in the Evaluators tab`,
     every: EVERY_EVALUATOR_NEEDS_VALUES,
     some: "some have not been configured for traces",
     fix: "Configure them in the",

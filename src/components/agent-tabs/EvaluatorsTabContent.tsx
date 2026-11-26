@@ -30,7 +30,6 @@ import {
   agentTaskType,
   fitsAgent,
   needsTraceValues,
-  NOT_CONFIGURED_FOR_TRACES,
   takesTraceValues,
 } from "@/lib/traceScoring";
 
@@ -89,6 +88,8 @@ export function EvaluatorsTabContent({
     return data;
   }, [agentUuid, backendAccessToken]);
 
+  const notSetUp = (evaluator: EvaluatorData) =>
+    traceScoringOn && hasTraces && needsTraceValues(evaluator, agentNature);
   const traceValues = useConfigureTraceValues({
     agentUuid,
     agentNature,
@@ -395,11 +396,6 @@ export function EvaluatorsTabContent({
               evaluator={evaluator}
               data-tour="evaluator-card"
               data-evaluator-name={evaluator.name}
-              warning={
-                traceScoringOn && hasTraces && needsTraceValues(evaluator, agentNature)
-                  ? NOT_CONFIGURED_FOR_TRACES
-                  : undefined
-              }
               actions={
                 <>
                   <DuplicateEvaluatorButton
@@ -410,9 +406,13 @@ export function EvaluatorsTabContent({
                     <button
                       type="button"
                       onClick={() => openTraceValues([evaluator])}
-                      className={EVALUATOR_CARD_BUTTON_CLASS}
+                      className={
+                        notSetUp(evaluator)
+                          ? `${EVALUATOR_CARD_BUTTON_CLASS} border-amber-500/40 text-amber-600 dark:text-amber-400`
+                          : EVALUATOR_CARD_BUTTON_CLASS
+                      }
                     >
-                      Configure
+                      {notSetUp(evaluator) ? "Set up for traces" : "Configure"}
                     </button>
                   )}
                   <Tooltip content="Remove from agent" position="top">
