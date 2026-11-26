@@ -801,7 +801,7 @@ export function AddLlmGeneralItemsDialog({
             <div className="flex-1 min-w-0 flex flex-col min-h-0 p-4 md:p-6">
               <div
                 ref={toolCallListRef}
-                className="flex-1 min-h-0 overflow-y-auto space-y-3 flex flex-col"
+                className="flex-1 min-h-0 overflow-y-auto hide-scrollbar [scrollbar-width:none] space-y-3 flex flex-col"
               >
                 <TextVersionsEditor
                   field="output"
