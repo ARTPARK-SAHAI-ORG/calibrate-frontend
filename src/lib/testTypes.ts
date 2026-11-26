@@ -1,7 +1,7 @@
 /**
  * Test-type helpers shared across the tests list views.
  *
- * A test's `type` is one of these three backend values. Keeping the
+ * A test's `type` is one of these four backend values. Keeping the
  * human-readable label in one place means a rename only happens here
  * instead of in every table / card that shows the type.
  */
@@ -39,11 +39,9 @@ export type TestTypeFilterValue = "all" | TestType;
 /**
  * Does a test's type belong under the chosen filter chip?
  *
- * The "response" chip also matches "general" tests. To the reader they are one
- * thing, "Agent Response": a general agent's test and a conversation agent's
- * test are both a reply being judged, and both show that same name. The split
- * lives only in how the test stores its content, so a single chip has to
- * select both or a general agent's tests would have no chip that finds them.
+ * On an agent's Tests tab the one reply chip ("response") also matches
+ * "general" tests, since one agent holds only one of the two kinds and the
+ * chip is named after the agent's kind.
  */
 export function matchesTestTypeFilter(
   testType: string | null | undefined,

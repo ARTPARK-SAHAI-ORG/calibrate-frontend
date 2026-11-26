@@ -402,17 +402,24 @@ function MetricsPageInner() {
                           {evaluator.name}
                         </h3>
                         {/* The card ignores the mouse so a click opens it; the
-                            pill takes it back so its tooltip shows. */}
-                        {evaluator.evaluator_type && (
-                          <span className="pointer-events-auto">
+                            pills take it back so their tooltips show, and
+                            still open the evaluator on a click. */}
+                        <Link
+                          href={`/evaluators/${evaluator.uuid}`}
+                          tabIndex={-1}
+                          className="pointer-events-auto flex items-center gap-2"
+                        >
+                          {evaluator.evaluator_type && (
                             <EvaluatorTypePill
                               evaluatorType={evaluator.evaluator_type}
                             />
-                          </span>
-                        )}
-                        {evaluator.output_type && (
-                          <OutputTypePill outputType={evaluator.output_type} />
-                        )}
+                          )}
+                          {evaluator.output_type && (
+                            <OutputTypePill
+                              outputType={evaluator.output_type}
+                            />
+                          )}
+                        </Link>
                       </div>
                       {evaluator.description && (
                         <p className="text-sm text-muted-foreground mt-2 leading-relaxed">

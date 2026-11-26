@@ -129,3 +129,16 @@ describe("scoringFailedCopy", () => {
     expect(scoringFailedCopy("")).toBe("Scoring failed");
   });
 });
+
+it("falls back to a plain sentence for a reason the app does not know", () => {
+  expect(ineligibleReasonCopy("something_new" as never)).toBe(
+    "Cannot score traces",
+  );
+  expect(
+    nothingCanScoreCopy([
+      { evaluator_uuid: "e1", name: "A", reason: "something_new" as never },
+    ]),
+  ).toBe(
+    "None of the evaluators added to this agent can score its traces. Add an evaluator that can in the",
+  );
+});

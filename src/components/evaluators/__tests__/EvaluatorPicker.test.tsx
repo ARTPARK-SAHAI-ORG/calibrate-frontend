@@ -330,7 +330,7 @@ describe("EvaluatorPicker hidden types", () => {
     expect(screen.queryByText("Whole chat judge")).not.toBeInTheDocument();
   });
 
-  it("shows the name without type or scoring pills", () => {
+  it("shows the type pill beside the name, but no scoring pill", () => {
     render(
       <EvaluatorPicker
         evaluators={[
@@ -345,7 +345,7 @@ describe("EvaluatorPicker hidden types", () => {
         onToggle={jest.fn()}
       />,
     );
-    expect(screen.queryByText("Agent reply")).not.toBeInTheDocument();
+    expect(screen.getByText("Conversation reply")).toBeInTheDocument();
     expect(screen.queryByText("Binary")).not.toBeInTheDocument();
   });
 });

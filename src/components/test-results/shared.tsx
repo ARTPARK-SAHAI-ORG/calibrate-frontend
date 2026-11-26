@@ -137,7 +137,7 @@ export type TestCaseData = {
   history?: TestCaseHistory[];
   /** The single input a test written for a basic agent
    * carries instead of a conversation. Present on both its Agent Response
-   * (`evaluation.type: "general"`) and its Tool Call tests — for the latter
+   * (`evaluation.type: "general"`) and its Tool call tests — for the latter
    * the backend also widens it into a one-turn `history` for the run, so
    * this field is the only thing that says the test was written as one
    * input. Absent on tests written as a conversation. */
@@ -1060,7 +1060,7 @@ export function TestDetailView({
   // gets the same plain Input/Output box layout used for these agents
   // everywhere else (the labelling item pane, a trace's detail view).
   // Both of its test types qualify: an Agent Response test says so with
-  // `evaluation.type`, a Tool Call test only by carrying `input`.
+  // `evaluation.type`, a Tool call test only by carrying `input`.
   const isGeneralType =
     evaluation?.type === "general" || typeof input === "string";
   const generalInput = isGeneralType

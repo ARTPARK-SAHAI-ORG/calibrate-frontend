@@ -45,7 +45,7 @@ const FINAL_CARDS: Record<
   },
   "llm-general": {
     title: "The output",
-    description: "Judge the output of an LLM given a text input",
+    description: "Judge a basic agent's output for a given input",
     tone: "orange",
   },
   "tool-call": {

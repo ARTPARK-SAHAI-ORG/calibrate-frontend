@@ -23,8 +23,8 @@ const Q_MODE_PARAM: Record<SearchMode, string> = {
 };
 
 /**
- * The test types one filter chip covers. "Agent response" is one thing to the
- * reader but two types underneath, so it asks for both. It is the same rule
+ * The test types one filter chip covers. The reply chip on an agent's Tests
+ * tab covers both reply types, so it asks for both. It is the same rule
  * `matchesTestTypeFilter` applies in the browser, kept here in one place.
  */
 const TYPE_PARAM_VALUES: (

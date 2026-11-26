@@ -89,7 +89,7 @@ const NOTHING_CAN_SCORE_BY_REASON: Record<
 export function ineligibleReasonCopy(
   reason: TraceScoringIneligibleReason,
 ): string {
-  return NOTHING_CAN_SCORE_BY_REASON[reason].one;
+  return NOTHING_CAN_SCORE_BY_REASON[reason]?.one ?? "Cannot score traces";
 }
 
 /**
@@ -104,7 +104,14 @@ export function nothingCanScoreCopy(
     return "This agent has no evaluators, so its traces are not scored. Add one in the";
   }
   const copies = [...new Set(ineligible.map((item) => item.reason))].map(
-    (reason) => NOTHING_CAN_SCORE_BY_REASON[reason],
+    (reason) =>
+      NOTHING_CAN_SCORE_BY_REASON[reason] ?? {
+        one: "Cannot score traces",
+        every:
+          "None of the evaluators added to this agent can score its traces.",
+        some: "some cannot score traces",
+        fix: "Add an evaluator that can in the",
+      },
   );
   if (copies.length === 1) {
     return `${copies[0].every} ${copies[0].fix}`;

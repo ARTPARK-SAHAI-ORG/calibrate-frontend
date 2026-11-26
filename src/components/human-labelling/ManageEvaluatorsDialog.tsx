@@ -11,7 +11,11 @@ import {
   type EvaluatorType,
 } from "@/components/EvaluatorPills";
 import { apiClient, unwrapList } from "@/lib/api";
-import { evaluatorTypesForTask, fitsTaskType } from "@/lib/labellingItem";
+import {
+  evaluatorFitsItem,
+  evaluatorTypesForTask,
+  fitsTaskType,
+} from "@/lib/labellingItem";
 
 type EvaluatorListItem = {
   uuid: string;
@@ -42,6 +46,9 @@ type ManageEvaluatorsDialogProps = {
   currentEvaluatorIds: string[];
   /** The task holds a tool call item, which only a tool call evaluator answers. */
   hasToolCallItems?: boolean;
+  /** The task holds an item that is not a tool call item, which only an
+   *  evaluator that is not a tool call evaluator answers. */
+  hasNonToolCallItems?: boolean;
   currentOptionalIds: string[];
   onClose: () => void;
   onSaved: () => void;
@@ -53,6 +60,7 @@ export function ManageEvaluatorsDialog({
   taskType,
   currentEvaluatorIds,
   hasToolCallItems = false,
+  hasNonToolCallItems = false,
   currentOptionalIds,
   onClose,
   onSaved,
@@ -108,8 +116,11 @@ export function ManageEvaluatorsDialog({
     };
   }, [accessToken]);
 
-  const isToolCall = (uuid: string) =>
-    evaluators.some((e) => e.uuid === uuid && e.evaluator_type === "tool-call");
+  // Whether an evaluator answers tool call items, or null when not loaded.
+  const answersToolCalls = (uuid: string) => {
+    const ev = evaluators.find((e) => e.uuid === uuid);
+    return ev ? evaluatorFitsItem(ev.evaluator_type, true) : null;
+  };
   const [saveAttempted, setSaveAttempted] = useState(false);
 
   const filteredEvaluators = useMemo(() => {
@@ -197,14 +208,18 @@ export function ManageEvaluatorsDialog({
     optionalSelected.length === orderedSelected.length;
   const canSave = hasChanges && !wouldRemoveAll && !allWouldBeOptional;
 
-  // Tool call items are answered only through a tool call evaluator.
+  // Each kind of item is answered only through an evaluator that fits it.
   const missingToolCallEvaluator =
-    hasToolCallItems && !orderedSelected.some(isToolCall);
+    hasToolCallItems &&
+    !orderedSelected.some((id) => answersToolCalls(id) === true);
+  const missingOtherEvaluator =
+    hasNonToolCallItems &&
+    !orderedSelected.some((id) => answersToolCalls(id) === false);
 
   const handleSave = async () => {
     if (!canSave || saving) return;
     setSaveAttempted(true);
-    if (missingToolCallEvaluator) return;
+    if (missingToolCallEvaluator || missingOtherEvaluator) return;
     setSaving(true);
     setSaveError(null);
     try {
@@ -351,6 +366,12 @@ export function ManageEvaluatorsDialog({
             <ErrorNote>
               This task has tool call items, so select at least one tool call
               evaluator.
+            </ErrorNote>
+          )}
+          {saveAttempted && missingOtherEvaluator && (
+            <ErrorNote>
+              This task has items with a text reply, so select at least one
+              evaluator that is not a tool call evaluator.
             </ErrorNote>
           )}
           <div className="flex items-center justify-between gap-3">

@@ -26,7 +26,6 @@ type TaskEvaluator = {
   name: string;
   description?: string | null;
   evaluator_type?: string | null;
-  source_default_slug?: string | null;
 };
 
 /** Returns a new Set with `id` toggled in or out. */
@@ -151,9 +150,8 @@ type AssignAnnotatorsDialogProps = {
   accessToken: string;
   /** Evaluators linked to the task, the pool the job can show in labelling. */
   evaluators: TaskEvaluator[];
-  /** True when at least one of the chosen items is a tool call. The built-in
-   * Tool call correctness is then shown ticked and cannot be unticked, and
-   * custom tool-call labels are offered. */
+  /** True when at least one of the chosen items is a tool call, so tool call
+   * labels are offered. */
   hasToolCallItems: boolean;
   /** True when at least one of the chosen items is answered in writing rather
    * than by a tool call. Labels that are not tool-call labels are offered only
@@ -335,14 +333,13 @@ export function AssignAnnotatorsDialog({
 
   // Each kind of chosen item needs at least one label that fits it, when the
   // task has one to offer.
-  const offeredLabels = choosableEvaluators;
   const kindsMissingLabel = [
     { isToolCall: true, chosen: hasToolCallItems },
     { isToolCall: false, chosen: hasNonToolCallItems },
   ].filter(
     ({ isToolCall, chosen }) =>
       chosen &&
-      offeredLabels.some((ev) =>
+      choosableEvaluators.some((ev) =>
         evaluatorFitsItem(ev.evaluator_type, isToolCall),
       ) &&
       !shownLabels.some((ev) =>
@@ -362,7 +359,7 @@ export function AssignAnnotatorsDialog({
 
   // Only worth showing the column when there is more than one label on
   // screen in total. With just one there is nothing to weigh.
-  const showEvaluatorChoice = offeredLabels.length > 1;
+  const showEvaluatorChoice = choosableEvaluators.length > 1;
 
   const reasoningModeOf = (id: string) => reasoningModes[id] ?? "optional";
 

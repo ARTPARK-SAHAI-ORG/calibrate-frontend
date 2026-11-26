@@ -216,7 +216,6 @@ type LabellingTask = {
     name: string;
     description?: string | null;
     slug?: string | null;
-    source_default_slug?: string | null;
     evaluator_type?:
       "llm" | "llm-general" | "stt" | "tts" | "conversation" | "tool-call";
     output_type?: "binary" | "rating" | null;
@@ -1734,7 +1733,7 @@ function LabellingTaskPageInner() {
       ).length === 0
     ) {
       toast.error(
-        "None of this task's evaluators fit the chosen items. Tool-call items need a tool-call evaluator, and every other item needs an evaluator that is not a tool-call evaluator.",
+        "None of this task's evaluators fit the chosen items. Tool call items need a tool call evaluator, and every other item needs an evaluator that is not a tool call evaluator.",
       );
       return;
     }
@@ -4200,6 +4199,9 @@ function LabellingTaskPageInner() {
           currentEvaluatorIds={(task.evaluators ?? []).map((e) => e.uuid)}
           hasToolCallItems={(task.items ?? []).some(
             (it) => it.is_tool_call === true,
+          )}
+          hasNonToolCallItems={(task.items ?? []).some(
+            (it) => it.is_tool_call !== true,
           )}
           currentOptionalIds={(task.evaluators ?? [])
             .filter((e) => e.is_optional)

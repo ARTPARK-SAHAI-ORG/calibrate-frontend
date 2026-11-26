@@ -669,7 +669,7 @@ export function BulkUploadTestsModal({
     }
 
     return {
-      title: "Bulk upload — Tool call tests",
+      title: `Bulk upload — ${testTypeLabel("tool_call")} tests`,
       intro:
         "Upload a CSV with the following columns. Each row creates one test.",
       columns: [

@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { EvaluatorPromptPreview } from "./EvaluatorPromptPreview";
 import { PickerRow } from "@/components/ui/PickerRow";
+import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import { EmptyState } from "@/components/ui";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 import { isDefaultEvaluator, isOwnedEvaluator } from "@/lib/evaluatorApi";
@@ -98,8 +99,6 @@ export function EvaluatorPicker({
     defaultEvaluators.length > 0 && customEvaluators.length > 0;
 
   const renderEvaluatorRow = (ev: EvaluatorData) => (
-    // Name only: what it judges and how it scores are in the prompt on the
-    // right, so no badge here.
     <PickerRow
       key={ev.uuid}
       ariaLabel={`Select ${ev.name}`}
@@ -108,6 +107,11 @@ export function EvaluatorPicker({
       isPreviewed={previewUuid === ev.uuid}
       onPreview={() => setPickedUuid(ev.uuid)}
       name={ev.name}
+      badge={
+        ev.evaluator_type ? (
+          <EvaluatorTypePill evaluatorType={ev.evaluator_type} />
+        ) : undefined
+      }
       description={ev.description}
     />
   );

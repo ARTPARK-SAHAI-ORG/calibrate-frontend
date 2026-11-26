@@ -784,20 +784,27 @@ export function TracesTabContent({
   const openTraceIsToolCall =
     !!openTraceItem && isToolCallTraceRow(openTraceItem);
   // Only the evaluators that could have scored the open trace's kind of output.
+  // A type not read yet is kept, since nothing says it does not fit.
   const ineligibleForOpenTrace =
     openTraceItem && evaluatorTypes
-      ? ineligible.filter((item) =>
-          evaluatorFitsItem(
-            evaluatorTypes[item.evaluator_uuid],
-            openTraceIsToolCall,
-          ),
+      ? ineligible.filter(
+          (item) =>
+            !evaluatorTypes[item.evaluator_uuid] ||
+            evaluatorFitsItem(
+              evaluatorTypes[item.evaluator_uuid],
+              openTraceIsToolCall,
+            ),
         )
       : ineligible;
   // The agent's evaluators that fit the open trace's kind of output. A type
-  // not read yet must not count, since an unknown type fits a reply.
-  const scoringNamesForOpenTrace =
-    openTraceItem && evaluatorTypes
-      ? (eligibility?.eligible ?? [])
+  // not read yet must not count, since an unknown type fits a reply. A trace
+  // not on this page has no known kind, so every evaluator that can score is
+  // named; the backend skips it again if none fits.
+  const eligibleEvaluators = eligibility?.eligible ?? [];
+  const scoringNamesForOpenTrace = !openTraceItem
+    ? eligibleEvaluators.map((item) => item.name)
+    : evaluatorTypes
+      ? eligibleEvaluators
           .filter(
             (item) =>
               !!evaluatorTypes[item.evaluator_uuid] &&
@@ -1300,10 +1307,16 @@ export function TracesTabContent({
             : []
         }
         onScored={() => void refetch()}
-        onGoToEvaluators={() => {
-          closeTrace();
-          onGoToEvaluators();
-        }}
+        onGoToEvaluators={
+          // Pointing at the Evaluators tab helps only when no evaluator that
+          // fits this trace is added yet.
+          scoringNamesForOpenTrace.length > 0
+            ? undefined
+            : () => {
+                closeTrace();
+                onGoToEvaluators();
+              }
+        }
         keysPaused={toolCallPickerOpen}
         isOpen={openTraceUuid != null}
         onClose={closeTrace}

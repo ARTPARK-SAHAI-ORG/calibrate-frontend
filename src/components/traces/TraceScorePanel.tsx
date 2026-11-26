@@ -152,7 +152,8 @@ function RunBody({
         ) : (
           `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`
         )}
-        {run.error === "no_usable_evaluators" &&
+        {(run.error === "no_usable_evaluators" ||
+          (run.error === "no_tool_call_evaluator" && !addToolCallEvaluator)) &&
           onGoToEvaluators &&
           !canScore && (
             <>
