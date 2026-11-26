@@ -190,6 +190,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     onToggleSelected,
     selectedCount,
     evaluatorDescriptions,
+    canScoreTrace,
   }: {
     isOpen: boolean;
     traceUuid: string | null;
@@ -202,9 +203,10 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     onToggleSelected?: () => void;
     selectedCount?: number;
     evaluatorDescriptions?: Record<string, string>;
+    canScoreTrace?: boolean;
   }) =>
     isOpen ? (
-      <div data-testid="trace-detail">
+      <div data-testid="trace-detail" data-can-score={String(!!canScoreTrace)}>
         {traceUuid}
         <span data-testid="trace-detail-descriptions">
           {Object.entries(evaluatorDescriptions ?? {})
@@ -2766,6 +2768,40 @@ describe("TracesTabContent", () => {
       expect(screen.getByText("Submit for labelling (1)")).toBeInTheDocument();
     });
   });
+
+  it.each([
+    ["scoring is on and an evaluator can score traces", true, 1, true],
+    ["scoring is off", false, 1, false],
+    ["no evaluator can score traces", true, 0, false],
+    ["the evaluators that can score traces have not loaded", true, null, false],
+  ])(
+    "offers to score a skipped trace again only when %s",
+    async (_name, enabled, eligibleCount, expected) => {
+      const user = setupUser();
+      mockUseTraces.mockReturnValue(tracesResult([trace({ input_preview: "Open me" })]));
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            enabled,
+            eligibility:
+              eligibleCount === null
+                ? null
+                : {
+                    eligible: traceScoring.eligibility.eligible.slice(0, eligibleCount),
+                    ineligible: [],
+                  },
+          }}
+        />,
+      );
+      await user.click(screen.getAllByText("Open me")[0]);
+      expect(screen.getByTestId("trace-detail")).toHaveAttribute(
+        "data-can-score",
+        String(expected),
+      );
+    },
+  );
 
   it("opens the detail view for the trace that was clicked", async () => {
     const user = setupUser();

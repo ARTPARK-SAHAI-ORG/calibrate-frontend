@@ -303,3 +303,40 @@ it("names each evaluator that could not score the trace, and why", () => {
     screen.getByText(/uses variables, which cannot be filled/),
   ).toBeInTheDocument();
 });
+
+describe("the Score this trace button", () => {
+  const skippedFor = (error: string): TraceScoringRun => ({
+    run_uuid: "r-score",
+    status: "skipped",
+    created_at: "2026-08-29T12:00:00Z",
+    error,
+    results: [],
+  });
+  const button = <button type="button">Score this trace</button>;
+
+  it("shows under the no-evaluator reason in place of the list of evaluators that cannot score", () => {
+    render(
+      <TraceScorePanel
+        run={skippedFor("no_usable_evaluators")}
+        scoreTrace={button}
+        ineligible={[
+          { evaluator_uuid: "ev-x", name: "Tone", reason: "no_live_version" },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Score this trace" }),
+    ).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent("Tone");
+    expect(document.body).toHaveTextContent(/\.\s*Score this trace$/);
+  });
+
+  it("does not show for a trace skipped for another reason", () => {
+    render(
+      <TraceScorePanel run={skippedFor("over_limit")} scoreTrace={button} />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Score this trace" }),
+    ).not.toBeInTheDocument();
+  });
+});

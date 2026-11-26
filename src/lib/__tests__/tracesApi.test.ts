@@ -6,6 +6,7 @@ import {
   fetchTraceLabels,
   fetchTraceScores,
   fetchTraceScoringEligibility,
+  scoreTrace,
   setAgentTraceScoring,
   configWithTraceScoring,
   fetchTraceUsage,
@@ -1062,5 +1063,16 @@ describe("traceFilterKey", () => {
     const chosen = { agentId, createdBefore: "2026-11-04T10:00:00.000Z" };
     expect(key(chosen)).toBe(key({ agentId }));
     expect(key(chosen)).not.toContain("2026");
+  });
+});
+
+describe("scoreTrace", () => {
+  it("posts to the trace's score route and returns the new run", async () => {
+    mockApiPost.mockResolvedValue({ run_uuid: "run-1", status: "pending" });
+    await expect(scoreTrace("tok", "a/b")).resolves.toEqual({
+      run_uuid: "run-1",
+      status: "pending",
+    });
+    expect(mockApiPost).toHaveBeenCalledWith("/traces/a%2Fb/score", "tok", {});
   });
 });
