@@ -1,4 +1,5 @@
 import type { EvaluatorType } from "@/components/EvaluatorPills";
+import type { TextKind } from "@/components/evaluators/EvaluatorTypeQuestions";
 
 // Evaluator names that collide with reserved bulk-upload CSV columns.
 //
@@ -26,19 +27,28 @@ export function reservedEvaluatorNameError(name: string): string {
 const KIND_WORDS: Record<EvaluatorType, string> = {
   llm: "conversation reply",
   conversation: "whole conversation",
-  "llm-general": "basic output",
+  "llm-general": "agent response",
   "tool-call": "tool call",
   stt: "speech to text",
   tts: "text to speech",
 };
 
 // The name a new evaluator opens with, so it can be created without typing
-// one. A name already in the workspace gets " 2", " 3" and so on.
+// one. A tool call evaluator fits both kinds of agent, so its name says which
+// one the reader picked, when they picked one. A name already in the
+// workspace gets " 2", " 3" and so on.
 export function defaultEvaluatorName(
   type: EvaluatorType,
   existingNames: string[],
+  textKind: TextKind | null = null,
 ): string {
-  const base = `New ${KIND_WORDS[type]} evaluator`;
+  const agentKind =
+    type === "tool-call" && textKind
+      ? textKind === "single"
+        ? "basic "
+        : "conversation "
+      : "";
+  const base = `New ${agentKind}${KIND_WORDS[type]} evaluator`;
   const taken = new Set(existingNames.map((n) => n.trim().toLowerCase()));
   let name = base;
   for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${base} ${n}`;

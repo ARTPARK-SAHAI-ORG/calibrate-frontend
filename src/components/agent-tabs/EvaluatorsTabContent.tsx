@@ -13,6 +13,8 @@ import {
   EVALUATOR_CARD_BUTTON_CLASS,
 } from "@/components/evaluators/DuplicateEvaluatorButton";
 import { XIcon } from "@/components/icons";
+import { evaluatorTypesForTask, fitsTaskType } from "@/lib/labellingItem";
+import { agentTaskType } from "@/lib/traceScoring";
 import {
   type EvaluatorData,
   fetchAllEvaluators,
@@ -36,15 +38,6 @@ const ADD_BUTTON_CLASS =
   "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-indigo-500/12 border-indigo-500/45 text-indigo-950 dark:text-indigo-100 hover:bg-indigo-500/22 dark:hover:bg-indigo-500/18";
 const CREATE_BUTTON_CLASS =
   "h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18";
-
-// Full-conversation evaluators are hidden for now, so a conversation agent
-// lists only the next-reply (`llm`) ones. A general (non-conversational,
-// one-input-one-output) agent only takes output-type evaluators instead.
-function agentEvaluatorTypes(agentNature: "conversation" | "general") {
-  return agentNature === "general"
-    ? new Set(["llm-general"])
-    : new Set(["llm"]);
-}
 
 export function EvaluatorsTabContent({
   agentUuid,
@@ -211,12 +204,10 @@ export function EvaluatorsTabContent({
 
   // Library minus already-attached — what the Add dialog can offer.
   const attachedUuids = new Set(attachedEvaluators.map((e) => e.uuid));
-  const evaluatorTypes = agentEvaluatorTypes(agentNature);
   const availableEvaluators = allEvaluators.filter(
     (e) =>
       !attachedUuids.has(e.uuid) &&
-      e.evaluator_type != null &&
-      evaluatorTypes.has(e.evaluator_type),
+      fitsTaskType(e.evaluator_type ?? undefined, agentTaskType(agentNature)),
   );
 
   const deleteDialogTitle =
@@ -261,7 +252,7 @@ export function EvaluatorsTabContent({
           {/* No heading: the tab strip above already says Evaluators. */}
           <p className="text-sm md:text-base text-muted-foreground">
             LLM judges for evaluating the agent&rsquo;s{" "}
-            {agentNature === "general" ? "output" : "responses"}
+            {agentNature === "general" ? "output" : "responses"} and tool calls
           </p>
           {renderHeaderButtons()}
         </div>
@@ -318,7 +309,8 @@ export function EvaluatorsTabContent({
           </h3>
           <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4 text-center max-w-md">
             Choose the LLM judges to evaluate the agent&rsquo;s{" "}
-            {agentNature === "general" ? "output" : "responses"}. Add an
+            {agentNature === "general" ? "output" : "responses"} and tool
+            calls. Add an
             existing one from your list of evaluators or create a new one.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
@@ -389,8 +381,7 @@ export function EvaluatorsTabContent({
         onClose={() => setCreateFlowOpen(false)}
         existingEvaluators={allEvaluators}
         onCreated={handleCreated}
-        // Single-type only, so the flow skips the "what is this for?" step.
-        useCaseTypes={agentNature === "general" ? ["llm-general"] : ["llm"]}
+        useCaseTypes={evaluatorTypesForTask(agentTaskType(agentNature))}
       />
 
       {/* Shared detach/delete confirmation */}

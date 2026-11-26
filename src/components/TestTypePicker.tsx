@@ -1,5 +1,6 @@
 "use client";
 
+import { testTypeLabel } from "@/lib/testTypes";
 import React, { useMemo, useState } from "react";
 import { isCreatableTestType } from "@/constants/testTypes";
 
@@ -36,13 +37,13 @@ const TEST_TYPE_OPTIONS: Array<{
 }> = [
   {
     tab: "next-reply",
-    label: "Agent Response",
+    label: testTypeLabel("response"),
     title: "Does the agent give the right reply?",
     description: "Evaluate the agent's response given a conversation history",
   },
   {
     tab: "tool-invocation",
-    label: "Tool call",
+    label: testTypeLabel("tool_call"),
     title: "Does the agent use the right tool?",
     description:
       "Check whether the agent invokes the correct tool with the right arguments",
@@ -164,6 +165,7 @@ export function TestTypePicker({
               opt.tab === "next-reply"
                 ? {
                     ...opt,
+                    label: testTypeLabel("general"),
                     title: "Does the agent give the right answer?",
                     description: "Evaluate the agent's output given the input",
                   }

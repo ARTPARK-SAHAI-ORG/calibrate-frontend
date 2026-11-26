@@ -1,5 +1,7 @@
 "use client";
 
+import { missingEvaluatorMessage } from "./itemConversation";
+import { ErrorNote } from "@/components/ui";
 import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ClippedText } from "@/components/ui/ClippedText";
@@ -8,6 +10,7 @@ import { CheckCircleIcon, GearIcon, UserIcon } from "@/components/icons";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Select } from "@/components/ui/Select";
 import { apiClient } from "@/lib/api";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import {
   createAnnotator,
   renameAnnotator,
@@ -145,19 +148,18 @@ function SettingChoice<T extends string>({
 }
 
 type AssignAnnotatorsDialogProps = {
+  /** The task's type, which names its items in messages. */
+  taskType?: string;
   isOpen: boolean;
   accessToken: string;
-  /** Evaluators linked to the task — the pool the job can show in labelling. */
+  /** Evaluators linked to the task, the pool the job can show in labelling. */
   evaluators: TaskEvaluator[];
-  /** True when at least one of the chosen items is answered by a tool call.
-   * Tool call correctness is then shown ticked and cannot be unticked, since
-   * such an item is always answered by it. With no such item it is not shown
-   * at all. */
+  /** True when at least one of the chosen items is a tool call, so tool call
+   * labels are offered. */
   hasToolCallItems: boolean;
-  /** True when at least one of the chosen items is answered by written text
-   * rather than a tool call. The AI-judge labels only apply to such an item,
-   * so with none chosen they are left out entirely — there is nothing for
-   * them to judge. */
+  /** True when at least one of the chosen items is answered in writing rather
+   * than by a tool call. Labels that are not tool-call labels are offered only
+   * then. */
   hasNonToolCallItems: boolean;
   onClose: () => void;
   /** The evaluators to show in the created labelling jobs. */
@@ -173,6 +175,7 @@ export function AssignAnnotatorsDialog({
   accessToken,
   evaluators,
   hasToolCallItems,
+  taskType,
   hasNonToolCallItems,
   onClose,
   onConfirm,
@@ -229,24 +232,15 @@ export function AssignAnnotatorsDialog({
     };
   }, [isOpen, accessToken]);
 
+  // A label is offered only when an item it fits is chosen.
+  const choosableEvaluators = evaluators.filter((ev) =>
+    evaluatorFitsItem(ev.evaluator_type, true)
+      ? hasToolCallItems
+      : hasNonToolCallItems,
+  );
+
   // Start with every label picked, and re-seed if the task's labels arrive
   // (or change) while the dialog is open.
-  // Tool call correctness is never a choice. It comes with a tool-call item
-  // and is added by the backend whether or not it is ticked here, so it is
-  // shown as already on when such an item is in the selection, and left out
-  // entirely when none is.
-  const toolCallEvaluators = evaluators.filter(
-    (ev) => ev.evaluator_type === "tool-call",
-  );
-  // The AI-judge labels only apply to an item answered in writing. With no
-  // such item in the selection none of them belong in the picker at all —
-  // this is what was missing before: the full task list showed here no
-  // matter which items were actually chosen.
-  const choosableEvaluators = hasNonToolCallItems
-    ? evaluators.filter((ev) => ev.evaluator_type !== "tool-call")
-    : [];
-  const shownToolCallEvaluators = hasToolCallItems ? toolCallEvaluators : [];
-
   const evaluatorIdsKey = choosableEvaluators.map((ev) => ev.uuid).join(",");
   useEffect(() => {
     if (!isOpen) return;
@@ -335,42 +329,49 @@ export function AssignAnnotatorsDialog({
   const toggleEvaluator = (id: string) =>
     setPickedEvaluators((prev) => toggleInSet(prev, id));
 
-  // A task with no labels at all can still be assigned; one with labels needs
-  // at least one picked.
-  const evaluatorSelectionValid =
-    choosableEvaluators.length === 0 || pickedEvaluators.size > 0;
+  // What gets a reasoning choice is what the job will show, in the order the
+  // labels sit on screen. This does not depend on showEvaluatorChoice: a job
+  // with one label has no Labels column, and that label is still in here.
+  const shownLabels = choosableEvaluators.filter((ev) =>
+    pickedEvaluators.has(ev.uuid),
+  );
+
+  // Each kind of chosen item needs at least one label that fits it, when the
+  // task has one to offer.
+  const kindsMissingLabel = [
+    { isToolCall: true, chosen: hasToolCallItems },
+    { isToolCall: false, chosen: hasNonToolCallItems },
+  ].filter(
+    ({ isToolCall, chosen }) =>
+      chosen &&
+      choosableEvaluators.some((ev) =>
+        evaluatorFitsItem(ev.evaluator_type, isToolCall),
+      ) &&
+      !shownLabels.some((ev) =>
+        evaluatorFitsItem(ev.evaluator_type, isToolCall),
+      ),
+  );
+  const evaluatorSelectionValid = kindsMissingLabel.length === 0;
+  const missingLabelMessage =
+    kindsMissingLabel.length === 1 && hasToolCallItems && hasNonToolCallItems
+      ? missingEvaluatorMessage(kindsMissingLabel[0].isToolCall, taskType)
+      : "Select at least one evaluator";
   const allEvaluatorsPicked =
     choosableEvaluators.length > 0 &&
     pickedEvaluators.size === choosableEvaluators.length;
 
   // Only worth showing the column when there is more than one label on
-  // screen in total (choosable ones plus the locked tool-call one). With
-  // just one — a single choosable label, or only the tool-call label because
-  // every chosen item is a tool call — there is nothing to weigh, so the
-  // column is left out, same as the original one-label rule.
-  const totalShownLabels =
-    choosableEvaluators.length + shownToolCallEvaluators.length;
-  const showEvaluatorChoice = totalShownLabels > 1;
+  // screen in total. With just one there is nothing to weigh.
+  const showEvaluatorChoice = choosableEvaluators.length > 1;
 
   const reasoningModeOf = (id: string) => reasoningModes[id] ?? "optional";
-
-  // What gets a reasoning choice is what the job will show, in the order the
-  // labels sit on screen. This does not depend on showEvaluatorChoice: a job
-  // with one label has no Labels column, and that label is still in here.
-  const shownLabels = [
-    ...choosableEvaluators.filter((ev) => pickedEvaluators.has(ev.uuid)),
-    ...shownToolCallEvaluators,
-  ];
 
   const handleConfirm = async () => {
     if (picked.size === 0 || !evaluatorSelectionValid || submitting) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const evaluatorIds = [
-        ...pickedEvaluators,
-        ...shownToolCallEvaluators.map((ev) => ev.uuid),
-      ];
+      const evaluatorIds = [...pickedEvaluators];
       await onConfirm(Array.from(picked), evaluatorIds, {
         comments_enabled: commentsEnabled,
         evaluator_reasoning_modes: Object.fromEntries(
@@ -666,6 +667,9 @@ export function AssignAnnotatorsDialog({
                 <p className="text-xs text-foreground/80">
                   Pick one or more labels to show in the labelling jobs created
                 </p>
+                {!evaluatorSelectionValid && (
+                  <ErrorNote>{missingLabelMessage}</ErrorNote>
+                )}
                 {choosableEvaluators.length > 1 && (
                   <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">
                     <input
@@ -730,35 +734,6 @@ export function AssignAnnotatorsDialog({
                       </label>
                     );
                   })}
-                  {/* Always on, never a choice: a tool-call item is answered
-                      by this one and the backend adds it either way. */}
-                  {shownToolCallEvaluators.map((ev) => (
-                    <div
-                      key={ev.uuid}
-                      className="flex items-start gap-3 px-3 py-2 rounded-md border border-border bg-muted/30"
-                    >
-                      <span className="flex h-5 items-center flex-shrink-0">
-                        <input
-                          type="checkbox"
-                          checked
-                          disabled
-                          readOnly
-                          aria-label={`${ev.name} is always included`}
-                          className="w-4 h-4 accent-foreground cursor-not-allowed"
-                        />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium truncate">
-                          {ev.name}
-                        </div>
-                        {ev.description && (
-                          <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                            {ev.description}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
             )}
@@ -835,10 +810,7 @@ export function AssignAnnotatorsDialog({
                               onClick={() =>
                                 setReasoningModes(
                                   Object.fromEntries(
-                                    [
-                                      ...choosableEvaluators,
-                                      ...shownToolCallEvaluators,
-                                    ].map((other) => [
+                                    choosableEvaluators.map((other) => [
                                       other.uuid,
                                       reasoningModeOf(ev.uuid),
                                     ]),

@@ -1,5 +1,6 @@
 "use client";
 
+import { missingEvaluatorMessage } from "./itemConversation";
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ErrorNote } from "@/components/ui";
@@ -7,9 +8,15 @@ import { Tooltip } from "@/components/Tooltip";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import {
   EVALUATOR_TYPE_LABELS,
+  EvaluatorTypePill,
   type EvaluatorType,
 } from "@/components/EvaluatorPills";
 import { apiClient, unwrapList } from "@/lib/api";
+import {
+  evaluatorFitsItem,
+  evaluatorTypesForTask,
+  fitsTaskType,
+} from "@/lib/labellingItem";
 
 type EvaluatorListItem = {
   uuid: string;
@@ -38,6 +45,11 @@ type ManageEvaluatorsDialogProps = {
   taskUuid: string;
   taskType?: EvaluatorType;
   currentEvaluatorIds: string[];
+  /** The task holds a tool call item, which only a tool call evaluator answers. */
+  hasToolCallItems?: boolean;
+  /** The task holds an item that is not a tool call item, which only an
+   *  evaluator that is not a tool call evaluator answers. */
+  hasNonToolCallItems?: boolean;
   currentOptionalIds: string[];
   onClose: () => void;
   onSaved: () => void;
@@ -48,6 +60,8 @@ export function ManageEvaluatorsDialog({
   taskUuid,
   taskType,
   currentEvaluatorIds,
+  hasToolCallItems = false,
+  hasNonToolCallItems = false,
   currentOptionalIds,
   onClose,
   onSaved,
@@ -103,10 +117,19 @@ export function ManageEvaluatorsDialog({
     };
   }, [accessToken]);
 
+  // Whether an evaluator answers tool call items, or null when not loaded.
+  const answersToolCalls = (uuid: string) => {
+    const ev = evaluators.find((e) => e.uuid === uuid);
+    return ev ? evaluatorFitsItem(ev.evaluator_type, true) : null;
+  };
+  const [saveAttempted, setSaveAttempted] = useState(false);
+
   const filteredEvaluators = useMemo(() => {
     const q = search.trim().toLowerCase();
     return evaluators
-      .filter((ev) => (taskType ? ev.evaluator_type === taskType : true))
+      .filter((ev) =>
+        taskType ? fitsTaskType(ev.evaluator_type, taskType) : true,
+      )
       .filter((ev) => (q ? ev.name.toLowerCase().includes(q) : true));
   }, [evaluators, taskType, search]);
 
@@ -186,8 +209,27 @@ export function ManageEvaluatorsDialog({
     optionalSelected.length === orderedSelected.length;
   const canSave = hasChanges && !wouldRemoveAll && !allWouldBeOptional;
 
+  // Each kind of item is answered only through an evaluator that fits it. An
+  // evaluator not in the loaded list may fit either, so it never blocks.
+  const missingToolCallEvaluator =
+    hasToolCallItems &&
+    !orderedSelected.some((id) => answersToolCalls(id) !== false);
+  const missingOtherEvaluator =
+    hasNonToolCallItems &&
+    !orderedSelected.some((id) => answersToolCalls(id) !== true);
+
   const handleSave = async () => {
     if (!canSave || saving) return;
+    setSaveAttempted(true);
+    if (missingToolCallEvaluator || missingOtherEvaluator) {
+      // The message sits at the top of the list, which may be scrolled away.
+      requestAnimationFrame(() =>
+        document
+          .querySelector("[data-missing-evaluator]")
+          ?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }),
+      );
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
@@ -330,6 +372,21 @@ export function ManageEvaluatorsDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
+          {saveAttempted &&
+            (missingToolCallEvaluator || missingOtherEvaluator) && (
+              <div data-missing-evaluator className="space-y-2">
+                {missingToolCallEvaluator && (
+                  <ErrorNote>
+                    {missingEvaluatorMessage(true, taskType)}
+                  </ErrorNote>
+                )}
+                {missingOtherEvaluator && (
+                  <ErrorNote>
+                    {missingEvaluatorMessage(false, taskType)}
+                  </ErrorNote>
+                )}
+              </div>
+            )}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span>{orderedSelected.length} selected</span>
@@ -428,8 +485,15 @@ export function ManageEvaluatorsDialog({
                           />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium truncate">
-                            {ev.name}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium truncate">
+                              {ev.name}
+                            </span>
+                            {ev.evaluator_type && (
+                              <EvaluatorTypePill
+                                evaluatorType={ev.evaluator_type}
+                              />
+                            )}
                           </div>
                           {ev.description && (
                             <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
@@ -502,8 +566,15 @@ export function ManageEvaluatorsDialog({
                           />
                         </svg>
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium truncate">
-                            {ev?.name ?? uuid.slice(0, 8)}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium truncate">
+                              {ev?.name ?? uuid.slice(0, 8)}
+                            </span>
+                            {ev?.evaluator_type && (
+                              <EvaluatorTypePill
+                                evaluatorType={ev.evaluator_type}
+                              />
+                            )}
                           </div>
                         </div>
                         <label
@@ -572,11 +643,7 @@ export function ManageEvaluatorsDialog({
             </p>
           )}
 
-          {saveError && (
-            <ErrorNote>
-              {saveError}
-            </ErrorNote>
-          )}
+          {saveError && <ErrorNote>{saveError}</ErrorNote>}
         </div>
 
         <div className="flex items-center justify-end gap-2 md:gap-3 px-5 md:px-6 py-4 border-t border-border">
@@ -603,12 +670,11 @@ export function ManageEvaluatorsDialog({
         open={createFlowOpen}
         onClose={() => setCreateFlowOpen(false)}
         existingEvaluators={evaluators}
-        // A task judges one kind of thing, so the flow skips asking what for.
-        useCaseTypes={taskType ? [taskType] : undefined}
+        useCaseTypes={taskType ? evaluatorTypesForTask(taskType) : undefined}
         onCreated={(created) => {
           setCreateFlowOpen(false);
           setEvaluators((prev) => [
-            { ...created, evaluator_type: taskType ?? created.evaluator_type },
+            { ...created, evaluator_type: created.evaluator_type ?? taskType },
             ...prev,
           ]);
           // Made for this task, so it starts ticked and joins the order.

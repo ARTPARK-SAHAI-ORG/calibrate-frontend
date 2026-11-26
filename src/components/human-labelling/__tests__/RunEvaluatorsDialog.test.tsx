@@ -57,41 +57,108 @@ describe("RunEvaluatorsDialog", () => {
     mockedApiClient.mockReset();
   });
 
-  it("says how many chosen rows are tool calls left out of the run", async () => {
-    mockedApiClient.mockResolvedValue(detailResponse);
-    renderDialog({ toolCallSkipCount: 2 });
+  it("offers a tool-call evaluator and runs it like any other", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue([
+      ...detailResponse,
+      {
+        uuid: "ev-tool",
+        live_version_id: "vt-live",
+        live_version_index: 0,
+        versions: [{ uuid: "vt-live", version_number: 1 }],
+      },
+    ]);
+    const onConfirm = jest.fn();
+    renderDialog({
+      evaluators: [...evaluators, { uuid: "ev-tool", name: "Right tool" }],
+      onConfirm,
+    });
+    expect(await screen.findByText("Right tool")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Run" }));
     expect(
-      await screen.findByText(
-        /2 of the chosen items evaluate one or more tool calls, which only supports human review today\./,
+      onConfirm.mock.calls[0][0].map((s: { evaluator_id: string }) => s.evaluator_id),
+    ).toContain("ev-tool");
+  });
+
+  it("says how many chosen items no ticked evaluator fits", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue([
+      ...detailResponse,
+      {
+        uuid: "ev-tool",
+        live_version_id: "vt-live",
+        live_version_index: 0,
+        versions: [{ uuid: "vt-live", version_number: 1 }],
+      },
+    ]);
+    renderDialog({
+      evaluators: [
+        { uuid: "ev-1", name: "Relevance", evaluator_type: "llm" },
+        { uuid: "ev-tool", name: "Right tool", evaluator_type: "tool-call" },
+      ],
+      items: [{ is_tool_call: true }, { is_tool_call: true }, {}],
+    });
+    expect(await screen.findByText("Right tool")).toBeInTheDocument();
+    const note = /of the chosen items fit none of the ticked evaluators/;
+    expect(screen.queryByText(note)).not.toBeInTheDocument();
+    await user.click(screen.getByText("Right tool"));
+    expect(
+      screen.getByText(/^2 of the chosen items fit none of the ticked evaluators/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run" })).toBeEnabled();
+  });
+
+  it("says it in the singular when one chosen item fits none", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue([
+      ...detailResponse,
+      {
+        uuid: "ev-tool",
+        live_version_id: "vt-live",
+        live_version_index: 0,
+        versions: [{ uuid: "vt-live", version_number: 1 }],
+      },
+    ]);
+    renderDialog({
+      evaluators: [
+        { uuid: "ev-1", name: "Relevance", evaluator_type: "llm" },
+        { uuid: "ev-tool", name: "Right tool", evaluator_type: "tool-call" },
+      ],
+      items: [{ is_tool_call: true }, {}],
+    });
+    expect(await screen.findByText("Right tool")).toBeInTheDocument();
+    await user.click(screen.getByText("Right tool"));
+    expect(
+      screen.getByText(
+        "1 of the chosen items fits none of the ticked evaluators, so it will be left out of this run",
       ),
     ).toBeInTheDocument();
   });
 
-  it("says it for a single tool-call row too", async () => {
-    mockedApiClient.mockResolvedValue(detailResponse);
-    renderDialog({ toolCallSkipCount: 1 });
+  it("turns Run off when no chosen item fits the ticked evaluators", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue([
+      ...detailResponse,
+      {
+        uuid: "ev-tool",
+        live_version_id: "vt-live",
+        live_version_index: 0,
+        versions: [{ uuid: "vt-live", version_number: 1 }],
+      },
+    ]);
+    renderDialog({
+      evaluators: [
+        { uuid: "ev-1", name: "Relevance", evaluator_type: "llm" },
+        { uuid: "ev-tool", name: "Right tool", evaluator_type: "tool-call" },
+      ],
+      items: [{}],
+    });
+    expect(await screen.findByText("Right tool")).toBeInTheDocument();
+    await user.click(screen.getByText("Relevance"));
     expect(
-      await screen.findByText(
-        /1 of the chosen items evaluate one or more tool calls, which only supports human review today\./,
-      ),
+      screen.getByText("None of the chosen items fit the ticked evaluators"),
     ).toBeInTheDocument();
-  });
-
-  it("says it without a number when the rows cannot be counted", async () => {
-    mockedApiClient.mockResolvedValue(detailResponse);
-    renderDialog({ toolCallSkipCount: null });
-    expect(
-      await screen.findByText(
-        /Any chosen item that evaluates one or more tool calls, which only supports human review today\./,
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("says nothing when no chosen row is a tool call", async () => {
-    mockedApiClient.mockResolvedValue(detailResponse);
-    renderDialog();
-    expect(await screen.findByText("Relevance")).toBeInTheDocument();
-    expect(screen.queryByText(/left out of this run/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run" })).toBeDisabled();
   });
 
   it("does not repeat an evaluator's name the row shows in full", async () => {

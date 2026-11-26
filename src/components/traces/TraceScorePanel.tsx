@@ -1,17 +1,19 @@
 "use client";
 
+import type React from "react";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { EVALUATOR_PILL_CLASSES } from "@/components/EvaluatorPillList";
 import { RunFailureBox } from "@/components/RunFailureBox";
 import { SpinnerIcon } from "@/components/icons";
-import { CONTACT_LINK } from "@/constants/limits";
+import { ExtendLimitsLink } from "@/constants/limits";
 import { useUsesOwnProviderKeys } from "@/hooks";
+import { EvaluatorsTabLink } from "./NothingCanScoreMessage";
+import { WarningBox } from "./WarningBox";
 import {
   ineligibleReasonCopy,
   isTraceScoringInProgress,
   scoringRunErrorCopy,
 } from "@/lib/traceScoring";
-import type React from "react";
 import type {
   TraceScoreResult,
   TraceScoringIneligibleEvaluator,
@@ -26,10 +28,15 @@ type TraceScorePanelProps = {
   /** What each evaluator is for, by evaluator id. */
   descriptions?: Record<string, string>;
   /** The agent's evaluators that cannot score traces, and why. Named under
-   *  "No evaluators could score this trace" so the reader knows what to fix. */
+   *  "No evaluator on this agent could score this trace" so the reader knows what to fix. */
   ineligible?: TraceScoringIneligibleEvaluator[];
+  /** The button that adds a tool call evaluator, shown when the run was
+   *  skipped because the agent has none. */
+  addToolCallEvaluator?: React.ReactNode;
+  /** Opens the agent's Evaluators tab, for a trace no evaluator fits. */
+  onGoToEvaluators?: () => void;
   /** The button that scores the trace again, shown when it was skipped for
-   *  having no evaluator that could score it and the agent now has one. */
+   *  having no evaluator that fits and the agent now has one. */
   scoreTrace?: React.ReactNode;
   /** The agent's evaluators that can score this trace now, named beside it. */
   scoringEvaluatorNames?: string[];
@@ -55,6 +62,8 @@ function RunBody({
   run,
   descriptions,
   ineligible = [],
+  addToolCallEvaluator,
+  onGoToEvaluators,
   scoreTrace,
   scoringEvaluatorNames = [],
   onTryAgain,
@@ -62,6 +71,8 @@ function RunBody({
   run: TraceScoringRun;
   descriptions?: Record<string, string>;
   ineligible?: TraceScoringIneligibleEvaluator[];
+  addToolCallEvaluator?: React.ReactNode;
+  onGoToEvaluators?: () => void;
   scoreTrace?: React.ReactNode;
   scoringEvaluatorNames?: string[];
   onTryAgain?: () => void;
@@ -88,60 +99,79 @@ function RunBody({
   }
 
   // A skipped trace is a warning whatever the reason, so every reason gets
-  // the same amber box the Traces tab uses. Only the limit has somewhere for
-  // the reader to go next, so only it carries the link.
+  // the same amber box the Traces tab uses. Only the limit, a missing tool
+  // call evaluator and an agent with no evaluator that fits have somewhere
+  // for the reader to go next, so only they carry a link.
   if (run.status === "skipped") {
-    const canScore = !!scoreTrace && run.error === "no_usable_evaluators";
+    const canScore =
+      !!scoreTrace &&
+      (run.error === "no_tool_call_evaluator" ||
+        run.error === "no_usable_evaluators");
     return (
-      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-        <p className="text-sm text-amber-700 dark:text-amber-300">
-          {/* A lone reason takes no full stop. One followed by a second
-              sentence or a button takes one. */}
-          {canScore ? (
+      <WarningBox
+        after={
+          canScore ? (
+            <div className="mt-2">{scoreTrace}</div>
+          ) : run.error === "no_tool_call_evaluator" && addToolCallEvaluator ? (
+            <div className="mt-2">{addToolCallEvaluator}</div>
+          ) : (
+            run.error === "no_usable_evaluators" &&
+            ineligible.length > 0 && (
+              <ul className="mt-1 list-disc pl-5 text-sm text-amber-700 dark:text-amber-300">
+                {ineligible.map((item) => (
+                  <li key={item.evaluator_uuid}>
+                    <span className="font-medium">{item.name}</span>:{" "}
+                    {ineligibleReasonCopy(item.reason).toLowerCase()}
+                  </li>
+                ))}
+              </ul>
+            )
+          )
+        }
+      >
+        {/* A lone reason takes no full stop. One followed by more words or
+            a button takes one. */}
+        {canScore ? (
+          <>
+            {run.error === "no_usable_evaluators"
+              ? "This trace was not scored because none of the agent's evaluators could score it then."
+              : `${scoringRunErrorCopy(run.error)}.`}{" "}
+            {listNames.formatToParts(scoringEvaluatorNames).map((part, i) =>
+              part.type === "element" ? (
+                <span key={i} className={EVALUATOR_PILL_CLASSES}>
+                  {part.value}
+                </span>
+              ) : (
+                part.value
+              ),
+            )}{" "}
+            can score it now.
+          </>
+        ) : run.error === "over_limit" && usesOwnProviderKeys ? (
+          "This trace was not scored because the workspace had reached its scoring limit at the time"
+        ) : (
+          `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`
+        )}
+        {(run.error === "no_usable_evaluators" ||
+          (run.error === "no_tool_call_evaluator" && !addToolCallEvaluator)) &&
+          onGoToEvaluators &&
+          !canScore && (
             <>
-              This trace was not scored because none of the agent&apos;s
-              evaluators could score it then.{" "}
-              {listNames.formatToParts(scoringEvaluatorNames).map((part, i) =>
-                part.type === "element" ? (
-                  <span key={i} className={EVALUATOR_PILL_CLASSES}>
-                    {part.value}
-                  </span>
-                ) : (
-                  part.value
-                ),
-              )}{" "}
-              can score it now.
-            </>
-          ) : run.error === "over_limit" && usesOwnProviderKeys
-              ? "This trace was not scored because the workspace had reached its scoring limit at the time"
-              : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`}
-          {run.error === "over_limit" && !usesOwnProviderKeys && (
-            <>
-              {" "}
-              <a
-                href={CONTACT_LINK}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold"
-              >
-                Click here
-              </a>{" "}
-              to contact us to extend your limits.
+              . Add one that can in the{" "}
+              <EvaluatorsTabLink onGoToEvaluators={onGoToEvaluators} />.
             </>
           )}
-        </p>
-        {canScore && <div className="mt-2">{scoreTrace}</div>}
-        {run.error === "no_usable_evaluators" && !canScore && ineligible.length > 0 && (
-          <ul className="mt-1 list-disc pl-5 text-sm text-amber-700 dark:text-amber-300">
-            {ineligible.map((item) => (
-              <li key={item.evaluator_uuid}>
-                <span className="font-medium">{item.name}</span>:{" "}
-                {ineligibleReasonCopy(item.reason).toLowerCase()}
-              </li>
-            ))}
-          </ul>
+        {run.error === "no_tool_call_evaluator" &&
+          addToolCallEvaluator &&
+          !canScore &&
+          "."}
+        {run.error === "over_limit" && !usesOwnProviderKeys && (
+          <>
+            {" "}
+            <ExtendLimitsLink />
+          </>
         )}
-      </div>
+      </WarningBox>
     );
   }
 
@@ -183,6 +213,8 @@ export function TraceScorePanel({
   error = null,
   descriptions,
   ineligible,
+  addToolCallEvaluator,
+  onGoToEvaluators,
   scoreTrace,
   scoringEvaluatorNames,
   onTryAgain,
@@ -197,6 +229,8 @@ export function TraceScorePanel({
           run={run}
           descriptions={descriptions}
           ineligible={ineligible}
+          addToolCallEvaluator={addToolCallEvaluator}
+          onGoToEvaluators={onGoToEvaluators}
           scoreTrace={scoreTrace}
           scoringEvaluatorNames={scoringEvaluatorNames}
           onTryAgain={onTryAgain}

@@ -8,8 +8,8 @@ import { useSidebarState } from "@/lib/sidebar";
 
 /**
  * The evaluators that can be added to an agent: the next-reply ones a
- * conversation agent uses (`llm`) and the output ones a general agent uses
- * (`llm-general`), shown the same way the other evaluator pages show theirs.
+ * conversation agent uses (`llm`), the output ones a general agent uses
+ * (`llm-general`), and the tool call ones either can use (`tool-call`).
  */
 export default function AgentEvaluatorsPage() {
   const router = useRouter();

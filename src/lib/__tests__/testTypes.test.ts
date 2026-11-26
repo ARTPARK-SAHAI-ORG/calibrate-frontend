@@ -15,7 +15,7 @@ import {
 
 describe("testTypeLabel", () => {
   it("labels tool_call", () => {
-    expect(testTypeLabel("tool_call")).toBe("Tool Call");
+    expect(testTypeLabel("tool_call")).toBe("Tool call");
   });
 
   it("labels conversation", () => {
@@ -23,10 +23,10 @@ describe("testTypeLabel", () => {
   });
 
   it("labels response", () => {
-    expect(testTypeLabel("response")).toBe("Agent Response");
+    expect(testTypeLabel("response")).toBe("Conversation reply");
   });
 
-  it("labels general the same as response", () => {
+  it("labels general", () => {
     expect(testTypeLabel("general")).toBe("Agent Response");
   });
 

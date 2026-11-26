@@ -638,6 +638,8 @@ describe("AssignAnnotatorsDialog", () => {
         isOpen={false}
         accessToken="tok"
         evaluators={evaluators}
+        hasToolCallItems={false}
+        hasNonToolCallItems
         onClose={jest.fn()}
         onConfirm={jest.fn()}
       />,
@@ -647,6 +649,8 @@ describe("AssignAnnotatorsDialog", () => {
         isOpen
         accessToken="tok"
         evaluators={evaluators}
+        hasToolCallItems={false}
+        hasNonToolCallItems
         onClose={jest.fn()}
         onConfirm={jest.fn()}
       />,
@@ -668,6 +672,8 @@ describe("AssignAnnotatorsDialog", () => {
         isOpen={false}
         accessToken="tok"
         evaluators={evaluators}
+        hasToolCallItems={false}
+        hasNonToolCallItems
         onClose={jest.fn()}
         onConfirm={jest.fn()}
       />,
@@ -966,13 +972,19 @@ describe("AssignAnnotatorsDialog", () => {
   });
 });
 
-// Tool call correctness is never a choice: a tool-call item is answered by it
-// and the backend adds it whether or not it is ticked here.
+// The built-in Tool call correctness is never a choice: a tool-call item has
+// no other slot for a person's answer.
 describe("AssignAnnotatorsDialog and the tool call label", () => {
   const TOOL_CALL = {
     uuid: "ev-tool",
     name: "Tool call correctness",
     description: "Did the agent call the right tool",
+    evaluator_type: "tool-call",
+    source_default_slug: "default-tool-call-correctness",
+  };
+  const CUSTOM_TOOL_CALL = {
+    uuid: "ev-custom-tool",
+    name: "Right arguments",
     evaluator_type: "tool-call",
   };
 
@@ -990,18 +1002,23 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
   });
 
-  it("shows it ticked and not untickable when something chosen is a tool call", async () => {
+  it("offers it ticked when something chosen is a tool call, and asks for one when it is unticked", async () => {
+    const user = setupUser();
     mockedApiClient.mockResolvedValue(annotators);
     renderDialog({
       evaluators: [...evaluators, TOOL_CALL],
       hasToolCallItems: true,
     });
     await screen.findByText("Alice");
-    const box = screen.getByRole("checkbox", {
-      name: "Tool call correctness is always included",
-    });
+    await user.click(screen.getByRole("checkbox", { name: "Alice" }));
+    const box = screen.getByRole("checkbox", { name: /Tool call correctness/ });
     expect(box).toBeChecked();
-    expect(box).toBeDisabled();
+    expect(box).toBeEnabled();
+    await user.click(box);
+    expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
+    expect(
+      screen.getByText("Select at least one evaluator for the tool call items"),
+    ).toBeInTheDocument();
   });
 
   it("sends it along with the labels that were chosen", async () => {
@@ -1032,7 +1049,7 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
   });
 
-  it("hides the whole label picker when the only label left is the locked tool-call one", async () => {
+  it("hides the whole label picker when the only label left is the tool call one", async () => {
     // Same rule as a task with a single label: nothing to weigh, so no
     // column at all — the evaluator is still included, just not shown as a
     // choice.
@@ -1046,7 +1063,7 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     expect(screen.queryByText("Labels")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("checkbox", {
-        name: "Tool call correctness is always included",
+        name: /Tool call correctness/,
       }),
     ).not.toBeInTheDocument();
   });
@@ -1066,7 +1083,7 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     expect(onConfirm.mock.calls[0][1]).toEqual(["ev-tool"]);
   });
 
-  it("gives the locked label a row beside the chosen ones and sends its choice", async () => {
+  it("gives the tool call label a row beside the others and sends its choice", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValue(annotators);
     const { onConfirm } = renderDialog({
@@ -1101,7 +1118,7 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     });
   });
 
-  it("gives the locked label a row and sends it when it is the only label", async () => {
+  it("gives the tool call label a row and sends it when it is the only label", async () => {
     const user = setupUser();
     mockedApiClient.mockResolvedValue(annotators);
     const { onConfirm } = renderDialog({
@@ -1117,5 +1134,95 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     expect(onConfirm.mock.calls[0][2].evaluator_reasoning_modes).toEqual({
       "ev-tool": "required",
     });
+  });
+
+  it("lets a custom tool-call evaluator be unticked like any other label", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    const { onConfirm } = renderDialog({
+      evaluators: [...evaluators, TOOL_CALL, CUSTOM_TOOL_CALL],
+      hasToolCallItems: true,
+    });
+    await screen.findByText("Alice");
+    const custom = screen.getByRole("checkbox", { name: /Right arguments/ });
+    expect(custom).toBeChecked();
+    expect(custom).toBeEnabled();
+    await user.click(custom);
+    await user.click(screen.getByRole("checkbox", { name: "Alice" }));
+    await user.click(screen.getByRole("button", { name: /Assign/ }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onConfirm.mock.calls[0][1]).toEqual(["ev-1", "ev-2", "ev-tool"]);
+  });
+
+  it("leaves a custom tool-call evaluator out when nothing chosen is a tool call", async () => {
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({
+      evaluators: [...evaluators, CUSTOM_TOOL_CALL],
+      hasToolCallItems: false,
+    });
+    await screen.findByText("Alice");
+    expect(screen.queryByText("Right arguments")).not.toBeInTheDocument();
+  });
+
+  it("needs a label for each kind of item when every label is unticked", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({
+      evaluators: [...evaluators, TOOL_CALL],
+      hasToolCallItems: true,
+    });
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("checkbox", { name: "Alice" }));
+    await user.click(screen.getByRole("checkbox", { name: "Unselect all labels" }));
+    expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
+    expect(screen.getByText("Select at least one evaluator")).toBeInTheDocument();
+  });
+
+  it("needs a label for the tool-call items when only custom ones are offered", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog({
+      evaluators: [...evaluators, CUSTOM_TOOL_CALL],
+      hasToolCallItems: true,
+    });
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("checkbox", { name: "Alice" }));
+    await user.click(screen.getByRole("checkbox", { name: /Right arguments/ }));
+    expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
+    expect(
+      screen.getByText("Select at least one evaluator for the tool call items"),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["llm", "items with a text reply"],
+    ["llm-general", "items with a text output"],
+  ])(
+    "names the %s task's text items when none of their evaluators is ticked",
+    async (taskType, words) => {
+      const user = setupUser();
+      mockedApiClient.mockResolvedValue(annotators);
+      renderDialog({
+        evaluators: [...evaluators, CUSTOM_TOOL_CALL],
+        hasToolCallItems: true,
+        taskType,
+      });
+      await screen.findByText("Alice");
+      await user.click(screen.getByRole("checkbox", { name: /Relevance/ }));
+      await user.click(screen.getByRole("checkbox", { name: /Fluency/ }));
+      expect(
+        screen.getByText(`Select at least one evaluator for the ${words}`),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("asks for a label without naming a kind when only one kind is chosen", async () => {
+    const user = setupUser();
+    mockedApiClient.mockResolvedValue(annotators);
+    renderDialog();
+    await screen.findByText("Alice");
+    expect(screen.queryByText(/Select at least one evaluator/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "Unselect all labels" }));
+    expect(screen.getByText("Select at least one evaluator")).toBeInTheDocument();
   });
 });

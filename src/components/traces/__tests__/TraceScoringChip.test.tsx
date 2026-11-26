@@ -40,6 +40,7 @@ function controls(
     saveError: null,
     enableBlocked: false,
     cannotEnable: false,
+    refreshEligibility: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }

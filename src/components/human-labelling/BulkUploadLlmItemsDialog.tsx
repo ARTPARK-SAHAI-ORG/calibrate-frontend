@@ -1,7 +1,11 @@
 "use client";
 
 import { parseJsonLenient } from "@/lib/jsonSanitize";
-import { ChatHistoryPreview, type TurnObject } from "./bulk-upload-shared";
+import {
+  ChatHistoryPreview,
+  toolCallColumns,
+  type TurnObject,
+} from "./bulk-upload-shared";
 import {
   BulkUploadItemsDialog,
   type BulkContentColumn,
@@ -74,7 +78,9 @@ const CONTENT_COLUMNS: BulkContentColumn[] = [
     ],
     previewLabel: "AI reply",
     previewWidth: "minmax(120px, 200px)",
-    guidelineDescription: "The agent response being judged.",
+    guidelineDescription:
+      "The agent response being judged. Required, unless the row has tool calls.",
+    emptyWithToolCalls: true,
     parse: (raw) => ({ value: raw }),
     renderPreview: (value) => (
       <div className="max-h-24 overflow-y-auto pr-1 leading-snug text-foreground break-words whitespace-pre-wrap">
@@ -82,6 +88,7 @@ const CONTENT_COLUMNS: BulkContentColumn[] = [
       </div>
     ),
   },
+  ...toolCallColumns("agent_response"),
 ];
 
 const SAMPLE_ROWS: BulkSampleRow[] = [
@@ -92,7 +99,8 @@ const SAMPLE_ROWS: BulkSampleRow[] = [
       conversation_history: JSON.stringify([
         { role: "user", content: "What is your return policy?" },
       ]),
-      agent_response: "You can return any item within 30 days for a full refund.",
+      agent_response:
+        "You can return any item within 30 days for a full refund.",
     },
     variableValue:
       "The agent should clearly explain the return policy in a helpful and friendly tone.",
@@ -110,6 +118,24 @@ const SAMPLE_ROWS: BulkSampleRow[] = [
     },
     variableValue:
       "The agent should apologize for the duplicate charge and offer to investigate the order.",
+    reasoning: "",
+  },
+  {
+    name: "Save plan",
+    description: "The agent should save the plan instead of replying.",
+    content: {
+      conversation_history: JSON.stringify([
+        { role: "user", content: "Save my plan for 7 months" },
+      ]),
+      agent_response: "",
+      actual_tool_calls: JSON.stringify([
+        { tool: "save", arguments: { months: 7 } },
+      ]),
+      expected_tool_calls: JSON.stringify([
+        { tool: "save", arguments: { months: 7 } },
+      ]),
+    },
+    variableValue: "",
     reasoning: "",
   },
 ];

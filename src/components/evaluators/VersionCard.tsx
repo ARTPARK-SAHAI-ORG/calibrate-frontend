@@ -119,9 +119,9 @@ export function VersionCard({
       }
     >
       {/* The whole header row goes when it would be empty: the version pill
-          and the buttons only appear on the evaluator's own page, and an
-          evaluator no AI judge runs has no model to name. Left in, it was an
-          empty row with the card's gap above and below it. */}
+          and the buttons only appear on the evaluator's own page, and a
+          version saved without a model has no model to name. Left in, it was
+          an empty row with the card's gap above and below it. */}
       {showHeaderRow && (
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="flex flex-col gap-1 min-w-0">
@@ -137,9 +137,8 @@ export function VersionCard({
                 )}
               </div>
             )}
-            {/* An evaluator that no AI judge runs, such as Tool call
-              correctness, has no model and no prompt. Show nothing rather
-              than a heading over an empty space. */}
+            {/* A version saved without a model shows nothing rather than a
+              heading over an empty space. */}
             {hasJudgeModel && (
               <>
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">

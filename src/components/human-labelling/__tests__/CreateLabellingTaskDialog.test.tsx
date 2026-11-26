@@ -231,6 +231,85 @@ describe("CreateLabellingTaskDialog", () => {
     expect(screen.getByText("No matching evaluators.")).toBeInTheDocument();
   });
 
+  it.each([
+    ["Agent reply", true],
+    ["Basic", true],
+    ["Full conversation", false],
+    ["Speech to Text", false],
+  ])("offers tool call evaluators on a %s task: %s", async (typeTitle, shown) => {
+    const user = setupUser();
+    mockApiClient.mockResolvedValue({
+      items: [
+        ...EVALUATORS,
+        { uuid: "ev-tool", name: "Tool call correctness", evaluator_type: "tool-call" },
+      ],
+    });
+    renderDialog();
+    await goToStep3(user, typeTitle);
+    await waitFor(() =>
+      expect(screen.queryByText("Loading evaluators")).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Tool call correctness") !== null).toBe(shown);
+  });
+
+  it("shows each evaluator's type next to its name", async () => {
+    const user = setupUser();
+    mockApiClient.mockResolvedValue({
+      items: [
+        ...EVALUATORS,
+        { uuid: "ev-tool", name: "Tool call correctness", evaluator_type: "tool-call" },
+      ],
+    });
+    renderDialog();
+    await goToStep3(user, "Agent reply");
+    await waitFor(() =>
+      expect(screen.queryByText("Loading evaluators")).not.toBeInTheDocument(),
+    );
+    expect(screen.getAllByText("Conversation reply").length).toBeGreaterThan(0);
+    expect(screen.getByText("Tool call")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["Agent reply", "A single reply"],
+    ["Basic", "The output"],
+  ])(
+    "offers the tool calls when creating an evaluator on a %s task",
+    async (typeTitle, ownKind) => {
+      const user = setupUser();
+      renderDialog();
+      await goToStep3(user, typeTitle);
+      await user.click(screen.getByRole("button", { name: "New evaluator" }));
+
+      expect(screen.getByText("What is this evaluator for?")).toBeInTheDocument();
+      expect(screen.getByText(ownKind)).toBeInTheDocument();
+      expect(screen.getByText("The tool calls")).toBeInTheDocument();
+    },
+  );
+
+  it("keeps a chosen tool call evaluator when the task moves from Agent reply to Basic", async () => {
+    const user = setupUser();
+    mockApiClient.mockResolvedValue({
+      items: [
+        ...EVALUATORS,
+        { uuid: "ev-tool", name: "Tool call correctness", evaluator_type: "tool-call" },
+      ],
+    });
+    renderDialog();
+    await goToStep3(user, "Agent reply");
+    await user.click(await screen.findByText("Tool call correctness"));
+    await user.click(screen.getByText("Correctness"));
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByText("Basic"));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    const checked = screen
+      .getAllByRole("checkbox")
+      .filter((box) => (box as HTMLInputElement).checked);
+    expect(checked).toHaveLength(1);
+    expect(checked[0].closest("label")).toHaveTextContent("Tool call correctness");
+  });
+
   it("shows a type-specific empty state when there are no matching evaluators and no search", async () => {
     const user = setupUser();
     mockApiClient.mockResolvedValue({ items: [] });
@@ -238,7 +317,7 @@ describe("CreateLabellingTaskDialog", () => {
     await goToStep3(user, "Agent reply");
     await waitFor(() =>
       expect(
-        screen.getByText("No Agent reply evaluators yet."),
+        screen.getByText("No Conversation reply evaluators yet."),
       ).toBeInTheDocument(),
     );
   });

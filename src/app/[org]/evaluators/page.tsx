@@ -280,8 +280,8 @@ function MetricsPageInner() {
             >
               <option value="all">All purposes</option>
               {EVALUATOR_USE_CASE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {EVALUATOR_TYPE_LABELS[opt.value]}
+                <option key={opt} value={opt}>
+                  {EVALUATOR_TYPE_LABELS[opt]}
                 </option>
               ))}
             </Select>
@@ -401,14 +401,25 @@ function MetricsPageInner() {
                         <h3 className="text-base md:text-lg font-semibold text-foreground">
                           {evaluator.name}
                         </h3>
-                        {evaluator.evaluator_type && (
-                          <EvaluatorTypePill
-                            evaluatorType={evaluator.evaluator_type}
-                          />
-                        )}
-                        {evaluator.output_type && (
-                          <OutputTypePill outputType={evaluator.output_type} />
-                        )}
+                        {/* The card ignores the mouse so a click opens it; the
+                            pills take it back so their tooltips show, and
+                            still open the evaluator on a click. */}
+                        <Link
+                          href={`/evaluators/${evaluator.uuid}`}
+                          tabIndex={-1}
+                          className="pointer-events-auto flex items-center gap-2"
+                        >
+                          {evaluator.evaluator_type && (
+                            <EvaluatorTypePill
+                              evaluatorType={evaluator.evaluator_type}
+                            />
+                          )}
+                          {evaluator.output_type && (
+                            <OutputTypePill
+                              outputType={evaluator.output_type}
+                            />
+                          )}
+                        </Link>
                       </div>
                       {evaluator.description && (
                         <p className="text-sm text-muted-foreground mt-2 leading-relaxed">

@@ -9,6 +9,9 @@ import {
 // Stub it here and capture the props the wrapper passes through, so we can
 // exercise the llm-general-specific contentColumns/sampleRows data that this
 // file defines.
+// jspdf is ESM-only and jest's transform cannot parse it.
+jest.mock("jspdf", () => ({ jsPDF: class {} }));
+
 let capturedProps: any = null;
 jest.mock("../BulkUploadItemsDialog", () => ({
   BulkUploadItemsDialog: (props: any) => {
@@ -60,8 +63,12 @@ describe("BulkUploadLlmGeneralItemsDialog", () => {
     );
     expect(capturedProps.guidelinesIntro).toMatch(/non-conversational/);
     expect(capturedProps.sampleFilenameBase).toBe("llm_response_items");
-    expect(capturedProps.sampleRows).toHaveLength(2);
-    expect(capturedProps.contentColumns).toHaveLength(2);
+    expect(capturedProps.sampleRows).toHaveLength(3);
+    const toolCallRow = capturedProps.sampleRows.find(
+      (r: { name: string }) => r.name === "Save plan",
+    );
+    expect(toolCallRow.variableValue).toBe("");
+    expect(capturedProps.contentColumns).toHaveLength(4);
   });
 
   it("defaults linkedEvaluators to an empty array when omitted", () => {
@@ -142,5 +149,37 @@ describe("BulkUploadLlmGeneralItemsDialog", () => {
       const { container } = render(column.renderPreview("Some output"));
       expect(container.textContent).toBe("Some output");
     });
+  });
+
+  it("adds the two optional tool-call columns and lets the reply be empty with them", () => {
+    render(
+      <BulkUploadLlmGeneralItemsDialog
+        isOpen
+        accessToken="tok"
+        taskUuid="task-1"
+        linkedEvaluators={linkedEvaluators}
+        onClose={jest.fn()}
+        onSuccess={jest.fn()}
+      />
+    );
+    const cols = capturedProps.contentColumns;
+    const keys = cols.map((c: any) => c.payloadKey);
+    expect(keys).toContain("actual_tool_calls");
+    expect(keys).toContain("expected_tool_calls");
+    for (const c of cols) {
+      if (c.payloadKey.endsWith("_tool_calls")) expect(c.optional).toBe(true);
+    }
+    const reply = cols.find((c: any) => c.payloadKey === "output");
+    expect(reply.emptyWithToolCalls).toBe(true);
+    expect(
+      cols.find((c: any) => c.payloadKey === "actual_tool_calls")
+        .guidelineDescription,
+    ).toContain('"output" can be left empty');
+    for (const c of cols.filter((c: any) => c.payloadKey.endsWith("_tool_calls"))) {
+      expect(c.guidelineDescription).toContain(
+        "Only tool call evaluators score a tool call row",
+      );
+      expect(c.headerCandidates).toEqual([c.payloadKey]);
+    }
   });
 });

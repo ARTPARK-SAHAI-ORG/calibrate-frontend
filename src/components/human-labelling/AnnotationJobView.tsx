@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { publicFetch } from "@/lib/publicFetch";
+import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
 import { Tooltip } from "@/components/Tooltip";
 import { ErrorNote, type MetadataEntry } from "@/components/ui";
@@ -168,22 +169,14 @@ function fieldKey(itemId: string, evaluatorId: string): FieldKey {
   return `${itemId}:${evaluatorId}`;
 }
 
-/**
- * The evaluators that apply to one row.
- *
- * A tool-call row is answered by the tool call evaluator alone: the AI judges
- * read a written reply and there is none. Every other row is answered by
- * everything except that one. This is the ONE place the rule lives — the
- * cards on screen, the "is this row finished?" checks and the submit guard
- * all ask here, so they cannot disagree.
- */
+/** The evaluators that apply to one row. The cards, the "is this row
+ * finished?" checks and the submit guard all ask here, so they cannot disagree. */
 function evaluatorsForItem(
   evaluators: Evaluator[],
   item: { is_tool_call?: boolean } | null | undefined,
 ): Evaluator[] {
-  const wantToolCall = item?.is_tool_call === true;
-  return evaluators.filter(
-    (ev) => (ev.evaluator_type === "tool-call") === wantToolCall,
+  return evaluators.filter((ev) =>
+    evaluatorFitsItem(ev.evaluator_type, item?.is_tool_call === true),
   );
 }
 
@@ -1580,13 +1573,7 @@ export function ItemPane({
   // the tool-call pane, which reads `chat_history` / `agent_response`.
   if (taskType === "llm-general")
     return <LlmGeneralItemPane payload={payload} />;
-  // The flag is stamped by the backend and absent on a run's copy of an item
-  // and on older responses, so the lists it is worked out from count too.
-  if (
-    item.is_tool_call === true ||
-    Array.isArray(payload.expected_tool_calls) ||
-    Array.isArray(payload.actual_tool_calls)
-  )
+  if (item.is_tool_call === true)
     return <ToolCallItemPane payload={payload} />;
   if (taskType === "llm") return <LlmItemPane payload={payload} />;
   if (taskType === "conversation")

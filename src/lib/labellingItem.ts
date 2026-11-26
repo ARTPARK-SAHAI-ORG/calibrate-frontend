@@ -1,11 +1,5 @@
-// Shrinks a task's item row down to the shape ItemDetailDialog wants,
-// field by field, when the item detail view is opened from the task's
-// Items tab.
-//
-// Pulled out of the page so it can be unit tested directly: the page it was
-// inline in sits outside what the coverage setup measures, and dropping a
-// field silently here is exactly the bug that made the dialog draw every
-// evaluator on a tool-call item instead of just Tool call correctness.
+import type { EvaluatorType } from "@/components/EvaluatorPills";
+import type { ExpectedToolCall } from "@/components/ToolCallExpectationsEditor";
 import type { MetadataEntry } from "@/components/ui";
 import { readTurnExtras, textOf, type TurnExtras } from "@/lib/messageVersions";
 
@@ -20,6 +14,7 @@ export type ItemDetailSourceItem = {
   metadata?: MetadataEntry[] | null;
 };
 
+// Shrinks a task's item row down to the shape ItemDetailDialog wants.
 export function toItemDetailItem(
   match: ItemDetailSourceItem,
 ): ItemDetailSourceItem {
@@ -35,59 +30,58 @@ export function toItemDetailItem(
   };
 }
 
-// What running the AI judges over a chosen set of rows should do. A judge has
-// no wording to read on a tool call, so the backend skips those rows: a set of
-// nothing but tool calls has nothing to run and is refused before the run
-// dialog opens. A mixed set runs on `runnable` alone, so a tool-call row never
-// reaches the run at all, and `toolCallSkipCount` says how many were left out
-// so the reader is told before confirming.
-//
-// `is_tool_call` is stamped by the backend and absent on an older response, so
-// an unknown row counts as a normal one. The backend applies the same rule, so
-// erring that way only costs a round trip.
-export function runEvaluatorsDecision<T extends { is_tool_call?: boolean }>(
-  rows: T[],
-):
-  | { blocked: true }
-  | { blocked: false; toolCallSkipCount: number; runnable: T[] } {
-  const runnable = rows.filter((r) => r.is_tool_call !== true);
-  const toolCallSkipCount = rows.length - runnable.length;
-  if (rows.length > 0 && runnable.length === 0) {
-    return { blocked: true };
-  }
-  return { blocked: false, toolCallSkipCount, runnable };
+// The evaluator kinds a labelling task of this type can use. Any row of an
+// `llm` or `llm-general` task can be a tool call, so those also take the
+// tool-call kind.
+export function evaluatorTypesForTask(
+  taskType: EvaluatorType,
+): EvaluatorType[] {
+  return taskType === "llm" || taskType === "llm-general"
+    ? [taskType, "tool-call"]
+    : [taskType];
 }
 
-// True when an evaluation run recorded no score for a row because the AI
-// judge does not run on it. The backend writes such a result on every
-// tool-call row so the run page can say why the card is empty, rather than
-// leaving a blank one behind.
-export function isSkippedRunResult(
-  value: { skipped?: unknown; value?: unknown } | null | undefined,
+export function fitsTaskType(
+  evaluatorType: EvaluatorType | undefined,
+  taskType: EvaluatorType,
 ): boolean {
-  return value?.skipped === true;
+  return (
+    !!evaluatorType && evaluatorTypesForTask(taskType).includes(evaluatorType)
+  );
 }
 
-// The evaluators an evaluation run can actually use. Tool call correctness is
-// answered by people, never by a run, so it is left out of the Run evaluators
-// dialog rather than offered as something to start.
-export function evaluatorsThatCanBeRun<
-  T extends { evaluator_type?: string },
->(evaluators: T[]): T[] {
-  return evaluators.filter((e) => e.evaluator_type !== "tool-call");
+// A tool-call evaluator judges only tool-call rows, and every other evaluator
+// only the rest. The backend applies the same rule when it runs the judges.
+export function evaluatorFitsItem(
+  evaluatorType: string | null | undefined,
+  isToolCallItem: boolean,
+): boolean {
+  return (evaluatorType === "tool-call") === isToolCallItem;
 }
 
-// The one sentence the app uses about a tool-call row nothing can score. It
-// appears in four places — the greyed-out Evaluate button, the refusal when
-// every chosen row is one, the note in the run dialog, and the card on the
-// evaluation run page — and they must not drift apart, so they are all built
-// here. `subject` names who is doing the evaluating, `tail` adds anything that
-// only one of them says.
-export function toolCallNotEvaluatedMessage(
-  subject: string,
-  tail = "",
-): string {
-  return `${subject} one or more tool calls, which only supports human review today. Evaluators do not run on them${tail}.`;
+// An evaluator is offered when it fits at least one of the items. With no
+// items to check, every evaluator is offered.
+export function evaluatorsFittingItems<
+  E extends { evaluator_type?: string | null },
+>(evaluators: E[], items: { is_tool_call?: boolean }[]): E[] {
+  if (items.length === 0) return evaluators;
+  return evaluators.filter((e) =>
+    items.some((it) => evaluatorFitsItem(e.evaluator_type, it.is_tool_call === true)),
+  );
+}
+
+// Mirrors the backend's select-all rule: a case-insensitive substring of
+// `payload.name`, so the kinds counted here are the items the action reaches.
+export function selectedTaskItems<
+  T extends { uuid: string; payload: unknown },
+>(items: T[], pick: { q: string } | { ids: Set<string> }): T[] {
+  if ("ids" in pick) return items.filter((it) => pick.ids.has(it.uuid));
+  const needle = pick.q.trim().toLowerCase();
+  if (!needle) return items;
+  return items.filter((it) => {
+    const name = (it.payload as { name?: unknown } | null)?.name;
+    return typeof name === "string" && name.toLowerCase().includes(needle);
+  });
 }
 
 export type ItemEditForm = "tts" | "stt" | "llm-general" | "chat";
@@ -131,6 +125,7 @@ export type LlmGeneralDialogRow = {
   inputExtras: TurnExtras;
   outputExtras: TurnExtras;
   toolCalls: unknown[];
+  expectedToolCalls: ExpectedToolCall[];
   varValues: Record<string, Record<string, string>>;
   metadata?: MetadataEntry[] | null;
 };
@@ -151,8 +146,36 @@ export function llmGeneralDialogRow(item: {
     output: textOf(p.output),
     inputExtras: readTurnExtras(p.input),
     outputExtras: readTurnExtras(p.output),
-    toolCalls: Array.isArray(p.actual_tool_calls) ? p.actual_tool_calls : [],
+    toolCalls: agentToolCalls(p),
+    expectedToolCalls: Array.isArray(p.expected_tool_calls)
+      ? p.expected_tool_calls
+      : [],
     varValues: readEvaluatorVariables(p),
     metadata: item.metadata,
   };
+}
+
+export function isToolCallContent(content: Record<string, unknown>): boolean {
+  return (
+    Array.isArray(content.actual_tool_calls) ||
+    Array.isArray(content.expected_tool_calls)
+  );
+}
+
+// An empty expected or actual tool call list is kept on save and still marks
+// the item as a tool-call item.
+export function storesEmptyToolCallList(payload: unknown): boolean {
+  const p = (payload ?? {}) as Record<string, unknown>;
+  return [p.expected_tool_calls, p.actual_tool_calls].some(
+    (list) => Array.isArray(list) && list.length === 0,
+  );
+}
+
+/** The tool calls the agent made: `actual_tool_calls` whenever it is a list,
+ * even an empty one, else `tool_calls` when the item has no text reply. The
+ * backend reads the same. */
+export function agentToolCalls(payload: Record<string, unknown>): unknown[] {
+  if (Array.isArray(payload.actual_tool_calls)) return payload.actual_tool_calls;
+  if (textOf(payload.agent_response) || textOf(payload.output)) return [];
+  return Array.isArray(payload.tool_calls) ? payload.tool_calls : [];
 }

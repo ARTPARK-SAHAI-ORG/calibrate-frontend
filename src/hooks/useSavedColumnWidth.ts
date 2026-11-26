@@ -21,8 +21,9 @@ function savedWidth(
 }
 
 /**
- * The width of a right-hand column as a percentage of the row it sits in,
- * dragged by a handle that is a direct child of that row. A percentage rather
+ * The width of a column at one end of a row, as a percentage of the row,
+ * dragged by a handle that is a direct child of that row. `side` says which
+ * end the column sits at. A percentage rather
  * than pixels, so the limits hold at any window size. Saved when the mouse is
  * released, so a click that moves nothing saves nothing. Read before the first
  * render, so only mount this in the browser, after the page has loaded.
@@ -32,6 +33,7 @@ export function useSavedColumnWidth(
   initial: number,
   min: number,
   max: number,
+  side: "left" | "right" = "right",
 ) {
   const [percent, setPercent] = useState(() =>
     savedWidth(storageKey, initial, min, max),
@@ -46,11 +48,9 @@ export function useSavedColumnWidth(
       beginDrag(
         e,
         (ev) => {
-          const { right, width } = row.getBoundingClientRect();
-          latest = Math.min(
-            max,
-            Math.max(min, ((right - ev.clientX) / width) * 100),
-          );
+          const { left, right, width } = row.getBoundingClientRect();
+          const span = side === "left" ? ev.clientX - left : right - ev.clientX;
+          latest = Math.min(max, Math.max(min, (span / width) * 100));
           setPercent(latest);
         },
         () => {
@@ -63,7 +63,7 @@ export function useSavedColumnWidth(
         },
       );
     },
-    [storageKey, min, max, beginDrag],
+    [storageKey, min, max, side, beginDrag],
   );
 
   return { percent, startDrag };

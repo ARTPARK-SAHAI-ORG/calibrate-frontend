@@ -127,7 +127,7 @@ describe("CreateEvaluatorFlow", () => {
         onClose={jest.fn()}
         existingEvaluators={[]}
         onCreated={jest.fn()}
-        useCaseGroups={["conversation"]}
+        useCaseTypes={["llm", "conversation"]}
       />,
     );
 
@@ -149,7 +149,7 @@ describe("CreateEvaluatorFlow", () => {
         onClose={onClose}
         existingEvaluators={[]}
         onCreated={jest.fn()}
-        useCaseGroups={["conversation"]}
+        useCaseTypes={["llm", "conversation"]}
       />,
     );
 
@@ -168,7 +168,6 @@ describe("CreateEvaluatorFlow", () => {
         onClose={onClose}
         existingEvaluators={[]}
         onCreated={onCreated}
-        useCaseGroups={["conversation"]}
         useCaseTypes={["llm"]}
       />,
     );
@@ -190,6 +189,97 @@ describe("CreateEvaluatorFlow", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("creates a tool call evaluator from the tool-call default prompt", async () => {
+    const user = setupUser();
+    const onCreated = jest.fn();
+
+    render(
+      <CreateEvaluatorFlow
+        open
+        onClose={jest.fn()}
+        existingEvaluators={[]}
+        onCreated={onCreated}
+        useCaseTypes={["tool-call"]}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("prompt-field")).toHaveTextContent(
+        "Judge the reply",
+      ),
+    );
+    const fetchMock = global.fetch as jest.Mock;
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes("/evaluators/default-prompt?purpose=tool-call"),
+      ),
+    ).toBe(true);
+
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "Right tool");
+    await user.click(screen.getByText("Submit create"));
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    const post = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        String(url).endsWith("/evaluators") && init?.method === "POST",
+    );
+    const body = JSON.parse(post![1].body as string);
+    expect(body.evaluator_type).toBe("tool-call");
+    expect(body.data_type).toBe("text");
+  });
+
+  it.each([
+    ["a conversation agent", ["llm", "tool-call"]],
+    ["a basic agent", ["llm-general", "tool-call"]],
+  ] as const)(
+    "offers Tool call in the picker for %s",
+    async (_label, types) => {
+      const user = setupUser();
+      render(
+        <CreateEvaluatorFlow
+          open
+          onClose={jest.fn()}
+          existingEvaluators={[]}
+          onCreated={jest.fn()}
+          useCaseTypes={[...types]}
+        />,
+      );
+
+      expect(screen.getByText("What is this evaluator for?")).toBeInTheDocument();
+      await user.click(screen.getByText("The tool calls"));
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+
+      expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
+      const fetchMock = global.fetch as jest.Mock;
+      await waitFor(() =>
+        expect(
+          fetchMock.mock.calls.some(([url]) =>
+            String(url).includes("default-prompt?purpose=tool-call"),
+          ),
+        ).toBe(true),
+      );
+    },
+  );
+
+  it("offers Tool call when every use case is on offer", async () => {
+    const user = setupUser();
+    render(
+      <CreateEvaluatorFlow
+        open
+        onClose={jest.fn()}
+        existingEvaluators={[]}
+        onCreated={jest.fn()}
+      />,
+    );
+
+    await user.click(screen.getByText("Text"));
+    await user.click(screen.getByText("Conversation"));
+    await user.click(screen.getByText("The tool calls"));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
+  });
+
   it("opens with a name that says what the evaluator judges, numbered past names already taken", async () => {
     render(
       <CreateEvaluatorFlow
@@ -197,12 +287,10 @@ describe("CreateEvaluatorFlow", () => {
         onClose={jest.fn()}
         existingEvaluators={[{ name: "New conversation reply evaluator" }]}
         onCreated={jest.fn()}
-        useCaseGroups={["conversation"]}
         useCaseTypes={["llm"]}
       />,
     );
 
-    // The judge prompt is still filled in from the default for this use case.
     await waitFor(() =>
       expect(screen.getByTestId("prompt-field")).toHaveTextContent(
         "Judge the reply",
@@ -213,6 +301,40 @@ describe("CreateEvaluatorFlow", () => {
       "New conversation reply evaluator 2",
     );
   });
+
+  it.each([
+    ["Conversation", "New conversation tool call evaluator"],
+    ["Basic", "New basic tool call evaluator"],
+  ])(
+    "names a tool call evaluator after the %s answer, and posts that name",
+    async (agentKind, expected) => {
+      const user = setupUser();
+      render(
+        <CreateEvaluatorFlow
+          open
+          onClose={jest.fn()}
+          existingEvaluators={[]}
+          onCreated={jest.fn()}
+        />,
+      );
+
+      await user.click(screen.getByText("Text"));
+      await user.click(screen.getByText(agentKind));
+      await user.click(screen.getByText("The tool calls"));
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+      expect(await screen.findByLabelText("Name")).toHaveValue(expected);
+
+      await user.click(screen.getByText("Submit create"));
+      const fetchMock = global.fetch as jest.Mock;
+      await waitFor(() => {
+        const post = fetchMock.mock.calls.find(
+          ([url, init]) =>
+            String(url).endsWith("/evaluators") && init?.method === "POST",
+        );
+        expect(JSON.parse(post![1].body as string).name).toBe(expected);
+      });
+    },
+  );
 
   it("names the evaluator after the answer picked, and posts that name", async () => {
     const user = setupUser();
@@ -245,6 +367,21 @@ describe("CreateEvaluatorFlow", () => {
     });
   });
 
+  it("keeps a tool call evaluator's name plain when the agent kind was never asked", async () => {
+    render(
+      <CreateEvaluatorFlow
+        open
+        onClose={jest.fn()}
+        existingEvaluators={[]}
+        onCreated={jest.fn()}
+        useCaseTypes={["tool-call"]}
+      />,
+    );
+    expect(await screen.findByLabelText("Name")).toHaveValue(
+      "New tool call evaluator",
+    );
+  });
+
   it("says the name is needed and puts the cursor back on the box", async () => {
     const user = setupUser();
     const onCreated = jest.fn();
@@ -255,7 +392,6 @@ describe("CreateEvaluatorFlow", () => {
         onClose={jest.fn()}
         existingEvaluators={[]}
         onCreated={onCreated}
-        useCaseGroups={["conversation"]}
         useCaseTypes={["llm"]}
       />,
     );

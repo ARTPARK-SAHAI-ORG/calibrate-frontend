@@ -279,7 +279,7 @@ describe("TracesTable", () => {
     });
     expect(
       screen.getAllByRole("img", {
-        name: "No evaluators could score this trace",
+        name: "No evaluator on this agent could score this trace",
       }),
     ).toHaveLength(2);
     // The skipped trace says why beside its input and again in each of its

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type HTMLAttributes, type ReactNode } from "react";
-import { PreBuiltPill } from "@/components/EvaluatorPills";
+import { EvaluatorTypePill, PreBuiltPill } from "@/components/EvaluatorPills";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
 import { EyeIcon } from "@/components/icons";
@@ -14,7 +14,7 @@ type Props = {
 } & HTMLAttributes<HTMLDivElement>;
 
 /**
- * One evaluator as a card: name, pre-built pill, description, View and the
+ * One evaluator as a card: name, type pill, pre-built pill, description, View and the
  * caller's own actions. Clicking anywhere on the card, or View, opens how
  * the evaluator judges in `EvaluatorPreviewModal`, which carries the links to
  * the evaluator's own page. Shared by the evaluator library pages and the
@@ -42,8 +42,16 @@ export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
             <h3 className="text-base font-semibold text-foreground">
               {evaluator.name}
             </h3>
-            {/* Only "where did this come from". What it judges and how it
-                scores are in the evaluator itself. */}
+            {evaluator.evaluator_type && (
+              // Takes the mouse back so its tooltip shows, and still opens
+              // the card on a click.
+              <span
+                className="pointer-events-auto"
+                onClick={() => setPreviewOpen(true)}
+              >
+                <EvaluatorTypePill evaluatorType={evaluator.evaluator_type} />
+              </span>
+            )}
             {isDefaultEvaluator(evaluator) && <PreBuiltPill />}
           </div>
           {evaluator.description && (

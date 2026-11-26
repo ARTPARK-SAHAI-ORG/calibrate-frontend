@@ -8,7 +8,7 @@ const KEY = "test:column-width";
 function pressHandle(startDrag: (e: React.MouseEvent) => void, button = 0) {
   const row = document.createElement("div");
   row.getBoundingClientRect = () =>
-    ({ right: 1000, width: 1000 }) as DOMRect;
+    ({ left: 0, right: 1000, width: 1000 }) as DOMRect;
   const handle = document.createElement("div");
   row.appendChild(handle);
   act(() => {
@@ -59,6 +59,17 @@ describe("useSavedColumnWidth", () => {
     moveTo(600);
     expect(result.current.percent).toBe(40);
     release();
+  });
+
+  it("measures a left-hand column from the left edge of the row, and saves it", () => {
+    const { result } = renderHook(() =>
+      useSavedColumnWidth(KEY, 30, 20, 70, "left"),
+    );
+    pressHandle(result.current.startDrag);
+    moveTo(450);
+    expect(result.current.percent).toBe(45);
+    release();
+    expect(window.localStorage.getItem(KEY)).toBe("45");
   });
 
   it("stops at the limits", () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { toolCallColumns } from "./bulk-upload-shared";
 import {
   BulkUploadItemsDialog,
   type BulkContentColumn,
@@ -38,10 +39,12 @@ const CONTENT_COLUMNS: BulkContentColumn[] = [
     previewLabel: "Output",
     previewWidth: "minmax(120px, 220px)",
     guidelineDescription:
-      "Required. The output the LLM produced for that input.",
+      "Required, unless the row has tool calls. The output the LLM produced for that input.",
+    emptyWithToolCalls: true,
     parse: (raw) => ({ value: raw }),
     renderPreview: textPreview,
   },
+  ...toolCallColumns("output"),
 ];
 
 const SAMPLE_ROWS: BulkSampleRow[] = [
@@ -65,6 +68,22 @@ const SAMPLE_ROWS: BulkSampleRow[] = [
     },
     variableValue:
       "The label should correctly reflect the sentiment of the text.",
+    reasoning: "",
+  },
+  {
+    name: "Save plan",
+    description: "",
+    content: {
+      input: "Save my plan for 7 months",
+      output: "",
+      actual_tool_calls: JSON.stringify([
+        { tool: "save", arguments: { months: 7 } },
+      ]),
+      expected_tool_calls: JSON.stringify([
+        { tool: "save", arguments: { months: 7 } },
+      ]),
+    },
+    variableValue: "",
     reasoning: "",
   },
 ];

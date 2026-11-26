@@ -146,7 +146,7 @@ it("shows a spinner while scoring, the reason when it was skipped, and empty res
     />,
   );
   expect(
-    screen.getByText("No evaluators could score this trace"),
+    screen.getByText("No evaluator on this agent could score this trace"),
   ).toBeInTheDocument();
   expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
 
@@ -296,7 +296,7 @@ it("names each evaluator that could not score the trace, and why", () => {
     />,
   );
   expect(
-    screen.getByText("No evaluators could score this trace"),
+    screen.getByText("No evaluator on this agent could score this trace"),
   ).toBeInTheDocument();
   expect(screen.getByText("Tone check")).toBeInTheDocument();
   expect(
@@ -321,7 +321,11 @@ describe("the Score this trace button", () => {
         scoreTrace={button}
         scoringEvaluatorNames={["Helpfulness", "Tone", "Safety"]}
         ineligible={[
-          { evaluator_uuid: "ev-x", name: "Clarity", reason: "no_live_version" },
+          {
+            evaluator_uuid: "ev-x",
+            name: "Clarity",
+            reason: "no_live_version",
+          },
         ]}
       />,
     );
@@ -359,8 +363,165 @@ it("offers Try again on a failed run only when given a way to retry", async () =
   const onTryAgain = jest.fn();
   const user = setupUser();
   const { rerender } = render(<TraceScorePanel run={failed} />);
-  expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Try again" }),
+  ).not.toBeInTheDocument();
   rerender(<TraceScorePanel run={failed} onTryAgain={onTryAgain} />);
   await user.click(screen.getByRole("button", { name: "Try again" }));
   expect(onTryAgain).toHaveBeenCalledTimes(1);
+});
+
+it("points at the Evaluators tab when no evaluator fits and none is listed", async () => {
+  const onGoToEvaluators = jest.fn();
+  const user = setupUser();
+  render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r11",
+        status: "skipped",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "no_usable_evaluators",
+        results: [],
+      }}
+      ineligible={[]}
+      onGoToEvaluators={onGoToEvaluators}
+    />,
+  );
+  expect(document.body).toHaveTextContent(
+    "No evaluator on this agent could score this trace. Add one that can in the Evaluators tab.",
+  );
+  await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
+  expect(onGoToEvaluators).toHaveBeenCalled();
+});
+
+it("points at the Evaluators tab beside the evaluators that do not fit", async () => {
+  const onGoToEvaluators = jest.fn();
+  const user = setupUser();
+  render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r12",
+        status: "skipped",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "no_usable_evaluators",
+        results: [],
+      }}
+      ineligible={[
+        {
+          evaluator_uuid: "e1",
+          name: "Tone check",
+          reason: "declares_variables",
+        },
+      ]}
+      onGoToEvaluators={onGoToEvaluators}
+    />,
+  );
+  expect(screen.getByText("Tone check")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
+  expect(onGoToEvaluators).toHaveBeenCalled();
+});
+
+it("says the agent has no tool call evaluator and offers the button to add one", () => {
+  render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r9",
+        status: "skipped",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "no_tool_call_evaluator",
+        results: [],
+      }}
+      addToolCallEvaluator={
+        <button type="button">Add a tool call evaluator</button>
+      }
+    />,
+  );
+  const sentence = screen.getByText(
+    "This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent.",
+  );
+  const button = screen.getByRole("button", {
+    name: "Add a tool call evaluator",
+  });
+  // The button sits on its own line under the sentence, not inside it.
+  expect(sentence).not.toContainElement(button);
+});
+
+it("says the trace was skipped before a tool call evaluator was added, with no button, once the agent has one", () => {
+  render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r10",
+        status: "skipped",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "no_tool_call_evaluator",
+        results: [],
+      }}
+    />,
+  );
+  expect(document.body).toHaveTextContent(
+    /^Scores\s*This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent$/,
+  );
+  expect(
+    screen.queryByRole("button", { name: "Add a tool call evaluator" }),
+  ).not.toBeInTheDocument();
+});
+
+it("offers the button only beside the missing tool call evaluator reason", () => {
+  render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r11",
+        status: "failed",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "cli_failed",
+        results: [],
+      }}
+      addToolCallEvaluator={
+        <button type="button">Add a tool call evaluator</button>
+      }
+    />,
+  );
+  expect(
+    screen.queryByRole("button", { name: "Add a tool call evaluator" }),
+  ).not.toBeInTheDocument();
+});
+
+const toolCallSkip: TraceScoringRun = {
+  run_uuid: "r20",
+  status: "skipped",
+  created_at: "2026-08-29T12:00:00Z",
+  error: "no_tool_call_evaluator",
+  results: [],
+};
+
+it("names what can score a tool-only trace now and offers only Score this trace, not the add button", () => {
+  render(
+    <TraceScorePanel
+      run={toolCallSkip}
+      scoreTrace={<button type="button">Score this trace</button>}
+      scoringEvaluatorNames={["Tool call correctness"]}
+      addToolCallEvaluator={
+        <button type="button">Add a tool call evaluator</button>
+      }
+    />,
+  );
+  expect(document.body).toHaveTextContent(
+    "This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent. Tool call correctness can score it now.",
+  );
+  expect(
+    screen.getByRole("button", { name: "Score this trace" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Add a tool call evaluator" }),
+  ).not.toBeInTheDocument();
+});
+
+it("points at the Evaluators tab when a tool-only trace has no add button and nothing can score it", async () => {
+  const onGoToEvaluators = jest.fn();
+  const user = setupUser();
+  render(
+    <TraceScorePanel run={toolCallSkip} onGoToEvaluators={onGoToEvaluators} />,
+  );
+  await user.click(screen.getByRole("button", { name: /Evaluators tab/ }));
+  expect(onGoToEvaluators).toHaveBeenCalled();
 });

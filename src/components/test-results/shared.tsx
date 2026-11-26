@@ -137,7 +137,7 @@ export type TestCaseData = {
   history?: TestCaseHistory[];
   /** The single input a test written for a basic agent
    * carries instead of a conversation. Present on both its Agent Response
-   * (`evaluation.type: "general"`) and its Tool Call tests — for the latter
+   * (`evaluation.type: "general"`) and its Tool call tests — for the latter
    * the backend also widens it into a one-turn `history` for the run, so
    * this field is the only thing that says the test was written as one
    * input. Absent on tests written as a conversation. */
@@ -954,15 +954,12 @@ export function TestDetailView({
   legacyDefaultEvaluator,
   enableEvaluatorLinks = true,
   highlightEvalTarget = false,
-  toolCallLabel = "Agent Tool Call",
   afterHistory,
   showVerdict = true,
   markOutput = true,
   afterOutput,
   afterTurn,
 }: {
-  /** The heading above a tool call the agent made. */
-  toolCallLabel?: string;
   /** Drawn right under the conversation, lined up with it. */
   afterHistory?: React.ReactNode;
   history: TestCaseHistory[];
@@ -988,8 +985,10 @@ export function TestDetailView({
   /** When true, the trailing assistant message (text reply or tool call)
    * in `history` is rendered with a blue left border + "Evaluation
    * target" pill. Used by the LLM labelling pane to indicate which
-   * message annotators are scoring. */
-  highlightEvalTarget?: boolean;
+   * message annotators are scoring. A number marks that many turns ending
+   * at the last assistant turn, for a reply followed by tool calls that the
+   * judge reads together. */
+  highlightEvalTarget?: boolean | number;
   /** When false, the agent's final output is still the emphasised last
    * turn (left border) but pass/fail chrome is omitted. Used by traces,
    * which are not scored. */
@@ -1021,14 +1020,14 @@ export function TestDetailView({
     return m;
   }, [history]);
 
-  const evalTargetIndex = highlightEvalTarget
+  const evalTarget = highlightEvalTarget
     ? (() => {
-        for (let i = history.length - 1; i >= 0; i--) {
-          if (history[i].role === "assistant") return i;
-        }
-        return -1;
+        let last = history.length - 1;
+        while (last >= 0 && history[last].role !== "assistant") last--;
+        const count = highlightEvalTarget === true ? 1 : highlightEvalTarget;
+        return { start: Math.max(0, last - count + 1), last };
       })()
-    : -1;
+    : { start: -1, last: -1 };
 
   // Auto-scroll to the most recent message whenever the list grows or
   // changes. The sentinel sits after the output section so the last
@@ -1061,7 +1060,7 @@ export function TestDetailView({
   // gets the same plain Input/Output box layout used for these agents
   // everywhere else (the labelling item pane, a trace's detail view).
   // Both of its test types qualify: an Agent Response test says so with
-  // `evaluation.type`, a Tool Call test only by carrying `input`.
+  // `evaluation.type`, a Tool call test only by carrying `input`.
   const isGeneralType =
     evaluation?.type === "general" || typeof input === "string";
   const generalInput = isGeneralType
@@ -1148,7 +1147,9 @@ export function TestDetailView({
           ) : (
             <div className="space-y-4">
               {history.map((message, index) => {
-                const isEvalTarget = index === evalTargetIndex;
+                const isEvalTarget =
+                  index >= evalTarget.start &&
+                  index <= evalTarget.last;
                 const turnLabel = readTurnExtras(message).label;
                 const timestamp = formatTurnTimestamp(message.created_at);
                 // Tool-response entries are surfaced inline on their parent
@@ -1237,7 +1238,7 @@ export function TestDetailView({
                         <>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium text-foreground">
-                              {toolCallLabel}
+                              {turnLabel || "Agent Tool Call"}
                             </span>
                             {isEvalTarget && (
                               <span className={EVAL_TARGET_CHIP_CLASS}>
@@ -1247,7 +1248,7 @@ export function TestDetailView({
                           </div>
                           <div className="w-[88%] md:w-3/4 flex flex-col">
                             {message.tool_calls.map((toolCall, tcIndex) => {
-                              const { toolName, args } =
+                              const { toolName, args, output } =
                                 normalizeToolCall(toolCall);
                               const toolResponse = toolResponseByCallId.get(
                                 toolCall.id,
@@ -1257,7 +1258,7 @@ export function TestDetailView({
                                   key={tcIndex}
                                   toolName={toolName}
                                   args={args}
-                                  output={toolResponse}
+                                  output={toolResponse ?? output}
                                 />
                               );
                             })}

@@ -1,8 +1,6 @@
 import {
   TestDetailView,
-  outputToolCallsToHistory,
   type TestCaseHistory,
-  type ToolCallOutput,
 } from "@/components/test-results/shared";
 import { readTextField } from "@/lib/messageVersions";
 import { normaliseHistoryItem } from "./shared";
@@ -26,20 +24,6 @@ export function LlmItemPane({
   const agentResponse = readTextField(payload.agent_response);
   if (agentResponse && agentResponse.content.length > 0) {
     history.push({ role: "assistant", ...agentResponse });
-  }
-
-  // A tool-call test's saved item carries the calls the agent made. Append
-  // them as the trailing assistant turn(s), the same way the labelling dialog
-  // does, so the annotator sees the call instead of an empty reply.
-  if (
-    Array.isArray(payload.actual_tool_calls) &&
-    payload.actual_tool_calls.length > 0
-  ) {
-    history.push(
-      ...outputToolCallsToHistory(
-        payload.actual_tool_calls as ToolCallOutput[],
-      ),
-    );
   }
 
   if (history.length === 0) {

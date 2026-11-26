@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { apiClient } from "@/lib/api";
+import { evaluatorFitsItem, isToolCallContent } from "@/lib/labellingItem";
 import { ClippedText, ErrorNote } from "@/components/ui";
 import {
   AnnotationOptIn,
@@ -49,6 +50,9 @@ export type BulkLinkedEvaluator = {
   output_type: "binary" | "rating" | null;
   scale_min: number | null;
   scale_max: number | null;
+  // Only a "tool-call" evaluator scores a tool call row, and only the others
+  // score the rest, so a variable is required only on rows its evaluator scores.
+  evaluator_type?: string | null;
 };
 
 // Describes one item-content column (the parts that differ between task types,
@@ -77,6 +81,10 @@ export type BulkContentColumn = {
   ) => { value: unknown } | { error: string };
   // Render the parsed value in the preview grid.
   renderPreview: (value: unknown) => React.ReactNode;
+  // The header may be left out of the CSV and a blank cell adds nothing.
+  optional?: boolean;
+  // A blank cell is allowed on a row that carries tool calls.
+  emptyWithToolCalls?: boolean;
 };
 
 export type BulkSampleRow = {
@@ -268,9 +276,16 @@ export function BulkUploadItemsDialog({
           col,
           key: findHeaderKey(headers, col.headerCandidates),
         }));
-        const missingContent = contentKeys.filter((ck) => !ck.key);
+        const missingContent = contentKeys.filter(
+          (ck) => !ck.key && !ck.col.optional,
+        );
         if (!nameKey || missingContent.length > 0) {
-          const required = ["name", ...contentColumns.map((c) => c.csvColumn)]
+          const required = [
+            "name",
+            ...contentColumns
+              .filter((c) => !c.optional)
+              .map((c) => c.csvColumn),
+          ]
             .map((c) => `"${c}"`)
             .join(", ");
           setParseError(
@@ -346,7 +361,7 @@ export function BulkUploadItemsDialog({
             ? (row[descriptionKey] ?? "").trim()
             : "";
           const contentRaws = contentKeys.map((ck) =>
-            (row[ck.key as string] ?? "").trim(),
+            ck.key ? (row[ck.key] ?? "").trim() : "",
           );
 
           const anyVariableValue = evaluatorsWithVariables.some((e) =>
@@ -368,11 +383,16 @@ export function BulkUploadItemsDialog({
           // item is matched by name rather than rewritten).
           const content: Record<string, unknown> = {};
           let contentError: string | null = null;
+          const blankUnlessToolCalls: BulkContentColumn[] = [];
           for (let c = 0; c < contentColumns.length; c++) {
             const col = contentColumns[c];
             const raw = contentRaws[c];
             if (!raw) {
-              if (uploadAnnotations) continue;
+              if (uploadAnnotations || col.optional) continue;
+              if (col.emptyWithToolCalls) {
+                blankUnlessToolCalls.push(col);
+                continue;
+              }
               contentError = `Row ${i + 1}: "${col.csvColumn}" is required.`;
               break;
             }
@@ -382,6 +402,16 @@ export function BulkUploadItemsDialog({
               break;
             }
             content[col.payloadKey] = parsed.value;
+          }
+          const toolCallRow = isToolCallContent(content);
+          if (!contentError && blankUnlessToolCalls.length > 0) {
+            if (toolCallRow) {
+              for (const col of blankUnlessToolCalls) {
+                content[col.payloadKey] = "";
+              }
+            } else {
+              contentError = `Row ${i + 1}: "${blankUnlessToolCalls[0].csvColumn}" is required unless the row has tool calls.`;
+            }
           }
           if (contentError) {
             setParseError(contentError);
@@ -396,10 +426,13 @@ export function BulkUploadItemsDialog({
             for (const slot of slots) {
               const raw = (row[slot.columnKey] ?? "").trim();
               if (!raw) {
-                // Same reason as the content columns above: a blank cell in
-                // the downloaded file means the item never carried a value
-                // for this variable, so it is left out instead of failing.
-                if (uploadAnnotations) continue;
+                // A blank cell is skipped when the evaluator does not score
+                // this row or the item never carried a value for it.
+                if (
+                  uploadAnnotations ||
+                  !evaluatorFitsItem(e.evaluator_type, toolCallRow)
+                )
+                  continue;
                 rowError = `Row ${i + 1}: missing value for "${variableColumnName(
                   e.name,
                   slot.varName,

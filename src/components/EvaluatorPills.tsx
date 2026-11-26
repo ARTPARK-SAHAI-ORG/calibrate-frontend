@@ -23,8 +23,8 @@ export function PreBuiltPill() {
 export const EVALUATOR_TYPE_LABELS: Record<EvaluatorType, string> = {
   tts: "Text to Speech",
   stt: "Speech to Text",
-  llm: "Agent reply",
-  "llm-general": "Basic",
+  llm: "Conversation reply",
+  "llm-general": "Agent Response",
   conversation: "Full conversation",
   "tool-call": "Tool call",
 };
@@ -33,9 +33,10 @@ export const EVALUATOR_TYPE_TOOLTIPS: Record<EvaluatorType, string> = {
   tts: "Evaluate the quality of generated audio",
   stt: "Evaluate the output of transcription of an audio",
   llm: "Evaluate the agent's next reply in a conversation",
-  "llm-general": "Evaluate an LLM's output for a given text input",
+  "llm-general": "Evaluate a basic agent's output for a given input",
   conversation: "Evaluate the agent's performance in a whole conversation",
-  "tool-call": "Judge whether the agent called the right tool",
+  "tool-call":
+    "Evaluate whether the agent called the right tools with the right values",
 };
 
 const EVALUATOR_TYPE_COLORS: Record<EvaluatorType, string> = {

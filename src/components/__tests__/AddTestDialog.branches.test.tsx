@@ -368,10 +368,42 @@ describe("AddTestDialog — additional branch coverage", () => {
       await user.click(screen.getByRole("button", { name: "Create" }));
 
       expect(onSubmit).not.toHaveBeenCalled();
-      expect(screen.getByText("Enter a valid integer.")).toBeInTheDocument();
+      expect(screen.getByText("Enter a valid integer")).toBeInTheDocument();
       expect(
-        screen.getByText(/Please complete every highlighted parameter/),
+        screen.queryByText(/Please complete every highlighted parameter/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("says under an empty parameter that it needs completing, and moves to it", async () => {
+      const user = setupUser();
+      const onSubmit = jest.fn();
+      (global as any).fetch = mockFetchImpl([STRUCTURED_TOOL]);
+      render(
+        <ControlledDialog
+          {...baseProps({ initialTab: "tool-invocation", onSubmit })}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Add tool" }));
+      await waitFor(() =>
+        expect(screen.getByText("Pick extract_data")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Pick extract_data"));
+      await user.click(screen.getByRole("button", { name: "+ Add parameter" }));
+      await user.type(screen.getByPlaceholderText("Parameter name"), "count");
+      await user.type(
+        screen.getByPlaceholderText("Your test name"),
+        "Empty value",
+      );
+      await fillHistory(user);
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(
+        screen.getByText("Enter the expected value"),
       ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByPlaceholderText("Expected value")).toHaveFocus(),
+      );
     });
 
     it("changes a custom param type to boolean, then to object (nested container)", async () => {
@@ -640,6 +672,91 @@ describe("AddTestDialog — additional branch coverage", () => {
     });
   });
 
+  it("shows only the body of a webhook call that also carries headers", async () => {
+    (global as any).fetch = mockFetchImpl([WEBHOOK_TOOL]);
+    const initialConfig: TestConfig = {
+      history: [
+        { role: "user", content: "What's the weather?" },
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [
+            {
+              id: "call-1",
+              type: "function",
+              function: {
+                name: "weather_webhook",
+                arguments: JSON.stringify({
+                  body: { units: "metric" },
+                  headers: { k: "v" },
+                }),
+              },
+            },
+          ],
+        },
+        {
+          role: "tool",
+          tool_call_id: "call-1",
+          content: '{"status":"success"}',
+        },
+      ],
+      evaluation: { type: "response" },
+    };
+    render(
+      <AddTestDialog
+        {...baseProps({
+          isEditing: true,
+          initialTab: "next-reply",
+          initialConfig,
+          testName: "Webhook edit",
+        })}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByDisplayValue("metric")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Body")).toBeInTheDocument();
+    expect(screen.queryByText("headers")).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/"k"/)).not.toBeInTheDocument();
+  });
+
+  it("lays out an item's webhook call the same way when its tool is gone", async () => {
+    (global as any).fetch = mockFetchImpl([]);
+    const initialConfig: TestConfig = {
+      history: [
+        { role: "user", content: "What's the weather?" },
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [
+            {
+              id: "actual-call-0",
+              type: "function",
+              function: {
+                name: "deleted_webhook",
+                arguments: JSON.stringify({
+                  body: { units: "metric" },
+                  headers: { k: "v" },
+                }),
+              },
+            },
+          ],
+        },
+      ],
+      evaluation: { type: "response" },
+    };
+    render(
+      <AddTestDialog
+        {...baseProps({ mode: "labelItem", isEditing: true, initialConfig })}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByDisplayValue("metric")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Body")).toBeInTheDocument();
+    expect(screen.queryByText("headers")).not.toBeInTheDocument();
+  });
+
   describe("chat: adding tool-call messages via the in-chat picker", () => {
     it("adds a structured tool call with parameter inputs and a response box", async () => {
       const user = setupUser();
@@ -864,6 +981,71 @@ describe("AddTestDialog — additional branch coverage", () => {
         role: "assistant",
         content: "Agent replies",
       });
+    });
+
+    it("saves an earlier tool call of an item as it was stored", async () => {
+      const user = setupUser();
+      (global as any).fetch = mockFetchImpl([WEATHER_TOOL]);
+      const onSubmit = jest.fn();
+      render(
+        <ControlledDialog
+          {...baseProps({
+            mode: "labelItem",
+            isEditing: true,
+            testName: "Item",
+            onSubmit,
+            initialEvaluators: [
+              {
+                evaluator_uuid: "eval-tone",
+                name: "Tone check",
+                slug: null,
+                variables: [],
+                variable_values: {},
+              },
+            ],
+            setItemDescription: jest.fn(),
+            requireAssistantLastMessage: true,
+            initialConfig: {
+              history: [
+                { role: "user", content: "Weather in Pune?" },
+                {
+                  role: "assistant",
+                  content: "",
+                  tool_calls: [
+                    {
+                      id: "call-1",
+                      type: "function",
+                      function: {
+                        name: "get_weather",
+                        arguments: JSON.stringify({ city: "Pune", days: 3 }),
+                      },
+                    },
+                  ],
+                },
+                { role: "user", content: "Thanks" },
+                { role: "assistant", content: "Welcome" },
+              ],
+              evaluation: { type: "response" },
+            },
+          })}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.getByDisplayValue("Welcome")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: /^(Save|Update)/ }));
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      const [config] = onSubmit.mock.calls[0];
+      const call = config.history.find(
+        (m: { tool_calls?: unknown[] }) => m.tool_calls,
+      );
+      expect(JSON.parse(call.tool_calls[0].function.arguments)).toEqual({
+        city: "Pune",
+        days: 3,
+      });
+      expect(
+        config.history.some((m: { role: string }) => m.role === "tool"),
+      ).toBe(false);
     });
   });
 });

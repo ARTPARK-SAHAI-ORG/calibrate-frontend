@@ -1,23 +1,59 @@
 "use client";
 
 import { useState } from "react";
-import { ChoiceCard } from "@/components/evaluators/evaluatorUseCases";
+import {
+  ChoiceCard,
+  type CardTone,
+} from "@/components/evaluators/evaluatorUseCases";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 
 /** Whether the agent is working with written words or with audio. */
 type Medium = "text" | "voice";
 
 /** Within text, whether there is a conversation behind the answer. */
-type TextKind = "conversation" | "single";
+export type TextKind = "conversation" | "single";
 
 /** The audio kinds, in the order they are offered. */
 const VOICE_KINDS: EvaluatorType[] = ["stt", "tts"];
 
+/** The kinds the last question can offer, once text is chosen. */
+type TextEvaluatorType = "llm" | "conversation" | "llm-general" | "tool-call";
+
 /** The text kinds that sit inside a conversation, in the order offered. */
-const CONVERSATION_KINDS: EvaluatorType[] = ["llm", "conversation"];
+const CONVERSATION_KINDS: TextEvaluatorType[] = ["llm", "conversation"];
 
 /** The one text kind with no conversation behind it. */
-const SINGLE_KIND: EvaluatorType = "llm-general";
+const SINGLE_KIND: TextEvaluatorType = "llm-general";
+
+/** Judges tool calls, so it fits both a conversation and a single response. */
+const TOOL_CALL_KIND: TextEvaluatorType = "tool-call";
+
+/** The last question's cards. The colours differ from every card above them. */
+const FINAL_CARDS: Record<
+  TextEvaluatorType,
+  { title: string; description: string; tone: CardTone }
+> = {
+  llm: {
+    title: "A single reply",
+    description: "Judge an agent's next reply in a conversation",
+    tone: "orange",
+  },
+  conversation: {
+    title: "The whole conversation",
+    description: "Judge the agent's performance in a whole conversation",
+    tone: "pink",
+  },
+  "llm-general": {
+    title: "The output",
+    description: "Judge a basic agent's output for a given input",
+    tone: "orange",
+  },
+  "tool-call": {
+    title: "The tool calls",
+    description: "Check whether the agent made the right tool calls",
+    tone: "blue",
+  },
+};
 
 /**
  * The answers that lead to a kind, so re-opening this step shows what was
@@ -31,7 +67,7 @@ function answersFor(value: EvaluatorType | null): {
     return { medium: "voice", textKind: null };
   }
   if (value === SINGLE_KIND) return { medium: "text", textKind: "single" };
-  if (value && CONVERSATION_KINDS.includes(value)) {
+  if (value === "llm" || value === "conversation" || value === TOOL_CALL_KIND) {
     return { medium: "text", textKind: "conversation" };
   }
   return { medium: null, textKind: null };
@@ -71,8 +107,8 @@ function Question({
  *
  * `allowed` is the kinds the screen may offer. A question with only one
  * possible answer is never asked: that answer is taken as given. So a screen
- * offering all five asks three questions, and one offering a reply in a
- * conversation or a single response asks one.
+ * offering every kind asks text or voice, then up to two more questions, and
+ * one offering a reply in a conversation and the tool calls asks one.
  */
 export function EvaluatorTypeQuestions({
   allowed,
@@ -81,13 +117,21 @@ export function EvaluatorTypeQuestions({
 }: {
   allowed: EvaluatorType[];
   value: EvaluatorType | null;
-  onChange: (value: EvaluatorType | null) => void;
+  /** `textKind` is whether the answer sits in a conversation or a basic
+   *  agent, or null for voice and for nothing chosen yet. */
+  onChange: (value: EvaluatorType | null, textKind: TextKind | null) => void;
 }) {
   const permitted = new Set(allowed);
   const voiceKinds = VOICE_KINDS.filter((k) => permitted.has(k));
   const conversationKinds = CONVERSATION_KINDS.filter((k) => permitted.has(k));
   const hasSingle = permitted.has(SINGLE_KIND);
-  const textPossible = conversationKinds.length > 0 || hasSingle;
+  const hasToolCall = permitted.has(TOOL_CALL_KIND);
+  const textPossible = conversationKinds.length > 0 || hasSingle || hasToolCall;
+  // The answers left once the reader has said what kind of text it is.
+  const finalKinds = (kind: TextKind): TextEvaluatorType[] => [
+    ...(kind === "single" ? [SINGLE_KIND] : conversationKinds),
+    ...(hasToolCall ? [TOOL_CALL_KIND] : []),
+  ];
 
   // With only one medium on offer there is nothing to ask, so it is taken as
   // given and the first question on screen is the one below it.
@@ -115,16 +159,28 @@ export function EvaluatorTypeQuestions({
     setChosen({ medium: next, textKind: null });
     // One ending down this branch means the question under it would have a
     // single answer, so take it rather than asking.
-    if (next === "voice" && voiceKinds.length === 1) onChange(voiceKinds[0]);
-    else onChange(null);
+    if (next === "voice" && voiceKinds.length === 1)
+      onChange(voiceKinds[0], null);
+    else if (
+      next === "text" &&
+      forcedTextKind &&
+      finalKinds(forcedTextKind).length === 1
+    )
+      onChange(finalKinds(forcedTextKind)[0], forcedTextKind);
+    else onChange(null, null);
   };
 
   const chooseTextKind = (next: TextKind) => {
     if (next === textKind) return;
     setChosen({ medium: "text", textKind: next });
-    if (next === "single") onChange(SINGLE_KIND);
-    else if (conversationKinds.length === 1) onChange(conversationKinds[0]);
-    else onChange(null);
+    // The tool calls are offered under both kinds of text, so that choice
+    // stays when the reader moves between them.
+    if (value === TOOL_CALL_KIND) {
+      onChange(TOOL_CALL_KIND, next);
+      return;
+    }
+    const kinds = finalKinds(next);
+    onChange(kinds.length === 1 ? kinds[0] : null, next);
   };
 
   return (
@@ -158,7 +214,7 @@ export function EvaluatorTypeQuestions({
             tone="blue"
             selected={value === "stt"}
             dimmed={value === "tts"}
-            onSelect={() => onChange("stt")}
+            onSelect={() => onChange("stt", null)}
           />
           <ChoiceCard
             title="Text to Speech"
@@ -166,7 +222,7 @@ export function EvaluatorTypeQuestions({
             tone="purple"
             selected={value === "tts"}
             dimmed={value === "stt"}
-            onSelect={() => onChange("tts")}
+            onSelect={() => onChange("tts", null)}
           />
         </Question>
       )}
@@ -194,24 +250,22 @@ export function EvaluatorTypeQuestions({
         </Question>
       )}
 
-      {textKind === "conversation" && conversationKinds.length > 1 && (
+      {textKind && finalKinds(textKind).length > 1 && (
         <Question>
-          <ChoiceCard
-            title="A single reply"
-            description="Judge an agent's next reply in a conversation"
-            tone="orange"
-            selected={value === "llm"}
-            dimmed={value === "conversation"}
-            onSelect={() => onChange("llm")}
-          />
-          <ChoiceCard
-            title="The whole conversation"
-            description="Judge the agent's performance in a whole conversation"
-            tone="pink"
-            selected={value === "conversation"}
-            dimmed={value === "llm"}
-            onSelect={() => onChange("conversation")}
-          />
+          {finalKinds(textKind).map((kind) => {
+            const card = FINAL_CARDS[kind];
+            return (
+              <ChoiceCard
+                key={kind}
+                title={card.title}
+                description={card.description}
+                tone={card.tone}
+                selected={value === kind}
+                dimmed={value !== null && value !== kind}
+                onSelect={() => onChange(kind, textKind)}
+              />
+            );
+          })}
         </Question>
       )}
     </div>

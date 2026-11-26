@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/lib/nav";
 import { apiClient, unwrapList } from "@/lib/api";
 import { reportError } from "@/lib/reportError";
+import { isToolCallOutput, type TraceOutputFacts } from "@/lib/traceScoring";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import type { TestCaseResult } from "@/components/TestRunnerDialog";
 import type { BenchmarkModelResult } from "@/components/eval-details";
@@ -167,25 +168,6 @@ export function targetTaskTypeForSource(
     default:
       return "llm";
   }
-}
-
-/** The only two things about a trace's output that decide how it is labelled.
- * The traces list has them as a preview and a count, this dialog has them as
- * the fetched output; both boil down to the same pair. */
-export type TraceOutputFacts = {
-  hasResponse: boolean;
-  hasToolCalls: boolean;
-};
-
-/** True when the output is a tool call and nothing else. Such a trace is built
- * as a tool-call item (a person marks it correct or wrong) rather than a
- * response item. A trace that also replied is a response item, and its call
- * rides along in the conversation. */
-export function isToolCallOutput({
-  hasResponse,
-  hasToolCalls,
-}: TraceOutputFacts): boolean {
-  return !hasResponse && hasToolCalls;
 }
 
 /** Whether a trace can be labelled at all. It can if it either replied or
@@ -398,7 +380,7 @@ export function isToolCallTest(raw: RawTestCaseLike): boolean {
 /** Tests that can be added to LLM labelling tasks: a conversation agent's
  * next-reply test (`response`) and a basic agent's test
  * (`general`) both become a response item scored by the evaluators; a
- * tool-call test becomes a tool-call item a person marks correct or wrong. */
+ * tool-call test becomes a tool-call item judged by tool-call evaluators. */
 export function isLabellingEligibleRaw(raw: RawTestCaseLike): boolean {
   const type = raw.test_case?.evaluation?.type;
   return type === "response" || type === "general" || type === "tool_call";
@@ -406,7 +388,7 @@ export function isLabellingEligibleRaw(raw: RawTestCaseLike): boolean {
 
 // Build a tool-call item — a normal item inside an `llm` or `llm-general`
 // task, carrying the expected match spec and the tool calls the agent actually
-// made. A person marks it correct or wrong; AI judges skip it.
+// made. Only tool-call evaluators judge it.
 // `actual_tool_calls` is what marks the item as a tool-call one.
 function buildToolCallItem(
   raw: RawTestCaseLike,
@@ -596,7 +578,7 @@ export function buildItemsFromSource(
           : source.benchmarkUuid.slice(0, 8);
       // Response and tool-call tests both become items in the task: a
       // response test → a response item scored by the evaluators, a tool-call
-      // test → a tool-call item a person marks correct or wrong.
+      // test → a tool-call item judged by tool-call evaluators.
       // The run names the version each evaluator ran at once, at the top
       // level, not on every verdict, so build the lookup once here.
       const versionByEvaluator: Record<string, number> = {};

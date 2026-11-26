@@ -223,7 +223,7 @@ function renderDialog(
 }
 
 describe("AddLlmGeneralItemsDialog tool-call output", () => {
-  it("shows the tool call under Output instead of an empty box", () => {
+  it("shows the tool call under Output beside the output box", () => {
     renderDialog({
       mode: "edit",
       initialRows: [
@@ -239,8 +239,8 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     expect(screen.getByText("dummy")).toBeInTheDocument();
     expect(screen.getByText("success")).toBeInTheDocument();
     expect(
-      screen.queryByPlaceholderText("The output the LLM produced"),
-    ).not.toBeInTheDocument();
+      screen.getByPlaceholderText("The output the LLM produced"),
+    ).toBeInTheDocument();
   });
 
   it("saves an edited argument value, with true kept as a yes/no", async () => {
@@ -264,6 +264,34 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
       { tool: "dummy", arguments: { success: false } },
+    ]);
+  });
+
+  it("keeps what a stored tool call returned when the item is saved", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [
+            {
+              tool: "dummy",
+              arguments: { success: true },
+              output: { status: "ok" },
+            },
+          ],
+        },
+      ],
+    });
+    await user.type(screen.getByDisplayValue("Item one"), " renamed");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "dummy", arguments: { success: true }, output: { status: "ok" } },
     ]);
   });
 
@@ -325,6 +353,185 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     expect(screen.getByRole("button", { name: "Save item" })).toBeEnabled();
   });
 
+  const replyEvaluator: LlmGeneralEvaluatorDef = {
+    uuid: "ev-reply",
+    name: "Correctness",
+    evaluator_type: "llm-general",
+    variables: [
+      { name: "criteria", description: "The criteria" },
+      { name: "extra", description: "The extra" },
+    ],
+  };
+  const toolCallEvaluator: LlmGeneralEvaluatorDef = {
+    uuid: "ev-tool",
+    name: "Tool call correctness",
+    evaluator_type: "tool-call",
+    variables: [{ name: "rule", description: "The rule" }],
+  };
+
+  it("says Tool call correctness joins the task on save when the task has no tool call evaluator", () => {
+    renderDialog({
+      mode: "edit",
+      evaluators: [replyEvaluator],
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    expect(
+      screen.getByText("Added to this task when you save this item"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
+  });
+
+  it("saves a tool-call item without asking for, or dropping, the values of evaluators that skip it", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn().mockResolvedValue(undefined);
+    renderDialog({
+      mode: "edit",
+      onSubmit,
+      evaluators: [replyEvaluator, toolCallEvaluator],
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+          varValues: {
+            "ev-reply": { criteria: "Old rule" },
+            "ev-tool": { rule: "Right tool" },
+          },
+        },
+      ],
+    });
+    expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("The criteria")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0][0].evaluator_variables).toEqual({
+      "ev-reply": { criteria: "Old rule" },
+      "ev-tool": { rule: "Right tool" },
+    });
+  });
+
+  it("saves nothing for an evaluator that skips the item and has no stored values", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn().mockResolvedValue(undefined);
+    renderDialog({
+      mode: "edit",
+      onSubmit,
+      evaluators: [replyEvaluator, toolCallEvaluator],
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+          varValues: { "ev-tool": { rule: "Right tool" } },
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0][0].evaluator_variables).toEqual({
+      "ev-tool": { rule: "Right tool" },
+    });
+  });
+
+  it("treats an item that stores an empty tool call list as a tool-call item", () => {
+    renderDialog({
+      mode: "edit",
+      storesEmptyToolCallList: true,
+      evaluators: [replyEvaluator, toolCallEvaluator],
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Sunny",
+          varValues: { "ev-tool": { rule: "Right tool" } },
+        },
+      ],
+    });
+    expect(screen.queryByText("Correctness")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save item" })).toBeEnabled();
+  });
+
+  it("saves an item that stores an empty tool call list and has no answer", () => {
+    renderDialog({
+      mode: "edit",
+      storesEmptyToolCallList: true,
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "", toolCalls: [] },
+      ],
+    });
+    expect(screen.getByRole("button", { name: "Save item" })).toBeEnabled();
+  });
+
+  it("saves an item with only expected tool calls and no answer", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          expectedToolCalls: [{ tool: "book_flight", arguments: { city: "Pune" } }],
+        },
+      ],
+    });
+    const save = screen.getByRole("button", { name: "Save item" });
+    expect(save).toBeEnabled();
+    await user.click(save);
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+  });
+
+  it("saves an edited number argument as a number", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { months: 7, note: null } }],
+        },
+      ],
+    });
+    expect(screen.getByLabelText("note")).toHaveValue("null");
+    await user.clear(screen.getByLabelText("months"));
+    await user.type(screen.getByLabelText("months"), "8");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "dummy", arguments: { months: 8, note: null } },
+    ]);
+  });
+
+  it("still asks for a reply item's values and skips the tool call evaluator", () => {
+    renderDialog({
+      mode: "edit",
+      evaluators: [replyEvaluator, toolCallEvaluator],
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Sunny" },
+      ],
+    });
+    expect(screen.queryByText("Tool call correctness")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("The criteria")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save item" })).toBeDisabled();
+  });
+
   it("adds a second tool call from the picker and sends both", async () => {
     const user = setupUser();
     const { onSubmit } = renderDialog({
@@ -348,6 +555,296 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
       { tool: "dummy", arguments: { success: true } },
       { tool: "book_flight", arguments: { city: "Bengaluru" } },
     ]);
+  });
+
+  const BOOK_FLIGHT = {
+    uuid: "t-bf",
+    name: "book_flight",
+    config: {
+      parameters: {
+        properties: { city: { type: "string" } },
+        required: ["city"],
+      },
+    },
+  };
+  const withTools = () => {
+    accessTokenMock.mockReturnValue("tok-123");
+    process.env.NEXT_PUBLIC_BACKEND_URL = "http://backend.test";
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [BOOK_FLIGHT],
+    }) as unknown as typeof fetch;
+  };
+  const expectedSection = () =>
+    screen.getByText("Expected tool calls").closest(".relative") as HTMLElement;
+
+  it("keeps digits typed into a tool call's text input as text", async () => {
+    withTools();
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "", toolCalls: [] },
+      ],
+    });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(screen.getByRole("button", { name: "Pick book_flight" }));
+    await user.type(screen.getByLabelText("city"), "560001");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "book_flight", arguments: { city: "560001" } },
+    ]);
+  });
+
+  it("saves expected tool calls apart from the agent's own", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    await user.click(
+      within(expectedSection()).getByRole("button", { name: "Add tool" }),
+    );
+    await user.click(
+      within(expectedSection()).getByRole("button", { name: "Pick book_flight" }),
+    );
+    await user.click(
+      within(expectedSection()).getByRole("button", { name: "+ Add parameter" }),
+    );
+    await user.type(screen.getByPlaceholderText("Parameter name"), "city");
+    await user.type(screen.getByPlaceholderText("Expected value"), "Pune");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    const row = onSubmit.mock.calls[0][0][0];
+    expect(row.output).toBe("Hello");
+    expect(row.toolCalls).toEqual([]);
+    expect(row.expectedToolCalls).toEqual([
+      {
+        tool: "book_flight",
+        arguments: { city: { match_type: "exact", value: "Pune" } },
+        accept_any_arguments: false,
+      },
+    ]);
+  });
+
+  it("saves an expected tool call that accepts any values", async () => {
+    withTools();
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: [
+            {
+              tool: "book_flight",
+              arguments: { city: { match_type: "exact", value: "Pune" } },
+              accept_any_arguments: false,
+            },
+          ],
+        },
+      ],
+    });
+    const label = await screen.findByText(
+      "Accept any values for the parameters",
+    );
+    expect(screen.getByDisplayValue("Pune")).toBeInTheDocument();
+    await user.click(label.previousElementSibling as HTMLElement);
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].expectedToolCalls).toEqual([
+      { tool: "book_flight", arguments: {}, accept_any_arguments: true },
+    ]);
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("loads expected tool calls back on edit and saves them unchanged", async () => {
+    withTools();
+    const user = setupUser();
+    const saved = [
+      {
+        tool: "book_flight",
+        arguments: { city: { match_type: "llm_judge", criteria: "A city in India" } },
+        accept_any_arguments: false,
+      },
+    ];
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+          expectedToolCalls: saved,
+        },
+      ],
+    });
+    expect(await screen.findByDisplayValue("A city in India")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].expectedToolCalls).toEqual(saved);
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "dummy", arguments: { success: true } },
+    ]);
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("does not save while an edited expected parameter is left empty", async () => {
+    withTools();
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: [
+            { tool: "book_flight", arguments: { city: "Pune" }, accept_any_arguments: false },
+          ],
+        },
+      ],
+    });
+    await screen.findByText("Accept any values for the parameters");
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.clear(screen.getByDisplayValue("Pune"));
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    expect(
+      await screen.findByText(
+        "Complete every highlighted parameter in Expected tool calls.",
+      ),
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("saves an expected call that leaves out a required input as it was", async () => {
+    withTools();
+    const user = setupUser();
+    const stored = [
+      { tool: "book_flight", arguments: {}, accept_any_arguments: false },
+    ];
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: stored,
+        },
+      ],
+    });
+    await screen.findByText("Accept any values for the parameters");
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].expectedToolCalls).toEqual(stored);
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("adds a newly created tool to the expected tool calls when made from there", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    await user.click(
+      screen.getByRole("button", { name: "Create tool for expected tool calls" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Finish creating tool" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    const row = onSubmit.mock.calls[0][0][0];
+    expect(row.toolCalls).toEqual([]);
+    expect(row.expectedToolCalls).toEqual([
+      { tool: "book_flight", arguments: {}, accept_any_arguments: false },
+    ]);
+  });
+
+  it("saves the agent's stored tool call exactly when it was not changed", async () => {
+    const user = setupUser();
+    const stored = [
+      {
+        tool: "dummy",
+        arguments: { seats: 3, ok: false, route: { from: "BLR" }, note: null, city: "Pune" },
+      },
+    ];
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "", toolCalls: stored },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual(stored);
+  });
+
+  it("matches a kept tool call to its own stored call after an earlier one is removed", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [
+            { tool: "dummy", arguments: { n: "7" } },
+            { tool: "dummy", arguments: { n: 7 } },
+          ],
+        },
+      ],
+    });
+    await user.click(screen.getAllByRole("button", { name: "Remove dummy" })[0]);
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
+      { tool: "dummy", arguments: { n: 7 } },
+    ]);
+  });
+
+  it("opens again with the expected tool calls' JSON view closed", async () => {
+    const user = setupUser();
+    const props = {
+      onClose: jest.fn(),
+      onSubmit: jest.fn(),
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: [{ tool: "book_flight", arguments: { city: "Pune" } }],
+        },
+      ],
+    };
+    const { rerender } = render(<AddLlmGeneralItemsDialog isOpen {...props} />);
+    await user.click(
+      within(expectedSection()).getByRole("button", { name: "JSON" }),
+    );
+    expect(screen.getByDisplayValue(/"city"/)).toBeInTheDocument();
+    rerender(<AddLlmGeneralItemsDialog isOpen={false} {...props} />);
+    rerender(<AddLlmGeneralItemsDialog isOpen {...props} />);
+    expect(screen.queryByDisplayValue(/"city"/)).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue("Pune")).toBeInTheDocument();
   });
 
   it("keeps the tool list open on Escape pressed inside the tool side panel", async () => {
@@ -414,7 +911,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     ]);
   });
 
-  it("keeps a phone number as text and only converts true, false and null", async () => {
+  it("keeps text typed into a stored text value as text", async () => {
     const user = setupUser();
     const { onSubmit } = renderDialog({
       mode: "edit",
@@ -427,7 +924,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
           toolCalls: [
             {
               tool: "dummy",
-              arguments: { phone: "", success: true, note: "" },
+              arguments: { phone: "", success: true, note: "", flag: "true" },
             },
           ],
         },
@@ -440,7 +937,12 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
       {
         tool: "dummy",
-        arguments: { phone: "9876543210", success: true, note: null },
+        arguments: {
+          phone: "9876543210",
+          success: true,
+          note: "null",
+          flag: "true",
+        },
       },
     ]);
   });
@@ -621,6 +1123,26 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     ]);
   });
 
+  it("shows only the body of a call that also carries headers, and saves the headers", async () => {
+    const user = setupUser();
+    const stored = [
+      { tool: "dummy", arguments: { body: { note: "hi" }, headers: { k: "v" } } },
+    ];
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "", toolCalls: stored },
+      ],
+    });
+    expect(screen.getByText("Body")).toBeInTheDocument();
+    expect(screen.getByLabelText("note")).toHaveValue("hi");
+    expect(screen.queryByLabelText("headers")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual(stored);
+  });
+
   it("gives a webhook tool call the tool's new inputs when the tool is saved", async () => {
     const user = setupUser();
     const { onSubmit } = renderDialog({
@@ -679,7 +1201,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     await user.click(screen.getByRole("button", { name: "Save item" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0][0].toolCalls).toEqual([
-      { tool: "send_email", arguments: { body: '{"to":"a"}' } },
+      { tool: "send_email", arguments: { body: { to: "a" } } },
     ]);
   });
 
@@ -823,6 +1345,7 @@ describe("AddLlmGeneralItemsDialog", () => {
         inputExtras: {},
         outputExtras: {},
         toolCalls: [],
+        expectedToolCalls: [],
         evaluator_variables: { "ev-1": { topic: "sports", tone: "neutral" } },
         metadata: [],
       },
@@ -1327,7 +1850,7 @@ describe("AddLlmGeneralItemsDialog headings and versions", () => {
     expect(save).toBeDisabled();
   });
 
-  it("sends no output versions when the answer is a tool call", async () => {
+  it("sends no output versions when the output is empty", async () => {
     const user = setupUser();
     const onSubmit = jest.fn().mockResolvedValue(undefined);
     renderDialog({
@@ -1341,10 +1864,39 @@ describe("AddLlmGeneralItemsDialog headings and versions", () => {
       ],
       onSubmit,
     });
-    expect(screen.queryByLabelText("Heading for the output")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save item" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0][0].outputExtras).toEqual({});
+  });
+
+  it("keeps the output's versions when the item also has a tool call", async () => {
+    const user = setupUser();
+    const onSubmit = jest.fn().mockResolvedValue(undefined);
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          ...versioned,
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+      onSubmit,
+    });
+    expect(screen.getByDisplayValue("A summary")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].outputExtras).toEqual(
+      versioned.outputExtras,
+    );
+  });
+
+  it("turns off the output heading while the output is blank", async () => {
+    const user = setupUser();
+    renderDialog({ mode: "add" });
+    const heading = screen.getByRole("textbox", { name: "Heading for the output" });
+    expect(heading).toBeDisabled();
+    await user.type(screen.getByPlaceholderText("The output the LLM produced"), "Booked");
+    expect(heading).toBeEnabled();
   });
 
   it("does not step to another item while the remove question is up", async () => {

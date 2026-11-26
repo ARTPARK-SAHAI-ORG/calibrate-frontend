@@ -24,8 +24,8 @@ import {
   type BinaryScaleRow,
 } from "@/components/evaluators/BinaryScaleEditor";
 import { UseCasePickerDialog } from "@/components/evaluators/UseCasePickerDialog";
+import type { TextKind } from "@/components/evaluators/EvaluatorTypeQuestions";
 import { EVALUATOR_USE_CASE_OPTIONS } from "@/components/evaluators/evaluatorUseCases";
-import type { EvaluatorUseCaseOption } from "@/components/evaluators/evaluatorUseCases";
 import { defaultBinaryLabel } from "@/lib/binaryLabels";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
 import {
@@ -82,9 +82,7 @@ type CreateEvaluatorFlowProps = {
   existingEvaluators: Pick<EvaluatorData, "name">[];
   /** Called with the created evaluator after a successful POST. */
   onCreated: (evaluator: EvaluatorData) => void;
-  /** Limit the use-case picker to these groups (e.g. conversation-only on agent detail). */
-  useCaseGroups?: EvaluatorUseCaseOption["group"][];
-  /** Further narrow the picker to specific evaluator types (e.g. `llm` on next-reply tests). */
+  /** Limit the picker to these evaluator types (e.g. `llm` on next-reply tests). */
   useCaseTypes?: EvaluatorType[];
   /** Open the form already filled in from this evaluator, as a copy of it. */
   duplicateOf?: EvaluatorDetail | null;
@@ -101,7 +99,6 @@ export function CreateEvaluatorFlow({
   onClose,
   existingEvaluators,
   onCreated,
-  useCaseGroups,
   useCaseTypes,
   duplicateOf,
 }: CreateEvaluatorFlowProps) {
@@ -141,17 +138,11 @@ export function CreateEvaluatorFlow({
     useState<BinaryScaleRow[]>(defaultBinaryScale());
 
   const useCaseOptions = useMemo(() => {
-    let options = useCaseGroups
-      ? EVALUATOR_USE_CASE_OPTIONS.filter((option) =>
-          useCaseGroups.includes(option.group),
-        )
-      : EVALUATOR_USE_CASE_OPTIONS;
-    if (useCaseTypes && useCaseTypes.length > 0) {
-      const allowed = new Set(useCaseTypes);
-      options = options.filter((option) => allowed.has(option.value));
-    }
-    return options;
-  }, [useCaseGroups, useCaseTypes]);
+    if (!useCaseTypes || useCaseTypes.length === 0)
+      return EVALUATOR_USE_CASE_OPTIONS;
+    const allowed = new Set(useCaseTypes);
+    return EVALUATOR_USE_CASE_OPTIONS.filter((option) => allowed.has(option));
+  }, [useCaseTypes]);
 
   // The only use case on offer, when the caller left just one.
   const onlyUseCase = useCaseOptions.length === 1 ? useCaseOptions[0] : null;
@@ -220,11 +211,11 @@ export function CreateEvaluatorFlow({
       // With one use case to choose from there is nothing to ask: go straight
       // to the form with that purpose already set.
       if (onlyUseCase) {
-        setNewEvaluatorType(onlyUseCase.value);
-        setEvaluatorName(suggestedName(onlyUseCase.value));
+        setNewEvaluatorType(onlyUseCase);
+        setEvaluatorName(suggestedName(onlyUseCase));
         setUseCasePickerOpen(false);
         setSidebarOpen(true);
-        void prefillDefaultPrompt(onlyUseCase.value);
+        void prefillDefaultPrompt(onlyUseCase);
       } else {
         setUseCasePickerOpen(true);
         setSidebarOpen(false);
@@ -235,7 +226,7 @@ export function CreateEvaluatorFlow({
       setLlmModalOpen(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, onlyUseCase?.value, duplicateOf]);
+  }, [open, onlyUseCase, duplicateOf]);
 
   // The name from the model list, once it has loaded.
   const judgeModel =
@@ -245,10 +236,14 @@ export function CreateEvaluatorFlow({
   // Lets a create that the name blocked put the cursor back on the box.
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  const suggestedName = (type: EvaluatorType): string =>
+  const suggestedName = (
+    type: EvaluatorType,
+    textKind: TextKind | null = null,
+  ): string =>
     defaultEvaluatorName(
       type,
       existingEvaluators.map((e) => e.name),
+      textKind,
     );
 
   const isNameDuplicate = (name: string): boolean => {
@@ -507,10 +502,10 @@ export function CreateEvaluatorFlow({
             // Cancelling the picker with no sidebar behind it closes the flow.
             if (!sidebarOpen) onClose();
           }}
-          onSelect={(value) => {
+          onSelect={(value, textKind) => {
             const prevType = newEvaluatorType;
             setNewEvaluatorType(value);
-            setEvaluatorName(suggestedName(value));
+            setEvaluatorName(suggestedName(value, textKind));
             setUseCasePickerOpen(false);
             setSidebarOpen(true);
             if (prevType !== value) {
