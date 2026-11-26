@@ -3,12 +3,16 @@
 import { useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
-import { EvaluatorTypeQuestions } from "@/components/evaluators/EvaluatorTypeQuestions";
+import {
+  EvaluatorTypeQuestions,
+  type TextKind,
+} from "@/components/evaluators/EvaluatorTypeQuestions";
+
 type UseCasePickerDialogProps = {
   initialValue: EvaluatorType | null;
   options: EvaluatorType[];
   onCancel: () => void;
-  onSelect: (value: EvaluatorType) => void;
+  onSelect: (value: EvaluatorType, textKind: TextKind | null) => void;
 };
 
 export function UseCasePickerDialog({
@@ -19,6 +23,7 @@ export function UseCasePickerDialog({
 }: UseCasePickerDialogProps) {
   useHideFloatingButton(true);
   const [selected, setSelected] = useState<EvaluatorType | null>(initialValue);
+  const [textKind, setTextKind] = useState<TextKind | null>(null);
 
   return (
     <div
@@ -63,7 +68,10 @@ export function UseCasePickerDialog({
           <EvaluatorTypeQuestions
             allowed={options}
             value={selected}
-            onChange={setSelected}
+            onChange={(value, kind) => {
+              setSelected(value);
+              setTextKind(kind);
+            }}
           />
         </div>
 
@@ -76,7 +84,7 @@ export function UseCasePickerDialog({
           </button>
           <button
             onClick={() => {
-              if (selected) onSelect(selected);
+              if (selected) onSelect(selected, textKind);
             }}
             disabled={!selected}
             className="h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"

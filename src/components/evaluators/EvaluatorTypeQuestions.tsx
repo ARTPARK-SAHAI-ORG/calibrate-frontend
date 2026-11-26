@@ -11,7 +11,7 @@ import type { EvaluatorType } from "@/components/EvaluatorPills";
 type Medium = "text" | "voice";
 
 /** Within text, whether there is a conversation behind the answer. */
-type TextKind = "conversation" | "single";
+export type TextKind = "conversation" | "single";
 
 /** The audio kinds, in the order they are offered. */
 const VOICE_KINDS: EvaluatorType[] = ["stt", "tts"];
@@ -117,7 +117,9 @@ export function EvaluatorTypeQuestions({
 }: {
   allowed: EvaluatorType[];
   value: EvaluatorType | null;
-  onChange: (value: EvaluatorType | null) => void;
+  /** `textKind` is whether the answer sits in a conversation or a basic
+   *  agent, or null for voice and for nothing chosen yet. */
+  onChange: (value: EvaluatorType | null, textKind: TextKind | null) => void;
 }) {
   const permitted = new Set(allowed);
   const voiceKinds = VOICE_KINDS.filter((k) => permitted.has(k));
@@ -157,14 +159,15 @@ export function EvaluatorTypeQuestions({
     setChosen({ medium: next, textKind: null });
     // One ending down this branch means the question under it would have a
     // single answer, so take it rather than asking.
-    if (next === "voice" && voiceKinds.length === 1) onChange(voiceKinds[0]);
+    if (next === "voice" && voiceKinds.length === 1)
+      onChange(voiceKinds[0], null);
     else if (
       next === "text" &&
       forcedTextKind &&
       finalKinds(forcedTextKind).length === 1
     )
-      onChange(finalKinds(forcedTextKind)[0]);
-    else onChange(null);
+      onChange(finalKinds(forcedTextKind)[0], forcedTextKind);
+    else onChange(null, null);
   };
 
   const chooseTextKind = (next: TextKind) => {
@@ -172,9 +175,12 @@ export function EvaluatorTypeQuestions({
     setChosen({ medium: "text", textKind: next });
     // The tool calls are offered under both kinds of text, so that choice
     // stays when the reader moves between them.
-    if (value === TOOL_CALL_KIND) return;
+    if (value === TOOL_CALL_KIND) {
+      onChange(TOOL_CALL_KIND, next);
+      return;
+    }
     const kinds = finalKinds(next);
-    onChange(kinds.length === 1 ? kinds[0] : null);
+    onChange(kinds.length === 1 ? kinds[0] : null, next);
   };
 
   return (
@@ -208,7 +214,7 @@ export function EvaluatorTypeQuestions({
             tone="blue"
             selected={value === "stt"}
             dimmed={value === "tts"}
-            onSelect={() => onChange("stt")}
+            onSelect={() => onChange("stt", null)}
           />
           <ChoiceCard
             title="Text to Speech"
@@ -216,7 +222,7 @@ export function EvaluatorTypeQuestions({
             tone="purple"
             selected={value === "tts"}
             dimmed={value === "stt"}
-            onSelect={() => onChange("tts")}
+            onSelect={() => onChange("tts", null)}
           />
         </Question>
       )}
@@ -256,7 +262,7 @@ export function EvaluatorTypeQuestions({
                 tone={card.tone}
                 selected={value === kind}
                 dimmed={value !== null && value !== kind}
-                onSelect={() => onChange(kind)}
+                onSelect={() => onChange(kind, textKind)}
               />
             );
           })}

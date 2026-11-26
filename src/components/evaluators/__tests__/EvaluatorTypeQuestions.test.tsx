@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { render, screen, setupUser } from "@/test-utils";
-import { EvaluatorTypeQuestions } from "../EvaluatorTypeQuestions";
+import { EvaluatorTypeQuestions, type TextKind } from "../EvaluatorTypeQuestions";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 
 const ALL: EvaluatorType[] = [
@@ -20,22 +20,26 @@ function Harness({
   onChange?: (value: EvaluatorType | null) => void;
 }) {
   const [value, setValue] = useState<EvaluatorType | null>(null);
+  const [textKind, setTextKind] = useState<TextKind | null>(null);
   return (
     <>
       <EvaluatorTypeQuestions
         allowed={allowed}
         value={value}
-        onChange={(next) => {
+        onChange={(next, kind) => {
           setValue(next);
+          setTextKind(kind);
           onChange?.(next);
         }}
       />
       <div data-testid="chosen">{value ?? "none"}</div>
+      <div data-testid="text-kind">{textKind ?? "none"}</div>
     </>
   );
 }
 
 const chosen = () => screen.getByTestId("chosen").textContent;
+const textKind = () => screen.getByTestId("text-kind").textContent;
 
 describe("EvaluatorTypeQuestions", () => {
   it("asks nothing below a question until it is answered", () => {
@@ -187,10 +191,13 @@ describe("EvaluatorTypeQuestions", () => {
     expect(screen.getByText("The whole conversation")).toBeInTheDocument();
     await user.click(screen.getByText("The tool calls"));
     expect(chosen()).toBe("tool-call");
+    expect(textKind()).toBe("conversation");
 
-    // The tool calls are offered under Basic too, so the choice stays.
+    // The tool calls are offered under Basic too, so the choice stays, and
+    // the agent kind it belongs to follows the answer.
     await user.click(screen.getByText("Basic"));
     expect(chosen()).toBe("tool-call");
+    expect(textKind()).toBe("single");
     await user.click(screen.getByText("The output"));
     expect(chosen()).toBe("llm-general");
 
@@ -206,5 +213,21 @@ describe("EvaluatorTypeQuestions", () => {
     render(<Harness allowed={["tool-call", "stt"]} />);
     await user.click(screen.getByText("Text"));
     expect(chosen()).toBe("tool-call");
+    expect(textKind()).toBe("conversation");
+  });
+
+  it("reports no agent kind for a voice answer", async () => {
+    const user = setupUser();
+    render(<Harness />);
+    await user.click(screen.getByText("Voice"));
+    await user.click(screen.getByText("Speech to Text"));
+    expect(textKind()).toBe("none");
+  });
+
+  it("reports the agent kind that was taken as given when it was not asked", async () => {
+    const user = setupUser();
+    render(<Harness allowed={["llm-general", "tool-call"]} />);
+    await user.click(screen.getByText("The tool calls"));
+    expect(textKind()).toBe("single");
   });
 });

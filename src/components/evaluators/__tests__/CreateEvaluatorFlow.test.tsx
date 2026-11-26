@@ -178,11 +178,6 @@ describe("CreateEvaluatorFlow", () => {
     ).not.toBeInTheDocument();
     expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
 
-    // Nothing is created until the reader names it.
-    await user.click(screen.getByText("Submit create"));
-    expect(onCreated).not.toHaveBeenCalled();
-
-    await user.type(screen.getByLabelText("Name"), "Refund policy");
     await user.click(screen.getByText("Submit create"));
 
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
@@ -220,6 +215,7 @@ describe("CreateEvaluatorFlow", () => {
       ),
     ).toBe(true);
 
+    await user.clear(screen.getByLabelText("Name"));
     await user.type(screen.getByLabelText("Name"), "Right tool");
     await user.click(screen.getByText("Submit create"));
 
@@ -284,25 +280,75 @@ describe("CreateEvaluatorFlow", () => {
     expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
   });
 
-  it("leaves the name empty for the reader to fill in", async () => {
+  it("opens with a name that says what the evaluator judges, numbered past names already taken", async () => {
+    render(
+      <CreateEvaluatorFlow
+        open
+        onClose={jest.fn()}
+        existingEvaluators={[{ name: "New conversation reply evaluator" }]}
+        onCreated={jest.fn()}
+        useCaseTypes={["llm"]}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("prompt-field")).toHaveTextContent(
+        "Judge the reply",
+      ),
+    );
+    // The name the backend suggests is not used.
+    expect(screen.getByLabelText("Name")).toHaveValue(
+      "New conversation reply evaluator 2",
+    );
+  });
+
+  it.each([
+    ["Conversation", "New conversation tool call evaluator"],
+    ["Basic", "New basic tool call evaluator"],
+  ])(
+    "names a tool call evaluator after the %s answer, and posts that name",
+    async (agentKind, expected) => {
+      const user = setupUser();
+      render(
+        <CreateEvaluatorFlow
+          open
+          onClose={jest.fn()}
+          existingEvaluators={[]}
+          onCreated={jest.fn()}
+        />,
+      );
+
+      await user.click(screen.getByText("Text"));
+      await user.click(screen.getByText(agentKind));
+      await user.click(screen.getByText("The tool calls"));
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+      expect(await screen.findByLabelText("Name")).toHaveValue(expected);
+
+      await user.click(screen.getByText("Submit create"));
+      const fetchMock = global.fetch as jest.Mock;
+      await waitFor(() => {
+        const post = fetchMock.mock.calls.find(
+          ([url, init]) =>
+            String(url).endsWith("/evaluators") && init?.method === "POST",
+        );
+        expect(JSON.parse(post![1].body as string).name).toBe(expected);
+      });
+    },
+  );
+
+  it("keeps a tool call evaluator's name plain when the agent kind was never asked", async () => {
     render(
       <CreateEvaluatorFlow
         open
         onClose={jest.fn()}
         existingEvaluators={[]}
         onCreated={jest.fn()}
-        useCaseTypes={["llm"]}
+        useCaseTypes={["tool-call"]}
       />,
     );
-
-    // The judge prompt is still filled in from the default for this use case.
-    await waitFor(() =>
-      expect(screen.getByTestId("prompt-field")).toHaveTextContent(
-        "Judge the reply",
-      ),
+    expect(await screen.findByLabelText("Name")).toHaveValue(
+      "New tool call evaluator",
     );
-    // The name the backend suggests is not put in the box.
-    expect(screen.getByLabelText("Name")).toHaveValue("");
   });
 
   it("says the name is needed and puts the cursor back on the box", async () => {
@@ -320,6 +366,7 @@ describe("CreateEvaluatorFlow", () => {
     );
 
     expect(await screen.findByTestId("create-sidebar")).toBeInTheDocument();
+    await user.clear(screen.getByLabelText("Name"));
     await user.click(screen.getByText("Submit create"));
 
     expect(await screen.findByText("Name is required")).toBeInTheDocument();
