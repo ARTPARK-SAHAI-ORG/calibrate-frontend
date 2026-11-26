@@ -100,8 +100,9 @@ describe("ManageEvaluatorsDialog", () => {
     mockApiClient.mockResolvedValue({ items: EVALUATORS });
   });
 
-  it("keeps the last tool call evaluator on the task, and frees it once another is ticked", async () => {
+  it("refuses to save a task with tool call items and no tool call evaluator, and says so", async () => {
     const user = setupUser();
+    const onSaved = jest.fn();
     mockApiClient.mockResolvedValue({
       items: [
         ...EVALUATORS,
@@ -109,38 +110,45 @@ describe("ManageEvaluatorsDialog", () => {
         { uuid: "ev-tc-2", name: "Booking calls", evaluator_type: "tool-call" },
       ],
     });
-    renderDialog({ currentEvaluatorIds: ["ev-1", "ev-tc"], hasToolCallItems: true });
+    renderDialog({
+      currentEvaluatorIds: ["ev-1", "ev-tc"],
+      hasToolCallItems: true,
+      onSaved,
+    });
     await waitForCatalogueLoaded();
-    const box = catalogueCheckbox("Tool call correctness");
-    expect(box).toBeChecked();
-    expect(box).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: "Remove Tool call correctness" }),
-    ).toBeDisabled();
-    expect(catalogueCheckbox("Correctness")).not.toBeDisabled();
+    const message = /select at least one tool call evaluator/;
 
-    await user.hover(screen.getAllByText("Tool call correctness")[0]);
-    expect(
-      await screen.findAllByText(/tool call items need a tool call evaluator/),
-    ).not.toHaveLength(0);
+    const box = catalogueCheckbox("Tool call correctness");
+    expect(box).not.toBeDisabled();
+    await user.click(box);
+    expect(screen.queryByText(message)).not.toBeInTheDocument();
+    mockApiClient.mockClear();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByText(message)).toBeInTheDocument();
+    expect(mockApiClient).not.toHaveBeenCalled();
 
     await user.click(catalogueCheckbox("Booking calls"));
-    expect(catalogueCheckbox("Tool call correctness")).not.toBeDisabled();
-    await user.click(catalogueCheckbox("Tool call correctness"));
-    expect(catalogueCheckbox("Tool call correctness")).not.toBeChecked();
-    expect(catalogueCheckbox("Booking calls")).toBeDisabled();
+    expect(screen.queryByText(message)).not.toBeInTheDocument();
+    mockApiClient.mockResolvedValue({ message: "ok" });
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
   });
 
-  it("locks nothing on a task with no tool call items", async () => {
+  it("lets a task with no tool call items save without a tool call evaluator", async () => {
+    const user = setupUser();
+    const onSaved = jest.fn();
     mockApiClient.mockResolvedValue({
       items: [
         ...EVALUATORS,
         { uuid: "ev-tc", name: "Tool call correctness", evaluator_type: "tool-call" },
       ],
     });
-    renderDialog({ currentEvaluatorIds: ["ev-1", "ev-tc"] });
+    renderDialog({ currentEvaluatorIds: ["ev-1", "ev-tc"], onSaved });
     await waitForCatalogueLoaded();
-    expect(catalogueCheckbox("Tool call correctness")).not.toBeDisabled();
+    await user.click(catalogueCheckbox("Tool call correctness"));
+    mockApiClient.mockResolvedValue({ message: "ok" });
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
   });
 
   it("renders with a generic subtitle when no taskType is given, and fetches evaluators", async () => {
