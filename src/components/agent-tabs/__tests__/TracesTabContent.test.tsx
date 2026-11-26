@@ -190,7 +190,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     onToggleSelected,
     selectedCount,
     evaluatorDescriptions,
-    canScoreTrace,
+    scoringEvaluatorNames,
   }: {
     isOpen: boolean;
     traceUuid: string | null;
@@ -203,10 +203,13 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     onToggleSelected?: () => void;
     selectedCount?: number;
     evaluatorDescriptions?: Record<string, string>;
-    canScoreTrace?: boolean;
+    scoringEvaluatorNames?: string[];
   }) =>
     isOpen ? (
-      <div data-testid="trace-detail" data-can-score={String(!!canScoreTrace)}>
+      <div
+        data-testid="trace-detail"
+        data-scoring-names={(scoringEvaluatorNames ?? []).join(",")}
+      >
         {traceUuid}
         <span data-testid="trace-detail-descriptions">
           {Object.entries(evaluatorDescriptions ?? {})
@@ -2770,12 +2773,12 @@ describe("TracesTabContent", () => {
   });
 
   it.each([
-    ["scoring is on and an evaluator can score traces", true, 1, true],
-    ["scoring is off", false, 1, false],
-    ["no evaluator can score traces", true, 0, false],
-    ["the evaluators that can score traces have not loaded", true, null, false],
+    ["scoring is on and an evaluator can score traces", true, 1, "Tone"],
+    ["scoring is off", false, 1, ""],
+    ["no evaluator can score traces", true, 0, ""],
+    ["the evaluators that can score traces have not loaded", true, null, ""],
   ])(
-    "offers to score a skipped trace again only when %s",
+    "names the evaluators that can score a skipped trace again when %s",
     async (_name, enabled, eligibleCount, expected) => {
       const user = setupUser();
       mockUseTraces.mockReturnValue(tracesResult([trace({ input_preview: "Open me" })]));
@@ -2797,8 +2800,8 @@ describe("TracesTabContent", () => {
       );
       await user.click(screen.getAllByText("Open me")[0]);
       expect(screen.getByTestId("trace-detail")).toHaveAttribute(
-        "data-can-score",
-        String(expected),
+        "data-scoring-names",
+        expected,
       );
     },
   );

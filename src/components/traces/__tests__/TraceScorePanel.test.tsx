@@ -319,17 +319,22 @@ describe("the Score this trace button", () => {
       <TraceScorePanel
         run={skippedFor("no_usable_evaluators")}
         scoreTrace={button}
+        scoringEvaluatorNames={["Helpfulness", "Tone", "Safety"]}
         ineligible={[
-          { evaluator_uuid: "ev-x", name: "Tone", reason: "no_live_version" },
+          { evaluator_uuid: "ev-x", name: "Clarity", reason: "no_live_version" },
         ]}
       />,
     );
     expect(
       screen.getByRole("button", { name: "Score this trace" }),
     ).toBeInTheDocument();
-    expect(document.body).not.toHaveTextContent("Tone");
+    expect(document.body).not.toHaveTextContent("Clarity");
+    for (const name of ["Helpfulness", "Tone", "Safety"]) {
+      expect(screen.getByText(name).tagName).toBe("SPAN");
+      expect(screen.getByText(name)).toHaveClass("rounded-md");
+    }
     expect(document.body).toHaveTextContent(
-      /No evaluator could score this trace when it came in\. The agent has one that can now\.\s*Score this trace$/,
+      /This trace was not scored because none of the agent's evaluators could score it then\. You have since added Helpfulness, Tone and Safety, which can\.\s*Score this trace$/,
     );
   });
 

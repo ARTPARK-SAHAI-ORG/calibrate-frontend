@@ -14,7 +14,7 @@ export type EvaluatorPillItem = {
   name: string;
 };
 
-const EVALUATOR_PILL_CLASSES =
+export const EVALUATOR_PILL_CLASSES =
   "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-border bg-muted/40 text-foreground max-w-full";
 
 /**

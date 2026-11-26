@@ -67,9 +67,9 @@ type TraceDetailDialogProps = {
   evaluatorDescriptions?: Record<string, string>;
   /** The agent's evaluators that cannot score traces, and why. */
   ineligibleEvaluators?: TraceScoringIneligibleEvaluator[];
-  /** The agent now has an evaluator that can score this trace, so a trace
+  /** The agent's evaluators that can score this trace now. With any, a trace
    *  skipped for lacking one can be scored again. */
-  canScoreTrace?: boolean;
+  scoringEvaluatorNames?: string[];
   /** Told once a new scoring run was started, so the list can show it. */
   onScored?: () => void;
   /** Whether this trace is ticked in the list behind the dialog. */
@@ -381,7 +381,7 @@ export function TraceDetailDialog({
   selectedCount = 0,
   conversation = null,
   ineligibleEvaluators,
-  canScoreTrace = false,
+  scoringEvaluatorNames = [],
   onScored,
 }: TraceDetailDialogProps) {
   useHideFloatingButton(isOpen);
@@ -524,7 +524,7 @@ export function TraceDetailDialog({
       setScoringUuid((current) => (current === scored ? null : current));
     }
   };
-  const scoreTraceButton = canScoreTrace ? (
+  const scoreTraceButton = scoringEvaluatorNames.length > 0 ? (
     <button
       type="button"
       onClick={() => void startScoring()}
@@ -719,6 +719,7 @@ export function TraceDetailDialog({
                   descriptions={evaluatorDescriptions}
                   ineligible={ineligibleEvaluators}
                   scoreTrace={scoreTraceButton}
+                  scoringEvaluatorNames={scoringEvaluatorNames}
                 />
               </div>
             )}
@@ -744,6 +745,7 @@ export function TraceDetailDialog({
                     descriptions={evaluatorDescriptions}
                     ineligible={ineligibleEvaluators}
                     scoreTrace={scoreTraceButton}
+                    scoringEvaluatorNames={scoringEvaluatorNames}
                   />
                 </div>
               </div>

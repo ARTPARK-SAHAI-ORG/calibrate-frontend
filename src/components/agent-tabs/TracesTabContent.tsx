@@ -1166,8 +1166,10 @@ export function TracesTabContent({
       <TraceDetailDialog
         evaluatorDescriptions={evaluatorDescriptions}
         ineligibleEvaluators={ineligible}
-        canScoreTrace={
-          traceScoring.enabled && (eligibility?.eligible.length ?? 0) > 0
+        scoringEvaluatorNames={
+          traceScoring.enabled
+            ? (eligibility?.eligible ?? []).map((item) => item.name)
+            : []
         }
         onScored={() => void refetch()}
         isOpen={openTraceUuid != null}

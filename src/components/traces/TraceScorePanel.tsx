@@ -1,6 +1,7 @@
 "use client";
 
 import { EvaluatorVerdictCard } from "@/components/EvaluatorVerdictCard";
+import { EVALUATOR_PILL_CLASSES } from "@/components/EvaluatorPillList";
 import { RunFailureBox } from "@/components/RunFailureBox";
 import { SpinnerIcon } from "@/components/icons";
 import { CONTACT_LINK } from "@/constants/limits";
@@ -30,7 +31,11 @@ type TraceScorePanelProps = {
   /** The button that scores the trace again, shown when it was skipped for
    *  having no evaluator that could score it and the agent now has one. */
   scoreTrace?: React.ReactNode;
+  /** The agent's evaluators that can score this trace now, named beside it. */
+  scoringEvaluatorNames?: string[];
 };
+
+const listNames = new Intl.ListFormat("en-GB", { type: "conjunction" });
 
 /** The verdict card keeps binary and rating displays apart, so the stored
  *  numeric `value` is split back into the field its output type reads. */
@@ -49,11 +54,13 @@ function RunBody({
   descriptions,
   ineligible = [],
   scoreTrace,
+  scoringEvaluatorNames = [],
 }: {
   run: TraceScoringRun;
   descriptions?: Record<string, string>;
   ineligible?: TraceScoringIneligibleEvaluator[];
   scoreTrace?: React.ReactNode;
+  scoringEvaluatorNames?: string[];
 }) {
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
   if (isTraceScoringInProgress(run.status)) {
@@ -85,9 +92,22 @@ function RunBody({
         <p className="text-sm text-amber-700 dark:text-amber-300">
           {/* A lone reason takes no full stop. Only the limit one is followed
               by a second sentence, so only it needs one. */}
-          {canScore
-            ? "No evaluator could score this trace when it came in. The agent has one that can now."
-            : run.error === "over_limit" && usesOwnProviderKeys
+          {canScore ? (
+            <>
+              This trace was not scored because none of the agent&apos;s
+              evaluators could score it then. You have since added{" "}
+              {listNames.formatToParts(scoringEvaluatorNames).map((part, i) =>
+                part.type === "element" ? (
+                  <span key={i} className={EVALUATOR_PILL_CLASSES}>
+                    {part.value}
+                  </span>
+                ) : (
+                  part.value
+                ),
+              )}
+              , which can.
+            </>
+          ) : run.error === "over_limit" && usesOwnProviderKeys
               ? "This trace was not scored because the workspace had reached its scoring limit at the time"
               : `${scoringRunErrorCopy(run.error)}${run.error === "over_limit" ? "." : ""}`}
           {run.error === "over_limit" && !usesOwnProviderKeys && (
@@ -159,6 +179,7 @@ export function TraceScorePanel({
   descriptions,
   ineligible,
   scoreTrace,
+  scoringEvaluatorNames,
 }: TraceScorePanelProps) {
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -171,6 +192,7 @@ export function TraceScorePanel({
           descriptions={descriptions}
           ineligible={ineligible}
           scoreTrace={scoreTrace}
+          scoringEvaluatorNames={scoringEvaluatorNames}
         />
       ) : null}
     </div>

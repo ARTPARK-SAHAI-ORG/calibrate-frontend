@@ -1407,14 +1407,14 @@ describe("Score this trace", () => {
     results: [],
   };
   const onScored = jest.fn();
-  const open = (canScoreTrace: boolean) =>
+  const open = (canScore: boolean) =>
     render(
       <TraceDetailDialog
         isOpen
         onClose={jest.fn()}
         accessToken="tok"
         traceUuid="t1"
-        canScoreTrace={canScoreTrace}
+        scoringEvaluatorNames={canScore ? ["Helpfulness"] : []}
         onScored={onScored}
       />,
     );
@@ -1478,7 +1478,7 @@ describe("Score this trace", () => {
         onClose={jest.fn()}
         accessToken="tok"
         traceUuid="t2"
-        canScoreTrace
+        scoringEvaluatorNames={["Helpfulness"]}
         onScored={onScored}
       />,
     );
