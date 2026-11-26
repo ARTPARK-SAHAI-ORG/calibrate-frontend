@@ -1010,7 +1010,7 @@ it("names what can score a tool-only trace now and offers only Score this trace,
     />,
   );
   expect(document.body).toHaveTextContent(
-    "This trace was not scored because the agent had no tool call evaluator when the trace arrived. Tool call correctness can score it now.",
+    "This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent. Tool call correctness can score it now.",
   );
   expect(
     screen.getByRole("button", { name: "Score this trace" }),
@@ -1051,7 +1051,7 @@ describe("a tool-only trace skipped before a tool call evaluator with variables 
       />,
     );
     expect(document.body).toHaveTextContent(
-      "This trace was not scored because the agent had no tool call evaluator when the trace arrived. The tool call evaluator added since has variables. Configure it below, then score this trace.",
+      "This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent. Expected tool and arguments has been added since, but has not been configured for traces. Configure it below, then score this trace.",
     );
     expect(
       screen.queryByRole("button", { name: /Evaluators tab/ }),
@@ -1074,10 +1074,24 @@ describe("a tool-only trace skipped before a tool call evaluator with variables 
       />,
     );
     expect(document.body).toHaveTextContent(
-      "Tool call correctness can score it now.",
+      "This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent. Tool call correctness can score it now. Expected tool and arguments has been added since, but has not been configured for traces. Configure it below.",
     );
     expect(document.body).toHaveTextContent(
       "Expected tool and argumentsConfigure for tracesDid not run as it has not been configured for traces",
+    );
+  });
+
+  it("names every evaluator still to configure", () => {
+    render(
+      <TraceScorePanel
+        run={toolCallSkip}
+        ineligible={[added, { ...added, evaluator_uuid: "ev-8", name: "Right date" }]}
+        unconfigured={[...unconfigured, { evaluator_uuid: "ev-8", name: "Right date" }]}
+        onConfigure={jest.fn()}
+      />,
+    );
+    expect(document.body).toHaveTextContent(
+      "This trace was not scored because the agent made a tool call, but no tool call evaluators had been added to the agent. Expected tool and arguments and Right date have been added since, but have not been configured for traces. Configure them below, then score this trace.",
     );
   });
 

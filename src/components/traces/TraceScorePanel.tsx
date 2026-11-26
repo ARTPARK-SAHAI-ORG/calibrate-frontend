@@ -114,6 +114,19 @@ export type TraceScorePanelProps = {
 
 const listNames = new Intl.ListFormat("en-GB", { type: "conjunction" });
 
+/** Evaluator names as pills, joined with commas and "and". */
+function pills(names: string[]) {
+  return listNames.formatToParts(names).map((part, i) =>
+    part.type === "element" ? (
+      <span key={i} className={EVALUATOR_PILL_CLASSES}>
+        {part.value}
+      </span>
+    ) : (
+      part.value
+    ),
+  );
+}
+
 /** The verdict card keeps binary and rating displays apart, so the stored
  *  numeric `value` is split back into the field its output type reads. */
 function verdictFields(result: TraceScoreResult): {
@@ -235,7 +248,7 @@ function RunBody({
   onlyNeedValues = false,
   onConfigure,
   configuringUuid,
-  configureBelow = 0,
+  configureNames = [],
 }: {
   run: TraceScoringRun;
   descriptions?: Record<string, string>;
@@ -251,8 +264,8 @@ function RunBody({
   onlyNeedValues?: boolean;
   onConfigure?: (evaluatorUuid: string) => void;
   configuringUuid?: string | null;
-  /** How many evaluators below this box still need configuring for traces. */
-  configureBelow?: number;
+  /** Evaluators with a card below this box, still to be configured for traces. */
+  configureNames?: string[];
 }) {
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
   const missingValues = run.missing_values ?? [];
@@ -314,12 +327,19 @@ function RunBody({
         run.error === "no_usable_evaluators");
     const needValuesOnly =
       !canScore && run.error === "no_usable_evaluators" && onlyNeedValues;
-    // Once the agent has a tool call evaluator, "none had been added" reads
-    // as if it still has none.
-    const reason =
-      run.error === "no_tool_call_evaluator" && (canScore || configureBelow > 0)
-        ? "This trace was not scored because the agent had no tool call evaluator when the trace arrived"
-        : scoringRunErrorCopy(run.error);
+    const reason = scoringRunErrorCopy(run.error);
+    const toConfigure =
+      run.error === "no_tool_call_evaluator" ? configureNames : [];
+    const one = toConfigure.length === 1;
+    const configureSentence = toConfigure.length > 0 && (
+      <>
+        {" "}
+        {pills(toConfigure)} {one ? "has" : "have"} been added since, but{" "}
+        {one ? "has" : "have"} not been configured for traces. Configure{" "}
+        {one ? "it" : "them"} below
+        {canScore ? "." : ", then score this trace."}
+      </>
+    );
     const button = canScore
       ? scoreTrace
       : run.error === "no_tool_call_evaluator" && addToolCallEvaluator;
@@ -349,16 +369,8 @@ function RunBody({
               {run.error === "no_usable_evaluators"
                 ? "This trace was not scored because none of the agent's evaluators could score it then."
                 : `${reason}.`}{" "}
-              {listNames.formatToParts(scoringEvaluatorNames).map((part, i) =>
-                part.type === "element" ? (
-                  <span key={i} className={EVALUATOR_PILL_CLASSES}>
-                    {part.value}
-                  </span>
-                ) : (
-                  part.value
-                ),
-              )}{" "}
-              can score it now.
+              {pills(scoringEvaluatorNames)} can score it now.
+              {configureSentence}
             </>
           ) : needValuesOnly ? (
             <>
@@ -374,12 +386,10 @@ function RunBody({
               )}
               .
             </>
-          ) : run.error === "no_tool_call_evaluator" && configureBelow > 0 ? (
-            `${reason}. ${
-              configureBelow === 1
-                ? "The tool call evaluator added since has variables. Configure it below"
-                : "The tool call evaluators added since have variables. Configure them below"
-            }, then score this trace.`
+          ) : toConfigure.length > 0 ? (
+            <>
+              {reason}.{configureSentence}
+            </>
           ) : run.error === "over_limit" && usesOwnProviderKeys ? (
             "This trace was not scored because the workspace had reached its scoring limit at the time"
           ) : (
@@ -388,7 +398,7 @@ function RunBody({
           {(run.error === "no_usable_evaluators" ||
             (run.error === "no_tool_call_evaluator" &&
               !addToolCallEvaluator &&
-              configureBelow === 0)) &&
+              toConfigure.length === 0)) &&
             onGoToEvaluators &&
             !canScore &&
             !needValuesOnly && (
@@ -498,7 +508,7 @@ export function TraceScorePanel({
           }
           onConfigure={onConfigure}
           configuringUuid={configuringUuid}
-          configureBelow={cards.length}
+          configureNames={cards.map((e) => e.name)}
           addToolCallEvaluator={addToolCallEvaluator}
           onGoToEvaluators={onGoToEvaluators}
           scoreTrace={scoreTrace}
