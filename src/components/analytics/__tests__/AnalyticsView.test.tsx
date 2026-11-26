@@ -31,6 +31,7 @@ function activity(over: Partial<AnalyticsActivity> = {}): AnalyticsActivity {
     labelling_evaluator_runs: 0,
     cost: null,
     traces_received: 0,
+    chat_messages: 0,
     traces_scored: 0,
     labelling_jobs_finished: 0,
     labels_collected: 0,
@@ -61,6 +62,7 @@ function response(over: Partial<AnalyticsResponse> = {}): AnalyticsResponse {
       limit_hits: 2,
       evaluations: 40,
       cost: 12.5,
+      chat_messages: 7,
     }),
     previous: activity({
       new_users: 10,
@@ -137,6 +139,17 @@ describe("AnalyticsView", () => {
     expect(within(card("Traces received")).queryByText(/vs previous/)).toBeNull();
     expect(within(card("Cost")).getByText("$12.50")).toBeInTheDocument();
     expect(within(card("Cost")).getByText("Test runs and model comparisons only")).toBeInTheDocument();
+    // Chat link messages are counted on their own, not inside traces received.
+    expect(within(card("Chat messages")).getByText("7")).toBeInTheDocument();
+    expect(
+      within(card("Chat messages")).getByText("Answered on agents' chat links"),
+    ).toBeInTheDocument();
+    expect(
+      within(card("Traces received")).getByText("Sent by the agent's own app"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /Chat messages/ }),
+    ).toBeInTheDocument();
 
     const today = toDateInput(new Date());
     expect(mockFetch).toHaveBeenCalledWith("t", {
