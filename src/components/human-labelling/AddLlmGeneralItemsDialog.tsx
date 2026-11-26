@@ -217,7 +217,7 @@ export function AddLlmGeneralItemsDialog({
   // narrower; the input and output take what is left, at least a quarter.
   const leftColumn = useSavedColumnWidth(
     "calibrate:one-shot-item-form-left-width",
-    28,
+    32,
     15,
     50,
     "left",

@@ -1516,10 +1516,10 @@ describe("AddLlmGeneralItemsDialog", () => {
       fireEvent.mouseUp(document);
     };
 
-    it("opens with the form column at 28% when nothing is saved", () => {
+    it("opens with the form column at 32% when nothing is saved", () => {
       renderDialog();
       expect(leftColumn().style.getPropertyValue("--form-column-width")).toBe(
-        "28%",
+        "32%",
       );
     });
 
