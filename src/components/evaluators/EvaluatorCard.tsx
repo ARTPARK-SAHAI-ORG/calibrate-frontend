@@ -62,8 +62,8 @@ export function EvaluatorCard({ evaluator, actions, warning, ...rest }: Props) {
             </p>
           )}
           {warning && (
-            <p className="flex items-center gap-1.5 text-xs text-orange-700 dark:text-orange-300 mt-1">
-              <WarningTriangleIcon className="w-3.5 h-3.5 flex-shrink-0 text-orange-600 dark:text-orange-400" />
+            <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+              <WarningTriangleIcon className="w-3 h-3 flex-shrink-0 opacity-70" />
               {warning}
             </p>
           )}

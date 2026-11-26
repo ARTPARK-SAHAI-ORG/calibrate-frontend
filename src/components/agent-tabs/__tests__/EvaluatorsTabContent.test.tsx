@@ -736,7 +736,7 @@ describe("EvaluatorsTabContent", () => {
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
       const warning = await screen.findByText(WARNING);
-      expect(warning).toHaveClass("text-orange-700");
+      expect(warning).toHaveClass("text-muted-foreground");
       expect(warning.querySelector("svg")).not.toBeNull();
 
       await user.click(
