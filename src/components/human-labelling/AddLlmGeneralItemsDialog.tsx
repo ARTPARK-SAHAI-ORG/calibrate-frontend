@@ -709,7 +709,7 @@ export function AddLlmGeneralItemsDialog({
                 "--form-column-width": `${leftColumn.percent}%`,
               } as React.CSSProperties
             }
-            className="w-full md:w-[var(--form-column-width)] md:shrink-0 flex flex-col border-b md:border-b-0 border-border overflow-y-auto p-4 md:p-6 space-y-6"
+            className="w-full md:w-[var(--form-column-width)] md:shrink-0 flex flex-col border-b md:border-b-0 border-border overflow-y-auto hide-scrollbar [scrollbar-width:none] p-4 md:p-6 space-y-6"
           >
             <div>
               <label className="block text-base font-medium text-foreground mb-2">
@@ -781,7 +781,7 @@ export function AddLlmGeneralItemsDialog({
           {/* Middle: input + output boxes shown side by side, each filling
               the full dialog height. */}
           <div className="w-full md:flex-1 md:min-w-0 flex flex-col md:flex-row bg-muted/30 min-h-0">
-            <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-y-auto p-4 md:p-6 border-b md:border-b-0 md:border-r border-border">
+            <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-y-auto hide-scrollbar [scrollbar-width:none] p-4 md:p-6 border-b md:border-b-0 md:border-r border-border">
               <TextVersionsEditor
                 field="input"
                 extras={inputExtras}
@@ -1051,7 +1051,7 @@ export function AddLlmGeneralItemsDialog({
                 "--side-column-width": `${sideColumnPercent}%`,
               } as React.CSSProperties
             }
-            className="w-full md:w-[var(--side-column-width)] md:shrink-0 flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 border-border p-4 md:p-6"
+            className="w-full md:w-[var(--side-column-width)] md:shrink-0 flex flex-col min-h-0 overflow-y-auto hide-scrollbar [scrollbar-width:none] border-t md:border-t-0 border-border p-4 md:p-6"
           >
             <label className="block text-base font-medium text-foreground mb-2">
               Evaluators
