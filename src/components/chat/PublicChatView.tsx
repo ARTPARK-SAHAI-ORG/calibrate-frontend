@@ -309,11 +309,7 @@ export function PublicChatView({ token }: { token: string }) {
     <PublicPageLayout
       title={agent.agent_name}
       contentClassName="max-w-3xl flex flex-col"
-      actions={
-        <button type="button" onClick={newChat} className={BUTTON_CLASS}>
-          New chat
-        </button>
-      }
+      actions={[{ label: "New chat", onClick: newChat }]}
     >
       <div className="flex-1 space-y-4 pb-6">
         {turns.length === 0 && (
