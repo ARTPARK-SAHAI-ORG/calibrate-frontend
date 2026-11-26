@@ -664,6 +664,9 @@ export function AssignAnnotatorsDialog({
                 <p className="text-xs text-foreground/80">
                   Pick one or more labels to show in the labelling jobs created
                 </p>
+                {!evaluatorSelectionValid && (
+                  <p className="text-xs text-red-500">{missingLabelMessage}</p>
+                )}
                 {choosableEvaluators.length > 1 && (
                   <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">
                     <input
@@ -729,9 +732,6 @@ export function AssignAnnotatorsDialog({
                     );
                   })}
                 </div>
-                {!evaluatorSelectionValid && (
-                  <p className="text-xs text-red-500">{missingLabelMessage}</p>
-                )}
               </div>
             )}
 
