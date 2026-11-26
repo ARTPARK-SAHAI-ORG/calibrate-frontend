@@ -401,6 +401,19 @@ export async function fetchTraceScores(
   );
 }
 
+/** JWT-only: score a stored trace again, such as one skipped before a fitting
+ *  evaluator was linked. */
+export async function scoreTrace(
+  accessToken: string,
+  traceUuid: string,
+): Promise<{ run_uuid: string; status: "pending" }> {
+  return apiPost<{ run_uuid: string; status: "pending" }>(
+    `/traces/${encodeURIComponent(traceUuid)}/score`,
+    accessToken,
+    {},
+  );
+}
+
 /** JWT-only: which linked evaluators can score this agent's traces. */
 export async function fetchTraceScoringEligibility(
   accessToken: string,

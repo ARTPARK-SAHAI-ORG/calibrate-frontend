@@ -229,6 +229,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     evaluatorDescriptions,
     ineligibleEvaluators,
     addToolCallEvaluator,
+    canScoreTrace,
     keysPaused,
   }: {
     isOpen: boolean;
@@ -244,10 +245,15 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     evaluatorDescriptions?: Record<string, string>;
     ineligibleEvaluators?: { name: string }[];
     addToolCallEvaluator?: React.ReactNode;
+    canScoreTrace?: boolean;
     keysPaused?: boolean;
   }) =>
     isOpen ? (
-      <div data-testid="trace-detail" data-keys-paused={String(!!keysPaused)}>
+      <div
+        data-testid="trace-detail"
+        data-keys-paused={String(!!keysPaused)}
+        data-can-score={String(!!canScoreTrace)}
+      >
         {traceUuid}
         <div data-testid="trace-detail-add-tool-call">
           {addToolCallEvaluator}
@@ -3529,6 +3535,48 @@ describe("TracesTabContent", () => {
       ),
     );
   });
+
+  it.each([
+    ["a tool-only trace with a tool call evaluator", true, "tool-call", true],
+    ["a tool-only trace with only a reply evaluator", true, "llm", false],
+    ["a reply trace with a reply evaluator", false, "llm", true],
+    ["a reply trace with only a tool call evaluator", false, "tool-call", false],
+  ])(
+    "lets %s be scored again only when an evaluator fits it",
+    async (_name, toolOnly, evaluatorType, expected) => {
+      const user = setupUser();
+      mockUseTraces.mockReturnValue(
+        tracesResult([
+          toolOnly
+            ? trace({ response_preview: null, tool_call_count: 1, input_preview: "Calls" })
+            : trace({ input_preview: "Calls" }),
+        ]),
+      );
+      fetchAgentEvaluators.mockResolvedValue([
+        { uuid: "ev-1", evaluator_type: evaluatorType },
+      ]);
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            eligibility: {
+              eligible: [{ evaluator_uuid: "ev-1", name: "Judge" }],
+              ineligible: [],
+            },
+          }}
+        />,
+      );
+      await waitFor(() => expect(fetchAgentEvaluators).toHaveBeenCalled());
+      await user.click(screen.getAllByText("Calls")[0]);
+      await waitFor(() =>
+        expect(screen.getByTestId("trace-detail")).toHaveAttribute(
+          "data-can-score",
+          String(expected),
+        ),
+      );
+    },
+  );
 
   it("opens the detail view for the trace that was clicked", async () => {
     const user = setupUser();
