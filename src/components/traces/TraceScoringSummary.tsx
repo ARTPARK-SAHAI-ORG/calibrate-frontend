@@ -6,6 +6,7 @@ import { SpinnerIcon } from "@/components/icons";
 import { PILL_CLASS } from "@/components/ui/PassFailCountPills";
 import {
   isTraceScoringInProgress,
+  scoringFailedCopy,
   scoringRunErrorCopy,
 } from "@/lib/traceScoring";
 import type { TraceSummary } from "@/lib/tracesApi";
@@ -161,7 +162,11 @@ export function TraceScoreMark({
   return (
     <RunStateMark
       state={status === "failed" ? "error" : "none_run"}
-      tooltip={scoringRunErrorCopy(trace.latest_run_error)}
+      tooltip={
+        status === "failed"
+          ? scoringFailedCopy(trace.latest_run_error)
+          : scoringRunErrorCopy(trace.latest_run_error)
+      }
     />
   );
 }

@@ -73,7 +73,7 @@ const completed: TraceScoringRun = {
 
 const prior: TraceScoringRun = {
   run_uuid: "run-old",
-  status: "failed",
+  status: "skipped",
   created_at: "2026-08-28T12:00:00Z",
   completed_at: "2026-08-28T12:02:00Z",
   error: "over_limit",
@@ -185,6 +185,40 @@ it("shows every reason a trace was not scored as a warning, not a note", () => {
   expect(box?.querySelector("p")?.className).toContain("text-amber-700");
   // Only the limit has somewhere for the reader to go next.
   expect(screen.queryByRole("link")).not.toBeInTheDocument();
+});
+
+it("shows a failed run as an error in red, with the reason calibrate gave", () => {
+  const { container } = render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r6",
+        status: "failed",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "Error code: 402 - out of credits",
+        results: [],
+      }}
+    />,
+  );
+
+  const box = container.querySelector(".border-red-500\\/30");
+  expect(box).toHaveTextContent("Scoring failed: Error code: 402 - out of credits");
+  expect(box?.querySelector("p")?.className).toContain("text-red-700");
+  expect(container.querySelector(".border-amber-500\\/40")).toBeNull();
+});
+
+it("says only that scoring failed when the failed run gave no reason", () => {
+  render(
+    <TraceScorePanel
+      run={{
+        run_uuid: "r7",
+        status: "failed",
+        created_at: "2026-08-29T12:00:00Z",
+        error: null,
+        results: [],
+      }}
+    />,
+  );
+  expect(screen.getByText("Scoring failed")).toBeInTheDocument();
 });
 
 it("says the workspace is over its scoring limit and offers the contact link", () => {

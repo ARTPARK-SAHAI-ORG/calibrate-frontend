@@ -2,6 +2,7 @@ import {
   ineligibleReasonCopy,
   isTraceScoringInProgress,
   nothingCanScoreCopy,
+  scoringFailedCopy,
   scoringRunErrorCopy,
 } from "../traceScoring";
 
@@ -82,5 +83,15 @@ describe("nothingCanScoreCopy", () => {
     expect(nothingCanScoreCopy([{ reason: "wrong_type_for_agent" }])).toBe(
       "None of this agent's evaluators can score traces.",
     );
+  });
+});
+
+describe("scoringFailedCopy", () => {
+  it("puts the stored reason after the words scoring failed", () => {
+    expect(scoringFailedCopy("Error code: 402 - out of credits")).toBe(
+      "Scoring failed: Error code: 402 - out of credits",
+    );
+    expect(scoringFailedCopy(null)).toBe("Scoring failed");
+    expect(scoringFailedCopy("")).toBe("Scoring failed");
   });
 });

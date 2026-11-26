@@ -7,6 +7,7 @@ import { useUsesOwnProviderKeys } from "@/hooks";
 import {
   ineligibleReasonCopy,
   isTraceScoringInProgress,
+  scoringFailedCopy,
   scoringRunErrorCopy,
 } from "@/lib/traceScoring";
 import type {
@@ -58,10 +59,20 @@ function RunBody({
     );
   }
 
-  // A trace that could not be scored is a warning whatever the reason, so
-  // every reason gets the same amber box the Traces tab uses. Only the limit
-  // has somewhere for the reader to go next, so only it carries the link.
-  if (run.status === "failed" || run.status === "skipped") {
+  if (run.status === "failed") {
+    return (
+      <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
+        <p className="text-sm text-red-700 dark:text-red-400 break-words">
+          {scoringFailedCopy(run.error)}
+        </p>
+      </div>
+    );
+  }
+
+  // A skipped trace is a warning whatever the reason, so every reason gets
+  // the same amber box the Traces tab uses. Only the limit has somewhere for
+  // the reader to go next, so only it carries the link.
+  if (run.status === "skipped") {
     return (
       <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
         <p className="text-sm text-amber-700 dark:text-amber-300">
