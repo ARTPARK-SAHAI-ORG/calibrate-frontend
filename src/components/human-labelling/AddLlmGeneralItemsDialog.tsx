@@ -7,7 +7,7 @@ import {
   versionsComplete,
 } from "./TextVersionsEditor";
 import type { TurnExtras } from "@/lib/messageVersions";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
 import { TrashIcon } from "@/components/icons";
@@ -442,6 +442,20 @@ export function AddLlmGeneralItemsDialog({
     },
   });
 
+  // A tool call added from this form lands at the bottom of the output
+  // column, which may be off screen, so bring it into view.
+  const scrollToNewToolCall = useRef(false);
+  const toolCallListRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!scrollToNewToolCall.current) return;
+    scrollToNewToolCall.current = false;
+    const cards = toolCallListRef.current?.querySelectorAll("[data-tool-call]");
+    cards?.[cards.length - 1]?.scrollIntoView?.({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [toolCalls]);
+
   if (!isOpen) return null;
 
   // A tool opened from the list or from a tool call card was saved. Tool calls
@@ -474,6 +488,7 @@ export function AddLlmGeneralItemsDialog({
   };
 
   const addToolCall = (toolName: string, params: ToolCallParam[]) => {
+    scrollToNewToolCall.current = true;
     setToolCalls((prev) => [
       ...prev,
       {
@@ -784,52 +799,73 @@ export function AddLlmGeneralItemsDialog({
               </TextVersionsEditor>
             </div>
             <div className="flex-1 min-w-0 flex flex-col min-h-0 p-4 md:p-6">
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-3 flex flex-col">
-                {showsText && (
-                  <TextVersionsEditor
-                    field="output"
-                    extras={outputExtras}
-                    onChange={setOutputExtras}
-                    onPendingChange={setOutputPending}
-                    disabled={submitting || !output.trim()}
-                  >
-                    {/* Remove sits beside the box, the same as on a tool
-                        call below it. The box keeps the column's height
-                        under its heading (3.25rem), so tool calls added
-                        below scroll the column rather than shrink it. */}
-                    <div className="flex shrink-0 w-full gap-2 h-[calc(100%-3.25rem)] min-h-[10rem]">
-                      {isToolCallItem && (
-                        <Tooltip
-                          content="Remove text reply"
-                          position="top"
-                          className="flex-shrink-0 self-start"
-                        >
-                          <button
-                            type="button"
-                            onClick={removeText}
-                            disabled={submitting}
-                            aria-label="Remove text reply"
-                            className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
-                        </Tooltip>
-                      )}
-                      <textarea
-                        value={output}
-                        onChange={(e) => setOutput(e.target.value)}
-                        placeholder="The output the LLM produced"
+              <div
+                ref={toolCallListRef}
+                className="flex-1 min-h-0 overflow-y-auto space-y-3 flex flex-col"
+              >
+                <TextVersionsEditor
+                  field="output"
+                  headingAside={
+                    !showsText && (
+                      <button
+                        type="button"
+                        onClick={() => setTextRemoved(false)}
                         disabled={submitting}
-                        className="flex-1 min-w-0 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-                      />
-                    </div>
-                  </TextVersionsEditor>
-                )}
+                        className="h-7 px-3 rounded-md text-sm font-medium whitespace-nowrap border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Add text reply
+                      </button>
+                    )
+                  }
+                  extras={outputExtras}
+                  onChange={setOutputExtras}
+                  onPendingChange={setOutputPending}
+                  disabled={submitting || !output.trim()}
+                >
+                  {showsText && (
+                    <>
+                      {/* Remove sits beside the box, the same as on a tool
+                          call below it. The box keeps the column's height
+                          under its heading (3.25rem), so tool calls added
+                          below scroll the column rather than shrink it. */}
+                      <div className="flex shrink-0 w-full gap-2 h-[calc(100%-3.25rem)] min-h-[10rem]">
+                        {isToolCallItem && (
+                          <Tooltip
+                            content="Remove text reply"
+                            position="top"
+                            className="flex-shrink-0 self-start"
+                          >
+                            <button
+                              type="button"
+                              onClick={removeText}
+                              disabled={submitting}
+                              aria-label="Remove text reply"
+                              className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </button>
+                          </Tooltip>
+                        )}
+                        <textarea
+                          value={output}
+                          onChange={(e) => setOutput(e.target.value)}
+                          placeholder="The output the LLM produced"
+                          disabled={submitting}
+                          className="flex-1 min-w-0 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                        />
+                      </div>
+                    </>
+                  )}
+                </TextVersionsEditor>
                 {toolCalls.map((tc) => (
                   // Same card the test dialog draws a tool call with, in the
                   // conversation tab: header row with the wrench and the tool
                   // name, remove button on the left, parameters below.
-                  <div key={tc.id} className="flex w-full items-start gap-2">
+                  <div
+                    key={tc.id}
+                    data-tool-call
+                    className="flex w-full items-start gap-2"
+                  >
                     <Tooltip
                       content="Remove tool call"
                       position="top"
@@ -936,16 +972,6 @@ export function AddLlmGeneralItemsDialog({
                 their rows and match. Outside the scrolling list, so the tool
                 list is never cut off. */}
               <div className="shrink-0 flex items-center justify-end gap-2 mt-3">
-                {!showsText && (
-                  <button
-                    type="button"
-                    onClick={() => setTextRemoved(false)}
-                    disabled={submitting}
-                    className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Add text reply
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => setCreateToolFor("output")}

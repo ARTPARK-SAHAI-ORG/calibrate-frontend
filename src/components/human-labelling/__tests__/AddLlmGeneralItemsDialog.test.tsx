@@ -265,6 +265,11 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     expect(
       screen.queryByPlaceholderText("The output the LLM produced"),
     ).not.toBeInTheDocument();
+    // The Output heading stays, with Add text reply on its row.
+    const heading = screen.getByLabelText("Heading for the output");
+    expect(heading.parentElement).toContainElement(
+      screen.getByRole("button", { name: "Add text reply" }),
+    );
     await user.click(screen.getByRole("button", { name: "Add text reply" }));
     expect(
       screen.getByPlaceholderText("The output the LLM produced"),
@@ -956,6 +961,33 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     rerender(<AddLlmGeneralItemsDialog isOpen {...props} />);
     expect(screen.queryByDisplayValue(/"city"/)).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Pune")).toBeInTheDocument();
+  });
+
+  it("scrolls to a tool call just added, and not to one already there", async () => {
+    const scrolled: Element[] = [];
+    const realScroll = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    expect(scrolled).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(screen.getByRole("button", { name: "Pick End conversation" }));
+    expect(scrolled).toHaveLength(1);
+    expect(scrolled[0]).toHaveTextContent("end_call");
+    Element.prototype.scrollIntoView = realScroll;
   });
 
   it("keeps the tool list open on Escape pressed inside the tool side panel", async () => {
