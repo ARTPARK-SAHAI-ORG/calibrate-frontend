@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ToolPicker, type AvailableTool } from "@/components/ToolPicker";
 import { OpenToolButton } from "@/components/tools/OpenToolButton";
 import {
@@ -672,17 +673,23 @@ export function selectedToolsToCalls(
 
 /** True when a tool expected to be called has an incomplete parameter. A
  * stored call the person did not change is not checked. */
+const toolHasInvalidParams = (tool: SelectedToolConfig): boolean =>
+  !isUnchanged(tool) &&
+  tool.expectation === "should-call" &&
+  !tool.acceptAnyParameterValues &&
+  hasInvalidExpectedParams(tool.expectedParameters);
+
 export function selectedToolsHaveInvalidParams(
   tools: SelectedToolConfig[],
 ): boolean {
-  return tools.some(
-    (tool) =>
-      !isUnchanged(tool) &&
-      tool.expectation === "should-call" &&
-      !tool.acceptAnyParameterValues &&
-      hasInvalidExpectedParams(tool.expectedParameters),
-  );
+  return tools.some(toolHasInvalidParams);
 }
+
+/** Every object row's id in these parameters, nested ones included. */
+const objectParamIds = (params: ExpectedParam[]): string[] =>
+  params.flatMap((p) =>
+    p.isObject ? [p.id, ...objectParamIds(p.properties || [])] : [],
+  );
 
 /** The editor's rows and the state behind its JSON views, held by the dialog
  * so it can read the rows on save and update them when a tool changes. */
@@ -716,16 +723,32 @@ export function useToolCallExpectations() {
   // `reset`, so opening a dialog with tools already there scrolls nowhere.
   const [lastAddedCardId, setLastAddedCardId] = useState<string | null>(null);
 
-  // After a refused save: every tool back in its form view with nothing
-  // folded, so each field shows what is wrong under it, then go to the first
-  // one. A tool whose JSON does not read stays as JSON, or the typed text
-  // would be lost. The fields are drawn on the next render, so look for them
+  // A tool open as JSON whose text does not read. Its last good values are
+  // what would be saved, so a save has to wait for it to be fixed.
+  const hasUnreadableJson = [...jsonModeToolIds].some(
+    (id) => toolJsonError[id],
+  );
+
+  // After a refused save: each tool with a missing value back in its form
+  // view with its rows unfolded, so each field shows what is wrong under it,
+  // then go to the first one. Other tools are left as they were. A tool whose
+  // JSON does not read stays as JSON, or the typed text would be lost; its box
+  // is marked too. The fields are drawn on the next render, so look for them
   // after that. `onNoField` runs when there is none to point at.
   const revealInvalidFields = (onNoField: () => void) => {
-    setJsonModeToolIds(
-      (prev) => new Set([...prev].filter((id) => toolJsonError[id])),
+    const flagged = selectedTools.filter(toolHasInvalidParams);
+    const toForm = new Set(
+      flagged.map((t) => t.cardId).filter((id) => !toolJsonError[id]),
     );
-    setCollapsedParamIds(new Set());
+    setJsonModeToolIds(
+      (prev) => new Set([...prev].filter((id) => !toForm.has(id))),
+    );
+    const unfold = new Set(
+      flagged.flatMap((t) => objectParamIds(t.expectedParameters)),
+    );
+    setCollapsedParamIds(
+      (prev) => new Set([...prev].filter((id) => !unfold.has(id))),
+    );
     requestAnimationFrame(() => {
       const bad = document.querySelector<HTMLElement>("[data-param-error]");
       if (!bad) return onNoField();
@@ -832,12 +855,10 @@ export function useToolCallExpectations() {
     lastAddedCardId,
     setLastAddedCardId,
     revealInvalidFields,
+    hasUnreadableJson,
   };
 }
 
-/** Pick the tools a call should be made to and the parameters it should be
- * made with. Used for a tool-call test and for a labelling item's expected
- * tool calls. */
 /** Where the tool list opens: under the button, or above it when the window
  * has too little room below. */
 function listPlacement(button: HTMLElement): React.CSSProperties {
@@ -848,6 +869,9 @@ function listPlacement(button: HTMLElement): React.CSSProperties {
     : { right, top: rect.bottom + 8 };
 }
 
+/** Pick the tools a call should be made to and the parameters it should be
+ * made with. Used for a tool-call test and for a labelling item's expected
+ * tool calls. */
 export function ToolCallExpectationsEditor({
   editor,
   heading,
@@ -1651,36 +1675,39 @@ export function ToolCallExpectationsEditor({
       </div>
 
       {/* Tool Dropdown */}
-      {toolDropdownOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-[99]"
-            onClick={() => {
-              setToolDropdownOpen(false);
-            }}
-          />
-          {/* Fixed to the window, so a scrolling column the editor sits in
-              never cuts the list off. */}
-          <div
-            style={toolListAt}
-            className="fixed w-72 bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden"
-          >
-            <ToolPicker
-              availableTools={availableTools}
-              isLoading={availableToolsLoading}
-              onSelectInbuiltTool={(toolId, toolName) => {
-                selectInbuiltTool(toolId, toolName);
+      {/* Drawn on the page itself: a dialog that is scaled or animated
+          moves anything fixed inside it, which put the list in the wrong
+          place and let the dialog's edge cut it off. */}
+      {toolDropdownOpen &&
+        createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[99]"
+              onClick={() => {
+                setToolDropdownOpen(false);
               }}
-              onSelectCustomTool={(tool) => {
-                addToolFromSelection(tool);
-              }}
-              selectedToolIds={selectedTools.map((t) => t.id)}
-              accessToken={accessToken}
-              onToolSaved={onToolSaved}
             />
-          </div>
-        </>
-      )}
+            <div
+              style={toolListAt}
+              className="fixed w-72 bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden"
+            >
+              <ToolPicker
+                availableTools={availableTools}
+                isLoading={availableToolsLoading}
+                onSelectInbuiltTool={(toolId, toolName) => {
+                  selectInbuiltTool(toolId, toolName);
+                }}
+                onSelectCustomTool={(tool) => {
+                  addToolFromSelection(tool);
+                }}
+                selectedToolIds={selectedTools.map((t) => t.id)}
+                accessToken={accessToken}
+                onToolSaved={onToolSaved}
+              />
+            </div>
+          </>,
+          document.body,
+        )}
 
       {selectedTools.length === 0 ? (
         <div className="bg-muted rounded-lg p-8 text-center ">

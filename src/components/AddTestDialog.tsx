@@ -2003,7 +2003,9 @@ export function AddTestDialog({
   // parameter (required ones, plus any optional/custom rows the user filled
   // in) must be complete.
   const selectedToolsInvalid = () => {
-    const invalid = selectedToolsHaveInvalidParams(selectedTools);
+    const invalid =
+      selectedToolsHaveInvalidParams(selectedTools) ||
+      toolExpectations.hasUnreadableJson;
     if (invalid) {
       toolExpectations.revealInvalidFields(() =>
         setToolValidationError(

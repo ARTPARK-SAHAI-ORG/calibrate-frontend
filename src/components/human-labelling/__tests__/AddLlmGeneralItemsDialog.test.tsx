@@ -32,6 +32,12 @@ jest.mock("../bulk-upload-shared", () => ({
 }));
 
 const accessTokenMock = jest.fn<string | null, []>(() => null);
+
+// Tests that watch scrolling swap this out; put it back even if one fails.
+const realScrollIntoView = Element.prototype.scrollIntoView;
+afterEach(() => {
+  Element.prototype.scrollIntoView = realScrollIntoView;
+});
 jest.mock("../../../hooks/useAccessToken", () => ({
   useAccessToken: () => accessTokenMock(),
 }));
@@ -701,7 +707,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
       within(expectedSection()).getByRole("button", { name: "Add tool" }),
     );
     await user.click(
-      within(expectedSection()).getByRole("button", { name: "Pick book_flight" }),
+      screen.getByRole("button", { name: "Pick book_flight" }),
     );
     await user.click(
       within(expectedSection()).getByRole("button", { name: "+ Add parameter" }),
@@ -1037,6 +1043,37 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     accessTokenMock.mockReturnValue(null);
   });
 
+  it("does not save while a tool's JSON does not read, even with every value filled", async () => {
+    withTools();
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: [
+            { tool: "book_flight", arguments: { city: "Pune" }, accept_any_arguments: false },
+          ],
+        },
+      ],
+    });
+    await screen.findByText("Accept any values for the parameters");
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "JSON" }));
+    const json = screen.getByDisplayValue(/Pune/);
+    await user.clear(json);
+    await user.type(json, "{{ broken");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() =>
+      expect(document.activeElement).toHaveValue("{ broken"),
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+    accessTokenMock.mockReturnValue(null);
+  });
+
   it("keeps a text reply typed after the box came back, once a tool call is added", async () => {
     const user = setupUser();
     const { onSubmit } = renderDialog({
@@ -1105,6 +1142,9 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
       .getByRole("button", { name: "Pick book_flight" })
       .closest(".w-72") as HTMLElement;
     expect(list).toHaveClass("fixed");
+    // On the page itself, outside the dialog, so the dialog's own animation
+    // cannot move it.
+    expect(list.parentElement).toBe(document.body);
     expect(list.style.right).not.toBe("");
   });
 
