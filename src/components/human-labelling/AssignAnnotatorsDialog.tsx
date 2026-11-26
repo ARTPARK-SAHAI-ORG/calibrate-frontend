@@ -1,5 +1,6 @@
 "use client";
 
+import { ErrorNote } from "@/components/ui";
 import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { ClippedText } from "@/components/ui/ClippedText";
@@ -349,10 +350,12 @@ export function AssignAnnotatorsDialog({
   const evaluatorSelectionValid = kindsMissingLabel.length === 0;
   const missingLabelMessage =
     kindsMissingLabel.length === 1 && hasToolCallItems && hasNonToolCallItems
-      ? `Pick at least one label for the ${
-          kindsMissingLabel[0].isToolCall ? "tool call items" : "other items"
+      ? `Select at least one evaluator for the ${
+          kindsMissingLabel[0].isToolCall
+            ? "tool call items"
+            : "items with a text reply"
         }`
-      : "Pick at least one label";
+      : "Select at least one evaluator";
   const allEvaluatorsPicked =
     choosableEvaluators.length > 0 &&
     pickedEvaluators.size === choosableEvaluators.length;
@@ -665,7 +668,7 @@ export function AssignAnnotatorsDialog({
                   Pick one or more labels to show in the labelling jobs created
                 </p>
                 {!evaluatorSelectionValid && (
-                  <p className="text-xs text-red-500">{missingLabelMessage}</p>
+                  <ErrorNote>{missingLabelMessage}</ErrorNote>
                 )}
                 {choosableEvaluators.length > 1 && (
                   <label className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none">

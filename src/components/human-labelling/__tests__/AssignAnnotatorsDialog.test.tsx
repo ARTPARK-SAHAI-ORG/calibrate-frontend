@@ -1017,7 +1017,7 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     await user.click(box);
     expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
     expect(
-      screen.getByText("Pick at least one label for the tool call items"),
+      screen.getByText("Select at least one evaluator for the tool call items"),
     ).toBeInTheDocument();
   });
 
@@ -1175,7 +1175,7 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     await user.click(screen.getByRole("checkbox", { name: "Alice" }));
     await user.click(screen.getByRole("checkbox", { name: "Unselect all labels" }));
     expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
-    expect(screen.getByText("Pick at least one label")).toBeInTheDocument();
+    expect(screen.getByText("Select at least one evaluator")).toBeInTheDocument();
   });
 
   it("needs a label for the tool-call items when only custom ones are offered", async () => {
@@ -1190,7 +1190,7 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     await user.click(screen.getByRole("checkbox", { name: /Right arguments/ }));
     expect(screen.getByRole("button", { name: /Assign/ })).toBeDisabled();
     expect(
-      screen.getByText("Pick at least one label for the tool call items"),
+      screen.getByText("Select at least one evaluator for the tool call items"),
     ).toBeInTheDocument();
   });
 
@@ -1199,8 +1199,8 @@ describe("AssignAnnotatorsDialog and the tool call label", () => {
     mockedApiClient.mockResolvedValue(annotators);
     renderDialog();
     await screen.findByText("Alice");
-    expect(screen.queryByText(/Pick at least one label/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Select at least one evaluator/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("checkbox", { name: "Unselect all labels" }));
-    expect(screen.getByText("Pick at least one label")).toBeInTheDocument();
+    expect(screen.getByText("Select at least one evaluator")).toBeInTheDocument();
   });
 });
