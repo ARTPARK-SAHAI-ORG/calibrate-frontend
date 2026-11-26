@@ -36,8 +36,9 @@ export function PickerRow({
     <div
       className={`flex items-start gap-3 px-3 py-2.5 transition-colors ${
         isPreviewed
-          ? "bg-muted/60 border-l-2 border-foreground/40 pl-[calc(0.75rem-2px)]"
-          : "hover:bg-muted/30"
+          ? // The same grey the test list in a run window marks its open row with.
+            "bg-muted"
+          : "hover:bg-muted/50"
       }`}
     >
       {/* The box is centred against the name's own line, so it sits the

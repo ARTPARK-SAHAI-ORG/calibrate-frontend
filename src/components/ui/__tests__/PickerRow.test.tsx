@@ -56,11 +56,13 @@ describe("PickerRow", () => {
 
   it("highlights the row when isPreviewed", () => {
     const { container } = renderRow({ isPreviewed: true });
-    expect(container.firstChild).toHaveClass("bg-muted/60");
+    expect(container.firstChild).toHaveClass("bg-muted");
+    // Grey edge to edge, with no bar down the left.
+    expect(container.firstChild).not.toHaveClass("border-l-2");
   });
 
   it("does not highlight the row when not previewed", () => {
     const { container } = renderRow({ isPreviewed: false });
-    expect(container.firstChild).not.toHaveClass("bg-muted/60");
+    expect(container.firstChild).not.toHaveClass("bg-muted");
   });
 });
