@@ -785,34 +785,40 @@ export function EvaluatorResultsPane({
     );
   }
 
-  const visibleEvaluators = evaluators.filter((ev) => {
-    const humansForEv = humanAgreementForItem?.evaluators.find(
-      (e) => e.evaluator_id === ev.evaluator_id,
-    );
-    const humanCount = humansForEv?.human_annotations.length ?? 0;
-    if (filterDisagreements) {
-      return (
-        !!humansForEv &&
-        humanCount > 0 &&
-        humansForEv.agreement !== null &&
-        humansForEv.agreement !== 1
-      );
-    }
-    // An optional evaluator can be left blank, so drop it from an item
-    // where nobody labelled it and no evaluator run scored it.
-    if (!ev.is_optional) return true;
-    return (
-      humanCount > 0 ||
-      runs.some(
-        (x) =>
-          x.evaluator_id === ev.evaluator_id &&
-          (!ev.evaluator_version_id ||
-            x.evaluator_version_id === ev.evaluator_version_id) &&
-          x.value?.value !== null &&
-          x.value?.value !== undefined,
-      )
-    );
-  });
+  const visibleEvaluators = !filterDisagreements
+    ? evaluators
+    : evaluators.filter((ev) => {
+        const humansForEv = humanAgreementForItem?.evaluators.find(
+          (e) => e.evaluator_id === ev.evaluator_id,
+        );
+        return (
+          !!humansForEv &&
+          humansForEv.human_annotations.length > 0 &&
+          humansForEv.agreement !== null &&
+          humansForEv.agreement !== 1
+        );
+      });
+
+  // An evaluator counts as answered when a person labelled it or a run
+  // scored it. An optional one says "Not answered" only once every required
+  // one on this item is answered.
+  const answeredIds = new Set<string>([
+    ...(jobStatus === "completed"
+      ? (humanAgreementForItem?.evaluators ?? [])
+          .filter((e) => e.human_annotations.length > 0)
+          .map((e) => e.evaluator_id)
+      : []),
+    ...runs
+      .filter((x) => x.value?.value !== null && x.value?.value !== undefined)
+      .map((x) => x.evaluator_id),
+  ]);
+  const requiredAllAnswered = evaluators.every(
+    (ev) => ev.is_optional === true || answeredIds.has(ev.evaluator_id),
+  );
+  const notAnsweredFor = (ev: { evaluator_id: string; is_optional?: boolean }) =>
+    ev.is_optional === true &&
+    requiredAllAnswered &&
+    !answeredIds.has(ev.evaluator_id);
 
   if (visibleEvaluators.length === 0) {
     return (
@@ -820,9 +826,7 @@ export function EvaluatorResultsPane({
         {itemDetails}
         {commentsBlock}
         <div className="border border-border rounded-xl p-4 text-sm text-muted-foreground">
-          {filterDisagreements
-            ? "All evaluators agree with human annotations on this item."
-            : "Every evaluator on this item could be skipped, and none was answered or scored."}
+          All evaluators agree with human annotations on this item.
         </div>
       </div>
     );
@@ -832,6 +836,7 @@ export function EvaluatorResultsPane({
     evaluator_id: string;
     evaluator_version_id?: string;
     name?: string;
+    is_optional?: boolean;
   }) => {
     const versionLabel = ev.evaluator_version_id
       ? versionLabels[ev.evaluator_version_id]
@@ -1060,6 +1065,8 @@ export function EvaluatorResultsPane({
         <EvaluatorVerdictCard
           mode="read"
           name={evaluatorName}
+          isOptional={ev.is_optional === true}
+          notAnswered={notAnsweredFor(ev)}
           description={jobEvaluator?.description ?? null}
           versionLabel={showVersionInSourcePill ? null : versionLabel}
           outputType={outputType}
@@ -1109,6 +1116,7 @@ export function EvaluatorResultsPane({
             jobStatus={jobStatus}
             linkEvaluators={linkEvaluators}
             annotatorFilterActive={annotatorFilterActive}
+            notAnswered={notAnsweredFor(byEvaluator.get(id)![0])}
           />
         ))}
       </div>
@@ -1200,12 +1208,15 @@ function GroupedEvaluatorCard({
   jobStatus,
   linkEvaluators,
   annotatorFilterActive = false,
+  notAnswered = false,
 }: {
   evaluators: {
     evaluator_id: string;
     evaluator_version_id?: string;
     name?: string;
+    is_optional?: boolean;
   }[];
+  notAnswered?: boolean;
   runs: EvaluatorRunRow[];
   versionLabels: Record<string, string>;
   evaluatorNamesById: Record<string, string>;
@@ -1382,6 +1393,8 @@ function GroupedEvaluatorCard({
       <EvaluatorVerdictCard
         mode="read"
         name={evaluatorName}
+        isOptional={evaluators[0]?.is_optional === true}
+        notAnswered={notAnswered}
         description={jobEvaluator?.description ?? null}
         outputType={outputType}
         evaluatorUuid={evaluatorId}
@@ -1443,8 +1456,7 @@ export function ItemDetailPane({
     evaluator_id: string;
     evaluator_version_id?: string;
     name?: string;
-    /** Named here so anyone rebuilding this list can see the flag exists.
-     * Rebuilding it without this drops the hiding rule silently. */
+    /** Marks the card Optional, and "Not answered" once the required ones are. */
     is_optional?: boolean;
   }[];
   evaluatorNamesById: Record<string, string>;

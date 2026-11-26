@@ -322,6 +322,34 @@ describe("EvaluatorVerdictCard - header extras", () => {
     expect(screen.queryByText("Optional")?.tagName).toBe("SPAN");
   });
 
+  it("shows a Not answered pill in read mode when asked to", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Script Fidelity"
+        outputType="rating"
+        isOptional
+        notAnswered
+        score={null}
+      />,
+    );
+    expect(screen.getByText("Not answered")).toBeInTheDocument();
+    expect(screen.getByText("Optional")).toBeInTheDocument();
+  });
+
+  it("shows no Not answered pill unless asked to", () => {
+    render(
+      <EvaluatorVerdictCard
+        mode="read"
+        name="Script Fidelity"
+        outputType="binary"
+        isOptional
+        match={null}
+      />,
+    );
+    expect(screen.queryByText("Not answered")).not.toBeInTheDocument();
+  });
+
   it("hides the Optional pill when the evaluator is required", () => {
     render(
       <EvaluatorVerdictCard

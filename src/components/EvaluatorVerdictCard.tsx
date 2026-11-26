@@ -56,6 +56,9 @@ type CommonProps = {
   /** Marks the evaluator as one an annotator may leave blank. Shown as
    * a muted pill beside the name, same shape as the version chip. */
   isOptional?: boolean;
+  /** Read mode only: show a grey "Not answered" pill where the verdict
+   * would sit. The caller decides when, since it needs the other evaluators. */
+  notAnswered?: boolean;
   /** "binary" → Correct/Wrong, "rating" → 1..scaleMax buttons. */
   outputType: EvaluatorOutputType;
   /** Evaluator uuid — used for linking the name to its detail page. */
@@ -270,6 +273,11 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             className="flex-shrink-0 flex items-center gap-1.5"
             data-evaluator-verdict-chips
           >
+            {props.mode === "read" && props.notAnswered && (
+              <span className="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-muted text-muted-foreground whitespace-nowrap">
+                Not answered
+              </span>
+            )}
             {props.mode === "read" && (
               <ReadVerdictPill
                 outputType={props.outputType}
