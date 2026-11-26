@@ -788,33 +788,41 @@ export function AddLlmGeneralItemsDialog({
                 {showsText && (
                   <TextVersionsEditor
                     field="output"
-                    headingAside={
-                      isToolCallItem && (
-                        <Tooltip content="Remove text reply" position="top">
-                          <button
-                            type="button"
-                            onClick={removeText}
-                            disabled={submitting}
-                            aria-label="Remove text reply"
-                            className="w-7 h-7 rounded-md border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
-                        </Tooltip>
-                      )
-                    }
                     extras={outputExtras}
                     onChange={setOutputExtras}
                     onPendingChange={setOutputPending}
                     disabled={submitting || !output.trim()}
                   >
-                    <textarea
-                      value={output}
-                      onChange={(e) => setOutput(e.target.value)}
-                      placeholder="The output the LLM produced"
-                      disabled={submitting}
-                      className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-                    />
+                    {/* Remove sits beside the box, the same as on a tool
+                        call below it. The box keeps the column's height
+                        under its heading (3.25rem), so tool calls added
+                        below scroll the column rather than shrink it. */}
+                    <div className="flex shrink-0 w-full gap-2 h-[calc(100%-3.25rem)] min-h-[10rem]">
+                      {isToolCallItem && (
+                        <Tooltip
+                          content="Remove text reply"
+                          position="top"
+                          className="flex-shrink-0 self-start"
+                        >
+                          <button
+                            type="button"
+                            onClick={removeText}
+                            disabled={submitting}
+                            aria-label="Remove text reply"
+                            className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </Tooltip>
+                      )}
+                      <textarea
+                        value={output}
+                        onChange={(e) => setOutput(e.target.value)}
+                        placeholder="The output the LLM produced"
+                        disabled={submitting}
+                        className="flex-1 min-w-0 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                      />
+                    </div>
                   </TextVersionsEditor>
                 )}
                 {toolCalls.map((tc) => (

@@ -73,7 +73,6 @@ export function TextVersionsEditor({
   onChange,
   onPendingChange,
   disabled = false,
-  headingAside,
   children,
 }: {
   field: "input" | "output";
@@ -82,8 +81,6 @@ export function TextVersionsEditor({
   /** Told whether a typed heading or name is waiting for its tick. */
   onPendingChange?: (pending: boolean) => void;
   disabled?: boolean;
-  /** A small button drawn at the end of the heading's row. */
-  headingAside?: ReactNode;
   children: ReactNode;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -201,7 +198,6 @@ export function TextVersionsEditor({
             canConfirm={!headingTaken}
           />
         )}
-        {headingAside}
       </div>
       {headingTaken && (
         <p className="text-xs text-red-500 px-4 -mt-1 mb-3">{TAKEN_MESSAGE}</p>
