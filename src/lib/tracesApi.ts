@@ -596,15 +596,20 @@ export type ConvertTracesToTestsBody = {
 export function defaultTestName(
   comment: string | null | undefined,
   userMessage: string | null | undefined,
-): string {
+): { name: string; from: "comment" | "message" | null } {
   const fromComment = comment?.trim();
-  if (fromComment) return fromComment;
-  const message = userMessage?.trim() ?? "";
+  if (fromComment) return { name: fromComment, from: "comment" };
+  const message = userMessage?.trim();
+  if (!message) return { name: "", from: null };
   // By character, so an emoji at the cut is not split in half.
   const chars = Array.from(message);
-  return chars.length <= 60
-    ? message
-    : `${chars.slice(0, 60).join("").trimEnd()}…`;
+  return {
+    name:
+      chars.length <= 60
+        ? message
+        : `${chars.slice(0, 60).join("").trimEnd()}…`,
+    from: "message",
+  };
 }
 
 export type ConvertTracesToTestsResult = {

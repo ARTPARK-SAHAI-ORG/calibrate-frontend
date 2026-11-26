@@ -332,7 +332,7 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
       dialog.getByRole("heading", { name: /Add 1 trace to your tests/ }),
     ).toBeVisible();
     // One trace is named first, filled in from the user's message.
-    const nameBox = dialog.getByLabel("Test name");
+    const nameBox = dialog.getByLabel("Name of the test");
     await expect(nameBox).toHaveValue(/^A question worth testing\./);
     await nameBox.fill(msgId);
     await dialog.getByRole("button", { name: "Next" }).click();

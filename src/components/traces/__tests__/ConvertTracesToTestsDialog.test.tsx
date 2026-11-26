@@ -490,9 +490,13 @@ describe("naming one trace's test", () => {
       nameFrom: { comment: " It skipped rotavirus ", userMessage: "Hi" },
     });
 
-    const box = screen.getByLabelText("Test name");
+    const box = screen.getByLabelText("Name of the test");
     expect(box).toHaveValue("It skipped rotavirus");
-    expect(screen.queryByText(/Filled in from/)).toBeNull();
+    expect(
+      screen.getByText(
+        "Automatically filled in from the comment left with the rating",
+      ),
+    ).toBeInTheDocument();
     // The evaluators wait for the second step.
     expect(screen.queryByText("Correctness")).toBeNull();
     expect(screen.queryByRole("button", { name: "Add to tests" })).toBeNull();
@@ -507,7 +511,7 @@ describe("naming one trace's test", () => {
     );
     expect(screen.queryByText("Evaluators", { selector: "div" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByLabelText("Test name")).toHaveValue(
+    expect(screen.getByLabelText("Name of the test")).toHaveValue(
       "Rotavirus left out",
     );
     await user.click(screen.getByRole("button", { name: "2 Evaluators" }));
@@ -532,9 +536,12 @@ describe("naming one trace's test", () => {
       traceUuids: ["tr-1"],
       nameFrom: { comment: "  ", userMessage: long },
     });
-    expect(screen.getByLabelText("Test name")).toHaveValue(
+    expect(screen.getByLabelText("Name of the test")).toHaveValue(
       `${"a".repeat(60)}…`,
     );
+    expect(
+      screen.getByText("Automatically filled in from the user's message"),
+    ).toBeInTheDocument();
   });
 
   it("never cuts an emoji in half", () => {
@@ -542,7 +549,7 @@ describe("naming one trace's test", () => {
       traceUuids: ["tr-1"],
       nameFrom: { userMessage: `${"a".repeat(59)}😀😀` },
     });
-    expect(screen.getByLabelText("Test name")).toHaveValue(
+    expect(screen.getByLabelText("Name of the test")).toHaveValue(
       `${"a".repeat(59)}😀…`,
     );
   });
@@ -556,7 +563,7 @@ describe("naming one trace's test", () => {
       await screen.findByRole("button", { name: "Add to tests" }),
     );
     await user.click(screen.getByRole("button", { name: "✓ Test name" }));
-    expect(screen.queryByLabelText("Test name")).toBeNull();
+    expect(screen.queryByLabelText("Name of the test")).toBeNull();
     expect(
       screen.getByRole("button", { name: "Adding..." }),
     ).toBeInTheDocument();
@@ -564,8 +571,9 @@ describe("naming one trace's test", () => {
 
   it("starts empty with nothing to name it from", () => {
     setup({ traceUuids: ["tr-1"], nameFrom: {} });
-    expect(screen.getByLabelText("Test name")).toHaveValue("");
+    expect(screen.getByLabelText("Name of the test")).toHaveValue("");
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(screen.queryByText(/Automatically filled in/)).toBeNull();
   });
 
   it("names a tool-call test on one screen with no steps", async () => {
@@ -577,7 +585,9 @@ describe("naming one trace's test", () => {
       nameFrom: { userMessage: "Book a visit" },
     });
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
-    expect(screen.getByLabelText("Test name")).toHaveValue("Book a visit");
+    expect(screen.getByLabelText("Name of the test")).toHaveValue(
+      "Book a visit",
+    );
     await user.click(screen.getByRole("button", { name: "Add to tests" }));
     await waitFor(() => expect(mockConvert).toHaveBeenCalled());
     expect(mockConvert.mock.calls[0][1]).toMatchObject({
@@ -588,7 +598,7 @@ describe("naming one trace's test", () => {
 
   it("does not ask for a name for several traces", async () => {
     setup({ nameFrom: { userMessage: "Hi" } });
-    expect(screen.queryByLabelText("Test name")).toBeNull();
+    expect(screen.queryByLabelText("Name of the test")).toBeNull();
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
