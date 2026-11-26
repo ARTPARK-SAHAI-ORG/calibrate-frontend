@@ -43,7 +43,9 @@ export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
               {evaluator.name}
             </h3>
             {evaluator.evaluator_type && (
-              <EvaluatorTypePill evaluatorType={evaluator.evaluator_type} />
+              <span className="pointer-events-auto">
+                <EvaluatorTypePill evaluatorType={evaluator.evaluator_type} />
+              </span>
             )}
             {isDefaultEvaluator(evaluator) && <PreBuiltPill />}
           </div>

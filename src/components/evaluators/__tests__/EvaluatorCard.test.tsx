@@ -20,3 +20,12 @@ it.each([
   render(<EvaluatorCard evaluator={evaluator({ evaluator_type: type })} />);
   expect(screen.getByText(label)).toBeInTheDocument();
 });
+
+it("lets the mouse reach the type pill, so its tooltip can show", () => {
+  render(
+    <EvaluatorCard evaluator={evaluator({ evaluator_type: "tool-call" })} />,
+  );
+  expect(
+    screen.getByText("Tool call").closest(".pointer-events-auto"),
+  ).not.toBeNull();
+});

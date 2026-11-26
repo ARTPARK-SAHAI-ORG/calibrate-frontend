@@ -401,10 +401,14 @@ function MetricsPageInner() {
                         <h3 className="text-base md:text-lg font-semibold text-foreground">
                           {evaluator.name}
                         </h3>
+                        {/* The card ignores the mouse so a click opens it; the
+                            pill takes it back so its tooltip shows. */}
                         {evaluator.evaluator_type && (
-                          <EvaluatorTypePill
-                            evaluatorType={evaluator.evaluator_type}
-                          />
+                          <span className="pointer-events-auto">
+                            <EvaluatorTypePill
+                              evaluatorType={evaluator.evaluator_type}
+                            />
+                          </span>
                         )}
                         {evaluator.output_type && (
                           <OutputTypePill outputType={evaluator.output_type} />
