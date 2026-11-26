@@ -100,7 +100,7 @@ function RunBody({
           {canScore ? (
             <>
               This trace was not scored because none of the agent&apos;s
-              evaluators could score it then. You have since added{" "}
+              evaluators could score it then.{" "}
               {listNames.formatToParts(scoringEvaluatorNames).map((part, i) =>
                 part.type === "element" ? (
                   <span key={i} className={EVALUATOR_PILL_CLASSES}>
@@ -109,8 +109,8 @@ function RunBody({
                 ) : (
                   part.value
                 ),
-              )}
-              , which can.
+              )}{" "}
+              can score it now.
             </>
           ) : run.error === "over_limit" && usesOwnProviderKeys
               ? "This trace was not scored because the workspace had reached its scoring limit at the time"

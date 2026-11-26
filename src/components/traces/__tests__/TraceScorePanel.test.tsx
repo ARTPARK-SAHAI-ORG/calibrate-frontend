@@ -334,7 +334,7 @@ describe("the Score this trace button", () => {
       expect(screen.getByText(name)).toHaveClass("rounded-md");
     }
     expect(document.body).toHaveTextContent(
-      /This trace was not scored because none of the agent's evaluators could score it then\. You have since added Helpfulness, Tone and Safety, which can\.\s*Score this trace$/,
+      /This trace was not scored because none of the agent's evaluators could score it then\. Helpfulness, Tone and Safety can score it now\.\s*Score this trace$/,
     );
   });
 
