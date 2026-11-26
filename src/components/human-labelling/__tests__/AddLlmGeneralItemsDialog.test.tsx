@@ -32,6 +32,12 @@ jest.mock("../bulk-upload-shared", () => ({
 }));
 
 const accessTokenMock = jest.fn<string | null, []>(() => null);
+
+// Tests that watch scrolling swap this out; put it back even if one fails.
+const realScrollIntoView = Element.prototype.scrollIntoView;
+afterEach(() => {
+  Element.prototype.scrollIntoView = realScrollIntoView;
+});
 jest.mock("../../../hooks/useAccessToken", () => ({
   useAccessToken: () => accessTokenMock(),
 }));
@@ -172,20 +178,25 @@ jest.mock("../../tools/CreateToolFlow", () => ({
   CreateToolFlow: (props: CreateToolFlowStubProps) => {
     createToolFlowProps = props;
     return props.isOpen ? (
-      <button
-        type="button"
-        onClick={() =>
-          props.onCreated(
-            { uuid: "tool-new", name: "book_flight", config: {} },
-            [
-              ...props.knownTools,
+      <>
+        <button type="button" onClick={props.onClose}>
+          Back out of creating a tool
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            props.onCreated(
               { uuid: "tool-new", name: "book_flight", config: {} },
-            ],
-          )
-        }
-      >
-        Finish creating tool
-      </button>
+              [
+                ...props.knownTools,
+                { uuid: "tool-new", name: "book_flight", config: {} },
+              ],
+            )
+          }
+        >
+          Finish creating tool
+        </button>
+      </>
     ) : null;
   },
 }));
@@ -238,9 +249,95 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     });
     expect(screen.getByText("dummy")).toBeInTheDocument();
     expect(screen.getByText("success")).toBeInTheDocument();
+    // Saved with no text reply, so it opens without the text box.
+    expect(
+      screen.queryByPlaceholderText("The output the LLM produced"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add text reply" }),
+    ).toBeInTheDocument();
+  });
+
+  it("removes the text reply from a tool call item and adds it back", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Booked",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Remove text reply" }));
+    expect(
+      screen.queryByPlaceholderText("The output the LLM produced"),
+    ).not.toBeInTheDocument();
+    // The Output heading stays, with Add text reply on its row.
+    const heading = screen.getByLabelText("Heading for the output");
+    expect(heading.parentElement).toContainElement(
+      screen.getByRole("button", { name: "Add text reply" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Add text reply" }));
+    expect(
+      screen.getByPlaceholderText("The output the LLM produced"),
+    ).toHaveValue("");
+    await user.click(screen.getByRole("button", { name: "Remove text reply" }));
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].output).toBe("");
+  });
+
+  it("brings the text box back once the last tool call is removed", async () => {
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Remove dummy" }));
     expect(
       screen.getByPlaceholderText("The output the LLM produced"),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Remove text reply" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("halves the text box once the item has a tool call", async () => {
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Booked",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    expect(screen.getByTestId("output-text-box")).toHaveClass("h-1/2");
+    await user.click(screen.getByRole("button", { name: "Remove dummy" }));
+    expect(screen.getByTestId("output-text-box")).not.toHaveClass("h-1/2");
+  });
+
+  it("offers no way to remove the text reply on a text item", () => {
+    renderDialog();
+    expect(
+      screen.queryByRole("button", { name: "Remove text reply" }),
+    ).not.toBeInTheDocument();
   });
 
   it("saves an edited argument value, with true kept as a yes/no", async () => {
@@ -610,7 +707,7 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
       within(expectedSection()).getByRole("button", { name: "Add tool" }),
     );
     await user.click(
-      within(expectedSection()).getByRole("button", { name: "Pick book_flight" }),
+      screen.getByRole("button", { name: "Pick book_flight" }),
     );
     await user.click(
       within(expectedSection()).getByRole("button", { name: "+ Add parameter" }),
@@ -717,16 +814,62 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     });
     await screen.findByText("Accept any values for the parameters");
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    const scroll = jest.fn();
+    Element.prototype.scrollIntoView = scroll;
     await user.clear(screen.getByDisplayValue("Pune"));
     await user.click(screen.getByRole("button", { name: "Save item" }));
+    // The first bad field is scrolled to and focused; the message is under it.
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("data-param-error"),
+    );
+    expect(scroll).toHaveBeenCalledWith({
+      block: "center",
+      behavior: "smooth",
+    });
     expect(
-      await screen.findByText(
+      screen.queryByText(
         "Complete every highlighted parameter in Expected tool calls.",
       ),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Switch to Form/)).not.toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
     accessTokenMock.mockReturnValue(null);
   });
+
+  it("switches a tool shown as JSON back to Form and goes to the bad field", async () => {
+    withTools();
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: [
+            {
+              tool: "book_flight",
+              arguments: { city: "Pune" },
+              accept_any_arguments: false,
+            },
+          ],
+        },
+      ],
+    });
+    await screen.findByText("Accept any values for the parameters");
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.clear(screen.getByDisplayValue("Pune"));
+    await user.click(screen.getByRole("button", { name: "JSON" }));
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("data-param-error"),
+    );
+    expect(screen.queryByText(/Switch to Form/)).not.toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+    accessTokenMock.mockReturnValue(null);
+  });
+
 
   it("saves an expected call that leaves out a required input as it was", async () => {
     withTools();
@@ -845,6 +988,185 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     rerender(<AddLlmGeneralItemsDialog isOpen {...props} />);
     expect(screen.queryByDisplayValue(/"city"/)).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Pune")).toBeInTheDocument();
+  });
+
+  it("stays open when the Create tool window is backed out of", async () => {
+    const user = setupUser();
+    const { onClose } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    await user.click(
+      screen.getByRole("button", { name: "Create tool for expected tool calls" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Back out of creating a tool" }),
+    );
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Save item" })).toBeInTheDocument();
+  });
+
+  it("keeps a tool's JSON that does not read when a save is refused", async () => {
+    withTools();
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: [
+            { tool: "book_flight", arguments: { city: "Pune" }, accept_any_arguments: false },
+          ],
+        },
+      ],
+    });
+    await screen.findByText("Accept any values for the parameters");
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.clear(screen.getByDisplayValue("Pune"));
+    await user.click(screen.getByRole("button", { name: "JSON" }));
+    const json = screen.getByDisplayValue(/city/);
+    await user.clear(json);
+    await user.type(json, "{{ broken");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    // Still JSON, text kept, and the box itself is where the form goes.
+    await waitFor(() =>
+      expect(document.activeElement).toHaveValue("{ broken"),
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("does not save while a tool's JSON does not read, even with every value filled", async () => {
+    withTools();
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: [
+            { tool: "book_flight", arguments: { city: "Pune" }, accept_any_arguments: false },
+          ],
+        },
+      ],
+    });
+    await screen.findByText("Accept any values for the parameters");
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "JSON" }));
+    const json = screen.getByDisplayValue(/Pune/);
+    await user.clear(json);
+    await user.type(json, "{{ broken");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() =>
+      expect(document.activeElement).toHaveValue("{ broken"),
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("keeps a text reply typed after the box came back, once a tool call is added", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Remove dummy" }));
+    await user.type(
+      screen.getByPlaceholderText("The output the LLM produced"),
+      "Booked",
+    );
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(screen.getByRole("button", { name: "Pick End conversation" }));
+    expect(
+      screen.getByPlaceholderText("The output the LLM produced"),
+    ).toHaveValue("Booked");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].output).toBe("Booked");
+  });
+
+  it("closes on the dark area only when the click started there", () => {
+    const { onClose, container } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    const backdrop = container.querySelector(".fixed.inset-0") as HTMLElement;
+    // A column divider dragged and let go over the dark area.
+    fireEvent.mouseDown(screen.getByRole("separator", { name: "Resize the right column" }));
+    fireEvent.click(backdrop);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.mouseDown(backdrop);
+    fireEvent.click(backdrop);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("scrolls to an expected tool just added", async () => {
+    const scrolled: Element[] = [];
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    const user = setupUser();
+    renderDialog();
+    await user.click(screen.getByRole("button", { name: "Add tool" }));
+    await user.click(screen.getByRole("button", { name: "Pick End conversation" }));
+    expect(scrolled.some((el) => el.hasAttribute("data-card-id"))).toBe(true);
+  });
+
+  it("opens the expected tool list over the form, not inside its column", async () => {
+    const user = setupUser();
+    renderDialog();
+    await user.click(screen.getByRole("button", { name: "Add tool" }));
+    const list = screen
+      .getByRole("button", { name: "Pick book_flight" })
+      .closest(".w-72") as HTMLElement;
+    expect(list).toHaveClass("fixed");
+    // On the page itself, outside the dialog, so the dialog's own animation
+    // cannot move it.
+    expect(list.parentElement).toBe(document.body);
+    expect(list.style.right).not.toBe("");
+  });
+
+  it("scrolls to a tool call just added, and not to one already there", async () => {
+    const scrolled: Element[] = [];
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    const user = setupUser();
+    renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    expect(scrolled).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(screen.getByRole("button", { name: "Pick End conversation" }));
+    expect(scrolled).toHaveLength(1);
+    expect(scrolled[0]).toHaveTextContent("end_call");
   });
 
   it("keeps the tool list open on Escape pressed inside the tool side panel", async () => {
@@ -1230,12 +1552,12 @@ describe("AddLlmGeneralItemsDialog", () => {
     expect(screen.queryByText("Add item")).not.toBeInTheDocument();
   });
 
-  it("renders the add-mode header with no evaluators section when none provided", () => {
+  it("renders the add-mode header with no evaluator cards when none provided", () => {
     renderDialog();
     expect(
       screen.getByRole("heading", { name: "Add item" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
+    expect(screen.queryByText("Relevance")).not.toBeInTheDocument();
   });
 
   it("keeps Add disabled until name/input/output are filled", async () => {
@@ -1350,6 +1672,96 @@ describe("AddLlmGeneralItemsDialog", () => {
         metadata: [],
       },
     ]);
+  });
+
+  describe("column widths", () => {
+    const LEFT = "calibrate:one-shot-item-form-left-width";
+    const RIGHT = "calibrate:one-shot-item-form-right-width";
+    beforeEach(() => window.localStorage.clear());
+    afterAll(() => window.localStorage.clear());
+
+    const leftColumn = () =>
+      screen
+        .getByPlaceholderText("Your item name")
+        .closest("[style]") as HTMLElement;
+    const rightColumn = () =>
+      screen.getByTestId("label-item-evaluators-column");
+    const drag = (name: string, clientX: number) => {
+      const handle = screen.getByRole("separator", { name });
+      handle.parentElement!.getBoundingClientRect = () =>
+        ({ left: 0, right: 1000, width: 1000 }) as DOMRect;
+      fireEvent.mouseDown(handle);
+      fireEvent.mouseMove(document, { clientX });
+      fireEvent.mouseUp(document);
+    };
+
+    it("opens with the form column at 32% when nothing is saved", () => {
+      renderDialog();
+      expect(leftColumn().style.getPropertyValue("--form-column-width")).toBe(
+        "32%",
+      );
+    });
+
+    it("opens at the widths saved in this browser", () => {
+      window.localStorage.setItem(LEFT, "30");
+      window.localStorage.setItem(RIGHT, "35");
+      renderDialog({ evaluators: [evaluatorWithVars] });
+      expect(leftColumn().style.getPropertyValue("--form-column-width")).toBe(
+        "30%",
+      );
+      expect(rightColumn().style.getPropertyValue("--side-column-width")).toBe(
+        "35%",
+      );
+    });
+
+    it("saves each column's width when its divider is dragged", () => {
+      renderDialog({ evaluators: [evaluatorWithVars] });
+      drag("Resize the form column", 300);
+      drag("Resize the right column", 700);
+      expect(leftColumn().style.getPropertyValue("--form-column-width")).toBe(
+        "30%",
+      );
+      expect(rightColumn().style.getPropertyValue("--side-column-width")).toBe(
+        "30%",
+      );
+      expect(window.localStorage.getItem(LEFT)).toBe("30");
+      expect(window.localStorage.getItem(RIGHT)).toBe("30");
+    });
+
+    it("keeps at least a quarter of the row for the input and output", () => {
+      window.localStorage.setItem(LEFT, "50");
+      window.localStorage.setItem(RIGHT, "40");
+      renderDialog({ evaluators: [evaluatorWithVars] });
+      expect(rightColumn().style.getPropertyValue("--side-column-width")).toBe(
+        "25%",
+      );
+    });
+
+    it("names the input and output only in their heading boxes", () => {
+      renderDialog();
+      expect(screen.queryByText("Input")).not.toBeInTheDocument();
+      expect(screen.queryByText("Output")).not.toBeInTheDocument();
+      expect(screen.getByLabelText("Heading for the input")).toHaveAttribute(
+        "placeholder",
+        "Input",
+      );
+    });
+
+    it("puts Expected tool calls in the left column, under metadata", () => {
+      renderDialog();
+      expect(leftColumn()).toContainElement(
+        screen.getByText("Expected tool calls"),
+      );
+    });
+
+    it("keeps the evaluators column when no evaluator scores the item", () => {
+      renderDialog({ evaluators: [] });
+      expect(
+        within(rightColumn()).getByText(
+          "No evaluator on this task scores this item",
+        ),
+      ).toBeInTheDocument();
+    });
   });
 
   it("puts the evaluators in their own right column", () => {

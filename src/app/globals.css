@@ -86,7 +86,10 @@ body {
   background: var(--muted-foreground);
 }
 
-/* Hide scrollbar for tabs navigation */
+/* Hide the scroll bar on an area that still scrolls */
+.hide-scrollbar {
+  scrollbar-width: none;
+}
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }

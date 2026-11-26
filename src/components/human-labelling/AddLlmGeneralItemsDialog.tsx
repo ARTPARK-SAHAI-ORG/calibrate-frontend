@@ -7,11 +7,16 @@ import {
   versionsComplete,
 } from "./TextVersionsEditor";
 import type { TurnExtras } from "@/lib/messageVersions";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Tooltip } from "@/components/Tooltip";
+import { TrashIcon } from "@/components/icons";
 import { FieldError } from "@/components/ui/FieldError";
-import { DialogNavHeader, ErrorNote, type MetadataEntry } from "@/components/ui";
+import {
+  DialogNavHeader,
+  ErrorNote,
+  type MetadataEntry,
+} from "@/components/ui";
 import {
   ToolPicker,
   getToolParams,
@@ -33,7 +38,11 @@ import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { getDefaultHeaders } from "@/lib/api";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { reportError } from "@/lib/reportError";
-import { normalizeToolCall } from "@/components/test-results/shared";
+import {
+  ResizeHandle,
+  normalizeToolCall,
+} from "@/components/test-results/shared";
+import { useSavedColumnWidth } from "@/hooks/useSavedColumnWidth";
 import { humaniseDetailObject } from "./bulk-upload-shared";
 import {
   MetadataFieldsEditor,
@@ -106,10 +115,29 @@ function ungroupParams(params: ToolCallParam[]): ToolCallParam[] {
   return argumentRows(paramsToArgs(params), false);
 }
 
+/** The red bin beside the text reply and beside each tool call. */
+const REMOVE_BUTTON_CLASS =
+  "w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60 disabled:opacity-50 disabled:cursor-not-allowed";
+
 let draftIdCounter = 0;
 function nextDraftId(): number {
   draftIdCounter += 1;
   return draftIdCounter;
+}
+
+/** A tool-call item saved with no text reply opens without the text box. */
+function seedHidesText(
+  s:
+    | { output: string; toolCalls?: unknown[]; expectedToolCalls?: unknown[] }
+    | undefined,
+  storesEmptyToolCallList: boolean,
+): boolean {
+  if (!s || s.output.trim()) return false;
+  return (
+    storesEmptyToolCallList ||
+    (s.toolCalls?.length ?? 0) > 0 ||
+    (s.expectedToolCalls?.length ?? 0) > 0
+  );
 }
 
 function seedToolCalls(raw: unknown): DraftToolCall[] {
@@ -189,6 +217,25 @@ export function AddLlmGeneralItemsDialog({
 }: AddLlmGeneralItemsDialogProps) {
   useHideFloatingButton(isOpen);
   const accessToken = useAccessToken();
+  // The left column and the evaluators column can be dragged wider or
+  // narrower; the input and output take what is left, at least a quarter.
+  const leftColumn = useSavedColumnWidth(
+    "calibrate:one-shot-item-form-left-width",
+    32,
+    15,
+    50,
+    "left",
+  );
+  const rightColumn = useSavedColumnWidth(
+    "calibrate:one-shot-item-form-right-width",
+    25,
+    15,
+    40,
+  );
+  const sideColumnPercent = Math.min(
+    rightColumn.percent,
+    75 - leftColumn.percent,
+  );
 
   const isEdit = mode === "edit";
   const evaluatorsWithVariables = evaluators.filter(
@@ -228,6 +275,10 @@ export function AddLlmGeneralItemsDialog({
   const [toolCalls, setToolCalls] = useState<DraftToolCall[]>(() =>
     seedToolCalls(seed?.toolCalls),
   );
+  // A tool-call item can drop its text box and keep only the tool calls.
+  const [textRemoved, setTextRemoved] = useState(() =>
+    seedHidesText(seed, storesEmptyToolCallList),
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
   // Which list a tool made in the new-tool flow is added to.
   const [createToolFor, setCreateToolFor] = useState<
@@ -261,6 +312,7 @@ export function AddLlmGeneralItemsDialog({
       setInputExtras(s?.inputExtras ?? {});
       setOutputExtras(s?.outputExtras ?? {});
       setToolCalls(seedToolCalls(s?.toolCalls));
+      setTextRemoved(seedHidesText(s, storesEmptyToolCallList));
       const seeded = toolCallsToSelectedTools(
         s?.expectedToolCalls,
         availableTools,
@@ -394,6 +446,21 @@ export function AddLlmGeneralItemsDialog({
     },
   });
 
+  // A tool call added from this form lands at the bottom of the output
+  // column, which may be off screen, so bring it into view.
+  const scrollToNewToolCall = useRef(false);
+  const pressedOnBackdrop = useRef(false);
+  const toolCallListRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!scrollToNewToolCall.current) return;
+    scrollToNewToolCall.current = false;
+    const cards = toolCallListRef.current?.querySelectorAll("[data-tool-call]");
+    cards?.[cards.length - 1]?.scrollIntoView?.({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [toolCalls]);
+
   if (!isOpen) return null;
 
   // A tool opened from the list or from a tool call card was saved. Tool calls
@@ -426,6 +493,7 @@ export function AddLlmGeneralItemsDialog({
   };
 
   const addToolCall = (toolName: string, params: ToolCallParam[]) => {
+    scrollToNewToolCall.current = true;
     setToolCalls((prev) => [
       ...prev,
       {
@@ -476,6 +544,14 @@ export function AddLlmGeneralItemsDialog({
     expected.selectedTools.length > 0;
   const evaluatorFits = (e: LlmGeneralEvaluatorDef) =>
     evaluatorFitsItem(e.evaluator_type, isToolCallItem);
+  // An item needs a text reply or a tool call, so the box comes back once
+  // the last tool call goes.
+  const showsText = !textRemoved || !isToolCallItem;
+  const removeText = () => {
+    setOutput("");
+    setOutputExtras({});
+    setTextRemoved(true);
+  };
   const varsComplete = evaluatorsWithVariables
     .filter(evaluatorFits)
     .every((e) =>
@@ -494,9 +570,15 @@ export function AddLlmGeneralItemsDialog({
 
   const handleSubmit = async () => {
     if (!valid || submitting) return;
-    if (selectedToolsHaveInvalidParams(expected.selectedTools)) {
+    if (
+      selectedToolsHaveInvalidParams(expected.selectedTools) ||
+      expected.hasUnreadableJson
+    ) {
       setExpectedAttempted(true);
-      setError("Complete every highlighted parameter in Expected tool calls.");
+      setError(null);
+      expected.revealInvalidFields(() =>
+        setError("Some expected tool call values are missing or invalid"),
+      );
       return;
     }
     const evaluator_variables: VarValues = {};
@@ -565,7 +647,18 @@ export function AddLlmGeneralItemsDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={handleBackdropClick}
+      // Only a click on the dark area itself. Clicks inside the windows this
+      // form opens on top of it (Create tool, discard changes) reach here
+      // too, and must not close the form.
+      onMouseDown={(e) => {
+        pressedOnBackdrop.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        // A drag of a column divider let go out here also counts as a click
+        // on this area, so it must have been pressed here too.
+        if (e.target === e.currentTarget && pressedOnBackdrop.current)
+          handleBackdropClick();
+      }}
     >
       <div
         className="bg-background border border-border rounded-xl md:rounded-2xl w-full max-w-[90rem] h-[95vh] md:h-[85vh] mx-2 md:mx-4 shadow-2xl flex flex-col overflow-hidden"
@@ -618,7 +711,14 @@ export function AddLlmGeneralItemsDialog({
             output in the middle, evaluators on the right. */}
         <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
           {/* Left column mirrors the AddTestDialog left column. */}
-          <div className="w-full md:w-[20%] flex flex-col border-b md:border-b-0 md:border-r border-border overflow-y-auto p-4 md:p-6 space-y-6">
+          <div
+            style={
+              {
+                "--form-column-width": `${leftColumn.percent}%`,
+              } as React.CSSProperties
+            }
+            className="w-full md:w-[var(--form-column-width)] md:shrink-0 flex flex-col border-b md:border-b-0 border-border overflow-y-auto hide-scrollbar p-4 md:p-6 space-y-6"
+          >
             <div>
               <label className="block text-base font-medium text-foreground mb-2">
                 Name
@@ -663,19 +763,33 @@ export function AddLlmGeneralItemsDialog({
               onRowsChange={setMetadataRows}
               disabled={submitting}
             />
+
+            {/* Below metadata, the same place the next-reply item form has it. */}
+            <div className="shrink-0">
+              <ToolCallExpectationsEditor
+                editor={expected}
+                heading="Expected tool calls"
+                emptyText={EXPECTED_TOOL_CALLS_HELP}
+                availableTools={availableTools}
+                availableToolsLoading={toolsLoading}
+                accessToken={accessToken ?? undefined}
+                onToolSaved={handleToolSaved}
+                onCreateTool={() => setCreateToolFor("expected")}
+                showErrors={expectedAttempted}
+                createToolLabel="Create tool for expected tool calls"
+              />
+            </div>
           </div>
+
+          <ResizeHandle
+            onMouseDown={leftColumn.startDrag}
+            label="Resize the form column"
+          />
 
           {/* Middle: input + output boxes shown side by side, each filling
               the full dialog height. */}
-          <div className="w-full md:flex-1 flex flex-col md:flex-row bg-muted/30 min-h-0">
-            <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-4 md:p-6 border-b md:border-b-0 md:border-r border-border">
-              {/* As tall as the Output row beside it, which holds the tool
-                  buttons, so both headings start on the same line. */}
-              <div className="flex items-center min-h-9 mb-3">
-                <label className="block text-base font-medium text-foreground">
-                  Input
-                </label>
-              </div>
+          <div className="w-full md:flex-1 md:min-w-0 flex flex-col md:flex-row bg-muted/30 min-h-0">
+            <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-y-auto hide-scrollbar p-4 md:p-6 border-b md:border-b-0 md:border-r border-border">
               <TextVersionsEditor
                 field="input"
                 extras={inputExtras}
@@ -692,90 +806,85 @@ export function AddLlmGeneralItemsDialog({
                 />
               </TextVersionsEditor>
             </div>
-            <div className="flex-1 flex flex-col min-h-0 p-4 md:p-6">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <label className="block text-base font-medium text-foreground">
-                  Output
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCreateToolFor("output")}
-                    disabled={submitting}
-                    className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Create tool
-                  </button>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setPickerOpen((open) => !open)}
-                      disabled={submitting}
-                      className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap bg-foreground text-background hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 4.5v15m7.5-7.5h-15"
-                        />
-                      </svg>
-                      Add tool call
-                    </button>
-                    {pickerOpen && (
-                      <>
-                        {/* Click anywhere else to close, the same invisible
-                          sheet the test dialog's tool menu uses. */}
-                        <div
-                          className="fixed inset-0 z-40"
-                          onClick={() => setPickerOpen(false)}
-                        />
-                        <div className="absolute right-0 z-50 mt-2 min-w-[280px] rounded-xl border border-border bg-background shadow-xl overflow-hidden">
-                          <ToolPicker
-                            availableTools={availableTools}
-                            isLoading={toolsLoading}
-                            onSelectInbuiltTool={(toolId) =>
-                              addToolCall(toolId, [])
-                            }
-                            onSelectCustomTool={(tool) =>
-                              addToolCall(tool.name, getToolParams(tool))
-                            }
-                            accessToken={accessToken ?? undefined}
-                            onToolSaved={handleToolSaved}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-3 flex flex-col">
+            <div className="flex-1 min-w-0 flex flex-col min-h-0 p-4 md:p-6">
+              <div
+                ref={toolCallListRef}
+                className="flex-1 min-h-0 overflow-y-auto hide-scrollbar space-y-3 flex flex-col"
+              >
                 <TextVersionsEditor
                   field="output"
+                  headingAside={
+                    !showsText && (
+                      <button
+                        type="button"
+                        onClick={() => setTextRemoved(false)}
+                        disabled={submitting}
+                        className="h-7 px-3 rounded-md text-sm font-medium whitespace-nowrap border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Add text reply
+                      </button>
+                    )
+                  }
                   extras={outputExtras}
                   onChange={setOutputExtras}
                   onPendingChange={setOutputPending}
                   disabled={submitting || !output.trim()}
                 >
-                  <textarea
-                    value={output}
-                    onChange={(e) => setOutput(e.target.value)}
-                    placeholder="The output the LLM produced"
-                    disabled={submitting}
-                    className="flex-1 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-                  />
+                  {showsText && (
+                    <>
+                      {/* Remove sits beside the box, the same as on a tool
+                          call below it. The box fills the column under its
+                          heading (3.25rem), or half of it once the item has
+                          a tool call; either way a fixed height, so tool
+                          calls below scroll the column, never shrink it. */}
+                      <div
+                        data-testid="output-text-box"
+                        className={`flex shrink-0 w-full gap-2 min-h-[10rem] ${
+                          isToolCallItem ? "h-1/2" : "h-[calc(100%-3.25rem)]"
+                        }`}
+                      >
+                        {isToolCallItem && (
+                          <Tooltip
+                            content="Remove text reply"
+                            position="top"
+                            className="flex-shrink-0 self-start"
+                          >
+                            <button
+                              type="button"
+                              onClick={removeText}
+                              disabled={submitting}
+                              aria-label="Remove text reply"
+                              className={REMOVE_BUTTON_CLASS}
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </button>
+                          </Tooltip>
+                        )}
+                        <textarea
+                          value={output}
+                          onChange={(e) => {
+                            setOutput(e.target.value);
+                            // Typed into, so it stays even once a tool call is
+                            // added again.
+                            setTextRemoved(false);
+                          }}
+                          placeholder="The output the LLM produced"
+                          disabled={submitting}
+                          className="flex-1 min-w-0 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                        />
+                      </div>
+                    </>
+                  )}
                 </TextVersionsEditor>
                 {toolCalls.map((tc) => (
                   // Same card the test dialog draws a tool call with, in the
                   // conversation tab: header row with the wrench and the tool
                   // name, remove button on the left, parameters below.
-                  <div key={tc.id} className="flex w-full items-start gap-2">
+                  <div
+                    key={tc.id}
+                    data-tool-call
+                    className="flex w-full items-start gap-2"
+                  >
                     <Tooltip
                       content="Remove tool call"
                       position="top"
@@ -786,21 +895,9 @@ export function AddLlmGeneralItemsDialog({
                         onClick={() => removeToolCall(tc.id)}
                         disabled={submitting}
                         aria-label={`Remove ${tc.tool}`}
-                        className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={REMOVE_BUTTON_CLASS}
                       >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                          />
-                        </svg>
+                        <TrashIcon className="w-4 h-4" />
                       </button>
                     </Tooltip>
                     <div className="flex-1 min-w-0 flex flex-col">
@@ -878,93 +975,150 @@ export function AddLlmGeneralItemsDialog({
                   </div>
                 ))}
               </div>
-              <div className="shrink-0 max-h-[50%] overflow-y-auto mt-6 pt-6 border-t border-border">
-                <ToolCallExpectationsEditor
-                  editor={expected}
-                  heading="Expected tool calls"
-                  emptyText={EXPECTED_TOOL_CALLS_HELP}
-                  availableTools={availableTools}
-                  availableToolsLoading={toolsLoading}
-                  accessToken={accessToken ?? undefined}
-                  onToolSaved={handleToolSaved}
-                  onCreateTool={() => setCreateToolFor("expected")}
-                  showErrors={expectedAttempted}
-                  createToolLabel="Create tool for expected tool calls"
-                />
+              {/* Below the output, so the Input and Output headings sit alone on
+                their rows and match. Outside the scrolling list, so the tool
+                list is never cut off. */}
+              <div className="shrink-0 flex items-center justify-end gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setCreateToolFor("output")}
+                  disabled={submitting}
+                  className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap border border-border bg-background hover:bg-muted/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create tool
+                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen((open) => !open)}
+                    disabled={submitting}
+                    className="h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap bg-foreground text-background hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 4.5v15m7.5-7.5h-15"
+                      />
+                    </svg>
+                    Add tool call
+                  </button>
+                  {pickerOpen && (
+                    <>
+                      {/* Click anywhere else to close, the same invisible
+                        sheet the test dialog's tool menu uses. */}
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setPickerOpen(false)}
+                      />
+                      <div className="absolute right-0 bottom-full z-50 mb-2 min-w-[280px] rounded-xl border border-border bg-background shadow-xl overflow-hidden">
+                        <ToolPicker
+                          availableTools={availableTools}
+                          isLoading={toolsLoading}
+                          onSelectInbuiltTool={(toolId) =>
+                            addToolCall(toolId, [])
+                          }
+                          onSelectCustomTool={(tool) =>
+                            addToolCall(tool.name, getToolParams(tool))
+                          }
+                          accessToken={accessToken ?? undefined}
+                          onToolSaved={handleToolSaved}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {(evaluators.some(evaluatorFits) || isToolCallItem) && (
-            <div
-              data-testid="label-item-evaluators-column"
-              className="w-full md:w-[25%] flex flex-col min-h-0 overflow-y-auto border-t md:border-t-0 md:border-l border-border p-4 md:p-6"
-            >
-              <label className="block text-base font-medium text-foreground mb-2">
-                Evaluators
-              </label>
-              <div className="space-y-4">
-                {isToolCallItem && !evaluators.some(evaluatorFits) && (
-                  <PendingToolCallEvaluatorCard />
-                )}
-                {evaluators.filter(evaluatorFits).map((e) => (
-                  <div
-                    key={e.uuid}
-                    className="border border-border rounded-lg p-4 bg-background"
-                  >
-                    <div className="min-w-0 mb-3">
-                      <div className="text-sm font-semibold text-foreground">
-                        {e.name}
-                      </div>
-                      {e.description && (
-                        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                          {e.description}
-                        </div>
-                      )}
+          <ResizeHandle
+            onMouseDown={rightColumn.startDrag}
+            label="Resize the right column"
+          />
+
+          {/* Always drawn, so the columns do not move as the item switches
+              between a text output and a tool call. */}
+          <div
+            data-testid="label-item-evaluators-column"
+            style={
+              {
+                "--side-column-width": `${sideColumnPercent}%`,
+              } as React.CSSProperties
+            }
+            className="w-full md:w-[var(--side-column-width)] md:shrink-0 flex flex-col min-h-0 overflow-y-auto hide-scrollbar border-t md:border-t-0 border-border p-4 md:p-6"
+          >
+            <label className="block text-base font-medium text-foreground mb-2">
+              Evaluators
+            </label>
+            <div className="space-y-4">
+              {isToolCallItem && !evaluators.some(evaluatorFits) && (
+                <PendingToolCallEvaluatorCard />
+              )}
+              {!isToolCallItem && !evaluators.some(evaluatorFits) && (
+                <p className="text-sm text-muted-foreground">
+                  No evaluator on this task scores this item
+                </p>
+              )}
+              {evaluators.filter(evaluatorFits).map((e) => (
+                <div
+                  key={e.uuid}
+                  className="border border-border rounded-lg p-4 bg-background"
+                >
+                  <div className="min-w-0 mb-3">
+                    <div className="text-sm font-semibold text-foreground">
+                      {e.name}
                     </div>
-                    {e.variables.length > 0 && (
-                      <div className="space-y-3">
-                        {e.variables.map((v) => {
-                          const placeholder =
-                            v.description && v.description.length > 0
-                              ? v.description
-                              : v.default && v.default.length > 0
-                                ? v.default
-                                : `Enter value for {{${v.name}}}`;
-                          return (
-                            <div key={v.name}>
-                              <div className="text-xs text-muted-foreground mb-1.5">
-                                <code className="font-mono">{`{{${v.name}}}`}</code>
-                              </div>
-                              <textarea
-                                value={varValues[e.uuid]?.[v.name] ?? ""}
-                                onChange={(ev) =>
-                                  updateVar(e.uuid, v.name, ev.target.value)
-                                }
-                                placeholder={placeholder}
-                                disabled={submitting}
-                                rows={4}
-                                className="w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
-                              />
-                            </div>
-                          );
-                        })}
+                    {e.description && (
+                      <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                        {e.description}
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
+                  {e.variables.length > 0 && (
+                    <div className="space-y-3">
+                      {e.variables.map((v) => {
+                        const placeholder =
+                          v.description && v.description.length > 0
+                            ? v.description
+                            : v.default && v.default.length > 0
+                              ? v.default
+                              : `Enter value for {{${v.name}}}`;
+                        return (
+                          <div key={v.name}>
+                            <div className="text-xs text-muted-foreground mb-1.5">
+                              <code className="font-mono">{`{{${v.name}}}`}</code>
+                            </div>
+                            <textarea
+                              value={varValues[e.uuid]?.[v.name] ?? ""}
+                              onChange={(ev) =>
+                                updateVar(e.uuid, v.name, ev.target.value)
+                              }
+                              placeholder={placeholder}
+                              disabled={submitting}
+                              rows={4}
+                              className="w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-5 md:px-6 py-4 border-t border-border">
-          {error && (
-            <ErrorNote className="mr-auto">
-              {error}
-            </ErrorNote>
-          )}
+          {error && <ErrorNote className="mr-auto">{error}</ErrorNote>}
           <button
             onClick={handleSubmit}
             disabled={!valid || submitting}
