@@ -121,7 +121,8 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     // detail page's header delete button (confirmDelete), which navigates
     // back to the list. The heading renders the evaluator's name once the
     // fetch resolves.
-    await card.click();
+    // A corner, since the card's pills take clicks of their own.
+    await card.click({ position: { x: 4, y: 4 } });
     await expect(page).toHaveURL(workspacePath(/\/evaluators\/[0-9a-f-]+/), {
       timeout: 20000,
     });
@@ -153,7 +154,8 @@ test.describe("Evaluators page (authenticated, real backend)", () => {
     const card = await createEvaluator(page, name);
 
     // Open the detail / versioning page and confirm it loaded.
-    await card.click();
+    // A corner, since the card's pills take clicks of their own.
+    await card.click({ position: { x: 4, y: 4 } });
     await expect(page).toHaveURL(workspacePath(/\/evaluators\/[0-9a-f-]+/), {
       timeout: 20000,
     });
