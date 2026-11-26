@@ -307,9 +307,11 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     testType,
     selectAll,
     agentNature,
+    nameFrom,
     onConverted,
   }: {
     isOpen: boolean;
+    nameFrom?: { comment?: string | null; userMessage?: string | null };
     agentUuid: string;
     traceUuids: string[];
     testType: "response" | "tool_call" | "general";
@@ -333,6 +335,9 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
         <span data-testid="convert-agent">{agentUuid}</span>
         <span data-testid="convert-traces">{traceUuids.join(",")}</span>
         <span data-testid="convert-type">{testType}</span>
+        <span data-testid="convert-name-from">
+          {JSON.stringify(nameFrom ?? null)}
+        </span>
         <span data-testid="convert-select-all">
           {selectAll
             ? `${selectAll.agentId}|${selectAll.outputType}|${(
@@ -2169,6 +2174,17 @@ describe("TracesTabContent", () => {
     expect(screen.getByText("Delete selected (4)")).toBeInTheDocument();
     expect(lastTracesArgs()).toEqual(before);
     expect(lastTracesArgs()).not.toHaveProperty("createdBefore");
+  });
+
+  it("names one trace's test from its comment, else its message, and leaves a batch unnamed", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Add to tests (1)"));
+    expect(
+      JSON.parse(screen.getByTestId("convert-name-from").textContent!),
+    ).toEqual({ userMessage: "When is the next vaccination?" });
   });
 
   it("keeps the ticks when Apply is pressed with nothing changed", async () => {

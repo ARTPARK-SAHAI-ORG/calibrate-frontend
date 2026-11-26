@@ -1369,6 +1369,14 @@ export function TracesTabContent({
         }
         agentUuid={agentUuid}
         agentNature={agentNature}
+        nameFrom={
+          selectedTraces.length === 1
+            ? {
+                comment: selectedTraces[0].feedback?.comment,
+                userMessage: selectedTraces[0].input_preview,
+              }
+            : undefined
+        }
         onConverted={(result, evaluatorsUsed = []) => {
           setConvertOpen(false);
           const created = result.created;

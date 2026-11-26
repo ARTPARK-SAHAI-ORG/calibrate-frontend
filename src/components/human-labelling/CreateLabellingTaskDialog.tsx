@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { ErrorNote } from "@/components/ui";
+import { DialogStepper, ErrorNote } from "@/components/ui";
 import {
   EVALUATOR_TYPE_LABELS,
   EvaluatorTypePill,
@@ -170,12 +170,6 @@ export function CreateLabellingTaskDialog({
     2: step2Valid,
     3: step3Valid,
   };
-  // A step can only be opened once every step before it is answered, so the
-  // reader cannot land on a stage that depends on something not chosen yet.
-  // Once a step is answered, moving back and forth over it is free.
-  const canOpenStep = (n: Step) =>
-    STEPS.every((s) => s.n >= n || stepValid[s.n]);
-
   const handleSubmit = async () => {
     if (!canSubmit || !taskType) return;
     setSubmitting(true);
@@ -241,47 +235,12 @@ export function CreateLabellingTaskDialog({
             </button>
           </div>
 
-          {/* Stepper — a step opens only once the ones before it are answered. */}
-          <div className="mt-3 flex items-center gap-2">
-            {STEPS.map((s, i) => {
-              const active = step === s.n;
-              const done = stepValid[s.n] && !active;
-              return (
-                <div key={s.n} className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setStep(s.n)}
-                    disabled={!canOpenStep(s.n)}
-                    className="flex items-center gap-2 cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <span
-                      className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold transition-colors ${
-                        active
-                          ? "bg-foreground text-background"
-                          : done
-                            ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/40"
-                            : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {done ? "✓" : s.n}
-                    </span>
-                    <span
-                      className={`text-xs md:text-sm font-medium transition-colors ${
-                        active
-                          ? "text-foreground"
-                          : "text-muted-foreground group-hover:text-foreground"
-                      }`}
-                    >
-                      {s.label}
-                    </span>
-                  </button>
-                  {i < STEPS.length - 1 && (
-                    <span className="w-6 h-px bg-border" />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <DialogStepper
+            steps={STEPS}
+            current={step}
+            isDone={(n) => stepValid[n as Step]}
+            onSelect={(n) => setStep(n as Step)}
+          />
         </div>
 
         {/* Body */}
@@ -455,11 +414,7 @@ export function CreateLabellingTaskDialog({
             </div>
           )}
 
-          {submitError && (
-            <ErrorNote className="mt-5">
-              {submitError}
-            </ErrorNote>
-          )}
+          {submitError && <ErrorNote className="mt-5">{submitError}</ErrorNote>}
         </div>
 
         {/* Footer — dismissal is handled by the header ✕, so no Cancel here. */}

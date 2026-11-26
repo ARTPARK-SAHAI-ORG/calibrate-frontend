@@ -132,6 +132,7 @@ export function PublicChatView({ token }: { token: string }) {
   const [converting, setConverting] = useState<{
     traceUuid: string;
     testType: ConvertTestType;
+    userMessage: string | null;
   } | null>(null);
   const [added, setAdded] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -302,11 +303,13 @@ export function PublicChatView({ token }: { token: string }) {
   const { agent_id: agentId, org_uuid: orgUuid } = agent;
   const addToTests =
     agentId && orgUuid
-      ? (turn: Extract<Turn, { role: "agent" }>) => {
+      ? (turn: Extract<Turn, { role: "agent" }>, index: number) => {
           // The dialog's requests go to the agent's workspace.
           setActiveOrgUuid(orgUuid);
+          const asked = turns[index - 1];
           setConverting({
             traceUuid: turn.traceUuid!,
+            userMessage: asked?.role === "user" ? asked.text : null,
             // The same rule as the Monitoring tab's Add to tests.
             testType:
               !turn.reply && turn.toolCalls.length > 0
@@ -411,7 +414,7 @@ export function PublicChatView({ token }: { token: string }) {
                 patchFeedback(turn.traceUuid, { open: false, draft: "" })
               }
               onSave={() => turn.traceUuid && void saveComment(turn.traceUuid)}
-              onAddToTests={addToTests && (() => addToTests(turn))}
+              onAddToTests={addToTests && (() => addToTests(turn, i))}
             />
           ),
         )}
@@ -536,6 +539,14 @@ export function PublicChatView({ token }: { token: string }) {
           testType={converting?.testType ?? "response"}
           agentUuid={agentId}
           agentNature={agent.interaction_type}
+          nameFrom={
+            converting
+              ? {
+                  comment: feedback[converting.traceUuid]?.comment,
+                  userMessage: converting.userMessage,
+                }
+              : undefined
+          }
           onConverted={() => {
             setConverting(null);
             setAdded(true);

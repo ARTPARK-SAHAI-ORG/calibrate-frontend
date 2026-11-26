@@ -27,6 +27,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     testType: string;
     agentUuid: string;
     agentNature: string;
+    nameFrom?: { comment?: string | null; userMessage?: string | null };
     accessToken: string | null;
     onClose: () => void;
     onConverted: () => void;
@@ -39,6 +40,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
             testType: props.testType,
             agentUuid: props.agentUuid,
             agentNature: props.agentNature,
+            nameFrom: props.nameFrom,
           })}
         </pre>
         <button onClick={props.onConverted}>Convert</button>
@@ -714,6 +716,8 @@ describe("Add to tests", () => {
       testType,
       agentUuid: "a1",
       agentNature: kind,
+      // The test is named after what was asked, there being no comment.
+      nameFrom: { comment: null, userMessage: "Hi" },
     });
     await user.click(screen.getByText("Dismiss"));
     expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();

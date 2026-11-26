@@ -23,7 +23,11 @@ export { PassFailCountPills } from "./PassFailCountPills";
 export { RunStateMark } from "./RunStateMark";
 export { PageSizeSelect } from "./PageSizeSelect";
 export { ServerPaginatedListBar } from "./ServerPaginatedListBar";
-export { DialogNavHeader, DialogNavRow, showsDialogNav } from "./DialogNavHeader";
+export {
+  DialogNavHeader,
+  DialogNavRow,
+  showsDialogNav,
+} from "./DialogNavHeader";
 export { CopyCodeButton } from "./CopyCodeButton";
 export { ViewMoreToggle } from "./ViewMoreToggle";
 export { CopyLinkButton } from "./CopyLinkButton";
@@ -32,10 +36,7 @@ export { SegmentedFilter, type SegmentedFilterOption } from "./SegmentedFilter";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { RenameDialog } from "./RenameDialog";
 export { ResultTabs, RESULT_TAB_LABELS, type ResultTabId } from "./ResultTabs";
-export {
-  InteractionTypePill,
-  INTERACTION_TYPES,
-} from "./InteractionTypePill";
+export { InteractionTypePill, INTERACTION_TYPES } from "./InteractionTypePill";
 export {
   InteractionTypeChooser,
   type InteractionType,
@@ -43,3 +44,4 @@ export {
 export { MetadataTable, type MetadataEntry } from "./MetadataTable";
 export { InfoNote } from "./InfoNote";
 export { ErrorNote } from "./ErrorNote";
+export { DialogStepper, type DialogStep } from "./DialogStepper";

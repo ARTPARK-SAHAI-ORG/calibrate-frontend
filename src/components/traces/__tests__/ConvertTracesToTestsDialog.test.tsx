@@ -24,6 +24,7 @@ jest.mock("../../../lib/tracesApi", () => ({
   convertTracesErrorMessage: jest.requireActual("../../../lib/tracesApi")
     .convertTracesErrorMessage,
   convertTracesToTests: jest.fn(),
+  defaultTestName: jest.requireActual("../../../lib/tracesApi").defaultTestName,
 }));
 jest.mock("../../evaluators/EvaluatorPromptPreview", () => ({
   __esModule: true,
@@ -478,4 +479,100 @@ it("ticks an evaluator made here and opens its prompt on the right", async () =>
     screen.getByRole("checkbox", { name: "Select Made just now" }),
   ).toBeChecked();
   expect(screen.getByTestId("prompt-for")).toHaveTextContent("ev-made");
+});
+
+describe("naming one trace's test", () => {
+  it("names it first, from the comment, then picks evaluators", async () => {
+    mockConvert.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
+    const user = setupUser();
+    const { onClose } = setup({
+      traceUuids: ["tr-1"],
+      nameFrom: { comment: " It skipped rotavirus ", userMessage: "Hi" },
+    });
+
+    const box = screen.getByLabelText("Test name");
+    expect(box).toHaveValue("It skipped rotavirus");
+    expect(
+      screen.getByText("Filled in from the comment left with the rating"),
+    ).toBeInTheDocument();
+    // The evaluators wait for the second step.
+    expect(screen.queryByText("Correctness")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add to tests" })).toBeNull();
+
+    await user.clear(box);
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    await user.type(box, "Rotavirus left out");
+    expect(screen.queryByText(/Filled in from/)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Evaluators", { selector: "div" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByLabelText("Test name")).toHaveValue(
+      "Rotavirus left out",
+    );
+    await user.click(screen.getByRole("button", { name: "2 Evaluators" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Add to tests" }),
+    );
+
+    await waitFor(() => expect(mockConvert).toHaveBeenCalled());
+    expect(mockConvert.mock.calls[0][1]).toMatchObject({
+      traceIds: ["tr-1"],
+      evaluatorUuids: ["ev-default"],
+      name: "Rotavirus left out",
+    });
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("falls back to the user's message, cut to 60 characters", () => {
+    const long = "a".repeat(70);
+    setup({
+      traceUuids: ["tr-1"],
+      nameFrom: { comment: "  ", userMessage: long },
+    });
+    expect(screen.getByLabelText("Test name")).toHaveValue(
+      `${"a".repeat(60)}…`,
+    );
+    expect(
+      screen.getByText("Filled in from the user's message"),
+    ).toBeInTheDocument();
+  });
+
+  it("starts empty with nothing to name it from", () => {
+    setup({ traceUuids: ["tr-1"], nameFrom: {} });
+    expect(screen.getByLabelText("Test name")).toHaveValue("");
+    expect(screen.queryByText(/Filled in from/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+  });
+
+  it("names a tool-call test on one screen with no steps", async () => {
+    mockConvert.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
+    const user = setupUser();
+    setup({
+      traceUuids: ["tr-1"],
+      testType: "tool_call",
+      nameFrom: { userMessage: "Book a visit" },
+    });
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+    expect(screen.getByLabelText("Test name")).toHaveValue("Book a visit");
+    await user.click(screen.getByRole("button", { name: "Add to tests" }));
+    await waitFor(() => expect(mockConvert).toHaveBeenCalled());
+    expect(mockConvert.mock.calls[0][1]).toMatchObject({
+      type: "tool_call",
+      name: "Book a visit",
+    });
+  });
+
+  it("does not ask for a name for several traces", async () => {
+    setup({ nameFrom: { userMessage: "Hi" } });
+    expect(screen.queryByLabelText("Test name")).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByText("Correctness")).toBeInTheDocument(),
+    );
+  });
 });
