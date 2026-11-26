@@ -29,6 +29,7 @@ import type { EvaluatorUseCaseOption } from "@/components/evaluators/evaluatorUs
 import { defaultBinaryLabel } from "@/lib/binaryLabels";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
 import {
+  defaultEvaluatorName,
   isReservedEvaluatorName,
   reservedEvaluatorNameError,
 } from "@/lib/evaluatorNames";
@@ -220,6 +221,7 @@ export function CreateEvaluatorFlow({
       // to the form with that purpose already set.
       if (onlyUseCase) {
         setNewEvaluatorType(onlyUseCase.value);
+        setEvaluatorName(suggestedName(onlyUseCase.value));
         setUseCasePickerOpen(false);
         setSidebarOpen(true);
         void prefillDefaultPrompt(onlyUseCase.value);
@@ -243,6 +245,12 @@ export function CreateEvaluatorFlow({
   // Lets a create that the name blocked put the cursor back on the box.
   const nameInputRef = useRef<HTMLInputElement>(null);
 
+  const suggestedName = (type: EvaluatorType): string =>
+    defaultEvaluatorName(
+      type,
+      existingEvaluators.map((e) => e.name),
+    );
+
   const isNameDuplicate = (name: string): boolean => {
     const trimmedName = name.trim().toLowerCase();
     return existingEvaluators.some((e) => e.name.toLowerCase() === trimmedName);
@@ -260,8 +268,8 @@ export function CreateEvaluatorFlow({
       // Prefill is best-effort — leave the form blank on any failure.
       if (!response.ok) return;
 
-      // `name` is deliberately not read: the reader names their own
-      // evaluator, and a suggested name in the box reads as already filled in.
+      // `name` is not read: the form already holds a name that says which
+      // kind of evaluator this is.
       const data: {
         system_prompt: string;
         judge_model: string;
@@ -502,6 +510,7 @@ export function CreateEvaluatorFlow({
           onSelect={(value) => {
             const prevType = newEvaluatorType;
             setNewEvaluatorType(value);
+            setEvaluatorName(suggestedName(value));
             setUseCasePickerOpen(false);
             setSidebarOpen(true);
             if (prevType !== value) {
