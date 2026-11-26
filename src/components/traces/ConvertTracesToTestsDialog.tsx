@@ -303,6 +303,7 @@ export function ConvertTracesToTestsDialog({
                       }
                       previewUuid={createdUuid}
                       fillHeight
+                      selectedFirst
                     />
                   </div>
                 </div>
