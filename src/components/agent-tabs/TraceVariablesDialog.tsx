@@ -570,13 +570,13 @@ export function TraceVariablesDialog({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header + stepper */}
-        <div className="px-5 md:px-6 py-4 border-b border-border">
+        <div className="px-5 md:px-6 py-5 md:py-6 border-b border-border">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base md:text-lg font-semibold text-foreground">
                 Configure for traces
               </h2>
-              <p className="text-xs md:text-sm text-muted-foreground mt-1">
+              <p className="text-xs md:text-sm text-muted-foreground mt-1.5">
                 This evaluator has variables. Map each one to a part of the
                 trace so it can run on traces.
               </p>
@@ -592,13 +592,13 @@ export function TraceVariablesDialog({
           </div>
           {hasTraces && (
             <>
-              <div className="mt-3">
+              <div className="mt-5">
                 <WarningBox>
                   Applies to new traces only. Existing traces are not scored
                   again.
                 </WarningBox>
               </div>
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-5 flex items-center gap-2">
                 {STEPS.map((s, i) => {
                   const active = step === s.n;
                   const done = !active && s.n === 1;
