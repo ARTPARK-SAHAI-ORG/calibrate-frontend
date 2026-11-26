@@ -64,7 +64,7 @@ export function gradedAnswerStart<T>(
 
 /** Help text under the expected tool calls on a labelling item. */
 export const EXPECTED_TOOL_CALLS_HELP =
-  "Optional. Add the tool calls the agent should have made and the values it should have sent. Once you add one, this item is scored only by tool call evaluators, which compare the agent's tool calls with these.";
+  "(Optional) Add the tool calls the agent should have made and the values it should have sent. Once you add one, this item is scored only by tool call evaluators, which compare the agent's tool calls with the expected tool calls.";
 
 type ToolCallRecord = Pick<ExpectedToolCall, "tool" | "arguments"> & {
   output?: unknown;
