@@ -1004,6 +1004,85 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     expect(screen.getByRole("button", { name: "Save item" })).toBeInTheDocument();
   });
 
+  it("keeps a tool's JSON that does not read when a save is refused", async () => {
+    withTools();
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "Hello",
+          expectedToolCalls: [
+            { tool: "book_flight", arguments: { city: "Pune" }, accept_any_arguments: false },
+          ],
+        },
+      ],
+    });
+    await screen.findByText("Accept any values for the parameters");
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await user.clear(screen.getByDisplayValue("Pune"));
+    await user.click(screen.getByRole("button", { name: "JSON" }));
+    const json = screen.getByDisplayValue(/city/);
+    await user.clear(json);
+    await user.type(json, "{{ broken");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    // Still JSON, text kept, and the box itself is where the form goes.
+    await waitFor(() =>
+      expect(document.activeElement).toHaveValue("{ broken"),
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+    accessTokenMock.mockReturnValue(null);
+  });
+
+  it("keeps a text reply typed after the box came back, once a tool call is added", async () => {
+    const user = setupUser();
+    const { onSubmit } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        {
+          uuid: "i1",
+          name: "Item one",
+          input: "Hi",
+          output: "",
+          toolCalls: [{ tool: "dummy", arguments: { success: true } }],
+        },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Remove dummy" }));
+    await user.type(
+      screen.getByPlaceholderText("The output the LLM produced"),
+      "Booked",
+    );
+    await user.click(screen.getByRole("button", { name: "Add tool call" }));
+    await user.click(screen.getByRole("button", { name: "Pick End conversation" }));
+    expect(
+      screen.getByPlaceholderText("The output the LLM produced"),
+    ).toHaveValue("Booked");
+    await user.click(screen.getByRole("button", { name: "Save item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0][0].output).toBe("Booked");
+  });
+
+  it("closes on the dark area only when the click started there", () => {
+    const { onClose, container } = renderDialog({
+      mode: "edit",
+      initialRows: [
+        { uuid: "i1", name: "Item one", input: "Hi", output: "Hello" },
+      ],
+    });
+    const backdrop = container.querySelector(".fixed.inset-0") as HTMLElement;
+    // A column divider dragged and let go over the dark area.
+    fireEvent.mouseDown(screen.getByRole("separator", { name: "Resize the right column" }));
+    fireEvent.click(backdrop);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.mouseDown(backdrop);
+    fireEvent.click(backdrop);
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it("scrolls to an expected tool just added", async () => {
     const scrolled: Element[] = [];
     const realScroll = Element.prototype.scrollIntoView;

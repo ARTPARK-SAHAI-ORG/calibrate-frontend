@@ -716,10 +716,22 @@ export function useToolCallExpectations() {
   // `reset`, so opening a dialog with tools already there scrolls nowhere.
   const [lastAddedCardId, setLastAddedCardId] = useState<string | null>(null);
 
-  // Every tool back in its form view, so a field with a problem can show it.
-  const showFormViews = () => {
-    setJsonModeToolIds(new Set());
-    setToolJsonError({});
+  // After a refused save: every tool back in its form view with nothing
+  // folded, so each field shows what is wrong under it, then go to the first
+  // one. A tool whose JSON does not read stays as JSON, or the typed text
+  // would be lost. The fields are drawn on the next render, so look for them
+  // after that. `onNoField` runs when there is none to point at.
+  const revealInvalidFields = (onNoField: () => void) => {
+    setJsonModeToolIds(
+      (prev) => new Set([...prev].filter((id) => toolJsonError[id])),
+    );
+    setCollapsedParamIds(new Set());
+    requestAnimationFrame(() => {
+      const bad = document.querySelector<HTMLElement>("[data-param-error]");
+      if (!bad) return onNoField();
+      bad.scrollIntoView?.({ block: "center", behavior: "smooth" });
+      bad.focus();
+    });
   };
 
   const addToolFromSelection = (tool: AvailableTool) => {
@@ -819,7 +831,7 @@ export function useToolCallExpectations() {
     applyToolSaved,
     lastAddedCardId,
     setLastAddedCardId,
-    showFormViews,
+    revealInvalidFields,
   };
 }
 
@@ -867,9 +879,7 @@ export function ToolCallExpectationsEditor({
   /** A fuller name for the Create tool button when the screen has another. */
   createToolLabel?: string;
 }) {
-  const [toolListAt, setToolListAt] = useState<React.CSSProperties | null>(
-    null,
-  );
+  const [toolListAt, setToolListAt] = useState<React.CSSProperties>();
   const {
     selectedTools,
     setSelectedTools,
@@ -896,7 +906,9 @@ export function ToolCallExpectationsEditor({
     listRef.current
       ?.querySelector(`[data-card-id="${lastAddedCardId}"]`)
       ?.scrollIntoView?.({ block: "end", behavior: "smooth" });
-  }, [lastAddedCardId]);
+    // Once only, or drawing the editor again later would scroll back here.
+    setLastAddedCardId(null);
+  }, [lastAddedCardId, setLastAddedCardId]);
 
   const selectInbuiltTool = (toolId: string, toolName: string) => {
     const newTool: SelectedToolConfig = {
@@ -1650,10 +1662,8 @@ export function ToolCallExpectationsEditor({
           {/* Fixed to the window, so a scrolling column the editor sits in
               never cuts the list off. */}
           <div
-            style={toolListAt ?? undefined}
-            className={`${
-              toolListAt ? "fixed" : "absolute right-0 top-8 mt-2"
-            } w-72 bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden`}
+            style={toolListAt}
+            className="fixed w-72 bg-background border border-border rounded-xl shadow-2xl z-[100] overflow-hidden"
           >
             <ToolPicker
               availableTools={availableTools}

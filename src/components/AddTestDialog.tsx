@@ -2005,22 +2005,11 @@ export function AddTestDialog({
   const selectedToolsInvalid = () => {
     const invalid = selectedToolsHaveInvalidParams(selectedTools);
     if (invalid) {
-      // A tool shown as JSON has no field to point at, so show them as forms.
-      toolExpectations.showFormViews();
-      // Each field says what is wrong under it. The highlight lands on the
-      // next render, so look for it after that.
-      requestAnimationFrame(() => {
-        const bad = document.querySelector<HTMLElement>("[data-param-error]");
-        if (!bad) {
-          // A tool edited as JSON has no field to point at.
-          setToolValidationError(
-            "Some expected tool call values are missing or invalid. Switch to Form to see which",
-          );
-          return;
-        }
-        bad.scrollIntoView?.({ block: "center", behavior: "smooth" });
-        bad.focus();
-      });
+      toolExpectations.revealInvalidFields(() =>
+        setToolValidationError(
+          "Some expected tool call values are missing or invalid",
+        ),
+      );
     }
     return invalid;
   };

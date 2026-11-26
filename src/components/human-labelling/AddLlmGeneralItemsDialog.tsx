@@ -115,6 +115,10 @@ function ungroupParams(params: ToolCallParam[]): ToolCallParam[] {
   return argumentRows(paramsToArgs(params), false);
 }
 
+/** The red bin beside the text reply and beside each tool call. */
+const REMOVE_BUTTON_CLASS =
+  "w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60 disabled:opacity-50 disabled:cursor-not-allowed";
+
 let draftIdCounter = 0;
 function nextDraftId(): number {
   draftIdCounter += 1;
@@ -445,6 +449,7 @@ export function AddLlmGeneralItemsDialog({
   // A tool call added from this form lands at the bottom of the output
   // column, which may be off screen, so bring it into view.
   const scrollToNewToolCall = useRef(false);
+  const pressedOnBackdrop = useRef(false);
   const toolCallListRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!scrollToNewToolCall.current) return;
@@ -568,22 +573,9 @@ export function AddLlmGeneralItemsDialog({
     if (selectedToolsHaveInvalidParams(expected.selectedTools)) {
       setExpectedAttempted(true);
       setError(null);
-      // A tool shown as JSON has no field to point at, so show them as forms.
-      expected.showFormViews();
-      // Each field says what is wrong under it. The highlight lands on the
-      // next render, so look for it after that.
-      requestAnimationFrame(() => {
-        const bad = document.querySelector<HTMLElement>("[data-param-error]");
-        if (!bad) {
-          // A tool edited as JSON has no field to point at.
-          setError(
-            "Some expected tool call values are missing or invalid. Switch to Form to see which",
-          );
-          return;
-        }
-        bad.scrollIntoView?.({ block: "center", behavior: "smooth" });
-        bad.focus();
-      });
+      expected.revealInvalidFields(() =>
+        setError("Some expected tool call values are missing or invalid"),
+      );
       return;
     }
     const evaluator_variables: VarValues = {};
@@ -655,8 +647,14 @@ export function AddLlmGeneralItemsDialog({
       // Only a click on the dark area itself. Clicks inside the windows this
       // form opens on top of it (Create tool, discard changes) reach here
       // too, and must not close the form.
+      onMouseDown={(e) => {
+        pressedOnBackdrop.current = e.target === e.currentTarget;
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) handleBackdropClick();
+        // A drag of a column divider let go out here also counts as a click
+        // on this area, so it must have been pressed here too.
+        if (e.target === e.currentTarget && pressedOnBackdrop.current)
+          handleBackdropClick();
       }}
     >
       <div
@@ -853,7 +851,7 @@ export function AddLlmGeneralItemsDialog({
                               onClick={removeText}
                               disabled={submitting}
                               aria-label="Remove text reply"
-                              className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className={REMOVE_BUTTON_CLASS}
                             >
                               <TrashIcon className="w-4 h-4" />
                             </button>
@@ -861,7 +859,12 @@ export function AddLlmGeneralItemsDialog({
                         )}
                         <textarea
                           value={output}
-                          onChange={(e) => setOutput(e.target.value)}
+                          onChange={(e) => {
+                            setOutput(e.target.value);
+                            // Typed into, so it stays even once a tool call is
+                            // added again.
+                            setTextRemoved(false);
+                          }}
                           placeholder="The output the LLM produced"
                           disabled={submitting}
                           className="flex-1 min-w-0 min-h-[10rem] w-full px-4 py-3 rounded-lg text-base bg-background text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-accent resize-none disabled:opacity-50"
@@ -889,21 +892,9 @@ export function AddLlmGeneralItemsDialog({
                         onClick={() => removeToolCall(tc.id)}
                         disabled={submitting}
                         aria-label={`Remove ${tc.tool}`}
-                        className="w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors bg-red-500/10 border-red-500/40 text-red-500 hover:bg-red-500/20 hover:border-red-500/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={REMOVE_BUTTON_CLASS}
                       >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                          />
-                        </svg>
+                        <TrashIcon className="w-4 h-4" />
                       </button>
                     </Tooltip>
                     <div className="flex-1 min-w-0 flex flex-col">
