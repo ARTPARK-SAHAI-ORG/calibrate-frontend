@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { CheckIcon, CloseIcon } from "@/components/icons";
 import { Tooltip } from "@/components/Tooltip";
 import type { TurnExtras } from "@/lib/messageVersions";
@@ -87,6 +93,13 @@ export function TextVersionsEditor({
   children: ReactNode;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // A heading box just filled with its default, to select once it is drawn,
+  // so typing replaces the default rather than adding to it.
+  const selectOnDraw = useRef<HTMLInputElement | null>(null);
+  useLayoutEffect(() => {
+    selectOnDraw.current?.select();
+    selectOnDraw.current = null;
+  }, [drafts]);
   const [toRemove, setToRemove] = useState<string | null>(null);
 
   const pending = Object.keys(drafts).length > 0;
@@ -181,9 +194,10 @@ export function TextVersionsEditor({
           placeholder={defaultHeading}
           aria-label={`Heading for the ${field}`}
           disabled={disabled}
-          onFocus={() => {
-            if (headingDraft === undefined)
-              setDraft("heading", label || defaultHeading);
+          onFocus={(e) => {
+            if (headingDraft !== undefined) return;
+            setDraft("heading", label || defaultHeading);
+            if (!label) selectOnDraw.current = e.currentTarget;
           }}
           onChange={(e) => setDraft("heading", e.target.value)}
           onBlur={() => {

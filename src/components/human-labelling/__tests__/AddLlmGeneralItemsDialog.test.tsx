@@ -815,7 +815,6 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     await screen.findByText("Accept any values for the parameters");
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     const scroll = jest.fn();
-    const realScroll = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = scroll;
     await user.clear(screen.getByDisplayValue("Pune"));
     await user.click(screen.getByRole("button", { name: "Save item" }));
@@ -835,7 +834,6 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     expect(screen.queryByText(/Switch to Form/)).not.toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
     accessTokenMock.mockReturnValue(null);
-    Element.prototype.scrollIntoView = realScroll;
   });
 
   it("switches a tool shown as JSON back to Form and goes to the bad field", async () => {
@@ -1122,7 +1120,6 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
 
   it("scrolls to an expected tool just added", async () => {
     const scrolled: Element[] = [];
-    const realScroll = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = function (this: Element) {
       scrolled.push(this);
     };
@@ -1131,7 +1128,6 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     await user.click(screen.getByRole("button", { name: "Add tool" }));
     await user.click(screen.getByRole("button", { name: "Pick End conversation" }));
     expect(scrolled.some((el) => el.hasAttribute("data-card-id"))).toBe(true);
-    Element.prototype.scrollIntoView = realScroll;
   });
 
   it("opens the expected tool list over the form, not inside its column", async () => {
@@ -1150,7 +1146,6 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
 
   it("scrolls to a tool call just added, and not to one already there", async () => {
     const scrolled: Element[] = [];
-    const realScroll = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = function (this: Element) {
       scrolled.push(this);
     };
@@ -1172,7 +1167,6 @@ describe("AddLlmGeneralItemsDialog tool-call output", () => {
     await user.click(screen.getByRole("button", { name: "Pick End conversation" }));
     expect(scrolled).toHaveLength(1);
     expect(scrolled[0]).toHaveTextContent("end_call");
-    Element.prototype.scrollIntoView = realScroll;
   });
 
   it("keeps the tool list open on Escape pressed inside the tool side panel", async () => {

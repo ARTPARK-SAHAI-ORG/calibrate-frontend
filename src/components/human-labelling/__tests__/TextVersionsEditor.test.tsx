@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fireEvent, render, screen, setupUser } from "@/test-utils";
+import { fireEvent, render, screen, setupUser, waitFor } from "@/test-utils";
 import type { TurnExtras } from "@/lib/messageVersions";
 import {
   TextVersionsEditor,
@@ -218,6 +218,19 @@ describe("TextVersionsEditor", () => {
     await user.clear(heading);
     await user.type(heading, "Original{Enter}");
     expect(onChange).toHaveBeenLastCalledWith({ label: "Original" });
+  });
+
+  it("replaces the filled-in default when typing straight after clicking", async () => {
+    const user = setupUser();
+    render(<Harness initial={{}} />);
+    const heading = screen.getByLabelText("Heading for the input");
+    await user.click(heading);
+    await waitFor(() => expect(heading).toHaveValue("Input"));
+    await waitFor(() =>
+      expect((heading as HTMLInputElement).selectionStart).toBe(0),
+    );
+    await user.keyboard("Question");
+    expect(heading).toHaveValue("Question");
   });
 
   it("shows the heading annotators see by default, ready to edit", async () => {
