@@ -103,7 +103,7 @@ it("draws one card per evaluator of the run it is given, with no id pill", () =>
   expect(screen.queryByText(/Completed|Scored/)).not.toBeInTheDocument();
 });
 
-it("shows a spinner while scoring, the reason when it failed, and empty results", () => {
+it("shows a spinner while scoring, the reason when it was skipped, and empty results", () => {
   const { rerender, container } = render(
     <TraceScorePanel
       run={{
