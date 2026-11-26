@@ -799,6 +799,27 @@ export function EvaluatorResultsPane({
         );
       });
 
+  // An evaluator counts as answered when a person labelled it or a run
+  // scored it. An optional one says "Not answered" only once every required
+  // one on this item is answered.
+  const answeredIds = new Set<string>([
+    ...(jobStatus === "completed"
+      ? (humanAgreementForItem?.evaluators ?? [])
+          .filter((e) => e.human_annotations.length > 0)
+          .map((e) => e.evaluator_id)
+      : []),
+    ...runs
+      .filter((x) => x.value?.value !== null && x.value?.value !== undefined)
+      .map((x) => x.evaluator_id),
+  ]);
+  const requiredAllAnswered = evaluators.every(
+    (ev) => ev.is_optional === true || answeredIds.has(ev.evaluator_id),
+  );
+  const notAnsweredFor = (ev: { evaluator_id: string; is_optional?: boolean }) =>
+    ev.is_optional === true &&
+    requiredAllAnswered &&
+    !answeredIds.has(ev.evaluator_id);
+
   if (visibleEvaluators.length === 0) {
     return (
       <div className="space-y-3">
@@ -1045,6 +1066,7 @@ export function EvaluatorResultsPane({
           mode="read"
           name={evaluatorName}
           isOptional={ev.is_optional === true}
+          notAnswered={notAnsweredFor(ev)}
           description={jobEvaluator?.description ?? null}
           versionLabel={showVersionInSourcePill ? null : versionLabel}
           outputType={outputType}
@@ -1094,6 +1116,7 @@ export function EvaluatorResultsPane({
             jobStatus={jobStatus}
             linkEvaluators={linkEvaluators}
             annotatorFilterActive={annotatorFilterActive}
+            notAnswered={notAnsweredFor(byEvaluator.get(id)![0])}
           />
         ))}
       </div>
@@ -1185,6 +1208,7 @@ function GroupedEvaluatorCard({
   jobStatus,
   linkEvaluators,
   annotatorFilterActive = false,
+  notAnswered = false,
 }: {
   evaluators: {
     evaluator_id: string;
@@ -1192,6 +1216,7 @@ function GroupedEvaluatorCard({
     name?: string;
     is_optional?: boolean;
   }[];
+  notAnswered?: boolean;
   runs: EvaluatorRunRow[];
   versionLabels: Record<string, string>;
   evaluatorNamesById: Record<string, string>;
@@ -1369,6 +1394,7 @@ function GroupedEvaluatorCard({
         mode="read"
         name={evaluatorName}
         isOptional={evaluators[0]?.is_optional === true}
+        notAnswered={notAnswered}
         description={jobEvaluator?.description ?? null}
         outputType={outputType}
         evaluatorUuid={evaluatorId}
@@ -1430,7 +1456,7 @@ export function ItemDetailPane({
     evaluator_id: string;
     evaluator_version_id?: string;
     name?: string;
-    /** Marks the card Optional, and says so when nobody answered it. */
+    /** Marks the card Optional, and "Not answered" once the required ones are. */
     is_optional?: boolean;
   }[];
   evaluatorNamesById: Record<string, string>;

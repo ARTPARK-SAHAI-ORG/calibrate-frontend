@@ -1487,7 +1487,7 @@ describe("AnnotationJobView", () => {
       ).toBeInTheDocument();
     });
 
-    it("shows a skipped optional evaluator in the admin view with a note, and a blank required one without it", async () => {
+    it("shows a skipped optional evaluator in the admin view, without Not answered while a required one is blank", async () => {
       fetchMock.mockResolvedValue(
         jsonResponse(withOptionalRating({ read_only: true })),
       );
@@ -1498,7 +1498,31 @@ describe("AnnotationJobView", () => {
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
       expect(screen.getByText("Quality")).toBeInTheDocument();
-      expect(screen.getAllByText("Optional, not answered yet")).toHaveLength(1);
+      expect(screen.queryByText("Not answered")).not.toBeInTheDocument();
+    });
+
+    it("says Not answered on a skipped optional evaluator once the required one is answered", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          withOptionalRating({
+            read_only: true,
+            annotations: [
+              {
+                item_id: items[0].uuid,
+                evaluator_id: "ev-1",
+                value: { value: true },
+              },
+            ],
+          }),
+        ),
+      );
+      render(
+        <AnnotationJobView token="tok" mode="admin" fillViewport={false} />,
+      );
+      await waitFor(() =>
+        expect(screen.getByText("Quality")).toBeInTheDocument(),
+      );
+      expect(screen.getAllByText("Not answered")).toHaveLength(1);
     });
 
     it("still shows an optional evaluator the annotator did answer", async () => {
@@ -1523,9 +1547,7 @@ describe("AnnotationJobView", () => {
         expect(screen.getByText("Correctness")).toBeInTheDocument(),
       );
       expect(screen.getByText("Quality")).toBeInTheDocument();
-      expect(
-        screen.queryByText("Optional, not answered yet"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Not answered")).not.toBeInTheDocument();
     });
 
     it("asks before leaving an optional answer added to a row that was already submitted", async () => {

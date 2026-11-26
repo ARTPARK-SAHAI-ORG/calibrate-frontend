@@ -56,6 +56,9 @@ type CommonProps = {
   /** Marks the evaluator as one an annotator may leave blank. Shown as
    * a muted pill beside the name, same shape as the version chip. */
   isOptional?: boolean;
+  /** Read mode only: show a grey "Not answered" pill where the verdict
+   * would sit. The caller decides when, since it needs the other evaluators. */
+  notAnswered?: boolean;
   /** "binary" → Correct/Wrong, "rating" → 1..scaleMax buttons. */
   outputType: EvaluatorOutputType;
   /** Evaluator uuid — used for linking the name to its detail page. */
@@ -164,14 +167,6 @@ const RATING_ACTIVE_CLASS: Record<Tone, string> = {
 
 export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
   const tone: Tone = props.mode === "read" ? readVerdictTone(props) : "neutral";
-  // Read mode on an optional evaluator nobody answered: say so where the
-  // verdict would sit, instead of a bare card.
-  const optionalUnanswered =
-    props.mode === "read" &&
-    props.isOptional === true &&
-    (props.outputType === "binary"
-      ? props.match === null || props.match === undefined
-      : props.score === null || props.score === undefined);
 
   const hasVariables =
     !!props.variableValues &&
@@ -268,7 +263,7 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
                 {props.versionLabel}
               </span>
             )}
-            {props.isOptional && !optionalUnanswered && (
+            {props.isOptional && (
               <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded-md border border-border bg-muted/40 text-muted-foreground whitespace-nowrap font-medium">
                 Optional
               </span>
@@ -278,9 +273,9 @@ export function EvaluatorVerdictCard(props: EvaluatorVerdictCardProps) {
             className="flex-shrink-0 flex items-center gap-1.5"
             data-evaluator-verdict-chips
           >
-            {optionalUnanswered && (
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                Optional, not answered yet
+            {props.mode === "read" && props.notAnswered && (
+              <span className="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-muted text-muted-foreground whitespace-nowrap">
+                Not answered
               </span>
             )}
             {props.mode === "read" && (

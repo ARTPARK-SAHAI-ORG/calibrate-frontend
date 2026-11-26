@@ -322,49 +322,32 @@ describe("EvaluatorVerdictCard - header extras", () => {
     expect(screen.queryByText("Optional")?.tagName).toBe("SPAN");
   });
 
-  it("says an optional evaluator in read mode is not answered yet", () => {
+  it("shows a Not answered pill in read mode when asked to", () => {
     render(
       <EvaluatorVerdictCard
         mode="read"
         name="Script Fidelity"
         outputType="rating"
         isOptional
+        notAnswered
         score={null}
       />,
     );
-    expect(screen.getByText("Optional, not answered yet")).toBeInTheDocument();
-    expect(screen.queryByText("Optional")).not.toBeInTheDocument();
+    expect(screen.getByText("Not answered")).toBeInTheDocument();
+    expect(screen.getByText("Optional")).toBeInTheDocument();
   });
 
-  it("shows the answer, not the note, once an optional evaluator is answered", () => {
+  it("shows no Not answered pill unless asked to", () => {
     render(
       <EvaluatorVerdictCard
         mode="read"
         name="Script Fidelity"
         outputType="binary"
         isOptional
-        match={false}
-      />,
-    );
-    expect(screen.getByText("Optional")).toBeInTheDocument();
-    expect(screen.getByText("Wrong")).toBeInTheDocument();
-    expect(
-      screen.queryByText("Optional, not answered yet"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("adds no note to a required evaluator nobody answered", () => {
-    render(
-      <EvaluatorVerdictCard
-        mode="read"
-        name="Script Fidelity"
-        outputType="binary"
         match={null}
       />,
     );
-    expect(
-      screen.queryByText("Optional, not answered yet"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Not answered")).not.toBeInTheDocument();
   });
 
   it("hides the Optional pill when the evaluator is required", () => {

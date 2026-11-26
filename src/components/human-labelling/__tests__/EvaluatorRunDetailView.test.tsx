@@ -2018,23 +2018,42 @@ describe("EvaluatorResultsPane", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows an optional evaluator nobody answered, with a note saying so", () => {
-    render(
-      <EvaluatorResultsPane
-        {...baseProps}
-        groupVersionsByEvaluator
-        evaluators={[
-          {
-            evaluator_id: "ev-bin",
-            evaluator_version_id: "v-bin-1",
-            is_optional: true,
-          },
-        ]}
-        runs={[makeRun({ value: { value: null } })]}
-      />,
-    );
+  const optionalWithRequired = (requiredValue: number | null) => (
+    <EvaluatorResultsPane
+      {...baseProps}
+      groupVersionsByEvaluator
+      evaluators={[
+        { evaluator_id: "ev-rate", evaluator_version_id: "v-rate-1" },
+        {
+          evaluator_id: "ev-bin",
+          evaluator_version_id: "v-bin-1",
+          is_optional: true,
+        },
+      ]}
+      runs={[
+        makeRun({
+          uuid: "run-rate",
+          evaluator_id: "ev-rate",
+          evaluator_version_id: "v-rate-1",
+          value: { value: requiredValue },
+        }),
+        makeRun({ value: { value: null } }),
+      ]}
+    />
+  );
+
+  it("says Not answered on an empty optional evaluator once the required ones are answered", () => {
+    render(optionalWithRequired(3));
     expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
-    expect(screen.getByText("Optional, not answered yet")).toBeInTheDocument();
+    expect(screen.getByText("Optional")).toBeInTheDocument();
+    expect(screen.getByText("Not answered")).toBeInTheDocument();
+  });
+
+  it("shows an empty optional evaluator without Not answered while a required one is empty", () => {
+    render(optionalWithRequired(null));
+    expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
+    expect(screen.getByText("Optional")).toBeInTheDocument();
+    expect(screen.queryByText("Not answered")).not.toBeInTheDocument();
   });
 
   it("shows an optional evaluator that a run scored but nobody labelled", () => {
@@ -2053,9 +2072,7 @@ describe("EvaluatorResultsPane", () => {
     );
     expect(screen.getByText("Binary Evaluator")).toBeInTheDocument();
     expect(screen.getByText("Correct")).toBeInTheDocument();
-    expect(
-      screen.queryByText("Optional, not answered yet"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Not answered")).not.toBeInTheDocument();
   });
 
   it("shows an optional evaluator that a person labelled but no run scored", () => {
