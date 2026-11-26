@@ -38,6 +38,7 @@ const VIEWS: Record<
     stacked: false,
     series: [
       ["traces_received", "Traces received"],
+      ["chat_messages", "Chat messages"],
       ["traces_scored", "Traces scored"],
     ],
   },

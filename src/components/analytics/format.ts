@@ -133,7 +133,8 @@ export const CARD_GROUPS: { label: string; cards: CardSpec[] }[] = [
   {
     label: "Traces and labelling",
     cards: [
-      { key: "traces_received", label: "Traces received" },
+      { key: "traces_received", label: "Traces received", note: "Sent by the agent's own app" },
+      { key: "chat_messages", label: "Chat messages", note: "Answered on agents' chat links" },
       { key: "traces_scored", label: "Traces scored" },
       { key: "labelling_jobs_finished", label: "Labelling jobs finished" },
       { key: "labels_collected", label: "Labels collected" },

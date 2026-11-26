@@ -25,7 +25,10 @@ export type AnalyticsActivity = {
   labelling_evaluator_runs: number;
   /** US dollars, or null when nothing in the dates has a cost. */
   cost: number | null;
+  /** From the agent's own app; chat link messages are counted apart. */
   traces_received: number;
+  /** Messages answered on agents' chat links. */
+  chat_messages: number;
   traces_scored: number;
   labelling_jobs_finished: number;
   labels_collected: number;
@@ -45,6 +48,7 @@ export type AnalyticsDay = {
   labelling_evaluator_runs: number;
   failed_evaluations: number;
   traces_received: number;
+  chat_messages: number;
   traces_scored: number;
   labels_collected: number;
   labelling_jobs_finished: number;
