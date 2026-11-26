@@ -62,7 +62,11 @@ describe("the conversation filter on the traces list", () => {
     expect(query(1).has("conversation_id")).toBe(false);
     expect(
       selectAllBody({ agentId: "agent-1", conversationId: "conv-1" }),
-    ).toEqual({ select_all: true, agent_id: "agent-1", conversation_id: "conv-1" });
+    ).toEqual({
+      select_all: true,
+      agent_id: "agent-1",
+      conversation_id: "conv-1",
+    });
     expect(selectAllBody({ agentId: "agent-1" })).not.toHaveProperty(
       "conversation_id",
     );
@@ -113,7 +117,9 @@ describe("fetchTraceConversationIds", () => {
   it("asks for the agent's conversation IDs", async () => {
     mockApiGet.mockResolvedValueOnce({ conversation_ids: ["conv a/1"] });
     mockApiGet.mockResolvedValueOnce({});
-    expect(await fetchTraceConversationIds("tok", "agent 1")).toEqual(["conv a/1"]);
+    expect(await fetchTraceConversationIds("tok", "agent 1")).toEqual([
+      "conv a/1",
+    ]);
     expect(mockApiGet).toHaveBeenCalledWith(
       "/traces/conversation-ids?agent_id=agent%201",
       "tok",
@@ -158,7 +164,9 @@ describe("fetchTraceConversations", () => {
       outputType: "all",
     });
 
-    const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
+    const query = new URLSearchParams(
+      mockApiGet.mock.calls[0][0].split("?")[1],
+    );
     expect(query.has("q")).toBe(false);
     expect(query.has("output_type")).toBe(false);
     expect(query.has("labels")).toBe(false);
@@ -176,7 +184,9 @@ describe("fetchTraces", () => {
       createdBefore: "2026-11-04T10:00:00.000Z",
     });
 
-    const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
+    const query = new URLSearchParams(
+      mockApiGet.mock.calls[0][0].split("?")[1],
+    );
     expect(query.get("created_before")).toBe("2026-11-04T10:00:00.000Z");
   });
 
@@ -408,7 +418,9 @@ describe("fetchHasTrace", () => {
     await expect(
       fetchHasTrace("tok", "ag-1", { feedback: "any" }),
     ).resolves.toBe(true);
-    const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
+    const query = new URLSearchParams(
+      mockApiGet.mock.calls[0][0].split("?")[1],
+    );
     expect(query.get("agent_id")).toBe("ag-1");
     expect(query.get("feedback")).toBe("any");
     expect(query.get("limit")).toBe("1");
@@ -420,7 +432,9 @@ describe("fetchHasTrace", () => {
     await expect(
       fetchHasTrace("tok", "ag-1", { outputType: "tool_call" }),
     ).resolves.toBe(true);
-    const query = new URLSearchParams(mockApiGet.mock.calls[0][0].split("?")[1]);
+    const query = new URLSearchParams(
+      mockApiGet.mock.calls[0][0].split("?")[1],
+    );
     expect(query.get("output_type")).toBe("tool_call");
     expect(query.get("feedback")).toBeNull();
   });
@@ -522,6 +536,28 @@ describe("convertTracesToTests", () => {
       },
     );
     expect(result).toEqual({ created: 2, test_uuids: ["t1", "t2"] });
+  });
+
+  it("sends the test's name when one is given", async () => {
+    mockApiPost.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
+
+    await convertTracesToTests("tok", {
+      traceIds: ["a"],
+      type: "response",
+      evaluatorUuids: ["ev1"],
+      name: "Skipped rotavirus",
+    });
+
+    expect(mockApiPost).toHaveBeenCalledWith(
+      "/traces/convert-to-tests",
+      "tok",
+      {
+        trace_ids: ["a"],
+        type: "response",
+        evaluators: ["ev1"],
+        name: "Skipped rotavirus",
+      },
+    );
   });
 
   it("shapes a general conversion the same way, with its own type", async () => {
@@ -645,7 +681,10 @@ describe("selectAllBody", () => {
 
   it("carries the time the reader chose, and leaves it out when there is none", () => {
     expect(
-      selectAllBody({ agentId: "ag-1", createdBefore: "2026-11-04T10:00:00.000Z" }),
+      selectAllBody({
+        agentId: "ag-1",
+        createdBefore: "2026-11-04T10:00:00.000Z",
+      }),
     ).toEqual({
       select_all: true,
       agent_id: "ag-1",
@@ -1042,13 +1081,15 @@ describe("traceFilterKey", () => {
   });
 
   it("ignores the order of the score conditions", () => {
-    expect(
-      key({ agentId, scores: { "ev-1": "failed", "ev-2": "<=2" } }),
-    ).toBe(key({ agentId, scores: { "ev-2": "<=2", "ev-1": "failed" } }));
+    expect(key({ agentId, scores: { "ev-1": "failed", "ev-2": "<=2" } })).toBe(
+      key({ agentId, scores: { "ev-2": "<=2", "ev-1": "failed" } }),
+    );
   });
 
   it("ignores spaces around the search and a new array of the same labels", () => {
-    expect(key({ agentId, q: "  refund " })).toBe(key({ agentId, q: "refund" }));
+    expect(key({ agentId, q: "  refund " })).toBe(
+      key({ agentId, q: "refund" }),
+    );
     expect(key({ agentId, q: "   " })).toBe(key({ agentId }));
     expect(key({ agentId, labels: ["vip"] })).toBe(
       key({ agentId, labels: ["vip"] }),

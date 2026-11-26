@@ -28,7 +28,6 @@ export type TraceOutput = {
   stopped_early?: boolean | null;
 };
 
-
 /** Slim list row from `GET /traces` — previews and counts only; the full
  *  bodies live on the detail endpoint. */
 export type TraceSummary = {
@@ -375,7 +374,11 @@ export async function fetchTraceConversations(
     | "createdBefore"
   >,
 ): Promise<Paginated<TraceConversation>> {
-  const params = traceListQuery(listParams, listParams.limit, listParams.offset);
+  const params = traceListQuery(
+    listParams,
+    listParams.limit,
+    listParams.offset,
+  );
   return apiGet<Paginated<TraceConversation>>(
     `/traces/conversations?${params.toString()}`,
     accessToken,
@@ -563,7 +566,9 @@ export type ConvertTestType = "response" | "tool_call" | "general";
 export type TraceSelectAll = TraceFilters & { createdBefore?: string | null };
 
 /** Turn the filters into the fields both bulk endpoints read. */
-export function selectAllBody(filters: TraceSelectAll): Record<string, unknown> {
+export function selectAllBody(
+  filters: TraceSelectAll,
+): Record<string, unknown> {
   const body: Record<string, unknown> = {
     select_all: true,
     ...traceFilterFields(filters),
@@ -582,7 +587,30 @@ export type ConvertTracesToTestsBody = {
   evaluatorUuids?: string[];
   /** For `tool_call`: match only the tool name, ignore the recorded arguments. */
   acceptAnyArguments?: boolean;
+  /** The test's name. Only when converting exactly one trace by its id. */
+  name?: string;
 };
+
+/** The name a test made from one trace starts with: the comment left with the
+ *  rating, else the user's message cut to 60 characters. */
+export function defaultTestName(
+  comment: string | null | undefined,
+  userMessage: string | null | undefined,
+): { name: string; from: "comment" | "message" | null } {
+  const fromComment = comment?.trim();
+  if (fromComment) return { name: fromComment, from: "comment" };
+  const message = userMessage?.trim();
+  if (!message) return { name: "", from: null };
+  // By character, so an emoji at the cut is not split in half.
+  const chars = Array.from(message);
+  return {
+    name:
+      chars.length <= 60
+        ? message
+        : `${chars.slice(0, 60).join("").trimEnd()}…`,
+    from: "message",
+  };
+}
 
 export type ConvertTracesToTestsResult = {
   /** How many tests were created. */
@@ -609,6 +637,7 @@ export async function convertTracesToTests(
     type,
     evaluatorUuids,
     acceptAnyArguments,
+    name,
   }: ConvertTracesToTestsBody,
 ): Promise<ConvertTracesToTestsResult> {
   const body: Record<string, unknown> = selectAll
@@ -618,6 +647,7 @@ export async function convertTracesToTests(
     body.evaluators = evaluatorUuids;
   }
   if (type === "tool_call") body.accept_any_arguments = !!acceptAnyArguments;
+  if (name) body.name = name;
   return apiPost<ConvertTracesToTestsResult>(
     "/traces/convert-to-tests",
     accessToken,

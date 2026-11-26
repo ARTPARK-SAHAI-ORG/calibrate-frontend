@@ -5,6 +5,9 @@ import { publicFetch } from "@/lib/publicFetch";
 export type ChatAgent = {
   agent_name: string;
   interaction_type: "conversation" | "general";
+  /** Both set only for a signed-in member of the agent's workspace. */
+  agent_id?: string | null;
+  org_uuid?: string | null;
 };
 
 export type ChatToolCall = {

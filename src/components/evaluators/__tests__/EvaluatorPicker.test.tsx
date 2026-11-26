@@ -113,6 +113,29 @@ describe("EvaluatorPicker", () => {
     expect(screen.getByText("Default")).toBeInTheDocument();
   });
 
+  it("puts the ticked evaluators first in one list, with the count", () => {
+    setup({
+      selectedFirst: true,
+      evaluators: [
+        evaluator({ uuid: "ev-a", name: "Correctness", is_default: true }),
+        evaluator({ uuid: "ev-b", name: "Tone check" }),
+        evaluator({ uuid: "ev-c", name: "Safety", is_default: true }),
+      ],
+      selectedIds: new Set(["ev-c"]),
+    });
+
+    expect(screen.queryByText("My evaluators")).not.toBeInTheDocument();
+    expect(screen.queryByText("Default")).not.toBeInTheDocument();
+    expect(
+      screen.getByText((_, el) => el?.textContent === "1 evaluator selected"),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("checkbox")
+        .map((box) => box.getAttribute("aria-label")),
+    ).toEqual(["Select Safety", "Select Correctness", "Select Tone check"]);
+  });
+
   it("hides the section headers when every evaluator is owned", () => {
     setup({ evaluators: [evaluator({ uuid: "ev-a", name: "Tone check" })] });
 

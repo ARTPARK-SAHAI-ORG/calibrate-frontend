@@ -10,6 +10,22 @@ import {
 } from "../EvaluatorPills";
 
 describe("EvaluatorPills", () => {
+  it.each([
+    ["EvaluatorTypePill", <EvaluatorTypePill key="t" evaluatorType="llm" />],
+    ["KindPill", <KindPill key="k" kind="single" />],
+    ["OutputTypePill", <OutputTypePill key="o" outputType="binary" />],
+  ])(
+    "%s shows its hover text over the pill only, not the whole line",
+    (_name, pill) => {
+      const { container } = render(<div>{pill}</div>);
+      // The hover area wraps the pill; as a full-width block it caught the
+      // mouse anywhere on the line beside it.
+      expect(container.firstElementChild?.firstElementChild).toHaveClass(
+        "inline-block",
+      );
+    },
+  );
+
   it("renders the Default pill", () => {
     render(<PreBuiltPill />);
     expect(screen.getByText("Pre-built")).toBeInTheDocument();

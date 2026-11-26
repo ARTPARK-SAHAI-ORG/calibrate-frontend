@@ -9,9 +9,14 @@ import {
 import { EmptyState, ErrorNote, InfoNote } from "@/components/ui";
 import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
+import { AddedToTestsDialog } from "@/components/traces/AddedToTestsDialog";
+import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
+import { setActiveOrgUuid } from "@/lib/orgs";
+import type { ConvertTestType } from "@/lib/tracesApi";
 import {
   ChatIcon,
   InfoIcon,
+  PlusIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
 } from "@/components/icons";
@@ -124,6 +129,13 @@ export function PublicChatView({ token }: { token: string }) {
     isCorrect: boolean;
   } | null>(null);
   const [replaceBusy, setReplaceBusy] = useState(false);
+  const [converting, setConverting] = useState<{
+    traceUuid: string;
+    testType: ConvertTestType;
+    userMessage: string | null;
+  } | null>(null);
+  // The tests just made from a reply, for the confirmation to link to.
+  const [addedTests, setAddedTests] = useState<string[] | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const messageRef = useRef<HTMLTextAreaElement>(null);
   // Bumped by New chat, so a reply still on its way to the old chat is dropped.
@@ -288,6 +300,28 @@ export function PublicChatView({ token }: { token: string }) {
     }
   };
 
+  // Only a member of the agent's workspace is sent these.
+  const { agent_id: agentId, org_uuid: orgUuid } = agent;
+  const addToTests =
+    agentId && orgUuid
+      ? (turn: Extract<Turn, { role: "agent" }>, index: number) => {
+          // The dialog's requests go to the agent's workspace.
+          setActiveOrgUuid(orgUuid);
+          const asked = turns[index - 1];
+          setConverting({
+            traceUuid: turn.traceUuid!,
+            userMessage: asked?.role === "user" ? asked.text : null,
+            // The same rule as the Monitoring tab's Add to tests.
+            testType:
+              !turn.reply && turn.toolCalls.length > 0
+                ? "tool_call"
+                : agent.interaction_type === "general"
+                  ? "general"
+                  : "response",
+          });
+        }
+      : undefined;
+
   const replaceFeedback = async () => {
     if (!replacing) return;
     setReplaceBusy(true);
@@ -381,6 +415,7 @@ export function PublicChatView({ token }: { token: string }) {
                 patchFeedback(turn.traceUuid, { open: false, draft: "" })
               }
               onSave={() => turn.traceUuid && void saveComment(turn.traceUuid)}
+              onAddToTests={addToTests && (() => addToTests(turn, i))}
             />
           ),
         )}
@@ -496,6 +531,42 @@ export function PublicChatView({ token }: { token: string }) {
         busyText="Clearing..."
         isDeleting={clearBusy}
       />
+      {agentId && (
+        <ConvertTracesToTestsDialog
+          isOpen={converting !== null}
+          onClose={() => setConverting(null)}
+          accessToken={accessToken}
+          traceUuids={converting ? [converting.traceUuid] : []}
+          testType={converting?.testType ?? "response"}
+          agentUuid={agentId}
+          agentNature={agent.interaction_type}
+          nameFrom={
+            converting
+              ? {
+                  // A comment typed but not saved yet is what is on screen.
+                  comment: (() => {
+                    const f = feedback[converting.traceUuid];
+                    return f?.open && f.draft.trim() ? f.draft : f?.comment;
+                  })(),
+                  userMessage: converting.userMessage,
+                }
+              : undefined
+          }
+          onConverted={(result) => {
+            setConverting(null);
+            setAddedTests(result.test_uuids);
+          }}
+        />
+      )}
+      {addedTests && agentId && (
+        <AddedToTestsDialog
+          testUuids={addedTests}
+          orgUuid={orgUuid}
+          agentUuid={agentId}
+          noun="reply"
+          onClose={() => setAddedTests(null)}
+        />
+      )}
     </PublicPageLayout>
   );
 }
@@ -513,6 +584,7 @@ function AgentTurn({
   onDraft,
   onCancel,
   onSave,
+  onAddToTests,
 }: {
   turn: Extract<Turn, { role: "agent" }>;
   feedback: Feedback;
@@ -525,6 +597,8 @@ function AgentTurn({
   onDraft: (text: string) => void;
   onCancel: () => void;
   onSave: () => void;
+  /** Set only for a member of the agent's workspace. */
+  onAddToTests?: () => void;
 }) {
   const picked = feedback.isCorrect;
   // The comment box opens under the reply; bring it into view, clear of the
@@ -627,6 +701,16 @@ function AgentTurn({
                 <ChatIcon className="w-4 h-4" />
               </button>
             </Tooltip>
+          )}
+          {onAddToTests && picked !== null && (
+            <button
+              type="button"
+              onClick={onAddToTests}
+              className="ml-2 h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Add to tests
+            </button>
           )}
           {feedback.failed && (
             <span className="text-xs text-red-600 dark:text-red-400 ml-2">

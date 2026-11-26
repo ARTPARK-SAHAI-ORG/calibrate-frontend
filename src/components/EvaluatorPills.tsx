@@ -54,7 +54,11 @@ export function EvaluatorTypePill({
   evaluatorType: EvaluatorType;
 }) {
   return (
-    <Tooltip content={EVALUATOR_TYPE_TOOLTIPS[evaluatorType]} position="top">
+    <Tooltip
+      content={EVALUATOR_TYPE_TOOLTIPS[evaluatorType]}
+      position="top"
+      className="inline-block"
+    >
       <span
         className={`${baseClasses} ${EVALUATOR_TYPE_COLORS[evaluatorType]} cursor-pointer`}
       >
@@ -76,7 +80,11 @@ const KIND_LABELS: Record<Kind, string> = {
 
 export function KindPill({ kind }: { kind: Kind }) {
   return (
-    <Tooltip content={KIND_TOOLTIPS[kind]} position="top">
+    <Tooltip
+      content={KIND_TOOLTIPS[kind]}
+      position="top"
+      className="inline-block"
+    >
       <span
         className={`${baseClasses} bg-muted text-muted-foreground cursor-pointer`}
       >
@@ -102,7 +110,11 @@ export function OutputTypePill({ outputType }: { outputType: OutputType }) {
       ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
       : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
   return (
-    <Tooltip content={OUTPUT_TYPE_TOOLTIPS[outputType]} position="top">
+    <Tooltip
+      content={OUTPUT_TYPE_TOOLTIPS[outputType]}
+      position="top"
+      className="inline-block"
+    >
       <span className={`${baseClasses} ${color} cursor-pointer`}>
         {OUTPUT_TYPE_LABELS[outputType]}
       </span>

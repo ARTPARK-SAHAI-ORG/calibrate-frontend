@@ -980,6 +980,13 @@ export function AddTestDialog({
   // Each heading and version name keeps its own draft, applied only by its
   // tick or Enter, so editing one field never touches another's.
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // A heading box just filled with its default, to select once it is drawn,
+  // so typing replaces the default rather than adding to it.
+  const selectOnDraw = useRef<HTMLInputElement | null>(null);
+  useLayoutEffect(() => {
+    selectOnDraw.current?.select();
+    selectOnDraw.current = null;
+  }, [drafts]);
   const headingKey = (id: string) => `heading:${id}`;
   const versionKey = (id: string, name: string) => `version:${id}:${name}`;
   const setDraft = (key: string, value: string) =>
@@ -2003,22 +2010,15 @@ export function AddTestDialog({
   // parameter (required ones, plus any optional/custom rows the user filled
   // in) must be complete.
   const selectedToolsInvalid = () => {
-    const invalid = selectedToolsHaveInvalidParams(selectedTools);
+    const invalid =
+      selectedToolsHaveInvalidParams(selectedTools) ||
+      toolExpectations.hasUnreadableJson;
     if (invalid) {
-      // Each field says what is wrong under it. The highlight lands on the
-      // next render, so look for it after that.
-      requestAnimationFrame(() => {
-        const bad = document.querySelector<HTMLElement>("[data-param-error]");
-        if (!bad) {
-          // A tool edited as JSON has no field to point at.
-          setToolValidationError(
-            "Some expected tool call values are missing or invalid. Switch to Form to see which",
-          );
-          return;
-        }
-        bad.scrollIntoView?.({ block: "center", behavior: "smooth" });
-        bad.focus();
-      });
+      toolExpectations.revealInvalidFields(() =>
+        setToolValidationError(
+          "Some expected tool call values are missing or invalid",
+        ),
+      );
     }
     return invalid;
   };
@@ -2271,8 +2271,10 @@ export function AddTestDialog({
               value={shown}
               placeholder={placeholder}
               aria-label={`Heading for this ${placeholder.toLowerCase()} message`}
-              onFocus={() => {
-                if (draft === undefined) setDraft(key, current || placeholder);
+              onFocus={(e) => {
+                if (draft !== undefined) return;
+                setDraft(key, current || placeholder);
+                if (!current) selectOnDraw.current = e.currentTarget;
               }}
               onChange={(e) => setDraft(key, e.target.value)}
               onBlur={() => {

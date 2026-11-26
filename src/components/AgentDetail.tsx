@@ -1491,7 +1491,6 @@ export function AgentDetail({
               }}
               isActive={activeTab === "monitoring"}
               onTestsCreated={() => setTestsReloadKey((k) => k + 1)}
-              onViewTests={() => performTabSwitch("tests")}
               onAgentDefaultsAttached={() =>
                 setEvaluatorsReloadKey((k) => k + 1)
               }

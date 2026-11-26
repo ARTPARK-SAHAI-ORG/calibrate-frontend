@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fireEvent, render, screen, setupUser } from "@/test-utils";
+import { fireEvent, render, screen, setupUser, waitFor } from "@/test-utils";
 import type { TurnExtras } from "@/lib/messageVersions";
 import {
   TextVersionsEditor,
@@ -213,8 +213,40 @@ describe("TextVersionsEditor", () => {
     const user = setupUser();
     const onChange = jest.fn();
     render(<Harness initial={{}} onChange={onChange} />);
-    await user.type(screen.getByLabelText("Heading for the input"), "Original{Enter}");
+    const heading = screen.getByLabelText("Heading for the input");
+    await user.click(heading);
+    await user.clear(heading);
+    await user.type(heading, "Original{Enter}");
     expect(onChange).toHaveBeenLastCalledWith({ label: "Original" });
+  });
+
+  it("replaces the filled-in default when typing straight after clicking", async () => {
+    const user = setupUser();
+    render(<Harness initial={{}} />);
+    const heading = screen.getByLabelText("Heading for the input");
+    await user.click(heading);
+    await waitFor(() => expect(heading).toHaveValue("Input"));
+    await waitFor(() =>
+      expect((heading as HTMLInputElement).selectionStart).toBe(0),
+    );
+    await user.keyboard("Question");
+    expect(heading).toHaveValue("Question");
+  });
+
+  it("shows the heading annotators see by default, ready to edit", async () => {
+    const user = setupUser();
+    const onChange = jest.fn();
+    render(<Harness initial={{}} onChange={onChange} />);
+    const heading = screen.getByLabelText("Heading for the input");
+    expect(heading).toHaveAttribute("placeholder", "Input");
+    await user.click(heading);
+    expect(heading).toHaveValue("Input");
+    // Keeping it stores no heading, and nothing is waiting for a tick.
+    await user.type(heading, "{Enter}");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "Confirm heading" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renames a version on a text with no heading", async () => {

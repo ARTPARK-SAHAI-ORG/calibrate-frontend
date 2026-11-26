@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { CheckIcon, CloseIcon } from "@/components/icons";
 import { Tooltip } from "@/components/Tooltip";
 import type { TurnExtras } from "@/lib/messageVersions";
@@ -73,6 +79,7 @@ export function TextVersionsEditor({
   onChange,
   onPendingChange,
   disabled = false,
+  headingAside,
   children,
 }: {
   field: "input" | "output";
@@ -81,9 +88,18 @@ export function TextVersionsEditor({
   /** Told whether a typed heading or name is waiting for its tick. */
   onPendingChange?: (pending: boolean) => void;
   disabled?: boolean;
+  /** A small button drawn at the end of the heading's row. */
+  headingAside?: ReactNode;
   children: ReactNode;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // A heading box just filled with its default, to select once it is drawn,
+  // so typing replaces the default rather than adding to it.
+  const selectOnDraw = useRef<HTMLInputElement | null>(null);
+  useLayoutEffect(() => {
+    selectOnDraw.current?.select();
+    selectOnDraw.current = null;
+  }, [drafts]);
   const [toRemove, setToRemove] = useState<string | null>(null);
 
   const pending = Object.keys(drafts).length > 0;
@@ -118,16 +134,21 @@ export function TextVersionsEditor({
   });
 
   const label = extras.label ?? "";
+  // What annotators see when there is no heading, shown in the box so it is
+  // clear what goes there. Keeping it stores no heading.
+  const defaultHeading = field === "input" ? "Input" : "Output";
   const headingDraft = drafts.heading;
+  const headingUnchanged = (to: string) =>
+    to === label || (!label && to === defaultHeading);
   const headingDirty =
-    headingDraft !== undefined && headingDraft.trim() !== label;
+    headingDraft !== undefined && !headingUnchanged(headingDraft.trim());
   const headingTaken =
     headingDirty && Object.hasOwn(versions, headingDraft.trim());
   const confirmHeading = () => {
     if (headingDraft === undefined || headingTaken) return;
     dropDraft("heading");
     const to = headingDraft.trim();
-    if (to === label) return;
+    if (headingUnchanged(to)) return;
     onChange({
       ...(to ? { label: to } : {}),
       ...(extras.versions ? { versions: extras.versions } : {}),
@@ -170,9 +191,14 @@ export function TextVersionsEditor({
         <input
           type="text"
           value={headingDraft ?? label}
-          placeholder="Add a heading for annotators"
+          placeholder={defaultHeading}
           aria-label={`Heading for the ${field}`}
           disabled={disabled}
+          onFocus={(e) => {
+            if (headingDraft !== undefined) return;
+            setDraft("heading", label || defaultHeading);
+            if (!label) selectOnDraw.current = e.currentTarget;
+          }}
           onChange={(e) => setDraft("heading", e.target.value)}
           onBlur={() => {
             if (headingDraft !== undefined && !headingDirty)
@@ -189,6 +215,7 @@ export function TextVersionsEditor({
             canConfirm={!headingTaken}
           />
         )}
+        {headingAside}
       </div>
       {headingTaken && (
         <p className="text-xs text-red-500 px-4 -mt-1 mb-3">{TAKEN_MESSAGE}</p>
