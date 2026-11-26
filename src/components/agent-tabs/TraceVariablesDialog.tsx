@@ -1,26 +1,24 @@
 "use client";
 
 import { CloseIcon } from "@/components/icons";
-import { copyToClipboard } from "@/lib/clipboard";
 import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import {
-  OptionRow,
-  TraceDropdown,
-} from "@/components/agent-tabs/TraceDropdown";
+import { SingleSelectPicker } from "@/components/SingleSelectPicker";
 import { traceValue } from "@/components/agent-tabs/traceValue";
 import { MAX_KEY_LENGTH } from "@/components/human-labelling/MetadataFieldsEditor";
 import { SpinnerIcon, WarningTriangleIcon } from "@/components/icons";
+import {
+  CodeTabsBox,
+  snippetBackendUrl,
+} from "@/components/traces/CodeTabsBox";
 import { KEY_PLACEHOLDER } from "@/components/traces/TraceIngestSnippet";
 import { WarningBox } from "@/components/traces/WarningBox";
 import {
   buildSnippet,
-  SNIPPET_LANGUAGES,
   type SnippetLanguage,
 } from "@/components/traces/ingestSnippets";
 import { ErrorNote } from "@/components/ui/ErrorNote";
 import { useAccessToken } from "@/hooks";
-import { getBackendUrl } from "@/lib/api";
 import type { EvaluatorData } from "@/lib/evaluatorApi";
 import { parseBackendErrorMessage } from "@/lib/parseBackendError";
 import { formatRelativeTime } from "@/lib/relativeTime";
@@ -86,6 +84,51 @@ function Waiting() {
   );
 }
 
+// Props shared by the pickers that sit beside a variable, so they look like `Select`.
+const PICKER = {
+  compact: true,
+  className: "w-40",
+  triggerClassName: "h-10 px-3 rounded-md",
+  panelWidth: 300,
+};
+
+const latestHeading = () => (
+  <p className="text-xs text-muted-foreground">{LATEST_HEADING}</p>
+);
+
+/** An option's name, with the value it would take under it when there is one. */
+function OptionRow({
+  name,
+  detail,
+  muted,
+}: {
+  name: string;
+  /** Undefined draws no second line; null says the latest trace lacks it. */
+  detail?: string | null;
+  muted?: boolean;
+}) {
+  return (
+    <span className="block min-w-0 flex-1">
+      <span
+        className={`block text-sm font-medium ${muted ? "text-muted-foreground" : ""}`}
+      >
+        {name}
+      </span>
+      {detail === null ? (
+        <span className="block truncate text-xs italic text-muted-foreground/60">
+          Not in the latest trace
+        </span>
+      ) : (
+        detail !== undefined && (
+          <span className="block truncate text-xs text-muted-foreground">
+            {detail}
+          </span>
+        )
+      )}
+    </span>
+  );
+}
+
 function TraceRow({ trace }: { trace: TraceSummary }) {
   return (
     <span className="flex items-center gap-2 min-w-0 text-sm">
@@ -131,7 +174,6 @@ export function TraceVariablesDialog({
     error: string | null;
   } | null>(null);
   const [language, setLanguage] = useState<SnippetLanguage>("curl");
-  const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -251,12 +293,6 @@ export function TraceVariablesDialog({
 
   // The code column: what a trace must carry, with the metadata the choices
   // read shown as entries and everything else left as "...".
-  let backendUrl = "https://<backend>";
-  try {
-    backendUrl = getBackendUrl();
-  } catch {
-    // Missing env var only happens in misconfigured dev; keep the placeholder.
-  }
   const metadata = [
     ...new Map(
       Object.values(choices)
@@ -271,7 +307,7 @@ export function TraceVariablesDialog({
     ).values(),
   ];
   const snippet = buildSnippet(language, {
-    backendUrl,
+    backendUrl: snippetBackendUrl(),
     agentUuid,
     apiKey: KEY_PLACEHOLDER,
     agentNature,
@@ -284,12 +320,6 @@ export function TraceVariablesDialog({
     metaStart < 0
       ? -1
       : lines.findIndex((l, i) => i > metaStart && l.trim() === "]");
-
-  const handleCopy = async () => {
-    if (!(await copyToClipboard(snippet))) return;
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const sourceRow = (name: string) => {
     const value = values[name] ?? "";
@@ -312,73 +342,59 @@ export function TraceVariablesDialog({
       <React.Fragment key={name}>
         <code className={CHIP}>{chip(name)}</code>
         <div className="flex gap-2">
-          <TraceDropdown
-            label={`Source for ${name}`}
-            value={isMeta ? METADATA_SOURCE : value}
-            heading={latest ? LATEST_HEADING : undefined}
+          <SingleSelectPicker
+            {...PICKER}
+            ariaLabel={`Source for ${name}`}
+            items={[...orderedSources, ...offList]}
+            selectedId={isMeta ? METADATA_SOURCE : value}
+            getId={(source) => source.value}
+            placeholder="Not set"
             disabled={saving}
-            selected={
-              value ? (
-                isMeta ? (
-                  "Metadata"
-                ) : (
-                  traceSourceLabel(value, agentNature)
-                )
-              ) : (
-                <span className="text-muted-foreground">Not set</span>
-              )
+            renderHeader={latest ? latestHeading : undefined}
+            renderTrigger={(source) =>
+              source?.value === METADATA_SOURCE
+                ? "Metadata"
+                : traceSourceLabel(value, agentNature)
             }
-            options={[...orderedSources, ...offList].map((source) => ({
-              value: source.value,
-              row: (
-                <OptionRow
-                  name={source.label}
-                  detail={
-                    !latest
-                      ? undefined
-                      : source.value === METADATA_SOURCE
-                        ? metaKeys.join(", ") || null
-                        : latestValue(source.value)
-                  }
-                />
-              ),
-            }))}
-            onChange={(next) => {
+            renderOption={(source) => (
+              <OptionRow
+                name={source.label}
+                detail={
+                  !latest
+                    ? undefined
+                    : source.value === METADATA_SOURCE
+                      ? metaKeys.join(", ") || null
+                      : latestValue(source.value)
+                }
+              />
+            )}
+            onSelect={({ value: next }) => {
               if (!(next === METADATA_SOURCE && isMeta)) setValue(name, next);
             }}
           />
           {isMeta && metaKeys.length > 0 && (
-            <TraceDropdown
-              label={`Metadata key list for ${name}`}
-              value={typing ? OTHER_KEY : key}
-              heading={LATEST_HEADING}
+            <SingleSelectPicker
+              {...PICKER}
+              ariaLabel={`Metadata key list for ${name}`}
+              items={[...metaKeys, OTHER_KEY]}
+              selectedId={typing ? OTHER_KEY : key}
+              getId={(k) => k}
+              placeholder="Choose a key"
               disabled={saving}
-              selected={
-                typing ? (
-                  "Other key"
-                ) : key ? (
-                  key
+              renderHeader={latestHeading}
+              isItemSeparated={(k) => k === OTHER_KEY}
+              renderTrigger={(k) => (k === OTHER_KEY ? "Other key" : k)}
+              renderOption={(k) =>
+                k === OTHER_KEY ? (
+                  <OptionRow name="Other key" muted />
                 ) : (
-                  <span className="text-muted-foreground">Choose a key</span>
+                  <OptionRow
+                    name={k}
+                    detail={latestValue(METADATA_SOURCE + k)}
+                  />
                 )
               }
-              options={[
-                ...metaKeys.map((k) => ({
-                  value: k,
-                  row: (
-                    <OptionRow
-                      name={k}
-                      detail={latestValue(METADATA_SOURCE + k)}
-                    />
-                  ),
-                })),
-                {
-                  value: OTHER_KEY,
-                  separated: true,
-                  row: <OptionRow name="Other key" muted />,
-                },
-              ]}
-              onChange={(next) =>
+              onSelect={(next) =>
                 next === OTHER_KEY
                   ? setValue(name, METADATA_SOURCE, true)
                   : setValue(name, METADATA_SOURCE + next)
@@ -421,57 +437,24 @@ export function TraceVariablesDialog({
         <p className="text-sm font-medium text-foreground">
           What your code needs to send
         </p>
-        <div className="border border-border rounded-lg overflow-hidden bg-muted/40">
-          <div className="flex items-center justify-between gap-2 p-1 border-b border-border">
-            <div className="flex items-center gap-0.5 overflow-x-auto">
-              {SNIPPET_LANGUAGES.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setLanguage(option.id)}
-                  className={`h-7 px-2.5 rounded-md text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                    language === option.id
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className={`flex-shrink-0 h-7 px-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                copied
-                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              {copied ? "Copied" : "Copy"}
-            </button>
-          </div>
-          <pre
-            data-testid="trace-send-code"
-            className="w-full text-left font-mono text-xs leading-relaxed text-foreground p-4 overflow-x-auto"
-          >
-            <code>
-              {lines.map((line, i) =>
-                i >= metaStart && i <= metaEnd && metaStart >= 0 ? (
-                  <span
-                    key={i}
-                    data-highlighted
-                    className="block bg-amber-500/15 -mx-4 px-4"
-                  >
-                    {line}
-                  </span>
-                ) : (
-                  `${line}${i < lines.length - 1 ? "\n" : ""}`
-                ),
-              )}
-            </code>
-          </pre>
-        </div>
+        <CodeTabsBox
+          code={snippet}
+          language={language}
+          onLanguageChange={setLanguage}
+          testId="trace-send-code"
+          renderLine={(line, i) =>
+            i >= metaStart && i <= metaEnd && metaStart >= 0 ? (
+              <span
+                data-highlighted
+                className="block bg-amber-500/15 -mx-4 px-4"
+              >
+                {line}
+              </span>
+            ) : (
+              `${line}${i < lines.length - 1 ? "\n" : ""}`
+            )
+          }
+        />
       </div>
     </div>
   );
@@ -490,17 +473,16 @@ export function TraceVariablesDialog({
       <div className="space-y-2">
         <p className="text-sm font-medium text-foreground">Select a trace</p>
         {selectedTrace && (
-          <TraceDropdown
-            label="Select a trace"
-            value={traceUuid}
-            className="w-full"
-            menuClassName="w-full"
-            selected={<TraceRow trace={selectedTrace} />}
-            options={(traces ?? []).map((trace) => ({
-              value: trace.uuid,
-              row: <TraceRow trace={trace} />,
-            }))}
-            onChange={setTraceUuid}
+          <SingleSelectPicker
+            compact
+            triggerClassName="h-10 px-3 rounded-md"
+            ariaLabel="Select a trace"
+            items={traces ?? []}
+            selectedId={traceUuid}
+            getId={(trace) => trace.uuid}
+            renderTrigger={(trace) => trace && <TraceRow trace={trace} />}
+            renderOption={(trace) => <TraceRow trace={trace} />}
+            onSelect={(trace) => setTraceUuid(trace.uuid)}
           />
         )}
       </div>

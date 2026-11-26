@@ -155,7 +155,7 @@ it("lists a conversation agent's parts by their names for it", async () => {
   await user.click(source("nurse_reply"));
 
   expect(
-    screen.getAllByRole("option").map((o) => o.firstChild?.textContent),
+    screen.getAllByRole("option").map((o) => o.firstChild?.firstChild?.textContent),
   ).toEqual([
     "Conversation",
     "Agent reply",
