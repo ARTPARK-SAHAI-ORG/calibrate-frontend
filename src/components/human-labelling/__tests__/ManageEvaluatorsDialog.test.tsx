@@ -116,6 +116,9 @@ describe("ManageEvaluatorsDialog", () => {
       screen.getByRole("button", { name: "Remove Tool call correctness" }),
     ).toBeDisabled();
     expect(catalogueCheckbox("Correctness")).not.toBeDisabled();
+    expect(
+      screen.getByText(/Cannot be removed: annotators answer this task.s tool call items with it/),
+    ).toBeInTheDocument();
   });
 
   it("renders with a generic subtitle when no taskType is given, and fetches evaluators", async () => {

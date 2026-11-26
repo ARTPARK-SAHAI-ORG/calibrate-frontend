@@ -449,6 +449,12 @@ export function ManageEvaluatorsDialog({
                               {ev.description}
                             </div>
                           )}
+                          {isLocked(ev.uuid) && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Cannot be removed: annotators answer this
+                              task&rsquo;s tool call items with it
+                            </div>
+                          )}
                         </div>
                       </label>
                     );
