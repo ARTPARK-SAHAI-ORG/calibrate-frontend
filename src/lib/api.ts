@@ -6,6 +6,7 @@ import {
   isWorkspaceFreePath,
 } from "@/lib/orgs";
 import { clearOrgsCache } from "@/hooks/useOrganizations";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/sessionExpired";
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -142,7 +143,7 @@ export async function apiClient<T>(
   // on so signing in again brings them back to it.
   if (response.status === 401) {
     await signOutCompletely(loginPathAfterSignOut());
-    throw new Error("Unauthorized - session expired");
+    throw new Error(SESSION_EXPIRED_MESSAGE);
   }
 
   // Handle non-2xx responses

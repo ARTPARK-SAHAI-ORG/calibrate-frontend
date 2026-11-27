@@ -523,6 +523,15 @@ const onTestsCreated = jest.fn();
 const onGoToEvaluators = jest.fn();
 const onGoToSettings = jest.fn();
 const setEnabled = jest.fn(async () => {});
+// One evaluator's passing verdict on a trace, as a list row carries it.
+const scored = (evaluator_uuid: string, name: string) => ({
+  evaluator_uuid,
+  name,
+  output_type: "binary" as const,
+  value: 1,
+  passed: true,
+});
+
 // Scoring off, with one evaluator able to score, unless a test says otherwise.
 const traceScoring = {
   enabled: false,
@@ -1161,6 +1170,102 @@ describe("TracesTabContent", () => {
           .getByPlaceholderText("Search traces")
           .compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
+    });
+
+    it("shows no card for an evaluator taken off the agent", () => {
+      mockUseTraces.mockReturnValue(
+        tracesResult([trace()], {
+          scoreAverages: [
+            {
+              evaluator_uuid: "ev-1",
+              name: "Tone",
+              output_type: "binary",
+              traces_scored: 4,
+              average: 0.5,
+            },
+            {
+              evaluator_uuid: "ev-gone",
+              name: "Retired judge",
+              output_type: "binary",
+              traces_scored: 1,
+              average: 0,
+            },
+          ],
+        }),
+      );
+      render(<TracesTabContent {...tabProps} />);
+      expect(screen.getByText("50%")).toBeInTheDocument();
+      expect(screen.queryByText("Retired judge")).not.toBeInTheDocument();
+      expect(screen.queryByText("0%")).not.toBeInTheDocument();
+    });
+
+    it("shows no cards or score columns until it is known which evaluators are on the agent", () => {
+      mockUseTraces.mockReturnValue(
+        tracesResult(
+          [
+            trace({
+              latest_run_status: "completed",
+              results: [scored("ev-1", "Tone")],
+            }),
+          ],
+          {
+            scoreAverages: [
+              {
+                evaluator_uuid: "ev-1",
+                name: "Tone",
+                output_type: "binary",
+                traces_scored: 4,
+                average: 0.5,
+              },
+            ],
+          },
+        ),
+      );
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{ ...traceScoring, eligibility: null }}
+        />,
+      );
+      expect(screen.queryByText("Production quality")).not.toBeInTheDocument();
+      expect(screen.queryByText("Tone")).not.toBeInTheDocument();
+    });
+
+    it("still shows the cards and score columns when the agent's evaluators could not be checked", () => {
+      mockUseTraces.mockReturnValue(
+        tracesResult(
+          [
+            trace({
+              latest_run_status: "completed",
+              results: [scored("ev-1", "Tone")],
+            }),
+          ],
+          {
+            scoreAverages: [
+              {
+                evaluator_uuid: "ev-1",
+                name: "Tone",
+                output_type: "binary",
+                traces_scored: 4,
+                average: 0.5,
+              },
+            ],
+          },
+        ),
+      );
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            eligibility: null,
+            eligibilityError: "Could not check",
+          }}
+        />,
+      );
+      expect(screen.getByText("50%")).toBeInTheDocument();
+      // The card's name and the column heading.
+      expect(screen.getAllByText("Tone").length).toBeGreaterThanOrEqual(2);
     });
 
     it("says the numbers cover the list below once it is narrowed", async () => {
@@ -1961,19 +2066,14 @@ describe("TracesTabContent", () => {
       expect(screen.queryByText("Tone")).not.toBeInTheDocument();
     });
 
-    it("keeps a column for an evaluator that scored a trace but has since left the agent", () => {
+    it("drops the column of an evaluator taken off the agent, and keeps one for an evaluator still on it", () => {
       mockUseTraces.mockReturnValue(
         tracesResult([
           trace({
             latest_run_status: "completed",
             results: [
-              {
-                evaluator_uuid: "ev-gone",
-                name: "Retired judge",
-                output_type: "binary",
-                value: 1,
-                passed: true,
-              },
+              scored("ev-gone", "Retired judge"),
+              scored("ev-stuck", "Needs values"),
             ],
           }),
         ]),
@@ -1983,57 +2083,21 @@ describe("TracesTabContent", () => {
           {...tabProps}
           traceScoring={{
             ...traceScoring,
-            eligibility: { eligible: [], ineligible: [] },
+            eligibility: {
+              eligible: [],
+              ineligible: [
+                {
+                  evaluator_uuid: "ev-stuck",
+                  name: "Needs values",
+                  reason: "declares_variables",
+                },
+              ],
+            },
           }}
         />,
       );
-      expect(screen.getAllByText("Retired judge").length).toBeGreaterThan(0);
-    });
-
-    it("keeps a retired evaluator's empty cells as they were while the kinds are read again", async () => {
-      fetchAgentEvaluators.mockResolvedValue([]);
-      mockUseTraces.mockReturnValue(
-        tracesResult([
-          trace({
-            latest_run_status: "completed",
-            results: [
-              {
-                evaluator_uuid: "ev-gone",
-                name: "Retired judge",
-                output_type: "binary",
-                value: 1,
-                passed: true,
-              },
-            ],
-          }),
-          trace({ uuid: "trace-2", latest_run_status: "completed" }),
-        ]),
-      );
-      const noEligible = {
-        ...traceScoring,
-        eligibility: { eligible: [], ineligible: [] },
-      };
-      const { container, rerender } = render(
-        <TracesTabContent {...tabProps} traceScoring={noEligible} />,
-      );
-      await waitFor(() => expect(fetchAgentEvaluators).toHaveBeenCalled());
-      await act(async () => {});
-      const before = container.textContent;
-      rerender(
-        <TracesTabContent
-          {...tabProps}
-          traceScoring={noEligible}
-          isActive={false}
-        />,
-      );
-      fetchAgentEvaluators.mockReturnValue(new Promise(() => {}));
-      rerender(
-        <TracesTabContent {...tabProps} traceScoring={noEligible} isActive />,
-      );
-      await waitFor(() =>
-        expect(fetchAgentEvaluators).toHaveBeenCalledTimes(2),
-      );
-      expect(container.textContent).toBe(before);
+      expect(screen.queryByText("Retired judge")).not.toBeInTheDocument();
+      expect(screen.getAllByText("Needs values").length).toBeGreaterThan(0);
     });
 
     const blockedBy = (...reasons: string[]) => ({

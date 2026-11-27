@@ -111,10 +111,24 @@ export function useTraces({
         });
         if (requestId !== requestIdRef.current) return 0;
         const nextTotal = page.total ?? 0;
-        setItems(page.items ?? []);
+        const nextItems = page.items ?? [];
+        setItems(nextItems);
         if (wantAverages) {
           averagesKeyRef.current = filterKey;
           setScoreAverages(page.score_averages ?? []);
+        }
+        // A silent read is a check made while a row was being scored, and it
+        // skips the averages. When it finds every row done, the averages have
+        // just changed: a first scored trace would otherwise show no card.
+        // Forgetting which filters they belong to, rather than asking for them
+        // on one read, means a page turn that cuts that read off asks instead.
+        if (
+          silent &&
+          !wantAverages &&
+          !nextItems.some((t) => isTraceScoringInProgress(t.latest_run_status))
+        ) {
+          averagesKeyRef.current = null;
+          void load(targetOffset, { silent: true });
         }
         setTotal(nextTotal);
         setLoadedFilters(filters);
