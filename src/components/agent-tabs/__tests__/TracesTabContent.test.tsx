@@ -2533,6 +2533,20 @@ describe("TracesTabContent", () => {
     ).toEqual({ userMessage: "When is the next vaccination?" });
   });
 
+  it("names a trace with no question by its id in the evaluator windows", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ input_preview: null })]),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Add to tests (1)"));
+    expect(
+      JSON.parse(screen.getByTestId("convert-labels").textContent!),
+    ).toEqual({ "trace-1": "trace-1" });
+  });
+
   it("hands over the comment left with a trace's feedback", async () => {
     const user = setupUser();
     mockUseTraces.mockReturnValue(

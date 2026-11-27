@@ -338,7 +338,7 @@ export function VersionCard({
                 </span>
               </InfoNote>
               <div className="border border-border rounded-md overflow-hidden">
-                {(version.variables ?? []).map((variable, i) => (
+                {version.variables!.map((variable, i) => (
                   <div
                     key={variable.name}
                     className={`p-3 md:p-4 bg-background ${
