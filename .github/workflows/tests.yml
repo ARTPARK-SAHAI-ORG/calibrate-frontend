@@ -25,6 +25,25 @@ jobs:
       - run: npm ci
       - run: npm test -- src/app/__tests__/seo.test.ts
 
+  # Code that redoes what a shared helper already does, or copies existing
+  # code. Same two checks the pre-commit hook runs.
+  reuse:
+    name: Reuse and copied code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The copy check compares against main, so it needs the history.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint:reuse -- src
+      - run: node --test scripts/check-duplication.test.mjs
+      - run: npm run check:duplication
+
   # Split across four runners in parallel. The suite is ~5,900 tests and
   # coverage more than doubles the processor time it needs, which on one
   # 4-core runner came to eleven minutes. Codecov merges the four uploads
