@@ -215,6 +215,7 @@ function VerdictCards({
           outputType={result.output_type}
           {...verdictFields(result)}
           reasoning={result.reasoning}
+          variableValues={result.variable_values}
           scaleMin={result.scale_min ?? undefined}
           scaleMax={result.scale_max ?? undefined}
           evaluatorUuid={result.evaluator_uuid}

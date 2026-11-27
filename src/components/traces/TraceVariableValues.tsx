@@ -152,7 +152,7 @@ function Values({
     );
   }
   return (
-    <table className="w-full text-sm">
+    <table className="w-full text-sm mt-4">
       <thead>
         <tr>
           <th className={`${SMALL_HEADING} text-left align-top pr-4 pb-1`}>

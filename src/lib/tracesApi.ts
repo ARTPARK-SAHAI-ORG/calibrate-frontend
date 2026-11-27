@@ -87,6 +87,8 @@ export type TraceScoreResult = {
   value: number;
   reasoning?: string | null;
   passed: boolean;
+  /** The values the evaluator was given for this trace's variables. */
+  variable_values?: Record<string, string> | null;
 };
 
 /** A variable that could not be filled because this trace lacks its source. */
