@@ -3,10 +3,14 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from "@sentry/nextjs";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/sessionExpired";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   environment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
+
+  // The user has already been sent to sign in; nothing went wrong.
+  ignoreErrors: [SESSION_EXPIRED_MESSAGE],
 
   // Add optional integrations for additional features
   integrations: [
