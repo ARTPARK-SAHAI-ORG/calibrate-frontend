@@ -3,10 +3,11 @@ import { SpinnerIcon, WarningTriangleIcon } from "@/components/icons";
 import {
   isMetadataSource,
   metadataKey,
+  missingValueSentence,
+  missingValueText,
   traceSourceHint,
   traceSourceLabel,
 } from "@/lib/traceScoring";
-import { missingValueSentence, missingValueText } from "@/lib/traceVariableText";
 import { VARIABLE_CHIP } from "@/lib/variableChip";
 import type { AgentNature } from "./ingestSnippets";
 import { WarningBox } from "./WarningBox";

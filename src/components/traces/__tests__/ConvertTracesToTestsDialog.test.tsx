@@ -316,6 +316,7 @@ it("submits a response test with the selected evaluator", async () => {
     type: "response",
     evaluatorUuids: ["ev-default"],
     acceptAnyArguments: false,
+    skipMissingValues: false,
   });
   // The evaluators the tests were given come back too, so the tab can offer
   // to attach any the agent does not have yet.
@@ -382,6 +383,7 @@ it("asks only for confirmation for tool-call traces", async () => {
     type: "tool_call",
     evaluatorUuids: undefined,
     acceptAnyArguments: false,
+    skipMissingValues: false,
   });
 });
 
@@ -477,6 +479,7 @@ it("offers the output evaluators and sends a general conversion", async () => {
       type: "general",
       evaluatorUuids: ["ev-general-default"],
       acceptAnyArguments: false,
+      skipMissingValues: false,
     }),
   );
   expect(onConverted).toHaveBeenCalledWith(
@@ -760,7 +763,7 @@ describe("evaluators with variables", () => {
     await user.click(screen.getByRole("button", { name: "Add to tests" }));
 
     await waitFor(() => expect(onConverted).toHaveBeenCalled());
-    expect(mockConvert.mock.calls[0][1].skipMissingValues).toBeUndefined();
+    expect(mockConvert.mock.calls[0][1].skipMissingValues).toBe(false);
   });
 
   it("asks about the traces the backend names when every matching trace was asked for", async () => {

@@ -33,13 +33,10 @@ export type UseAgentLlmEvaluatorsResult = {
    *  reader ticks something. */
   selectedUuids: Set<string>;
   toggle: (uuid: string) => void;
-  /** Ticks one, keeping whatever else is ticked. */
-  tick: (uuid: string) => void;
   /** The evaluators already linked to the agent. */
   linkedUuids: Set<string>;
-  /** Evaluators with a variable that has no part of the trace chosen yet. */
-  needsSetup: Set<string>;
-  /** Records trace values just saved for an evaluator, which links it too. */
+  /** Records trace values just saved for an evaluator, which links and
+   *  ticks it too. */
   updateTraceVariables: (uuid: string, traceVariables: Record<string, string>) => void;
   isLoading: boolean;
   error: string | null;
@@ -157,31 +154,24 @@ export function useAgentLlmEvaluators({
     setPicked(next);
   };
 
-  const tick = (uuid: string) => setPicked(new Set(selectedUuids).add(uuid));
-
-  const updateTraceVariables = useCallback(
-    (uuid: string, traceVariables: Record<string, string>) => {
-      setEvaluators((prev) =>
-        prev.map((e) =>
-          e.uuid === uuid ? { ...e, trace_variables: traceVariables } : e,
-        ),
-      );
-      setLinkedUuids((prev) => new Set(prev).add(uuid));
-    },
-    [],
-  );
-
-  const needsSetup = new Set(
-    evaluators.filter(isMissingTraceValue).map((e) => e.uuid),
-  );
+  const updateTraceVariables = (
+    uuid: string,
+    traceVariables: Record<string, string>,
+  ) => {
+    setEvaluators((prev) =>
+      prev.map((e) =>
+        e.uuid === uuid ? { ...e, trace_variables: traceVariables } : e,
+      ),
+    );
+    setLinkedUuids((prev) => new Set(prev).add(uuid));
+    setPicked(new Set(selectedUuids).add(uuid));
+  };
 
   return {
     evaluators,
     selectedUuids,
     toggle,
-    tick,
     linkedUuids,
-    needsSetup,
     updateTraceVariables,
     isLoading,
     error,

@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@/test-utils";
 import { useAgentLlmEvaluators } from "../useAgentLlmEvaluators";
 import { fetchAgentEvaluators, fetchAllEvaluators } from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
+import { isMissingTraceValue } from "@/lib/traceScoring";
 
 jest.mock("../../lib/evaluatorApi", () => ({
   __esModule: true,
@@ -19,6 +20,9 @@ jest.mock("../../lib/reportError", () => ({
 const mockFetchEvals = fetchAllEvaluators as jest.Mock;
 const mockFetchAgentEvals = fetchAgentEvaluators as jest.Mock;
 const mockReportError = reportError as jest.Mock;
+
+const needsSetup = (evaluators: Parameters<typeof isMissingTraceValue>[0][]) =>
+  evaluators.filter(isMissingTraceValue).map((e) => e.uuid);
 
 const EVALUATORS = [
   {
@@ -87,7 +91,7 @@ it("starts from the agent's own evaluators, skipping ones still to set up", asyn
   await waitFor(() =>
     expect(Array.from(result.current.selectedUuids)).toEqual(["ev-custom"]),
   );
-  expect(Array.from(result.current.needsSetup)).toEqual(["ev-vars"]);
+  expect(needsSetup(result.current.evaluators)).toEqual(["ev-vars"]);
   expect(Array.from(result.current.linkedUuids)).toEqual([
     "ev-custom",
     "ev-vars",
@@ -105,11 +109,11 @@ it("carries the trace values saved on the agent and ticks one that has them", as
     result.current.evaluators.find((e) => e.uuid === "ev-vars")
       ?.trace_variables,
   ).toEqual({ topic: "metadata.topic" });
-  expect(result.current.needsSetup.size).toBe(0);
+  expect(needsSetup(result.current.evaluators)).toEqual([]);
   expect(Array.from(result.current.selectedUuids)).toEqual(["ev-vars"]);
 });
 
-it("toggles, ticks, and records values just saved", async () => {
+it("toggles, and records and ticks values just saved", async () => {
   const { result } = setup();
   await waitFor(() => expect(result.current.isLoading).toBe(false));
   expect(Array.from(result.current.selectedUuids)).toEqual(["ev-default"]);
@@ -120,8 +124,7 @@ it("toggles, ticks, and records values just saved", async () => {
   expect(Array.from(result.current.selectedUuids)).toEqual(["ev-custom"]);
 
   act(() => result.current.updateTraceVariables("ev-vars", { topic: "input" }));
-  act(() => result.current.tick("ev-vars"));
-  expect(result.current.needsSetup.has("ev-vars")).toBe(false);
+  expect(needsSetup(result.current.evaluators).includes("ev-vars")).toBe(false);
   expect(result.current.linkedUuids.has("ev-vars")).toBe(true);
   expect(Array.from(result.current.selectedUuids)).toEqual([
     "ev-custom",
@@ -150,7 +153,7 @@ it("lists but does not tick a new evaluator whose variables need setting up", as
   expect(result.current.evaluators.some((e) => e.uuid === "ev-made")).toBe(
     true,
   );
-  expect(result.current.needsSetup.has("ev-made")).toBe(true);
+  expect(needsSetup(result.current.evaluators).includes("ev-made")).toBe(true);
   expect(result.current.selectedUuids.has("ev-made")).toBe(false);
 });
 
@@ -172,7 +175,7 @@ it("does not tick the built-in evaluator while its variables need setting up", a
   const { result } = setup();
 
   await waitFor(() => expect(result.current.isLoading).toBe(false));
-  expect(result.current.needsSetup.has("ev-default")).toBe(true);
+  expect(needsSetup(result.current.evaluators).includes("ev-default")).toBe(true);
   expect(result.current.selectedUuids.size).toBe(0);
 });
 

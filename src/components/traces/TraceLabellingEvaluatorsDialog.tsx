@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { Button, LoadingState } from "@/components/ui";
 import { useAgentLlmEvaluators } from "@/hooks/useAgentLlmEvaluators";
@@ -11,10 +11,9 @@ import {
   hasVariables,
   readTraceValues,
   READ_VALUES_ERROR,
-  type MissingValues,
   type StepTrace,
 } from "./AgentEvaluatorStep";
-import { MissingValuesDialog } from "./MissingValuesDialog";
+import { MissingValuesDialog, type MissingValues } from "./MissingValuesDialog";
 
 /** Each trace's value for each variable, by trace, then evaluator. Blank
  *  where the trace had nothing. */
@@ -68,22 +67,14 @@ export function TraceLabellingEvaluatorsDialog({
   const [readError, setReadError] = useState<string | null>(null);
   const [missing, setMissing] = useState<{
     shown: MissingValues;
-    finish: () => void;
+    filled: TraceEvaluatorVariables;
   } | null>(null);
-  // A read that answers after the window has gone must not open the next one.
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
 
   const canContinue = !isLoading && !reading && selected.size > 0;
+  const chosen = evaluators.filter((e) => selected.has(e.uuid));
+  const refs = chosen.map((e) => ({ uuid: e.uuid, name: e.name }));
 
   const handleContinue = async () => {
-    const chosen = evaluators.filter((e) => selected.has(e.uuid));
-    const refs = chosen.map((e) => ({ uuid: e.uuid, name: e.name }));
     const withVariables = chosen.filter(hasVariables);
     if (withVariables.length === 0 || !accessToken) {
       onChosen(refs, {});
@@ -92,31 +83,20 @@ export function TraceLabellingEvaluatorsDialog({
     setReading(true);
     setReadError(null);
     try {
-      const { values, missing: gaps } = await readTraceValues(
+      // A value the trace does not have is left blank for the annotator.
+      const { filled, missing: gaps } = await readTraceValues(
         accessToken,
         agentUuid,
         withVariables,
         traces,
       );
-      if (!mounted.current) return;
-      // A value the trace does not have is left blank for the annotator.
-      const filled: TraceEvaluatorVariables = {};
-      for (const [traceId, byEvaluator] of Object.entries(values)) {
-        filled[traceId] = {};
-        for (const [evaluatorId, byVariable] of Object.entries(byEvaluator)) {
-          filled[traceId][evaluatorId] = Object.fromEntries(
-            Object.entries(byVariable).map(([k, v]) => [k, v ?? ""]),
-          );
-        }
-      }
-      const finish = () => onChosen(refs, filled);
-      if (gaps) setMissing({ shown: gaps, finish });
-      else finish();
+      if (gaps) setMissing({ shown: gaps, filled });
+      else onChosen(refs, filled);
     } catch (err) {
       reportError("Error reading trace values:", err);
-      if (mounted.current) setReadError(READ_VALUES_ERROR);
+      setReadError(READ_VALUES_ERROR);
     } finally {
-      if (mounted.current) setReading(false);
+      setReading(false);
     }
   };
 
@@ -182,13 +162,12 @@ export function TraceLabellingEvaluatorsDialog({
 
       {missing && (
         <MissingValuesDialog
-          evaluators={missing.shown.evaluators}
-          traces={missing.shown.traces}
+          missing={missing.shown}
           totalTraces={traces.length}
           outcome="labelling"
           agentNature={agentNature}
           onBack={() => setMissing(null)}
-          onConfirm={missing.finish}
+          onConfirm={() => onChosen(refs, missing.filled)}
         />
       )}
     </>

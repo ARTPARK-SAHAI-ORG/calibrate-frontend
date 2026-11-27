@@ -34,6 +34,7 @@ import {
   lowerFirst,
   METADATA_SOURCE,
   metadataKey,
+  missingValueSentence,
   traceChoices,
   traceSourceHint,
   traceSourceLabel,
@@ -598,7 +599,7 @@ export function TraceVariablesDialog({
                           <code className={CODE}>{metadataKey(source)}</code>
                         </>
                       ) : (
-                        `This trace has no ${lowerFirst(traceSourceLabel(source, agentNature))}`
+                        missingValueSentence(source, agentNature)
                       )}
                     </WarningBox>
                   ) : (

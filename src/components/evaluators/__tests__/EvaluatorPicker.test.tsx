@@ -381,7 +381,7 @@ describe("EvaluatorPicker hidden types", () => {
     setup({
       evaluators: [evaluator({ uuid: "ev-a" })],
       previewUuid: "ev-a",
-      renderPreviewExtra: (uuid) => <span>extra for {uuid}</span>,
+      renderVariablesPanel: (uuid) => <span>extra for {uuid}</span>,
     });
     expect(screen.getByText("extra for ev-a")).toBeInTheDocument();
   });

@@ -9,21 +9,22 @@ import {
   type TraceVariableOutcome,
 } from "./TraceVariableValues";
 
-type MissingValuesEvaluator = {
-  uuid: string;
-  name: string;
-  variables: { name: string; source: string }[];
-};
-
-type MissingValuesTrace = {
-  traceId: string;
-  label: string;
-  /** Keyed by evaluator uuid, then variable name. */
-  values: Record<string, Record<string, string | null>>;
+export type MissingValues = {
+  evaluators: {
+    uuid: string;
+    name: string;
+    variables: { name: string; source: string }[];
+  }[];
+  traces: {
+    traceId: string;
+    label: string;
+    /** Keyed by evaluator uuid, then variable name. */
+    values: Record<string, Record<string, string | null>>;
+  }[];
 };
 
 const valueOf = (
-  trace: MissingValuesTrace,
+  trace: MissingValues["traces"][number],
   evaluatorUuid: string,
   variable: string,
 ) => trace.values[evaluatorUuid]?.[variable] ?? null;
@@ -33,8 +34,7 @@ const valueOf = (
  * evaluator reads. Lists only those traces, with what each one has.
  */
 export function MissingValuesDialog({
-  evaluators,
-  traces,
+  missing: { evaluators, traces },
   totalTraces,
   outcome,
   onBack,
@@ -42,8 +42,7 @@ export function MissingValuesDialog({
   busy = false,
   agentNature,
 }: {
-  evaluators: MissingValuesEvaluator[];
-  traces: MissingValuesTrace[];
+  missing: MissingValues;
   totalTraces: number;
   outcome: TraceVariableOutcome;
   onBack: () => void;

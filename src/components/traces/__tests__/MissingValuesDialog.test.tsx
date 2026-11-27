@@ -1,5 +1,8 @@
 import { render, screen, setupUser } from "@/test-utils";
-import { MissingValuesDialog } from "../MissingValuesDialog";
+import {
+  MissingValuesDialog,
+  type MissingValues,
+} from "../MissingValuesDialog";
 
 const evaluators = [
   {
@@ -15,15 +18,18 @@ const traces = [
   { traceId: "t3", label: "Also has it", values: { e1: { comment: "Ok" } } },
 ];
 
-const setup = (
-  props: Partial<React.ComponentProps<typeof MissingValuesDialog>> = {},
-) => {
+const setup = ({
+  evaluators: shownEvaluators = evaluators,
+  traces: shownTraces = traces,
+  ...props
+}: Partial<
+  React.ComponentProps<typeof MissingValuesDialog> & MissingValues
+> = {}) => {
   const onBack = jest.fn();
   const onConfirm = jest.fn();
   render(
     <MissingValuesDialog
-      evaluators={evaluators}
-      traces={traces}
+      missing={{ evaluators: shownEvaluators, traces: shownTraces }}
       totalTraces={3}
       outcome="tests"
       onBack={onBack}

@@ -26,10 +26,9 @@ import {
   hasVariables,
   readTraceValues,
   READ_VALUES_ERROR,
-  type MissingValues,
   type StepTrace,
 } from "./AgentEvaluatorStep";
-import { MissingValuesDialog } from "./MissingValuesDialog";
+import { MissingValuesDialog, type MissingValues } from "./MissingValuesDialog";
 
 type ConvertTracesToTestsDialogProps = {
   isOpen: boolean;
@@ -160,7 +159,7 @@ export function ConvertTracesToTestsDialog({
       // and the test can be edited afterwards.
       acceptAnyArguments: false,
       name: naming ? name : undefined,
-      skipMissingValues: skipMissingValues || undefined,
+      skipMissingValues,
     }).then((result) =>
       onConverted(
         result,
@@ -400,8 +399,7 @@ export function ConvertTracesToTestsDialog({
 
       {missing && (
         <MissingValuesDialog
-          evaluators={missing.evaluators}
-          traces={missing.traces}
+          missing={missing}
           totalTraces={count}
           outcome="tests"
           agentNature={agentNature}

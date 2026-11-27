@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { TraceVariablesDialog } from "@/components/agent-tabs/TraceVariablesDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { EvaluatorPicker } from "@/components/evaluators/EvaluatorPicker";
@@ -12,12 +12,13 @@ import {
   type EvaluatorData,
 } from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
-import { agentTaskType } from "@/lib/traceScoring";
+import { agentTaskType, isMissingTraceValue } from "@/lib/traceScoring";
 import {
   fetchTraceVariableValues,
   type TraceSummary,
   type TraceVariableValuesItem,
 } from "@/lib/tracesApi";
+import type { MissingValues } from "./MissingValuesDialog";
 import {
   TraceVariableValues,
   type TraceVariableOutcome,
@@ -33,19 +34,6 @@ export const READ_VALUES_ERROR =
 
 type ValuesByTrace = Record<string, Record<string, Record<string, string | null>>>;
 
-export type MissingValues = {
-  evaluators: {
-    uuid: string;
-    name: string;
-    variables: { name: string; source: string }[];
-  }[];
-  traces: {
-    traceId: string;
-    label: string;
-    values: Record<string, Record<string, string | null>>;
-  }[];
-};
-
 /** Each variable an evaluator declares, with the part of the trace saved for it. */
 export function variablesOf(evaluator: EvaluatorData) {
   return (evaluator.live_version?.variables ?? []).map((v) => ({
@@ -55,18 +43,22 @@ export function variablesOf(evaluator: EvaluatorData) {
 }
 
 export const hasVariables = (evaluator: EvaluatorData) =>
-  variablesOf(evaluator).length > 0;
+  !!evaluator.live_version?.variables?.length;
 
 /**
- * Reads what each evaluator's variables hold in each trace. `missing` is set
- * when any of them holds nothing, ready for MissingValuesDialog.
+ * Reads what each evaluator's variables hold in each trace. `filled` has a
+ * blank where a trace holds nothing. `missing` is set when any of them holds
+ * nothing, ready for MissingValuesDialog.
  */
 export async function readTraceValues(
   accessToken: string,
   agentUuid: string,
   evaluators: EvaluatorData[],
   traces: StepTrace[],
-): Promise<{ values: ValuesByTrace; missing: MissingValues | null }> {
+): Promise<{
+  filled: Record<string, Record<string, Record<string, string>>>;
+  missing: MissingValues | null;
+}> {
   const items = await fetchTraceVariableValues(
     accessToken,
     agentUuid,
@@ -74,19 +66,23 @@ export async function readTraceValues(
     evaluators.map((e) => e.uuid),
   );
   const values: ValuesByTrace = {};
+  const filled: Record<string, Record<string, Record<string, string>>> = {};
   const previews: Record<string, string> = {};
   let anyMissing = false;
   for (const item of items) {
     if (item.input_preview) previews[item.trace_id] = item.input_preview;
     const forTrace = (values[item.trace_id] ??= {});
     const forEvaluator = (forTrace[item.evaluator_id] ??= {});
+    const filledForTrace = (filled[item.trace_id] ??= {});
+    const filledForEvaluator = (filledForTrace[item.evaluator_id] ??= {});
     for (const v of item.values) {
       forEvaluator[v.variable] = v.value;
+      filledForEvaluator[v.variable] = v.value ?? "";
       if (v.value === null) anyMissing = true;
     }
   }
   return {
-    values,
+    filled,
     missing: anyMissing
       ? {
           evaluators: evaluators.map((e) => ({
@@ -102,12 +98,6 @@ export async function readTraceValues(
         }
       : null,
   };
-}
-
-/** Asks for one evaluator's values once it is on show, and only once. */
-function LoadOnShow({ onShow }: { onShow: () => void }) {
-  useEffect(onShow, [onShow]);
-  return null;
 }
 
 type AgentEvaluatorStepProps = {
@@ -152,50 +142,59 @@ export function AgentEvaluatorStep({
   outcome,
   selectedFirst,
 }: AgentEvaluatorStepProps) {
-  const { evaluators, selectedUuids, needsSetup } = list;
+  const { evaluators, selectedUuids } = list;
   const [createFlowOpen, setCreateFlowOpen] = useState(false);
   // The evaluator made or set up from here, so it opens on the right.
   const [shownUuid, setShownUuid] = useState<string | null>(null);
   const [settingUp, setSettingUp] = useState<EvaluatorData | null>(null);
-  const [values, setValues] = useState<
-    Record<string, TraceVariableValuesItem[] | undefined>
-  >({});
-  // Evaluators whose values could not be read, offered a retry.
-  const [failed, setFailed] = useState<Set<string>>(() => new Set());
-  const requested = useRef(new Set<string>());
-  // One stable function per evaluator, so showing it again asks nothing.
-  const loaders = useRef(new Map<string, () => void>());
 
-  const loaderFor = (uuid: string) => {
-    let load = loaders.current.get(uuid);
-    if (!load) {
-      load = () => {
-        if (!accessToken || requested.current.has(uuid)) return;
-        requested.current.add(uuid);
-        fetchTraceVariableValues(
-          accessToken,
-          agentUuid,
-          traces.map((t) => t.uuid),
-          [uuid],
-        )
-          .then((items) => setValues((prev) => ({ ...prev, [uuid]: items })))
-          .catch((err) => {
-            reportError("Error reading trace values:", err);
-            requested.current.delete(uuid);
-            setFailed((prev) => new Set(prev).add(uuid));
-          });
-      };
-      loaders.current.set(uuid, load);
-    }
-    return load;
-  };
+  // The values of every set-up evaluator with variables, read in one go.
+  const evaluatorKey = evaluators
+    .filter((e) => hasVariables(e) && !isMissingTraceValue(e))
+    .map((e) => e.uuid)
+    .join(",");
+  const traceKey = traces.map((t) => t.uuid).join(",");
+  const [attempt, setAttempt] = useState(0);
+  const readKey = `${evaluatorKey}|${traceKey}|${attempt}`;
+  // `items` is null when the read failed.
+  const [read, setRead] = useState<{
+    key: string;
+    items: TraceVariableValuesItem[] | null;
+  } | null>(null);
 
-  const renderPreviewExtra = (uuid: string) => {
+  useEffect(() => {
+    if (!accessToken || !evaluatorKey || !traceKey) return;
+    let cancelled = false;
+    fetchTraceVariableValues(
+      accessToken,
+      agentUuid,
+      traceKey.split(","),
+      evaluatorKey.split(","),
+    )
+      .then((items) => {
+        if (!cancelled) setRead({ key: readKey, items });
+      })
+      .catch((err) => {
+        reportError("Error reading trace values:", err);
+        if (!cancelled) setRead({ key: readKey, items: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, agentUuid, evaluatorKey, traceKey, readKey]);
+
+  const current = read?.key === readKey ? read : null;
+
+  const renderVariablesPanel = (uuid: string) => {
     const evaluator = evaluators.find((e) => e.uuid === uuid);
-    if (!evaluator || !hasVariables(evaluator) || needsSetup.has(uuid)) {
+    if (
+      !evaluator ||
+      !hasVariables(evaluator) ||
+      isMissingTraceValue(evaluator)
+    ) {
       return undefined;
     }
-    if (failed.has(uuid)) {
+    if (current && current.items === null) {
       return (
         <ErrorNote className="flex items-center justify-between gap-3">
           Could not read the values from these traces
@@ -203,43 +202,33 @@ export function AgentEvaluatorStep({
             variant="secondary"
             size="sm"
             className="shrink-0"
-            // Clearing the failure shows the loader again, which asks again.
-            onClick={() =>
-              setFailed((prev) => {
-                const next = new Set(prev);
-                next.delete(uuid);
-                return next;
-              })
-            }
+            onClick={() => setAttempt((n) => n + 1)}
           >
             Try again
           </Button>
         </ErrorNote>
       );
     }
-    const items = values[uuid];
+    const items = current?.items?.filter((i) => i.evaluator_id === uuid);
     const loading = traces.length > 0 && !items;
     return (
-      <>
-        {loading && <LoadOnShow onShow={loaderFor(uuid)} />}
-        <TraceVariableValues
-          outcome={outcome}
-          agentNature={agentNature}
-          loading={loading}
-          rows={variablesOf(evaluator).map((v) => ({
-            variable: v.name,
-            source: v.source,
-            perTrace: traces.map((t) => ({
-              traceId: t.uuid,
-              label: t.label,
-              value:
-                items
-                  ?.find((i) => i.trace_id === t.uuid)
-                  ?.values.find((x) => x.variable === v.name)?.value ?? null,
-            })),
-          }))}
-        />
-      </>
+      <TraceVariableValues
+        outcome={outcome}
+        agentNature={agentNature}
+        loading={loading}
+        rows={variablesOf(evaluator).map((v) => ({
+          variable: v.name,
+          source: v.source,
+          perTrace: traces.map((t) => ({
+            traceId: t.uuid,
+            label: t.label,
+            value:
+              items
+                ?.find((i) => i.trace_id === t.uuid)
+                ?.values.find((x) => x.variable === v.name)?.value ?? null,
+          })),
+        }))}
+      />
     );
   };
 
@@ -261,7 +250,6 @@ export function AgentEvaluatorStep({
       token,
     );
     list.updateTraceVariables(evaluatorUuid, traceVariables);
-    list.tick(evaluatorUuid);
     onSetUp?.();
     setShownUuid(evaluatorUuid);
   };
@@ -293,12 +281,12 @@ export function AgentEvaluatorStep({
           onToggle={(uuid) => {
             const evaluator = evaluators.find((e) => e.uuid === uuid);
             // A ticked one always unticks; only ticking waits for set-up.
-            if (evaluator && !selectedUuids.has(uuid) && needsSetup.has(uuid)) {
+            if (evaluator && !selectedUuids.has(uuid) && isMissingTraceValue(evaluator)) {
               setSettingUp(evaluator);
             } else list.toggle(uuid);
           }}
           renderRowAction={(evaluator) =>
-            needsSetup.has(evaluator.uuid) ? (
+            isMissingTraceValue(evaluator) ? (
               <Button
                 variant="secondary"
                 size="sm"
@@ -308,7 +296,7 @@ export function AgentEvaluatorStep({
               </Button>
             ) : undefined
           }
-          renderPreviewExtra={renderPreviewExtra}
+          renderVariablesPanel={renderVariablesPanel}
           emptyMessage={`${emptyLead} Your workspace has none that score ${
             agentNature === "general"
               ? "a single output"

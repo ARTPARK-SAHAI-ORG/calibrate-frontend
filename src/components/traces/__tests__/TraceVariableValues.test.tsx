@@ -45,7 +45,7 @@ describe("TraceVariableValues", () => {
     );
     expect(
       screen.getByText(
-        "This trace's metadata has no city, so this item will have it left blank",
+        "This trace has no metadata entry called city, so this item will have it left blank",
       ),
     ).toBeInTheDocument();
   });

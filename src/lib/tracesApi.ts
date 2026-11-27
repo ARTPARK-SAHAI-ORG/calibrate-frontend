@@ -457,7 +457,7 @@ export async function previewTraceVariables(
   );
 }
 
-export type TraceVariableValue = {
+type TraceVariableValue = {
   variable: string;
   source: string;
   value: string | null;

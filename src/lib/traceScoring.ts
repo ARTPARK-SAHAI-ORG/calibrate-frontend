@@ -32,16 +32,14 @@ const GENERAL_SOURCES = [
 ];
 
 /** What a part of a trace holds, for the ones whose name does not say. */
-export const TRACE_SOURCE_HINTS: Record<string, string> = {
-  "feedback.comment":
-    "The comment given by the user along with the feedback for the trace",
-};
-
 export function traceSourceHint(source: string): string | null {
   if (isMetadataSource(source)) {
     return "A field your code sent in the trace's metadata";
   }
-  return TRACE_SOURCE_HINTS[source] ?? null;
+  if (source === "feedback.comment") {
+    return "The comment given by the user along with the feedback for the trace";
+  }
+  return null;
 }
 
 export const isMetadataSource = (source: string) =>
@@ -83,6 +81,25 @@ export function missingSourcePhrase(
   agentNature?: AgentNature,
 ): string {
   return `the trace's ${lowerFirst(traceSourceLabel(source, agentNature))}`;
+}
+
+/** What a trace lacks when a variable's part of it is empty, e.g. "No labels". */
+export function missingValueText(
+  source: string,
+  agentNature?: AgentNature,
+): string {
+  if (isMetadataSource(source)) return `No ${metadataKey(source)} in the metadata`;
+  return `No ${lowerFirst(traceSourceLabel(source, agentNature))}`;
+}
+
+/** The same, as the start of a sentence about one trace. */
+export function missingValueSentence(
+  source: string,
+  agentNature?: AgentNature,
+): string {
+  if (isMetadataSource(source))
+    return `This trace has no metadata entry called ${metadataKey(source)}`;
+  return `This trace has no ${lowerFirst(traceSourceLabel(source, agentNature))}`;
 }
 
 /**

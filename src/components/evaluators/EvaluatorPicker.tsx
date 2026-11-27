@@ -43,7 +43,7 @@ type EvaluatorPickerProps = {
    *  instead of the "My evaluators" and "Default" sections. */
   selectedFirst?: boolean;
   /** Drawn under the previewed evaluator's prompt as its Variables section. */
-  renderPreviewExtra?: (evaluatorUuid: string) => React.ReactNode;
+  renderVariablesPanel?: (evaluatorUuid: string) => React.ReactNode;
   /** Drawn at the right end of an evaluator's row. */
   renderRowAction?: (evaluator: EvaluatorData) => React.ReactNode;
 };
@@ -64,7 +64,7 @@ export function EvaluatorPicker({
   allowConversationType = false,
   onDeleteEvaluator,
   selectedFirst = false,
-  renderPreviewExtra,
+  renderVariablesPanel,
   renderRowAction,
 }: EvaluatorPickerProps) {
   const [search, setSearch] = useState("");
@@ -272,7 +272,7 @@ export function EvaluatorPicker({
           evaluatorUuid={previewUuid}
           onDelete={onDeleteEvaluator}
           variablesPanel={
-            previewUuid ? renderPreviewExtra?.(previewUuid) : undefined
+            previewUuid ? renderVariablesPanel?.(previewUuid) : undefined
           }
         />
       </div>

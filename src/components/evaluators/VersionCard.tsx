@@ -324,53 +324,50 @@ export function VersionCard({
         </div>
       )}
 
-      {variablesPanel ? (
+      {variablesPanel || version.variables?.length ? (
         <div className="space-y-2">
           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Variables
           </div>
-          {variablesPanel}
-        </div>
-      ) : version.variables?.length ? (
-        <div className="space-y-2">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-            Variables
-          </div>
-          <InfoNote>
-            <span>
-              When this evaluator is added to an LLM test, you will be able to
-              fill in the value of each variable for that test
-            </span>
-          </InfoNote>
-          <div className="border border-border rounded-md overflow-hidden">
-            {version.variables.map((variable, i) => (
-              <div
-                key={variable.name}
-                className={`p-3 md:p-4 bg-background ${
-                  i > 0 ? "border-t border-border" : ""
-                }`}
-              >
-                <code className="text-sm font-mono font-semibold text-foreground">
-                  {`{{${variable.name}}}`}
-                </code>
-                {variable.description && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {variable.description}
-                  </p>
-                )}
-                {variable.default ? (
-                  <div className="mt-2">
-                    <div className="text-[11px] text-muted-foreground mb-1">
-                      Default
-                    </div>
-                    <pre className="text-xs text-foreground whitespace-pre-wrap font-mono bg-muted/30 rounded-md p-2">
-                      {variable.default}
-                    </pre>
+          {variablesPanel || (
+            <>
+              <InfoNote>
+                <span>
+                  When this evaluator is added to an LLM test, you will be able
+                  to fill in the value of each variable for that test
+                </span>
+              </InfoNote>
+              <div className="border border-border rounded-md overflow-hidden">
+                {(version.variables ?? []).map((variable, i) => (
+                  <div
+                    key={variable.name}
+                    className={`p-3 md:p-4 bg-background ${
+                      i > 0 ? "border-t border-border" : ""
+                    }`}
+                  >
+                    <code className="text-sm font-mono font-semibold text-foreground">
+                      {`{{${variable.name}}}`}
+                    </code>
+                    {variable.description && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {variable.description}
+                      </p>
+                    )}
+                    {variable.default ? (
+                      <div className="mt-2">
+                        <div className="text-[11px] text-muted-foreground mb-1">
+                          Default
+                        </div>
+                        <pre className="text-xs text-foreground whitespace-pre-wrap font-mono bg-muted/30 rounded-md p-2">
+                          {variable.default}
+                        </pre>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
       ) : null}
 
