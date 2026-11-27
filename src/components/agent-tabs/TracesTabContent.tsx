@@ -89,7 +89,7 @@ import {
   traceFilterKey,
   type TraceUsage,
   type TraceDetail,
-  traceLabellingMetadata,
+  traceToLabellingItem,
   type TraceSummary,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
@@ -291,8 +291,7 @@ export function TracesTabContent({
   );
   const labellableUuids = labellableTraces.map((trace) => trace.uuid);
   // How a trace is named in the evaluator windows: what the user said.
-  const traceLabel = (trace: TraceSummary) =>
-    trace.input_preview || trace.uuid;
+  const traceLabel = (trace: TraceSummary) => trace.input_preview || trace.uuid;
   // A selection that is nothing but tool calls skips the evaluator step: a
   // tool-call row is answered only against the tool-call evaluator, so there
   // is nothing to pick.
@@ -368,21 +367,9 @@ export function TracesTabContent({
       }
       setLabellingEvaluators(chosen);
       setLabellingTraces(
-        loaded.map((trace) => ({
-          // Names are unique within a task, so the trace's own id names it.
-          // Anything drawn from the conversation repeats across calls that
-          // open the same way, which the backend rejects for the whole batch.
-          name: trace.uuid,
-          // The agent's own instructions are not part of the conversation the
-          // annotators read, so they are never stored with the item.
-          input:
-            typeof trace.input === "string"
-              ? trace.input
-              : (trace.input ?? []).filter((turn) => turn.role !== "system"),
-          output: trace.output,
-          metadata: traceLabellingMetadata(trace),
-          evaluatorVariables: variables[trace.uuid],
-        })),
+        loaded.map((trace) =>
+          traceToLabellingItem(trace, variables[trace.uuid]),
+        ),
       );
     } finally {
       setIsPreparingLabelling(false);
@@ -953,9 +940,7 @@ export function TracesTabContent({
   );
 
   const scoringWarning = (message: React.ReactNode) => (
-    <WarningBox
-      action={needValues.length > 0 && configureTraceValues.button}
-    >
+    <WarningBox action={needValues.length > 0 && configureTraceValues.button}>
       {message}
     </WarningBox>
   );

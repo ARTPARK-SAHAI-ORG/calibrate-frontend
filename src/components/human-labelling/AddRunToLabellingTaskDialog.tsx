@@ -228,6 +228,8 @@ export type AddRunToLabellingTaskDialogProps = {
   onClose: () => void;
   source: AddRunToLabellingTaskSource;
   onAdded?: (taskUuid: string, itemsCreated: number) => void;
+  /** Open "View task" in a new tab, for the public chat page, where leaving the page loses the chat. */
+  openTaskInNewTab?: boolean;
 };
 
 type LabellingTaskEvaluatorRef = {
@@ -845,6 +847,7 @@ export function AddRunToLabellingTaskDialog({
   onClose,
   source,
   onAdded,
+  openTaskInNewTab,
 }: AddRunToLabellingTaskDialogProps): React.ReactElement | null {
   const accessToken = useAccessToken();
   const mountedRef = useRef(true);
@@ -1197,6 +1200,10 @@ export function AddRunToLabellingTaskDialog({
               </button>
               <Link
                 href={`/human-alignment/tasks/${success.taskUuid}`}
+                {...(openTaskInNewTab && {
+                  target: "_blank",
+                  rel: "noopener noreferrer",
+                })}
                 className="h-9 md:h-10 px-4 flex items-center rounded-lg text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer"
               >
                 View task

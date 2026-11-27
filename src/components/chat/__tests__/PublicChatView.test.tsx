@@ -8,6 +8,8 @@ import {
 } from "@/test-utils";
 import { PublicChatView } from "../PublicChatView";
 import { setActiveOrgUuid } from "@/lib/orgs";
+import { fetchTrace } from "@/lib/tracesApi";
+import { toast } from "sonner";
 import {
   fetchChatAgent,
   sendChatMessage,
@@ -57,11 +59,70 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     ) : null,
 }));
 
+jest.mock("../../traces/TraceLabellingEvaluatorsDialog", () => ({
+  TraceLabellingEvaluatorsDialog: (props: {
+    agentUuid: string;
+    agentNature: string;
+    traces: { uuid: string; label: string }[];
+    onClose: () => void;
+    onChosen: (
+      evaluators: { uuid: string; name?: string }[],
+      variables: Record<string, Record<string, Record<string, string>>>,
+    ) => void;
+  }) => (
+    <div data-testid="evaluators-dialog">
+      <pre data-testid="evaluators-props">
+        {JSON.stringify({
+          agentUuid: props.agentUuid,
+          agentNature: props.agentNature,
+          traces: props.traces,
+        })}
+      </pre>
+      <button
+        onClick={() =>
+          props.onChosen([{ uuid: "e1", name: "Correct" }], {
+            t1: { e1: { topic: "billing" } },
+          })
+        }
+      >
+        Choose evaluators
+      </button>
+      <button onClick={props.onClose}>Close evaluators</button>
+    </div>
+  ),
+}));
+
+jest.mock("../../human-labelling/AddRunToLabellingTaskDialog", () => ({
+  AddRunToLabellingTaskDialog: (props: {
+    source: unknown;
+    openTaskInNewTab?: boolean;
+    onClose: () => void;
+  }) => (
+    <div data-testid="task-dialog">
+      <pre data-testid="task-props">
+        {JSON.stringify({
+          source: props.source,
+          openTaskInNewTab: props.openTaskInNewTab,
+        })}
+      </pre>
+      <button onClick={props.onClose}>Close task</button>
+    </div>
+  ),
+}));
+
+jest.mock("../../../lib/tracesApi", () => ({
+  ...jest.requireActual("../../../lib/tracesApi"),
+  fetchTrace: jest.fn(),
+}));
+
+jest.mock("sonner", () => ({ toast: { error: jest.fn() } }));
+
 jest.mock("../../../lib/orgs", () => ({
   ...jest.requireActual("../../../lib/orgs"),
   setActiveOrgUuid: jest.fn(),
 }));
 
+const mockFetchTrace = fetchTrace as jest.Mock;
 const mockAgent = fetchChatAgent as jest.Mock;
 const mockSend = sendChatMessage as jest.Mock;
 const mockFeedback = setChatFeedback as jest.Mock;
@@ -854,5 +915,204 @@ describe("Add to tests", () => {
     expect(screen.getByText("Add to tests")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByText("Added to tests")).not.toBeInTheDocument();
+  });
+});
+
+describe("Submit for labelling", () => {
+  const member = { agent_id: "a1", org_uuid: "o1" };
+  const fullTrace = {
+    uuid: "t1",
+    input: [
+      { role: "system", content: "Be kind" },
+      { role: "user", content: "Hi" },
+    ],
+    output: { response: "Simulated agent reply.", tool_calls: [] },
+    conversation_id: "c1",
+    message_id: null,
+  };
+  const props = (id: string) => JSON.parse(screen.getByTestId(id).textContent!);
+
+  // Signed in, since a member's login is what loads the whole reply.
+  beforeEach(() => {
+    localStorage.setItem("access_token", "jwt");
+  });
+  afterEach(() => {
+    localStorage.removeItem("access_token");
+  });
+
+  it("is not offered to a visitor outside the workspace", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    await open("conversation", { agent_id: null, org_uuid: null });
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Good reply"));
+    await screen.findByLabelText(/What was good/);
+    expect(screen.queryByText("Submit for labelling")).not.toBeInTheDocument();
+  });
+
+  it("appears for a member once a thumb is picked", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    await open("conversation", member);
+    await sendMessage(user);
+    await screen.findByLabelText("Good reply");
+    expect(screen.queryByText("Submit for labelling")).not.toBeInTheDocument();
+    await user.click(screen.getByLabelText("Bad reply"));
+    expect(await screen.findByText("Submit for labelling")).toBeInTheDocument();
+  });
+
+  it("picks evaluators, loads the reply, then opens the task window", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    let resolveTrace: (t: unknown) => void = () => {};
+    mockFetchTrace.mockReturnValue(
+      new Promise((resolve) => (resolveTrace = resolve)),
+    );
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Good reply"));
+    await user.click(await screen.findByText("Submit for labelling"));
+
+    expect(setActiveOrgUuid).toHaveBeenCalledWith("o1");
+    expect(props("evaluators-props")).toEqual({
+      agentUuid: "a1",
+      agentNature: "conversation",
+      traces: [{ uuid: "t1", label: "Hi" }],
+    });
+    await user.click(screen.getByText("Choose evaluators"));
+    expect(screen.queryByTestId("evaluators-dialog")).not.toBeInTheDocument();
+    // The button cannot be pressed again while the reply loads.
+    expect(screen.getByRole("button", { name: "Loading..." })).toBeDisabled();
+    expect(screen.getByText("Add to tests").closest("button")).toBeDisabled();
+    expect(mockFetchTrace).toHaveBeenCalledWith(expect.any(String), "t1");
+
+    await act(async () => resolveTrace(fullTrace));
+    expect(props("task-props")).toEqual({
+      openTaskInNewTab: true,
+      source: {
+        type: "traces",
+        agentUuid: "a1",
+        agentNature: "conversation",
+        evaluators: [{ uuid: "e1", name: "Correct" }],
+        traces: [
+          {
+            name: "t1",
+            input: [{ role: "user", content: "Hi" }],
+            output: { response: "Simulated agent reply.", tool_calls: [] },
+            metadata: [{ key: "conversation_id", value: "c1" }],
+            evaluatorVariables: { e1: { topic: "billing" } },
+          },
+        ],
+      },
+    });
+    expect(screen.getByText("Submit for labelling")).toBeEnabled();
+    await user.click(screen.getByText("Close task"));
+    expect(screen.queryByTestId("task-dialog")).not.toBeInTheDocument();
+  });
+
+  it("is not offered for a reply with neither text nor tool calls", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply({ reply: null, tool_calls: [] }));
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Good reply"));
+    expect(await screen.findByText("Add to tests")).toBeInTheDocument();
+    expect(screen.queryByText("Submit for labelling")).not.toBeInTheDocument();
+  });
+
+  it("drops a reply still loading when a new chat is started", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    let resolveTrace: (t: unknown) => void = () => {};
+    mockFetchTrace.mockReturnValue(
+      new Promise((resolve) => (resolveTrace = resolve)),
+    );
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Good reply"));
+    await user.click(await screen.findByText("Submit for labelling"));
+    await user.click(screen.getByText("Choose evaluators"));
+    await user.click(screen.getByRole("button", { name: "New chat" }));
+    await act(async () => resolveTrace(fullTrace));
+    expect(screen.queryByTestId("task-dialog")).not.toBeInTheDocument();
+  });
+
+  it("skips the evaluators for a reply with only tool calls", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(
+      reply({
+        reply: null,
+        tool_calls: [{ tool: "lookup", arguments: {}, output: "ok" }],
+      }),
+    );
+    mockFetchTrace.mockResolvedValue(fullTrace);
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Good reply"));
+    await user.click(await screen.findByText("Submit for labelling"));
+    await screen.findByTestId("task-dialog");
+    expect(screen.queryByTestId("evaluators-dialog")).not.toBeInTheDocument();
+    expect(props("task-props").source.evaluators).toEqual([]);
+  });
+
+  it("says so and opens nothing when the reply cannot be loaded", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    mockFetchTrace.mockRejectedValue(new Error("boom"));
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Good reply"));
+    await user.click(await screen.findByText("Submit for labelling"));
+    await user.click(screen.getByText("Choose evaluators"));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "This reply could not be loaded. Try again.",
+      ),
+    );
+    expect(screen.queryByTestId("task-dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Submit for labelling")).toBeEnabled();
+  });
+
+  it("saves a comment typed but not saved first", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Bad reply"));
+    await user.type(
+      await screen.findByLabelText(
+        "What was wrong with this reply? (optional)",
+      ),
+      "Too short",
+    );
+    mockFeedback.mockClear();
+    await user.click(screen.getByText("Submit for labelling"));
+    expect(mockFeedback).toHaveBeenCalledWith(
+      "tok",
+      "t1",
+      { is_correct: false, comment: "Too short" },
+      expect.any(String),
+    );
+    expect(await screen.findByTestId("evaluators-dialog")).toBeInTheDocument();
+  });
+
+  it("opens nothing when the comment cannot be saved", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Bad reply"));
+    await user.type(
+      await screen.findByLabelText(
+        "What was wrong with this reply? (optional)",
+      ),
+      "Too short",
+    );
+    mockFeedback.mockResolvedValueOnce({ ok: false, error: "network" });
+    await user.click(screen.getByText("Submit for labelling"));
+    expect(
+      await screen.findByText("Your feedback could not be saved. Try again"),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("evaluators-dialog")).not.toBeInTheDocument();
   });
 });

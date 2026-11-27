@@ -23,6 +23,7 @@ import {
   traceInputTurns,
   traceScoreParams,
   traceLabellingMetadata,
+  traceToLabellingItem,
   MAX_TRACES_PAGE_SIZE,
   type TraceScoreAverage,
   type TraceDetail,
@@ -867,7 +868,6 @@ describe("convertMissingValues", () => {
 });
 
 describe("convertTracesErrorMessage", () => {
-
   it("reads the messages naming the evaluators that cannot be used", () => {
     expect(
       convertTracesErrorMessage(
@@ -1164,6 +1164,52 @@ describe("traceLabellingMetadata", () => {
         trace({ metadata: full, conversation_id: "c", labels: ["x"] }),
       ),
     ).toEqual(full);
+  });
+});
+
+describe("traceToLabellingItem", () => {
+  const trace = (over: Partial<TraceDetail> = {}): TraceDetail => ({
+    uuid: "t-1",
+    agent_id: "a-1",
+    message_id: "msg-1",
+    conversation_id: null,
+    input: "hi",
+    output: { response: "hello" },
+    metadata: null,
+    labels: null,
+    created_at: "",
+    updated_at: "",
+    ...over,
+  });
+
+  it("names the item by the trace id and passes text input through", () => {
+    const vars = { "ev-1": { question: "hi" } };
+    expect(traceToLabellingItem(trace(), vars)).toEqual({
+      name: "t-1",
+      input: "hi",
+      output: { response: "hello" },
+      metadata: [{ key: "message_id", value: "msg-1" }],
+      evaluatorVariables: vars,
+    });
+  });
+
+  it("drops the agent's own instructions from a conversation", () => {
+    const item = traceToLabellingItem(
+      trace({
+        input: [
+          { role: "system", content: "be nice" },
+          { role: "user", content: "hi" },
+        ],
+      }),
+    );
+    expect(item.input).toEqual([{ role: "user", content: "hi" }]);
+    expect(item.evaluatorVariables).toBeUndefined();
+  });
+
+  it("turns a missing input into an empty conversation", () => {
+    expect(
+      traceToLabellingItem(trace({ input: null as unknown as string })).input,
+    ).toEqual([]);
   });
 });
 

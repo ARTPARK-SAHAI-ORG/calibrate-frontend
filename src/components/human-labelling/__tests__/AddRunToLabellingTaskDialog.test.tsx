@@ -1185,6 +1185,44 @@ describe("AddRunToLabellingTaskDialog", () => {
     ).toBeDisabled();
   });
 
+  it("opens View task in a new tab when openTaskInNewTab is set", async () => {
+    const user = setupUser();
+    apiClientMock.mockImplementation(
+      (path: string, _token: string, opts?: { method?: string }) => {
+        if (path === "/annotation-tasks" && !opts?.method)
+          return Promise.resolve({ items: [] });
+        if (path === "/annotation-tasks" && opts?.method === "POST")
+          return Promise.resolve({ uuid: "new-task-uuid" });
+        if (path === "/annotation-tasks/new-task-uuid/items")
+          return Promise.resolve({});
+        return Promise.reject(new Error(`unexpected call ${path}`));
+      },
+    );
+    unwrapListMock.mockReturnValue([]);
+
+    render(
+      <AddRunToLabellingTaskDialog
+        isOpen
+        onClose={jest.fn()}
+        source={source}
+        openTaskInNewTab
+      />,
+    );
+    const nameBox = await screen.findByPlaceholderText(
+      /e.g. Maternal health helpline/,
+    );
+    await user.type(nameBox, "New Task");
+    await user.type(
+      screen.getByPlaceholderText("Short description of the labelling task"),
+      "Some description",
+    );
+    await user.click(screen.getByRole("button", { name: /Create task & add/ }));
+
+    const link = await screen.findByRole("link", { name: "View task" });
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
   it("creates a new task, posts items, and reports success", async () => {
     const user = setupUser();
     const onAdded = jest.fn();
@@ -1239,6 +1277,9 @@ describe("AddRunToLabellingTaskDialog", () => {
       "href",
       "/human-alignment/tasks/new-task-uuid",
     );
+    expect(
+      screen.getByRole("link", { name: "View task" }),
+    ).not.toHaveAttribute("target");
 
     const postCall = apiClientMock.mock.calls.find(
       (c) => c[0] === "/annotation-tasks" && c[2]?.method === "POST",
