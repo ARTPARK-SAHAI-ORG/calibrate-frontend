@@ -508,34 +508,53 @@ export function TracesTabContent({
   // True during every read, the first and each one after. An evaluator linked
   // since the last read has no type yet, so its cells wait for this one.
   const [evaluatorTypesReading, setEvaluatorTypesReading] = useState(true);
-  // One column per evaluator that can score now, plus any that scored a trace
-  // on this page, so taking an evaluator off the agent does not hide the
-  // scores it already gave.
+  // Every evaluator still on the agent, whether or not it can score. Null
+  // until the eligibility is read, so nothing from a removed evaluator shows
+  // in the meantime.
+  const linkedEvaluatorIds = useMemo(
+    () =>
+      eligibility
+        ? new Set(
+            [...eligibility.eligible, ...eligibility.ineligible].map(
+              (item) => item.evaluator_uuid,
+            ),
+          )
+        : null,
+    [eligibility],
+  );
+  // One column per evaluator that can score now, plus any other evaluator on
+  // the agent that scored a trace on this page. An evaluator taken off the
+  // agent loses its column; its scores stay in each trace's own window.
   const scoreColumns = useMemo(() => {
     const byId = new Map<string, TraceScoreColumn>();
-    // An evaluator that only scored past traces may be off the agent, so no
-    // read will give its type; its cells wait only for the first read.
-    const add = (evaluator_uuid: string, name: string, linked: boolean) => {
+    const add = (evaluator_uuid: string, name: string) => {
       if (byId.has(evaluator_uuid)) return;
-      const waiting =
-        evaluatorTypesReading && (linked || evaluatorTypes === null);
       byId.set(evaluator_uuid, {
         evaluator_uuid,
         name,
         evaluator_type:
-          evaluatorTypes?.[evaluator_uuid] ?? (waiting ? null : undefined),
+          evaluatorTypes?.[evaluator_uuid] ??
+          (evaluatorTypesReading ? null : undefined),
       });
     };
     for (const item of eligibility?.eligible ?? []) {
-      add(item.evaluator_uuid, item.name, true);
+      add(item.evaluator_uuid, item.name);
     }
     for (const trace of items) {
       for (const result of trace.results ?? []) {
-        add(result.evaluator_uuid, result.name, false);
+        if (linkedEvaluatorIds?.has(result.evaluator_uuid)) {
+          add(result.evaluator_uuid, result.name);
+        }
       }
     }
     return [...byId.values()];
-  }, [eligibility, items, evaluatorTypes, evaluatorTypesReading]);
+  }, [
+    eligibility,
+    linkedEvaluatorIds,
+    items,
+    evaluatorTypes,
+    evaluatorTypesReading,
+  ]);
   // An evaluator taken off the agent takes its heading away with it, and with
   // no heading there is nothing left on screen to turn its ordering off.
   useEffect(() => {
@@ -677,30 +696,35 @@ export function TracesTabContent({
     />
   );
 
-  // The backend's own averages over every matching trace, not the page.
+  // The backend's own averages over every matching trace, not the page, for
+  // the evaluators still on the agent.
   const scoreCards = useMemo(
     () =>
-      scoreAverages.map((average) => ({
-        evaluatorId: average.evaluator_uuid,
-        name: average.name,
-        stat: formatEvaluatorResultStat(
-          average.output_type === "rating"
-            ? { count: average.traces_scored, mean: average.average }
-            : {
-                count: average.traces_scored,
-                // A yes-or-no evaluator averages ones and zeros, so its
-                // average is the share that passed.
-                trueCount: Math.round(average.average * average.traces_scored),
-              },
-          {
-            output_type: average.output_type,
-            scale_min: average.scale_min,
-            scale_max: average.scale_max,
-          },
-          "item",
-        ),
-      })),
-    [scoreAverages],
+      scoreAverages
+        .filter((average) => linkedEvaluatorIds?.has(average.evaluator_uuid))
+        .map((average) => ({
+          evaluatorId: average.evaluator_uuid,
+          name: average.name,
+          stat: formatEvaluatorResultStat(
+            average.output_type === "rating"
+              ? { count: average.traces_scored, mean: average.average }
+              : {
+                  count: average.traces_scored,
+                  // A yes-or-no evaluator averages ones and zeros, so its
+                  // average is the share that passed.
+                  trueCount: Math.round(
+                    average.average * average.traces_scored,
+                  ),
+                },
+            {
+              output_type: average.output_type,
+              scale_min: average.scale_min,
+              scale_max: average.scale_max,
+            },
+            "item",
+          ),
+        })),
+    [scoreAverages, linkedEvaluatorIds],
   );
 
   // Read on every visit, because the storage limit leaves no trace of itself
