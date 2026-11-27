@@ -1199,7 +1199,7 @@ describe("scoring a trace again with evaluators set up since", () => {
           ...completed,
           status: "processing",
           completed_at: null,
-          limited_to_evaluators: [
+          newly_scored_evaluators: [
             { evaluator_uuid: "ev-5", name: "Correctness" },
             { evaluator_uuid: "ev-6", name: "Tone check" },
           ],
@@ -1219,7 +1219,7 @@ describe("scoring a trace again with evaluators set up since", () => {
   it("keeps the plain running line for a normal run", () => {
     render(
       <TraceScorePanel
-        run={{ ...completed, status: "pending", results: [], limited_to_evaluators: [] }}
+        run={{ ...completed, status: "pending", results: [], newly_scored_evaluators: [] }}
       />,
     );
     expect(

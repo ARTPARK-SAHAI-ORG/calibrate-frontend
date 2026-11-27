@@ -114,7 +114,7 @@ export type TraceScoringRun = {
   unconfigured_evaluators?: TraceUnconfiguredEvaluator[];
   /** The only evaluators this run judges, when it scores a trace again for
    *  evaluators set up after it was first scored. Empty for a normal run. */
-  limited_to_evaluators?: TraceUnconfiguredEvaluator[];
+  newly_scored_evaluators?: TraceUnconfiguredEvaluator[];
 };
 
 export type TraceScoringIneligibleReason =

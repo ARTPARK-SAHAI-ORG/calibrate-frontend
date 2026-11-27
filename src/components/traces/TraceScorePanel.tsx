@@ -272,16 +272,16 @@ function RunBody({
   const usesOwnProviderKeys = useUsesOwnProviderKeys();
   const missingValues = run.missing_values ?? [];
   if (isTraceScoringInProgress(run.status)) {
-    const limitedTo = run.limited_to_evaluators ?? [];
+    const newlyScored = run.newly_scored_evaluators ?? [];
     const running = (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <SpinnerIcon className="w-4 h-4 animate-spin text-amber-500" />
-        {limitedTo.length > 0
+        {newlyScored.length > 0
           ? "Running the remaining evaluators on this trace"
           : "Running the evaluators on this trace"}
       </p>
     );
-    if (limitedTo.length === 0) return running;
+    if (newlyScored.length === 0) return running;
     return (
       <div className="space-y-3">
         <VerdictCards run={run} descriptions={descriptions} />

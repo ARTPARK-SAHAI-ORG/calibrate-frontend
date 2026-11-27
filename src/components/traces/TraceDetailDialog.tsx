@@ -540,14 +540,14 @@ export function TraceDetailDialog({
       // Scoring a completed trace again keeps its scores and judges only the
       // evaluators set up since, as the backend's new run does.
       setLatestRun((previous) => {
-        const limitedTo = evaluatorsSetUpSince(previous, scoringEvaluatorUuids);
+        const newlyScored = evaluatorsSetUpSince(previous, scoringEvaluatorUuids);
         return {
           run_uuid: run.run_uuid,
           status: run.status,
           created_at: new Date().toISOString(),
           error: null,
-          results: limitedTo.length > 0 ? (previous?.results ?? []) : [],
-          limited_to_evaluators: limitedTo,
+          results: newlyScored.length > 0 ? (previous?.results ?? []) : [],
+          newly_scored_evaluators: newlyScored,
         };
       });
     } catch (err) {
