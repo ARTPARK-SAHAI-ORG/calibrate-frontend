@@ -1177,6 +1177,51 @@ describe("TracesTabContent", () => {
       expect(screen.queryByText("Production quality")).not.toBeInTheDocument();
     });
 
+    it("still shows the cards and score columns when the agent's evaluators could not be checked", () => {
+      mockUseTraces.mockReturnValue(
+        tracesResult(
+          [
+            trace({
+              latest_run_status: "completed",
+              results: [
+                {
+                  evaluator_uuid: "ev-1",
+                  name: "Tone",
+                  output_type: "binary",
+                  value: 1,
+                  passed: true,
+                },
+              ],
+            }),
+          ],
+          {
+            scoreAverages: [
+              {
+                evaluator_uuid: "ev-1",
+                name: "Tone",
+                output_type: "binary",
+                traces_scored: 4,
+                average: 0.5,
+              },
+            ],
+          },
+        ),
+      );
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            eligibility: null,
+            eligibilityError: "Could not check",
+          }}
+        />,
+      );
+      expect(screen.getByText("50%")).toBeInTheDocument();
+      // The card's name and the column heading.
+      expect(screen.getAllByText("Tone").length).toBeGreaterThanOrEqual(2);
+    });
+
     it("says the numbers cover the list below once it is narrowed", async () => {
       const averages = [
         {

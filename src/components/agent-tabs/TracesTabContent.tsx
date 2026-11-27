@@ -508,20 +508,20 @@ export function TracesTabContent({
   // True during every read, the first and each one after. An evaluator linked
   // since the last read has no type yet, so its cells wait for this one.
   const [evaluatorTypesReading, setEvaluatorTypesReading] = useState(true);
-  // Every evaluator still on the agent, whether or not it can score. Null
-  // until the eligibility is read, so nothing from a removed evaluator shows
-  // in the meantime.
-  const linkedEvaluatorIds = useMemo(
-    () =>
-      eligibility
-        ? new Set(
-            [...eligibility.eligible, ...eligibility.ineligible].map(
-              (item) => item.evaluator_uuid,
-            ),
-          )
-        : null,
-    [eligibility],
-  );
+  // Whether an evaluator is still on the agent, whether or not it can score.
+  // Nothing passes until the eligibility is read, so a removed evaluator never
+  // shows in the meantime; everything passes if that read failed, so the scores
+  // do not all vanish with it.
+  const eligibilityFailed = traceScoring.eligibilityError !== null;
+  const isLinkedEvaluator = useMemo(() => {
+    if (!eligibility) return () => eligibilityFailed;
+    const ids = new Set(
+      [...eligibility.eligible, ...eligibility.ineligible].map(
+        (item) => item.evaluator_uuid,
+      ),
+    );
+    return (evaluatorUuid: string) => ids.has(evaluatorUuid);
+  }, [eligibility, eligibilityFailed]);
   // One column per evaluator that can score now, plus any other evaluator on
   // the agent that scored a trace on this page. An evaluator taken off the
   // agent loses its column; its scores stay in each trace's own window.
@@ -542,7 +542,7 @@ export function TracesTabContent({
     }
     for (const trace of items) {
       for (const result of trace.results ?? []) {
-        if (linkedEvaluatorIds?.has(result.evaluator_uuid)) {
+        if (isLinkedEvaluator(result.evaluator_uuid)) {
           add(result.evaluator_uuid, result.name);
         }
       }
@@ -550,7 +550,7 @@ export function TracesTabContent({
     return [...byId.values()];
   }, [
     eligibility,
-    linkedEvaluatorIds,
+    isLinkedEvaluator,
     items,
     evaluatorTypes,
     evaluatorTypesReading,
@@ -701,7 +701,7 @@ export function TracesTabContent({
   const scoreCards = useMemo(
     () =>
       scoreAverages
-        .filter((average) => linkedEvaluatorIds?.has(average.evaluator_uuid))
+        .filter((average) => isLinkedEvaluator(average.evaluator_uuid))
         .map((average) => ({
           evaluatorId: average.evaluator_uuid,
           name: average.name,
@@ -724,7 +724,7 @@ export function TracesTabContent({
             "item",
           ),
         })),
-    [scoreAverages, linkedEvaluatorIds],
+    [scoreAverages, isLinkedEvaluator],
   );
 
   // Read on every visit, because the storage limit leaves no trace of itself
