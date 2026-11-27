@@ -17,6 +17,7 @@ import {
   snippetBackendUrl,
 } from "@/components/traces/CodeTabsBox";
 import { KEY_PLACEHOLDER } from "@/components/traces/TraceIngestSnippet";
+import { MissingText } from "@/components/traces/TraceVariableValues";
 import { WarningBox } from "@/components/traces/WarningBox";
 import {
   buildSnippet,
@@ -34,7 +35,6 @@ import {
   lowerFirst,
   METADATA_SOURCE,
   metadataKey,
-  missingValueSentence,
   traceChoices,
   traceSourceHint,
   traceSourceLabel,
@@ -69,7 +69,6 @@ type TraceVariablesDialogProps = {
 const RECENT_TRACES = 20;
 const OTHER_KEY = "\u0000other";
 
-const CODE = METADATA_KEY_CODE;
 const PILL =
   "flex-shrink-0 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[11px] font-medium";
 const BACK_BUTTON =
@@ -593,14 +592,11 @@ export function TraceVariablesDialog({
                         <WarningTriangleIcon className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-700 dark:text-amber-300" />
                       }
                     >
-                      {isMetadataSource(source) ? (
-                        <>
-                          This trace has no metadata entry called{" "}
-                          <code className={CODE}>{metadataKey(source)}</code>
-                        </>
-                      ) : (
-                        missingValueSentence(source, agentNature)
-                      )}
+                      <MissingText
+                        source={source}
+                        agentNature={agentNature}
+                        sentence
+                      />
                     </WarningBox>
                   ) : (
                     value && (
@@ -624,8 +620,11 @@ export function TraceVariablesDialog({
               {i > 0 && " and "}
               {isMetadataSource(source) ? (
                 <>
-                  a <code className={CODE}>{metadataKey(source)}</code> entry in
-                  each trace&apos;s metadata
+                  a{" "}
+                  <code className={METADATA_KEY_CODE}>
+                    {metadataKey(source)}
+                  </code>{" "}
+                  entry in each trace&apos;s metadata
                 </>
               ) : (
                 `the ${lowerFirst(traceSourceLabel(source, agentNature))} in each trace`

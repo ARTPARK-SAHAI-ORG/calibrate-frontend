@@ -70,6 +70,18 @@ export function useAgentLlmEvaluators({
   const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
+  // Reopening starts loading on its first frame, so the last visit's ticks and
+  // a ready button never show before the effect below runs.
+  const [wasEnabled, setWasEnabled] = useState(enabled);
+  if (wasEnabled !== enabled) {
+    setWasEnabled(enabled);
+    if (enabled) {
+      setPicked(null);
+      setPreselectedUuids(new Set());
+      setIsLoading(true);
+    }
+  }
+
   useEffect(() => {
     if (!enabled || !accessToken) {
       // Sign-in has not landed yet, so there is nothing to show and nothing

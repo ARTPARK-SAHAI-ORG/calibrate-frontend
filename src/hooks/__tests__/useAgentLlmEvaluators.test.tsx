@@ -1,3 +1,4 @@
+import { useLayoutEffect } from "react";
 import { act, renderHook, waitFor } from "@/test-utils";
 import { useAgentLlmEvaluators } from "../useAgentLlmEvaluators";
 import { fetchAgentEvaluators, fetchAllEvaluators } from "@/lib/evaluatorApi";
@@ -262,4 +263,40 @@ it("ticks the built-in output evaluator when a general agent has none", async ()
   expect(Array.from(result.current.selectedUuids)).toEqual([
     "ev-general-default",
   ]);
+});
+
+it("shows loading, not the last visit's ticks, on the first frame after reopening", async () => {
+  const frames: { loading: boolean; selected: string[] }[] = [];
+  const { result, rerender } = renderHook(
+    ({ enabled }: { enabled: boolean }) => {
+      const r = useAgentLlmEvaluators({
+        agentUuid: "ag-1",
+        accessToken: "tok",
+        enabled,
+      });
+      // What reached the screen, not renders React threw away.
+      useLayoutEffect(() => {
+        frames.push({
+          loading: r.isLoading,
+          selected: Array.from(r.selectedUuids),
+        });
+      });
+      return r;
+    },
+    { initialProps: { enabled: true } },
+  );
+  await waitFor(() => expect(result.current.isLoading).toBe(false));
+  act(() => result.current.toggle("ev-custom"));
+  expect(Array.from(result.current.selectedUuids)).toEqual([
+    "ev-default",
+    "ev-custom",
+  ]);
+
+  rerender({ enabled: false });
+  frames.length = 0;
+  rerender({ enabled: true });
+
+  expect(frames[0]).toEqual({ loading: true, selected: [] });
+  await waitFor(() => expect(result.current.isLoading).toBe(false));
+  expect(Array.from(result.current.selectedUuids)).toEqual(["ev-default"]);
 });

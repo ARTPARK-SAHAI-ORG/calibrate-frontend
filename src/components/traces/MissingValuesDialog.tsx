@@ -68,9 +68,11 @@ export function MissingValuesDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-background rounded-xl w-full max-w-6xl max-h-full flex flex-col p-5 md:p-8 shadow-2xl">
         <h2 className="text-base md:text-lg font-semibold text-foreground mb-2">
-          {totalTraces === 1
-            ? "This trace is missing a value"
-            : "Some traces are missing a value"}
+          {missing > 1
+            ? "Some traces are missing a value"
+            : totalTraces === 1
+              ? "This trace is missing a value"
+              : "A trace is missing a value"}
         </h2>
         <p className="text-sm md:text-base text-foreground mb-5">
           <span className="font-semibold">
@@ -80,8 +82,8 @@ export function MissingValuesDialog({
           {missing === 1 ? "is" : "are"} missing a value.{" "}
           {outcome === "tests"
             ? missing === 1
-              ? "This test is added without the evaluator it has no value for."
-              : "Each of these tests is added without the evaluator it has no value for."
+              ? "This test is added without the evaluator it has no value for. If that leaves it with no evaluator, it is not added."
+              : "Each of these tests is added without the evaluator it has no value for. A trace left with no evaluator is not added."
             : missing === 1
               ? "This item is added with that value left blank."
               : "These items are added with that value left blank."}

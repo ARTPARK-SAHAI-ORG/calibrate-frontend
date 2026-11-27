@@ -325,6 +325,30 @@ describe("an evaluator with variables", () => {
     expect(mockAdd).not.toHaveBeenCalled();
   });
 
+  it("shows what is chosen so far beside the prompt while it still needs setting up", async () => {
+    mockFetchEvals.mockResolvedValue([
+      {
+        ...VARS,
+        live_version: { variables: [{ name: "topic" }, { name: "city" }] },
+      },
+    ]);
+    mockFetchAgentEvals.mockResolvedValue([
+      { uuid: "ev-vars", trace_variables: { topic: "input" } },
+    ]);
+    setup({ traces: TRACES });
+
+    expect(
+      await screen.findByText(
+        "Press Set up variables to choose which part of the trace fills each variable",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("{{topic}}")).toBeInTheDocument();
+    expect(screen.getByText("{{city}}")).toBeInTheDocument();
+    expect(screen.getByText("Not set")).toBeInTheDocument();
+    // Its values are only read once every variable has a part of the trace.
+    expect(mockValues).not.toHaveBeenCalled();
+  });
+
   it("hands back each trace's values", async () => {
     const user = setupUser();
     mockFetchEvals.mockResolvedValue([
@@ -362,14 +386,14 @@ describe("an evaluator with variables", () => {
 
     await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(
-      await screen.findByText("Some traces are missing a value"),
+      await screen.findByText("A trace is missing a value"),
     ).toBeInTheDocument();
     expect(onChosen).not.toHaveBeenCalled();
 
     // Back leaves the window as it was.
     await user.click(screen.getByRole("button", { name: "Back" }));
     expect(
-      screen.queryByText("Some traces are missing a value"),
+      screen.queryByText("A trace is missing a value"),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Continue" }));

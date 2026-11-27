@@ -735,13 +735,13 @@ describe("evaluators with variables", () => {
 
     await user.click(screen.getByRole("button", { name: "Add to tests" }));
     expect(
-      await screen.findByText("Some traces are missing a value"),
+      await screen.findByText("A trace is missing a value"),
     ).toBeInTheDocument();
     expect(mockConvert).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
     expect(
-      screen.queryByText("Some traces are missing a value"),
+      screen.queryByText("A trace is missing a value"),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Add to tests" }));
@@ -774,7 +774,7 @@ describe("evaluators with variables", () => {
         new Error(
           `Request failed: 400 - ${JSON.stringify({
             detail: {
-              message: "Some traces are missing values.",
+              error: "Some traces are missing values.",
               missing: [
                 {
                   trace_id: "tr-9",
@@ -836,7 +836,7 @@ describe("evaluators with variables", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText("Some traces are missing a value"),
+      screen.queryByRole("heading", { name: /missing a value/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -856,7 +856,7 @@ describe("evaluators with variables", () => {
     ).toBeInTheDocument();
     expect(mockConvert).not.toHaveBeenCalled();
     expect(
-      screen.queryByText("Some traces are missing a value"),
+      screen.queryByRole("heading", { name: /missing a value/ }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add to tests" })).toBeEnabled();
   });
@@ -868,7 +868,7 @@ describe("evaluators with variables", () => {
       new Error(
         `Request failed: 400 - ${JSON.stringify({
           detail: {
-            message: "Pass skip_missing_values to continue.",
+            error: "Pass skip_missing_values to continue.",
             missing: [{ trace_id: "tr-9", evaluator_id: "ev-vars" }],
           },
         })}`,

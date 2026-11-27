@@ -129,4 +129,39 @@ describe("TraceVariableValues", () => {
     expect(screen.getByText("Loading")).toBeInTheDocument();
     expect(screen.queryByText("Too slow")).not.toBeInTheDocument();
   });
+
+  it("keeps a long value with no spaces inside the box, scrolling past a cap", () => {
+    const long = "x".repeat(500);
+    render(
+      <TraceVariableValues
+        rows={[
+          row([
+            { traceId: "t1", label: "Hi", value: long },
+            { traceId: "t2", label: "Bye", value: "Pune" },
+          ]),
+        ]}
+        outcome="tests"
+      />,
+    );
+    // A fixed layout lets the cell break the word instead of widening.
+    expect(screen.getByRole("table")).toHaveClass("table-fixed");
+    const cell = screen.getByText(long);
+    expect(cell).toHaveClass("max-h-40", "overflow-y-auto");
+    expect(cell.closest("td")).toHaveClass("[overflow-wrap:anywhere]");
+  });
+
+  it("caps one trace's long value the same way", () => {
+    const long = "y".repeat(500);
+    render(
+      <TraceVariableValues
+        rows={[row([{ traceId: "t1", label: "Hi", value: long }])]}
+        outcome="tests"
+      />,
+    );
+    expect(screen.getByText(long)).toHaveClass(
+      "max-h-40",
+      "overflow-y-auto",
+      "[overflow-wrap:anywhere]",
+    );
+  });
 });

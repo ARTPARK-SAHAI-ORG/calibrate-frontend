@@ -853,7 +853,7 @@ describe("convertMissingValues", () => {
   ];
 
   it("reads the values a conversion was refused for", () => {
-    const error = failure({ message: "2 traces are missing values.", missing });
+    const error = failure({ error: "2 traces are missing values.", missing });
     expect(convertMissingValues(error)).toEqual(missing);
     // The window writes its own line for this, rather than the backend's.
     expect(convertTracesErrorMessage(error)).toBeNull();

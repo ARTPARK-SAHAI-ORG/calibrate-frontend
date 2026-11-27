@@ -15,7 +15,7 @@ import { WarningBox } from "./WarningBox";
 export type TraceVariableOutcome = "tests" | "labelling";
 
 /** What is missing, with a metadata field's name set apart from the words. */
-function MissingText({
+export function MissingText({
   source,
   agentNature,
   sentence,
@@ -49,7 +49,8 @@ export type TraceVariableRow = {
 const SMALL_HEADING =
   "text-[11px] uppercase tracking-wide text-muted-foreground font-medium";
 
-/** `{{name}}` from <part of the trace>, with what that part is on hover. */
+/** `{{name}}` from <part of the trace>, with what that part is on hover, or
+ *  Not set when no part is chosen yet. */
 export function VariableFromSource({
   variable,
   source,
@@ -59,6 +60,13 @@ export function VariableFromSource({
   source: string;
   agentNature?: AgentNature;
 }) {
+  if (!source)
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <code className={VARIABLE_CHIP}>{`{{${variable}}}`}</code>
+        <span className="text-sm text-muted-foreground">Not set</span>
+      </div>
+    );
   const hint = traceSourceHint(source);
   const chip = (
     <span className="bg-muted text-muted-foreground text-xs font-medium rounded px-2 py-0.5">
@@ -133,7 +141,7 @@ function Values({
     const { value } = row.perTrace[0];
     if (value !== null) {
       return (
-        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+        <p className="text-sm text-foreground whitespace-pre-wrap [overflow-wrap:anywhere] max-h-40 overflow-y-auto">
           {value}
         </p>
       );
@@ -154,10 +162,12 @@ function Values({
   return (
     // Its own box inside the variable's, like the missing-values table.
     <div className="mt-3 border border-border rounded-md overflow-hidden">
-      <table className="w-full text-sm">
+      <table className="w-full table-fixed text-sm">
         <thead className="bg-muted/30">
           <tr>
-            <th className={`${SMALL_HEADING} text-left align-top px-3 py-2`}>
+            <th
+              className={`${SMALL_HEADING} w-1/3 text-left align-top px-3 py-2`}
+            >
               Trace
             </th>
             <th className={`${SMALL_HEADING} text-left align-top px-3 py-2`}>
@@ -168,12 +178,14 @@ function Values({
         <tbody>
           {row.perTrace.map((t) => (
             <tr key={t.traceId} className="border-t border-border">
-              <td className="px-3 py-2 align-top text-muted-foreground break-words">
-                {t.label}
+              <td className="px-3 py-2 align-top text-muted-foreground [overflow-wrap:anywhere]">
+                <div className="max-h-40 overflow-y-auto">{t.label}</div>
               </td>
-              <td className="px-3 py-2 align-top break-words whitespace-pre-wrap">
+              <td className="px-3 py-2 align-top [overflow-wrap:anywhere] whitespace-pre-wrap">
                 {t.value !== null ? (
-                  <span className="text-foreground">{t.value}</span>
+                  <div className="max-h-40 overflow-y-auto text-foreground">
+                    {t.value}
+                  </div>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
                     <WarningTriangleIcon className="w-4 h-4 flex-shrink-0" />

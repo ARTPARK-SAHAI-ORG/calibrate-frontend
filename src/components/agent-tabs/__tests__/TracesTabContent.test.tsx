@@ -124,7 +124,7 @@ jest.mock("../../traces/TraceLabellingEvaluatorsDialog", () => ({
     fromTrace?: { uuid: string };
     onChosen: (
       evaluators: { uuid: string; name?: string }[],
-      variables?: Record<string, Record<string, Record<string, string>>>,
+      variables: Record<string, Record<string, Record<string, string>>>,
     ) => void;
     onEvaluatorSetUp?: () => void;
   }) => (
@@ -139,7 +139,7 @@ jest.mock("../../traces/TraceLabellingEvaluatorsDialog", () => ({
       <span data-testid="labelling-evaluators-from">{fromTrace?.uuid}</span>
       <button
         type="button"
-        onClick={() => onChosen([{ uuid: "ev-1", name: "Correctness" }])}
+        onClick={() => onChosen([{ uuid: "ev-1", name: "Correctness" }], {})}
       >
         choose evaluators
       </button>

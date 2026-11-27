@@ -314,7 +314,7 @@ export function TracesTabContent({
 
   const prepareLabelling = async (
     chosen: SourceEvaluatorRef[],
-    variables: TraceEvaluatorVariables = {},
+    variables: TraceEvaluatorVariables,
   ) => {
     setEvaluatorStepOpen(false);
     if (!accessToken) return;
@@ -1265,7 +1265,7 @@ export function TracesTabContent({
                       }
                       onOpen={() =>
                         labellingIsToolCallOnly
-                          ? prepareLabelling([])
+                          ? prepareLabelling([], {})
                           : setEvaluatorStepOpen(true)
                       }
                       className={SUBMIT_FOR_LABELLING_CLASS}

@@ -661,8 +661,9 @@ export type ConvertTracesToTestsBody = {
   acceptAnyArguments?: boolean;
   /** The test's name. Only when converting exactly one trace by its id. */
   name?: string;
-  /** Make tests from the traces that have every value their evaluators need,
-   *  and leave out the rest, rather than refusing the whole conversion. */
+  /** Rather than refusing the whole conversion, leave an evaluator off each
+   *  test whose trace has no value for one of its variables. A trace left with
+   *  no evaluator at all is not added. */
   skipMissingValues?: boolean;
 };
 
@@ -779,7 +780,7 @@ function convertErrorDetail(error: unknown): unknown {
   }
 }
 
-export type MissingTraceValue = {
+type MissingTraceValue = {
   trace_id: string;
   evaluator_id: string;
   evaluator_name: string;

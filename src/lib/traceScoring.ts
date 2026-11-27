@@ -83,12 +83,12 @@ export function missingSourcePhrase(
   return `the trace's ${lowerFirst(traceSourceLabel(source, agentNature))}`;
 }
 
-/** What a trace lacks when a variable's part of it is empty, e.g. "No labels". */
+/** What a trace lacks when a variable's part of it is empty, e.g. "No labels".
+ *  Not for metadata: `MissingText` sets the field's name apart. */
 export function missingValueText(
   source: string,
   agentNature?: AgentNature,
 ): string {
-  if (isMetadataSource(source)) return `No ${metadataKey(source)} in the metadata`;
   return `No ${lowerFirst(traceSourceLabel(source, agentNature))}`;
 }
 
@@ -97,8 +97,6 @@ export function missingValueSentence(
   source: string,
   agentNature?: AgentNature,
 ): string {
-  if (isMetadataSource(source))
-    return `This trace has no metadata entry called ${metadataKey(source)}`;
   return `This trace has no ${lowerFirst(traceSourceLabel(source, agentNature))}`;
 }
 

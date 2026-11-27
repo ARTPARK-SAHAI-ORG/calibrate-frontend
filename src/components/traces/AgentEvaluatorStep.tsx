@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { TraceVariablesDialog } from "@/components/agent-tabs/TraceVariablesDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { EvaluatorPicker } from "@/components/evaluators/EvaluatorPicker";
-import { Button, ErrorNote } from "@/components/ui";
+import { Button, ErrorNote, InfoNote } from "@/components/ui";
 import type { UseAgentLlmEvaluatorsResult } from "@/hooks/useAgentLlmEvaluators";
 import {
   addEvaluatorsToAgent,
@@ -28,11 +28,9 @@ import {
  *  its values, else by its id. */
 export type StepTrace = { uuid: string; label: string };
 
+const READ_VALUES_FAILED = "Could not read the values from these traces";
 /** Shown when reading the values fails as the reader continues. */
-export const READ_VALUES_ERROR =
-  "Could not read the values from these traces. Please try again.";
-
-type ValuesByTrace = Record<string, Record<string, Record<string, string | null>>>;
+export const READ_VALUES_ERROR = `${READ_VALUES_FAILED}. Please try again.`;
 
 /** Each variable an evaluator declares, with the part of the trace saved for it. */
 export function variablesOf(evaluator: EvaluatorData) {
@@ -44,6 +42,11 @@ export function variablesOf(evaluator: EvaluatorData) {
 
 export const hasVariables = (evaluator: EvaluatorData) =>
   !!evaluator.live_version?.variables?.length;
+
+const mapValues = <A, B>(record: Record<string, A>, f: (value: A) => B) =>
+  Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [key, f(value)]),
+  );
 
 /**
  * Reads what each evaluator's variables hold in each trace. `filled` has a
@@ -65,22 +68,22 @@ export async function readTraceValues(
     traces.map((t) => t.uuid),
     evaluators.map((e) => e.uuid),
   );
-  const values: ValuesByTrace = {};
-  const filled: Record<string, Record<string, Record<string, string>>> = {};
+  const values: Record<string, MissingValues["traces"][number]["values"]> = {};
   const previews: Record<string, string> = {};
   let anyMissing = false;
   for (const item of items) {
     if (item.input_preview) previews[item.trace_id] = item.input_preview;
     const forTrace = (values[item.trace_id] ??= {});
     const forEvaluator = (forTrace[item.evaluator_id] ??= {});
-    const filledForTrace = (filled[item.trace_id] ??= {});
-    const filledForEvaluator = (filledForTrace[item.evaluator_id] ??= {});
     for (const v of item.values) {
       forEvaluator[v.variable] = v.value;
-      filledForEvaluator[v.variable] = v.value ?? "";
       if (v.value === null) anyMissing = true;
     }
   }
+  // The same values with a blank where a trace holds nothing.
+  const filled = mapValues(values, (byEvaluator) =>
+    mapValues(byEvaluator, (byName) => mapValues(byName, (v) => v ?? "")),
+  );
   return {
     filled,
     missing: anyMissing
@@ -187,17 +190,30 @@ export function AgentEvaluatorStep({
 
   const renderVariablesPanel = (uuid: string) => {
     const evaluator = evaluators.find((e) => e.uuid === uuid);
-    if (
-      !evaluator ||
-      !hasVariables(evaluator) ||
-      isMissingTraceValue(evaluator)
-    ) {
-      return undefined;
+    if (!evaluator || !hasVariables(evaluator)) return undefined;
+    if (isMissingTraceValue(evaluator)) {
+      return (
+        <div className="space-y-2">
+          <InfoNote>
+            Press Set up variables to choose which part of the trace fills each
+            variable
+          </InfoNote>
+          <TraceVariableValues
+            outcome={outcome}
+            agentNature={agentNature}
+            rows={variablesOf(evaluator).map((v) => ({
+              variable: v.name,
+              source: v.source,
+              perTrace: [],
+            }))}
+          />
+        </div>
+      );
     }
     if (current && current.items === null) {
       return (
         <ErrorNote className="flex items-center justify-between gap-3">
-          Could not read the values from these traces
+          {READ_VALUES_FAILED}
           <Button
             variant="secondary"
             size="sm"
