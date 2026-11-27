@@ -14,6 +14,7 @@ const CONVERSATION_SOURCES = [
   { value: "input", label: "Conversation" },
   { value: "output.response", label: "Agent reply" },
   { value: "output.tool_calls", label: "Tool calls" },
+  { value: "feedback.comment", label: "User feedback comment" },
   { value: METADATA_SOURCE, label: "Metadata" },
   { value: "labels", label: "Labels" },
   { value: "conversation_id", label: "Conversation ID" },
@@ -25,9 +26,21 @@ const GENERAL_SOURCES = [
   { value: "input", label: "Input" },
   { value: "output.response", label: "Output" },
   { value: "output.tool_calls", label: "Tool calls" },
+  { value: "feedback.comment", label: "User feedback comment" },
   { value: METADATA_SOURCE, label: "Metadata" },
   { value: "labels", label: "Labels" },
 ];
+
+/** What a part of a trace holds, for the ones whose name does not say. */
+export function traceSourceHint(source: string): string | null {
+  if (isMetadataSource(source)) {
+    return "A field your code sent in the trace's metadata";
+  }
+  if (source === "feedback.comment") {
+    return "The comment given by the user along with the feedback for the trace";
+  }
+  return null;
+}
 
 export const isMetadataSource = (source: string) =>
   source.startsWith(METADATA_SOURCE);
@@ -62,12 +75,13 @@ export function traceSourceLabel(
 
 export const lowerFirst = (text: string) => text[0].toLowerCase() + text.slice(1);
 
-/** The part of a trace a variable is mapped to, to follow "is mapped to". */
-export function missingSourcePhrase(
+/** The name of a part of a trace inside a sentence, e.g. "agent reply" or
+ *  "message ID". Not for metadata, whose field name is set apart instead. */
+export function traceSourceName(
   source: string,
   agentNature?: AgentNature,
 ): string {
-  return `the trace's ${lowerFirst(traceSourceLabel(source, agentNature))}`;
+  return lowerFirst(traceSourceLabel(source, agentNature));
 }
 
 /**
@@ -159,15 +173,16 @@ export function fitsAgent(evaluator: EvaluatorData, agentNature: AgentNature) {
   );
 }
 
+/** An evaluator whose prompt has variables to fill. */
+export const declaresVariables = (evaluator: EvaluatorData) =>
+  !!evaluator.live_version?.variables?.length;
+
 /** An evaluator of a type that scores this agent's traces, with variables to fill from them. */
 export function takesTraceValues(
   evaluator: EvaluatorData,
   agentNature: AgentNature,
 ) {
-  return (
-    fitsAgent(evaluator, agentNature) &&
-    !!evaluator.live_version?.variables?.length
-  );
+  return fitsAgent(evaluator, agentNature) && declaresVariables(evaluator);
 }
 
 /** One that takes trace values and still has a variable with none chosen. */

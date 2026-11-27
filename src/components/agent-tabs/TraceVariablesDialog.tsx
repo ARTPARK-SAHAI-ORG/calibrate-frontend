@@ -8,6 +8,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { MAX_KEY_LENGTH } from "@/components/human-labelling/MetadataFieldsEditor";
 import {
   CloseIcon,
+  InfoIcon,
   SpinnerIcon,
   WarningTriangleIcon,
 } from "@/components/icons";
@@ -16,6 +17,7 @@ import {
   snippetBackendUrl,
 } from "@/components/traces/CodeTabsBox";
 import { KEY_PLACEHOLDER } from "@/components/traces/TraceIngestSnippet";
+import { MissingText } from "@/components/traces/TraceVariableValues";
 import { WarningBox } from "@/components/traces/WarningBox";
 import {
   buildSnippet,
@@ -30,11 +32,12 @@ import { reportError } from "@/lib/reportError";
 import {
   isMetadataSource,
   isMissingTraceValue,
-  lowerFirst,
   METADATA_SOURCE,
   metadataKey,
   traceChoices,
+  traceSourceHint,
   traceSourceLabel,
+  traceSourceName,
   traceSources,
 } from "@/lib/traceScoring";
 import {
@@ -44,6 +47,7 @@ import {
   type TraceSummary,
   type TraceVariablePreview,
 } from "@/lib/tracesApi";
+import { VARIABLE_CHIP, METADATA_KEY_CODE } from "@/lib/variableChip";
 
 type TraceVariablesDialogProps = {
   agentUuid: string;
@@ -52,6 +56,9 @@ type TraceVariablesDialogProps = {
   /** The trace the dialog was opened from: its values are shown, and it is
    *  the one tested on by default. */
   fromTrace?: TraceSummary;
+  /** The window's heading. With several evaluators and none given, it names
+   *  the one being set up. */
+  title?: string;
   onClose: () => void;
   onSave: (
     evaluatorUuid: string,
@@ -62,9 +69,6 @@ type TraceVariablesDialogProps = {
 const RECENT_TRACES = 20;
 const OTHER_KEY = "\u0000other";
 
-const CHIP =
-  "inline-block self-start max-w-full px-2 py-0.5 rounded-md text-sm font-mono font-semibold break-all bg-blue-500/10 text-blue-700 dark:text-blue-300";
-const CODE = "font-mono text-[13px] px-1 py-px rounded bg-amber-700/10";
 const PILL =
   "flex-shrink-0 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[11px] font-medium";
 const BACK_BUTTON =
@@ -107,8 +111,11 @@ function OptionRow({
   detail,
   muted,
   fromTrace,
+  hint,
 }: {
   name: string;
+  /** What the option holds, shown on hovering an (i) after its name. */
+  hint?: string | null;
   /** Undefined draws no second line; null says the trace lacks it. */
   detail?: string | null;
   muted?: boolean;
@@ -117,9 +124,20 @@ function OptionRow({
   return (
     <span className="block min-w-0 flex-1">
       <span
-        className={`block text-sm font-medium ${muted ? "text-muted-foreground" : ""}`}
+        className={`flex items-center gap-1 text-sm font-medium ${muted ? "text-muted-foreground" : ""}`}
       >
         {name}
+        {hint && (
+          <Tooltip content={hint} position="top">
+            <span
+              role="img"
+              aria-label={`About ${name}`}
+              className="inline-flex text-muted-foreground"
+            >
+              <InfoIcon className="w-3.5 h-3.5" />
+            </span>
+          </Tooltip>
+        )}
       </span>
       {detail === null ? (
         <span className="block truncate text-xs italic text-muted-foreground/60">
@@ -165,6 +183,7 @@ export function TraceVariablesDialog({
   evaluators,
   agentNature,
   fromTrace,
+  title,
   onClose,
   onSave,
 }: TraceVariablesDialogProps) {
@@ -386,10 +405,11 @@ export function TraceVariablesDialog({
         : [];
     return (
       <React.Fragment key={name}>
-        <code className={CHIP}>{chip(name)}</code>
+        <code className={VARIABLE_CHIP}>{chip(name)}</code>
         <div className="flex gap-2">
           <SingleSelectPicker
             {...PICKER}
+            className="w-56"
             ariaLabel={`Source for ${name}`}
             items={[...orderedSources, ...offList]}
             selectedId={isMeta ? METADATA_SOURCE : value}
@@ -406,6 +426,7 @@ export function TraceVariablesDialog({
               <OptionRow
                 fromTrace={!!fromTrace}
                 name={source.label}
+                hint={traceSourceHint(source.value)}
                 detail={
                   !latest
                     ? undefined
@@ -562,7 +583,7 @@ export function TraceVariablesDialog({
               const value = answer?.values.find((v) => v.variable === name);
               return (
                 <div key={name} className="p-4 flex flex-col gap-2">
-                  <code className={CHIP}>{chip(name)}</code>
+                  <code className={VARIABLE_CHIP}>{chip(name)}</code>
                   {!answer ? (
                     <Waiting />
                   ) : value?.value === null ? (
@@ -571,14 +592,11 @@ export function TraceVariablesDialog({
                         <WarningTriangleIcon className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-700 dark:text-amber-300" />
                       }
                     >
-                      {isMetadataSource(source) ? (
-                        <>
-                          This trace has no metadata entry called{" "}
-                          <code className={CODE}>{metadataKey(source)}</code>
-                        </>
-                      ) : (
-                        `This trace has no ${lowerFirst(traceSourceLabel(source, agentNature))}`
-                      )}
+                      <MissingText
+                        source={source}
+                        agentNature={agentNature}
+                        sentence
+                      />
                     </WarningBox>
                   ) : (
                     value && (
@@ -602,11 +620,14 @@ export function TraceVariablesDialog({
               {i > 0 && " and "}
               {isMetadataSource(source) ? (
                 <>
-                  a <code className={CODE}>{metadataKey(source)}</code> entry in
-                  each trace&apos;s metadata
+                  a{" "}
+                  <code className={METADATA_KEY_CODE}>
+                    {metadataKey(source)}
+                  </code>{" "}
+                  entry in each trace&apos;s metadata
                 </>
               ) : (
-                `the ${lowerFirst(traceSourceLabel(source, agentNature))} in each trace`
+                `the ${traceSourceName(source, agentNature)} in each trace`
               )}
             </React.Fragment>
           ))}
@@ -642,17 +663,18 @@ export function TraceVariablesDialog({
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base md:text-lg font-semibold text-foreground flex flex-wrap items-center gap-2">
-                {saved.length > 1 ? (
-                  <>
-                    Configure
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted border border-border">
-                      {current.name}
-                    </span>
-                    for traces
-                  </>
-                ) : (
-                  "Configure for traces"
-                )}
+                {title ??
+                  (saved.length > 1 ? (
+                    <>
+                      Configure
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted border border-border">
+                        {current.name}
+                      </span>
+                      for traces
+                    </>
+                  ) : (
+                    "Configure for traces"
+                  ))}
               </h2>
               <p className="text-xs md:text-sm text-muted-foreground mt-1.5">
                 This evaluator has variables. Map each one to a part of the

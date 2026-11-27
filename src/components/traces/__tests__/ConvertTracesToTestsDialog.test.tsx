@@ -1,8 +1,15 @@
 import { render, screen, setupUser, waitFor } from "@/test-utils";
 import { ConvertTracesToTestsDialog } from "../ConvertTracesToTestsDialog";
-import { fetchAgentEvaluators, fetchAllEvaluators } from "@/lib/evaluatorApi";
+import {
+  fetchAgentEvaluators,
+  fetchAllEvaluators,
+  saveEvaluatorTraceVariables,
+} from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
-import { convertTracesToTests } from "@/lib/tracesApi";
+import {
+  convertTracesToTests,
+  fetchTraceVariableValues,
+} from "@/lib/tracesApi";
 
 jest.mock("../../../lib/evaluatorApi", () => ({
   __esModule: true,
@@ -11,6 +18,8 @@ jest.mock("../../../lib/evaluatorApi", () => ({
   ...jest.requireActual("../../../lib/evaluatorApi"),
   fetchAllEvaluators: jest.fn(),
   fetchAgentEvaluators: jest.fn(),
+  saveEvaluatorTraceVariables: jest.fn(),
+  addEvaluatorsToAgent: jest.fn(),
   hasEvaluatorVariables: (e: {
     live_version?: { variables?: unknown[] | null } | null;
   }) => (e.live_version?.variables?.length ?? 0) > 0,
@@ -24,15 +33,49 @@ jest.mock("../../../lib/tracesApi", () => ({
   convertTracesErrorMessage: jest.requireActual("../../../lib/tracesApi")
     .convertTracesErrorMessage,
   convertTracesToTests: jest.fn(),
+  convertMissingValues: jest.requireActual("../../../lib/tracesApi")
+    .convertMissingValues,
+  fetchTraceVariableValues: jest.fn(),
   defaultTestName: jest.requireActual("../../../lib/tracesApi").defaultTestName,
 }));
 jest.mock("../../evaluators/EvaluatorPromptPreview", () => ({
   __esModule: true,
   EvaluatorPromptPreview: ({
     evaluatorUuid,
+    variablesPanel,
   }: {
     evaluatorUuid: string | null;
-  }) => <div data-testid="prompt-for">{evaluatorUuid ?? "none"}</div>,
+    variablesPanel?: React.ReactNode;
+  }) => (
+    <div>
+      <div data-testid="prompt-for">{evaluatorUuid ?? "none"}</div>
+      {variablesPanel}
+    </div>
+  ),
+}));
+jest.mock("../../agent-tabs/TraceVariablesDialog", () => ({
+  __esModule: true,
+  TraceVariablesDialog: ({
+    fromTrace,
+    evaluators,
+    onSave,
+    onClose,
+  }: {
+    fromTrace?: { uuid: string };
+    evaluators: { uuid: string }[];
+    onSave: (uuid: string, map: Record<string, string>) => Promise<void>;
+    onClose: () => void;
+  }) => (
+    <button
+      type="button"
+      onClick={async () => {
+        await onSave(evaluators[0].uuid, { topic: "input" });
+        onClose();
+      }}
+    >
+      save mapping from {fromTrace?.uuid ?? "nothing"}
+    </button>
+  ),
 }));
 jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
   __esModule: true,
@@ -70,6 +113,8 @@ const mockFetchEvals = fetchAllEvaluators as jest.Mock;
 const mockFetchAgentEvals = fetchAgentEvaluators as jest.Mock;
 const mockConvert = convertTracesToTests as jest.Mock;
 const mockReportError = reportError as jest.Mock;
+const mockValues = fetchTraceVariableValues as jest.Mock;
+const mockSave = saveEvaluatorTraceVariables as jest.Mock;
 
 const EVALUATORS = [
   {
@@ -136,6 +181,10 @@ beforeEach(() => {
   mockFetchAgentEvals.mockResolvedValue([]);
   mockConvert.mockReset();
   mockReportError.mockReset();
+  mockValues.mockReset();
+  mockValues.mockResolvedValue([]);
+  mockSave.mockReset();
+  mockSave.mockResolvedValue(undefined);
 });
 
 it("renders nothing when closed and never fetches", () => {
@@ -166,7 +215,7 @@ it("uses Add to tests copy and pluralizes the trace count", async () => {
   expect(screen.getAllByText(/Pick at least one/)).toHaveLength(1);
 });
 
-it("lists only llm evaluators without variables, and preselects the default LLM-reply one", async () => {
+it("lists the llm evaluators, and preselects the default LLM-reply one", async () => {
   setup();
   await waitFor(() =>
     expect(screen.getByText("Correctness")).toBeInTheDocument(),
@@ -177,8 +226,11 @@ it("lists only llm evaluators without variables, and preselects the default LLM-
   expect(screen.getByText("My Judge")).toBeInTheDocument();
   // Conversation evaluator filtered out.
   expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
-  // An evaluator whose prompt expects variables is not offered at all.
-  expect(screen.queryByText("Needs Variables")).not.toBeInTheDocument();
+  // An evaluator with variables is offered, and set up before it is ticked.
+  expect(screen.getByText("Needs Variables")).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Set up variables" }),
+  ).toBeInTheDocument();
   expect(evaluatorCheckbox("Correctness")).toBeChecked();
   // The default is preselected, so adding is enabled without further clicks.
   await waitFor(() =>
@@ -188,7 +240,7 @@ it("lists only llm evaluators without variables, and preselects the default LLM-
   expect(mockFetchAgentEvals).toHaveBeenCalledWith("ag-1", "tok");
 });
 
-it("preselects the agent's own evaluators, skipping ones that need variables", async () => {
+it("preselects the agent's own evaluators, skipping ones still to set up", async () => {
   mockFetchAgentEvals.mockResolvedValue([
     { uuid: "ev-custom" },
     {
@@ -203,7 +255,7 @@ it("preselects the agent's own evaluators, skipping ones that need variables", a
 
   expect(evaluatorCheckbox("My Judge")).toBeChecked();
   expect(evaluatorCheckbox("Correctness")).not.toBeChecked();
-  expect(screen.queryByText("Needs Variables")).not.toBeInTheDocument();
+  expect(evaluatorCheckbox("Needs Variables")).not.toBeChecked();
 
   await user.click(screen.getByRole("button", { name: "Add to tests" }));
   await waitFor(() => expect(mockConvert).toHaveBeenCalled());
@@ -238,7 +290,8 @@ it("does not offer an agent picker", async () => {
         // Each evaluator row carries the button that opens its prompt.
         !b.className.includes("flex-1 text-left") &&
         // The body carries the button that makes a new evaluator.
-        b.textContent !== "Create evaluator",
+        b.textContent !== "Create evaluator" &&
+        b.textContent !== "Set up variables",
     ),
   ).toHaveLength(2);
   expect(
@@ -263,6 +316,7 @@ it("submits a response test with the selected evaluator", async () => {
     type: "response",
     evaluatorUuids: ["ev-default"],
     acceptAnyArguments: false,
+    skipMissingValues: false,
   });
   // The evaluators the tests were given come back too, so the tab can offer
   // to attach any the agent does not have yet.
@@ -270,6 +324,20 @@ it("submits a response test with the selected evaluator", async () => {
     { created: 2, test_uuids: ["t1", "t2"] },
     [{ uuid: "ev-default", name: "Correctness" }],
   );
+  // The built-in evaluator has nothing to read from the traces.
+  expect(mockValues).not.toHaveBeenCalled();
+});
+
+it("leaves the built-in evaluator unticked while it needs setting up, and reads nothing", async () => {
+  mockFetchEvals.mockResolvedValue([
+    { ...EVALUATORS[0], live_version: { variables: [{ name: "criteria" }] } },
+  ]);
+  setup();
+  await screen.findByText("Correctness");
+
+  expect(evaluatorCheckbox("Correctness")).not.toBeChecked();
+  expect(screen.getByRole("button", { name: "Add to tests" })).toBeDisabled();
+  expect(mockValues).not.toHaveBeenCalled();
 });
 
 it("requires an evaluator for a response test", async () => {
@@ -315,6 +383,7 @@ it("asks only for confirmation for tool-call traces", async () => {
     type: "tool_call",
     evaluatorUuids: undefined,
     acceptAnyArguments: false,
+    skipMissingValues: false,
   });
 });
 
@@ -410,6 +479,7 @@ it("offers the output evaluators and sends a general conversion", async () => {
       type: "general",
       evaluatorUuids: ["ev-general-default"],
       acceptAnyArguments: false,
+      skipMissingValues: false,
     }),
   );
   expect(onConverted).toHaveBeenCalledWith(
@@ -602,5 +672,240 @@ describe("naming one trace's test", () => {
     await waitFor(() =>
       expect(screen.getByText("Correctness")).toBeInTheDocument(),
     );
+  });
+});
+
+describe("evaluators with variables", () => {
+  const MAPPED = { uuid: "ev-vars", trace_variables: { topic: "input" } };
+  const valuesFor = (topics: (string | null)[]) =>
+    topics.map((value, i) => ({
+      trace_id: `tr-${i + 1}`,
+      evaluator_id: "ev-vars",
+      values: [{ variable: "topic", source: "input", value }],
+    }));
+  const LABELS = { "tr-1": "Where is my order", "tr-2": "Cancel it" };
+
+  it("ticking one to set up opens the set-up on the first trace, then ticks it", async () => {
+    const user = setupUser();
+    mockValues.mockResolvedValue(valuesFor(["order", "cancel"]));
+    setup({ fromTrace: { uuid: "tr-1" } as never, traceLabels: LABELS });
+    await screen.findByText("Needs Variables");
+
+    await user.click(evaluatorCheckbox("Needs Variables"));
+    await user.click(
+      screen.getByRole("button", { name: "save mapping from tr-1" }),
+    );
+
+    expect(evaluatorCheckbox("Needs Variables")).toBeChecked();
+    expect(await screen.findByText("cancel")).toBeInTheDocument();
+    expect(screen.getByText("Cancel it")).toBeInTheDocument();
+  });
+
+  it("shows the values of the picked traces beside the prompt", async () => {
+    mockFetchAgentEvals.mockResolvedValue([MAPPED]);
+    mockValues.mockResolvedValue(valuesFor(["order"]));
+    setup({ traceUuids: ["tr-1"], traceLabels: LABELS });
+
+    // Ticked, so its prompt is what opens on the right.
+    expect(await screen.findByText("order")).toBeInTheDocument();
+    expect(mockValues).toHaveBeenCalledWith("tok", "ag-1", ["tr-1"], [
+      "ev-vars",
+    ]);
+  });
+
+  it("shows only where each value comes from for every matching trace", async () => {
+    mockFetchAgentEvals.mockResolvedValue([MAPPED]);
+    setup({
+      selectAll: { agentId: "ag-1" } as never,
+      traceCount: 40,
+    });
+
+    expect(await screen.findByText("{{topic}}")).toBeInTheDocument();
+    expect(screen.queryByText("Loading")).not.toBeInTheDocument();
+    expect(mockValues).not.toHaveBeenCalled();
+  });
+
+  it("reads the values first and asks before adding without them", async () => {
+    const user = setupUser();
+    mockFetchAgentEvals.mockResolvedValue([MAPPED]);
+    mockValues.mockResolvedValue(valuesFor(["order", null]));
+    mockConvert.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
+    const { onConverted } = setup({ traceLabels: LABELS });
+    await screen.findByText("order");
+
+    await user.click(screen.getByRole("button", { name: "Add to tests" }));
+    expect(
+      await screen.findByText("A trace is missing a value"),
+    ).toBeInTheDocument();
+    expect(mockConvert).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(
+      screen.queryByText("A trace is missing a value"),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add to tests" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Add without them" }),
+    );
+    await waitFor(() => expect(onConverted).toHaveBeenCalled());
+    expect(mockConvert.mock.calls[0][1].skipMissingValues).toBe(true);
+  });
+
+  it("adds straight away when every trace has its values", async () => {
+    const user = setupUser();
+    mockFetchAgentEvals.mockResolvedValue([MAPPED]);
+    mockValues.mockResolvedValue(valuesFor(["order", "cancel"]));
+    mockConvert.mockResolvedValue({ created: 2, test_uuids: ["t1", "t2"] });
+    const { onConverted } = setup();
+    await screen.findByText("order");
+
+    await user.click(screen.getByRole("button", { name: "Add to tests" }));
+
+    await waitFor(() => expect(onConverted).toHaveBeenCalled());
+    expect(mockConvert.mock.calls[0][1].skipMissingValues).toBe(false);
+  });
+
+  it("asks about the traces the backend names when every matching trace was asked for", async () => {
+    const user = setupUser();
+    mockFetchAgentEvals.mockResolvedValue([MAPPED]);
+    mockConvert
+      .mockRejectedValueOnce(
+        new Error(
+          `Request failed: 400 - ${JSON.stringify({
+            detail: {
+              error: "Some traces are missing values.",
+              missing: [
+                {
+                  trace_id: "tr-9",
+                  evaluator_id: "ev-vars",
+                  evaluator_name: "Needs Variables",
+                  variable: "topic",
+                  source: "input",
+                },
+              ],
+            },
+          })}`,
+        ),
+      )
+      .mockResolvedValueOnce({ created: 39, test_uuids: ["t1"] });
+    mockValues.mockResolvedValue([
+      {
+        trace_id: "tr-9",
+        evaluator_id: "ev-vars",
+        input_preview: "Refund my order",
+        values: [{ variable: "topic", source: "input", value: null }],
+      },
+    ]);
+    const { onConverted } = setup({
+      selectAll: { agentId: "ag-1" } as never,
+      traceCount: 40,
+    });
+    await screen.findByText("{{topic}}");
+
+    await user.click(screen.getByRole("button", { name: "Add to tests" }));
+
+    expect(await screen.findByText("1 of 40")).toBeInTheDocument();
+    // Not on the page, so it is named by what the user said in it.
+    expect(screen.getByText("Refund my order")).toBeInTheDocument();
+    expect(screen.queryByText("tr-9")).not.toBeInTheDocument();
+    expect(mockValues).toHaveBeenCalledWith("tok", "ag-1", ["tr-9"], [
+      "ev-vars",
+    ]);
+    await user.click(screen.getByRole("button", { name: "Add without them" }));
+    await waitFor(() => expect(onConverted).toHaveBeenCalled());
+    expect(mockConvert.mock.calls[1][1].skipMissingValues).toBe(true);
+  });
+
+  it("shows the failure when adding without them fails", async () => {
+    const user = setupUser();
+    mockFetchAgentEvals.mockResolvedValue([MAPPED]);
+    mockValues.mockResolvedValue(valuesFor(["order", null]));
+    mockConvert.mockRejectedValue(new Error("boom"));
+    setup();
+    await screen.findByText("order");
+
+    await user.click(screen.getByRole("button", { name: "Add to tests" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Add without them" }),
+    );
+
+    expect(
+      await screen.findByText(
+        "Something went wrong while adding to tests. Please try again.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /missing a value/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says the values could not be read and stays put", async () => {
+    const user = setupUser();
+    mockFetchAgentEvals.mockResolvedValue([MAPPED]);
+    mockValues.mockRejectedValue(new Error("boom"));
+    setup();
+    await screen.findByText("{{topic}}");
+
+    await user.click(screen.getByRole("button", { name: "Add to tests" }));
+
+    expect(
+      await screen.findByText(
+        "Could not read the values from these traces. Please try again.",
+      ),
+    ).toBeInTheDocument();
+    expect(mockConvert).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("heading", { name: /missing a value/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to tests" })).toBeEnabled();
+  });
+
+  it("shows its own line, not the backend's, when a refusal for missing values cannot be explained", async () => {
+    const user = setupUser();
+    mockFetchAgentEvals.mockResolvedValue([MAPPED]);
+    mockConvert.mockRejectedValue(
+      new Error(
+        `Request failed: 400 - ${JSON.stringify({
+          detail: {
+            error: "Pass skip_missing_values to continue.",
+            missing: [{ trace_id: "tr-9", evaluator_id: "ev-vars" }],
+          },
+        })}`,
+      ),
+    );
+    // The re-read finds the value after all.
+    mockValues.mockResolvedValue([
+      {
+        trace_id: "tr-9",
+        evaluator_id: "ev-vars",
+        values: [{ variable: "topic", source: "input", value: "order" }],
+      },
+    ]);
+    setup({ selectAll: { agentId: "ag-1" } as never, traceCount: 40 });
+    await screen.findByText("{{topic}}");
+
+    await user.click(screen.getByRole("button", { name: "Add to tests" }));
+
+    expect(
+      await screen.findByText(
+        "Something went wrong while adding to tests. Please try again.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/skip_missing_values/)).not.toBeInTheDocument();
+  });
+
+  it("tells the page once one is set up", async () => {
+    const user = setupUser();
+    const onEvaluatorSetUp = jest.fn();
+    setup({ fromTrace: { uuid: "tr-1" } as never, onEvaluatorSetUp });
+    await screen.findByText("Needs Variables");
+
+    await user.click(evaluatorCheckbox("Needs Variables"));
+    await user.click(
+      screen.getByRole("button", { name: "save mapping from tr-1" }),
+    );
+
+    await waitFor(() => expect(onEvaluatorSetUp).toHaveBeenCalledTimes(1));
   });
 });

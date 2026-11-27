@@ -197,4 +197,33 @@ describe("EvaluatorPromptPreview", () => {
     await screen.findByText("Judge whether the reply is concise.");
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
   });
+
+  it("marks the variables in the prompt and shows the panel in place of their definitions", async () => {
+    mockFetch.mockResolvedValue({
+      ...DETAIL,
+      versions: [
+        DETAIL.versions[0],
+        {
+          ...DETAIL.versions[1],
+          system_prompt: "Judge against {{criteria}} please.",
+        },
+      ],
+    });
+    render(
+      <EvaluatorPromptPreview
+        evaluatorUuid="e1"
+        variablesPanel={<p>Filled from the trace</p>}
+      />,
+    );
+    const mark = await screen.findByText("{{criteria}}");
+    expect(mark.tagName).toBe("MARK");
+    expect(screen.getByText("Filled from the trace")).toBeInTheDocument();
+    expect(screen.getByText("Variables")).toBeInTheDocument();
+    // The definition's own description and the note about tests are gone.
+    expect(screen.queryByText("What to look for")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/fill in the value of each variable/),
+    ).not.toBeInTheDocument();
+  });
 });
+

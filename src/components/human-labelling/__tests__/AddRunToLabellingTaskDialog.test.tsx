@@ -660,6 +660,30 @@ describe("buildItemsFromSource / isLabellingEligibleRaw", () => {
     expect(targetTaskTypeForSource(source)).toBe("llm-general");
   });
 
+  it("carries each trace's variable values into its item", () => {
+    const values = { "ev-vars": { topic: "refunds" } };
+    for (const agentNature of ["conversation", "general"] as const) {
+      const result = buildItemsFromSource({
+        type: "traces",
+        agentUuid: "agent-uuid-1",
+        agentNature,
+        traces: [
+          {
+            name: "Refund question",
+            input:
+              agentNature === "general"
+                ? "where is my refund?"
+                : [{ role: "user", content: "where is my refund?" }],
+            output: { response: "Let me check that." },
+            evaluatorVariables: values,
+          },
+        ],
+        evaluators: [{ uuid: "ev-vars", name: "Topic" }],
+      });
+      expect(result.items[0].payload.evaluator_variables).toEqual(values);
+    }
+  });
+
   it("skips a general trace with no input or no output", () => {
     const result = buildItemsFromSource({
       type: "traces",

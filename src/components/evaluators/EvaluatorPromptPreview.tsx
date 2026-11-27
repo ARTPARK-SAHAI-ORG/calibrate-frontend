@@ -29,6 +29,7 @@ export function EvaluatorPromptPreview({
   evaluatorUuid,
   onDelete,
   showHeader = true,
+  variablesPanel,
 }: {
   evaluatorUuid: string | null;
   /**
@@ -41,6 +42,11 @@ export function EvaluatorPromptPreview({
    * the window around it already names the evaluator and links to its page.
    */
   showHeader?: boolean;
+  /**
+   * What each of the evaluator's variables will be filled with, drawn under
+   * the prompt in place of the variable definitions.
+   */
+  variablesPanel?: React.ReactNode;
 }) {
   const accessToken = useAccessToken();
   const [detail, setDetail] = useState<EvaluatorDetail | null>(null);
@@ -191,6 +197,7 @@ export function EvaluatorPromptPreview({
           isSettingLive={false}
           onSetLive={() => {}}
           formatDateTime={(date) => date}
+          variablesPanel={variablesPanel}
         />
       )}
     </div>

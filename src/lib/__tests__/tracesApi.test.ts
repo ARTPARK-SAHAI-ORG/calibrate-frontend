@@ -17,6 +17,8 @@ import {
   traceFilterKey,
   NO_TRACE_FACETS,
   convertTracesErrorMessage,
+  convertMissingValues,
+  fetchTraceVariableValues,
   validateApiKeyForAgent,
   traceInputTurns,
   traceScoreParams,
@@ -556,6 +558,33 @@ describe("convertTracesToTests", () => {
     expect(result).toEqual({ created: 2, test_uuids: ["t1", "t2"] });
   });
 
+  it("asks to skip traces missing a value only when told to", async () => {
+    mockApiPost.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
+
+    await convertTracesToTests("tok", {
+      traceIds: ["a"],
+      type: "response",
+      evaluatorUuids: ["ev1"],
+      skipMissingValues: true,
+    });
+    await convertTracesToTests("tok", {
+      traceIds: ["a"],
+      type: "response",
+      evaluatorUuids: ["ev1"],
+      skipMissingValues: false,
+    });
+
+    expect(mockApiPost.mock.calls[0][2]).toEqual({
+      trace_ids: ["a"],
+      type: "response",
+      evaluators: ["ev1"],
+      skip_missing_values: true,
+    });
+    expect(mockApiPost.mock.calls[1][2]).not.toHaveProperty(
+      "skip_missing_values",
+    );
+  });
+
   it("sends the test's name when one is given", async () => {
     mockApiPost.mockResolvedValue({ created: 1, test_uuids: ["t1"] });
 
@@ -787,9 +816,57 @@ describe("convertTracesToTests for every trace the list matches", () => {
   });
 });
 
+describe("fetchTraceVariableValues", () => {
+  it("asks for each trace's values for each evaluator and returns the items", async () => {
+    const items = [
+      {
+        trace_id: "t1",
+        evaluator_id: "ev1",
+        values: [{ variable: "note", source: "feedback.comment", value: null }],
+      },
+    ];
+    mockApiPost.mockResolvedValue({ items });
+
+    await expect(
+      fetchTraceVariableValues("tok", "agent 1", ["t1"], ["ev1"]),
+    ).resolves.toEqual(items);
+    expect(mockApiPost).toHaveBeenCalledWith(
+      "/agents/agent%201/trace-variables/values",
+      "tok",
+      { trace_ids: ["t1"], evaluator_ids: ["ev1"] },
+    );
+  });
+});
+
+const failure = (detail: unknown) =>
+  new Error(`Request failed: 400 - ${JSON.stringify({ detail })}`);
+
+describe("convertMissingValues", () => {
+  const missing = [
+    {
+      trace_id: "t1",
+      evaluator_id: "ev1",
+      evaluator_name: "Tone",
+      variable: "note",
+      source: "feedback.comment",
+    },
+  ];
+
+  it("reads the values a conversion was refused for", () => {
+    const error = failure({ error: "2 traces are missing values.", missing });
+    expect(convertMissingValues(error)).toEqual(missing);
+    // The window writes its own line for this, rather than the backend's.
+    expect(convertTracesErrorMessage(error)).toBeNull();
+  });
+
+  it("gives nothing back for any other failure", () => {
+    expect(convertMissingValues(new Error("network"))).toBeNull();
+    expect(convertMissingValues(failure("plain text"))).toBeNull();
+    expect(convertMissingValues(failure({ error: "x" }))).toBeNull();
+  });
+});
+
 describe("convertTracesErrorMessage", () => {
-  const failure = (detail: unknown) =>
-    new Error(`Request failed: 400 - ${JSON.stringify({ detail })}`);
 
   it("reads the messages naming the evaluators that cannot be used", () => {
     expect(

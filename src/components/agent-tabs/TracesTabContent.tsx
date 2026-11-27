@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TracesTable } from "@/components/traces/TracesTable";
@@ -9,7 +15,10 @@ import { TraceDetailDialog } from "@/components/traces/TraceDetailDialog";
 import { TracesEmptyState } from "@/components/traces/TracesEmptyState";
 import { AddedToTestsDialog } from "@/components/traces/AddedToTestsDialog";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
-import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
+import {
+  TraceLabellingEvaluatorsDialog,
+  type TraceEvaluatorVariables,
+} from "@/components/traces/TraceLabellingEvaluatorsDialog";
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
 import {
   EvaluatorsTabLink,
@@ -86,6 +95,9 @@ import {
 import { reportError } from "@/lib/reportError";
 import { fetchChatLink, type ChatLink } from "@/lib/chatLinkApi";
 import { WarningBox } from "@/components/traces/WarningBox";
+
+const MIXED_SELECTION_ERROR =
+  "The selected traces contain a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.";
 
 /**
  * A number of traces, said the way a person says it: "1 trace", "50,000
@@ -278,11 +290,19 @@ export function TracesTabContent({
     isLabellableOutput(traceRowOutputFacts(trace)),
   );
   const labellableUuids = labellableTraces.map((trace) => trace.uuid);
+  // How a trace is named in the evaluator windows: what the user said.
+  const traceLabel = (trace: TraceSummary) =>
+    trace.input_preview || trace.uuid;
   // A selection that is nothing but tool calls skips the evaluator step: a
   // tool-call row is answered only against the tool-call evaluator, so there
   // is nothing to pick.
   const labellingIsToolCallOnly =
     labellableTraces.length > 0 && labellableTraces.every(isToolCallTraceRow);
+  // A tool-call item carries no evaluator values, so only the rest are read
+  // and checked for them.
+  const replyTraces = labellableTraces.filter(
+    (trace) => !isToolCallTraceRow(trace),
+  );
 
   // Send selected traces for labelling. Step one asks which evaluators the
   // annotators score against; step two needs the full traces, which the list
@@ -301,7 +321,10 @@ export function TracesTabContent({
   const labellableRef = useRef(labellableUuids);
   labellableRef.current = labellableUuids;
 
-  const prepareLabelling = async (chosen: SourceEvaluatorRef[]) => {
+  const prepareLabelling = async (
+    chosen: SourceEvaluatorRef[],
+    variables: TraceEvaluatorVariables,
+  ) => {
     setEvaluatorStepOpen(false);
     if (!accessToken) return;
     const uuids = labellableRef.current;
@@ -358,6 +381,7 @@ export function TracesTabContent({
               : (trace.input ?? []).filter((turn) => turn.role !== "system"),
           output: trace.output,
           metadata: traceLabellingMetadata(trace),
+          evaluatorVariables: variables[trace.uuid],
         })),
       );
     } finally {
@@ -488,14 +512,17 @@ export function TracesTabContent({
   const needValues = ineligible.filter(
     (item) => item.reason === "declares_variables",
   );
+  // Setting up an evaluator's variables can link it to the agent and lets it
+  // score, so the scoring state and the agent's evaluators are read again.
+  const afterEvaluatorSetUp = () => {
+    void traceScoring.refreshEligibility();
+    onAgentDefaultsAttached?.();
+  };
   const configureTraceValues = useConfigureTraceValues({
     agentUuid,
     agentNature,
     accessToken,
-    onRefresh: () => {
-      void traceScoring.refreshEligibility();
-      onAgentDefaultsAttached?.();
-    },
+    onRefresh: afterEvaluatorSetUp,
   });
   // What each column's evaluator judges, so a row it does not apply to reads
   // as empty rather than as waiting. Filled with the descriptions below.
@@ -508,34 +535,61 @@ export function TracesTabContent({
   // True during every read, the first and each one after. An evaluator linked
   // since the last read has no type yet, so its cells wait for this one.
   const [evaluatorTypesReading, setEvaluatorTypesReading] = useState(true);
-  // One column per evaluator that can score now, plus any that scored a trace
-  // on this page, so taking an evaluator off the agent does not hide the
-  // scores it already gave.
+  // Every evaluator still on the agent, whether or not it can score. Null
+  // until the eligibility is read.
+  const eligibilityIds = useMemo(
+    () =>
+      eligibility
+        ? new Set(
+            [...eligibility.eligible, ...eligibility.ineligible].map(
+              (item) => item.evaluator_uuid,
+            ),
+          )
+        : null,
+    [eligibility],
+  );
+  // Nothing passes until the eligibility is read, so a removed evaluator never
+  // shows in the meantime; everything passes if that read failed, so the scores
+  // do not all vanish with it.
+  const eligibilityFailed = traceScoring.eligibilityError !== null;
+  const isLinkedEvaluator = useCallback(
+    (evaluatorUuid: string) =>
+      eligibilityIds ? eligibilityIds.has(evaluatorUuid) : eligibilityFailed,
+    [eligibilityIds, eligibilityFailed],
+  );
+  // One column per evaluator that can score now, plus any other evaluator on
+  // the agent that scored a trace on this page. An evaluator taken off the
+  // agent loses its column; its scores stay in each trace's own window.
   const scoreColumns = useMemo(() => {
     const byId = new Map<string, TraceScoreColumn>();
-    // An evaluator that only scored past traces may be off the agent, so no
-    // read will give its type; its cells wait only for the first read.
-    const add = (evaluator_uuid: string, name: string, linked: boolean) => {
+    const add = (evaluator_uuid: string, name: string) => {
       if (byId.has(evaluator_uuid)) return;
-      const waiting =
-        evaluatorTypesReading && (linked || evaluatorTypes === null);
       byId.set(evaluator_uuid, {
         evaluator_uuid,
         name,
         evaluator_type:
-          evaluatorTypes?.[evaluator_uuid] ?? (waiting ? null : undefined),
+          evaluatorTypes?.[evaluator_uuid] ??
+          (evaluatorTypesReading ? null : undefined),
       });
     };
     for (const item of eligibility?.eligible ?? []) {
-      add(item.evaluator_uuid, item.name, true);
+      add(item.evaluator_uuid, item.name);
     }
     for (const trace of items) {
       for (const result of trace.results ?? []) {
-        add(result.evaluator_uuid, result.name, false);
+        if (isLinkedEvaluator(result.evaluator_uuid)) {
+          add(result.evaluator_uuid, result.name);
+        }
       }
     }
     return [...byId.values()];
-  }, [eligibility, items, evaluatorTypes, evaluatorTypesReading]);
+  }, [
+    eligibility,
+    isLinkedEvaluator,
+    items,
+    evaluatorTypes,
+    evaluatorTypesReading,
+  ]);
   // An evaluator taken off the agent takes its heading away with it, and with
   // no heading there is nothing left on screen to turn its ordering off.
   useEffect(() => {
@@ -632,13 +686,6 @@ export function TracesTabContent({
   const linkedTypes = evaluatorTypes ? Object.values(evaluatorTypes) : null;
   // The evaluator list and the eligibility are read separately, so one can
   // arrive before the other. Null until both name the same evaluators.
-  const eligibilityIds = eligibility
-    ? new Set(
-        [...eligibility.eligible, ...eligibility.ineligible].map(
-          (item) => item.evaluator_uuid,
-        ),
-      )
-    : null;
   const scoringTypes =
     eligibility &&
     evaluatorTypes &&
@@ -677,30 +724,35 @@ export function TracesTabContent({
     />
   );
 
-  // The backend's own averages over every matching trace, not the page.
+  // The backend's own averages over every matching trace, not the page, for
+  // the evaluators still on the agent.
   const scoreCards = useMemo(
     () =>
-      scoreAverages.map((average) => ({
-        evaluatorId: average.evaluator_uuid,
-        name: average.name,
-        stat: formatEvaluatorResultStat(
-          average.output_type === "rating"
-            ? { count: average.traces_scored, mean: average.average }
-            : {
-                count: average.traces_scored,
-                // A yes-or-no evaluator averages ones and zeros, so its
-                // average is the share that passed.
-                trueCount: Math.round(average.average * average.traces_scored),
-              },
-          {
-            output_type: average.output_type,
-            scale_min: average.scale_min,
-            scale_max: average.scale_max,
-          },
-          "item",
-        ),
-      })),
-    [scoreAverages],
+      scoreAverages
+        .filter((average) => isLinkedEvaluator(average.evaluator_uuid))
+        .map((average) => ({
+          evaluatorId: average.evaluator_uuid,
+          name: average.name,
+          stat: formatEvaluatorResultStat(
+            average.output_type === "rating"
+              ? { count: average.traces_scored, mean: average.average }
+              : {
+                  count: average.traces_scored,
+                  // A yes-or-no evaluator averages ones and zeros, so its
+                  // average is the share that passed.
+                  trueCount: Math.round(
+                    average.average * average.traces_scored,
+                  ),
+                },
+            {
+              output_type: average.output_type,
+              scale_min: average.scale_min,
+              scale_max: average.scale_max,
+            },
+            "item",
+          ),
+        })),
+    [scoreAverages, isLinkedEvaluator],
   );
 
   // Read on every visit, because the storage limit leaves no trace of itself
@@ -1211,9 +1263,7 @@ export function TracesTabContent({
                     onClick={async () => {
                       if (!everyTraceMatching) {
                         if (isMixedSelection) {
-                          toast.error(
-                            "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
-                          );
+                          toast.error(MIXED_SELECTION_ERROR);
                           return;
                         }
                         setConvertOpen(true);
@@ -1227,9 +1277,7 @@ export function TracesTabContent({
                           : facets.outputType;
                       if (!kind) return;
                       if (kind === "mixed") {
-                        toast.error(
-                          "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
-                        );
+                        toast.error(MIXED_SELECTION_ERROR);
                         return;
                       }
                       setConvertOpen(true);
@@ -1247,7 +1295,7 @@ export function TracesTabContent({
                       }
                       onOpen={() =>
                         labellingIsToolCallOnly
-                          ? prepareLabelling([])
+                          ? prepareLabelling([], {})
                           : setEvaluatorStepOpen(true)
                       }
                       className={SUBMIT_FOR_LABELLING_CLASS}
@@ -1431,6 +1479,11 @@ export function TracesTabContent({
               }
             : undefined
         }
+        traceLabels={Object.fromEntries(
+          selectedTraces.map((trace) => [trace.uuid, traceLabel(trace)]),
+        )}
+        fromTrace={selectedTraces[0]}
+        onEvaluatorSetUp={afterEvaluatorSetUp}
         onConverted={(result, evaluatorsUsed = []) => {
           setConvertOpen(false);
           const created = result.created;
@@ -1470,12 +1523,17 @@ export function TracesTabContent({
           evaluators rather than the last visit's ticks. */}
       {evaluatorStepOpen && (
         <TraceLabellingEvaluatorsDialog
-          isOpen
           onClose={() => setEvaluatorStepOpen(false)}
           agentUuid={agentUuid}
           agentNature={agentNature}
           accessToken={accessToken}
+          traces={replyTraces.map((trace) => ({
+            uuid: trace.uuid,
+            label: traceLabel(trace),
+          }))}
+          fromTrace={replyTraces[0]}
           onChosen={prepareLabelling}
+          onEvaluatorSetUp={afterEvaluatorSetUp}
         />
       )}
 
