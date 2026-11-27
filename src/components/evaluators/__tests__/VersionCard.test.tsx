@@ -442,5 +442,19 @@ describe("VersionCard variables", () => {
     expect(screen.getByText("Variables")).toBeInTheDocument();
     expect(screen.queryByText("The tone wanted")).not.toBeInTheDocument();
   });
-});
 
+  it("marks only braces holding a variable name", () => {
+    const { container } = setup({
+      version: makeVersion({
+        system_prompt: "Use {{ tone }}, not {{ my var }} or {{}}.",
+        variables: [{ name: "tone", description: "The tone wanted" }],
+      }),
+      isDefault: true,
+      isLive: true,
+      variablesPanel: <p>Panel here</p>,
+    });
+    const marks = container.querySelectorAll("mark");
+    expect(marks).toHaveLength(1);
+    expect(marks[0]).toHaveTextContent("{{ tone }}");
+  });
+});

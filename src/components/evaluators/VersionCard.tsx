@@ -59,8 +59,9 @@ const PROMPT_VARIABLE = `${VARIABLE_COLORS} rounded px-1`;
 
 /** The prompt with each `{{variable}}` marked. */
 function highlightVariables(prompt: string) {
-  // The capture group keeps each `{{...}}` in the split, at the odd indexes.
-  return prompt.split(/(\{\{[^{}]+\}\})/).map((part, i) =>
+  // The capture group keeps each `{{name}}` in the split, at the odd indexes.
+  // Same rule for a name as extractVariableNames.
+  return prompt.split(/(\{\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\}\})/).map((part, i) =>
     i % 2 ? (
       <mark key={i} className={PROMPT_VARIABLE}>
         {part}

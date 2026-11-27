@@ -96,8 +96,6 @@ export function useAgentLlmEvaluators({
         ? DEFAULT_LLM_GENERAL_SLUG
         : DEFAULT_LLM_NEXT_REPLY_SLUG;
     let cancelled = false;
-    // Each opening starts from the agent's own evaluators again.
-    setPicked(null);
     const load = async () => {
       setIsLoading(true);
       setError(null);
