@@ -41,6 +41,49 @@ const setup = ({
 };
 
 describe("MissingValuesDialog", () => {
+  it("says no test can be added when the only evaluator has no value", () => {
+    setup({ traces: [traces[1]], totalTraces: 1 });
+    expect(screen.getByText(/No test can be added/)).toHaveTextContent(
+      "No test can be added. This trace has no value for the only evaluator you picked. Go back and pick another evaluator, or set this one up to read a different part of the trace",
+    );
+    expect(
+      screen.getByRole("button", { name: "Add without them" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Back" })).toBeEnabled();
+  });
+
+  it("says none of several traces can be added", () => {
+    setup({
+      traces: [
+        traces[1],
+        { ...traces[1], traceId: "t4", label: "Lacks it too" },
+      ],
+      totalTraces: 2,
+    });
+    expect(
+      screen.getByText(/None of these traces has a value/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add without them" }),
+    ).toBeDisabled();
+  });
+
+  it("still adds when another ticked evaluator needs no values", () => {
+    setup({ traces: [traces[1]], totalTraces: 1, hasOtherEvaluators: true });
+    expect(screen.queryByText(/No test can be added/)).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Add without them" }),
+    ).toBeEnabled();
+  });
+
+  it("never blocks labelling, where the value is left blank", () => {
+    setup({ traces: [traces[1]], totalTraces: 1, outcome: "labelling" });
+    expect(screen.queryByText(/No test can be added/)).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Add with them blank" }),
+    ).toBeEnabled();
+  });
+
   it("says how many traces are missing a value and how many have every one", () => {
     setup();
     // One of three is missing, so it is not "some traces".

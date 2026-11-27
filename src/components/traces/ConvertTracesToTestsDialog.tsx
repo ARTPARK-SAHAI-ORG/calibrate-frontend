@@ -403,6 +403,7 @@ export function ConvertTracesToTestsDialog({
           totalTraces={count}
           outcome="tests"
           agentNature={agentNature}
+          hasOtherEvaluators={withVariables.length < chosen.length}
           busy={skipping}
           onBack={() => setMissing(null)}
           onConfirm={() => void addWithoutThem()}

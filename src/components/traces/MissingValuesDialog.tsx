@@ -41,6 +41,7 @@ export function MissingValuesDialog({
   onConfirm,
   busy = false,
   agentNature,
+  hasOtherEvaluators = false,
 }: {
   missing: MissingValues;
   totalTraces: number;
@@ -49,6 +50,9 @@ export function MissingValuesDialog({
   onConfirm: () => void;
   busy?: boolean;
   agentNature?: AgentNature;
+  /** An evaluator with no variables is also ticked, so every trace keeps at
+   *  least that one. */
+  hasOtherEvaluators?: boolean;
 }) {
   useHideFloatingButton(true);
 
@@ -63,6 +67,17 @@ export function MissingValuesDialog({
   );
   const missing = incomplete.length;
   const complete = totalTraces - missing;
+  // A test needs an evaluator, so when every trace lacks a value for each
+  // evaluator ticked, there is nothing to add.
+  const nothingToAdd =
+    outcome === "tests" &&
+    !hasOtherEvaluators &&
+    complete === 0 &&
+    incomplete.every((t) =>
+      evaluators.every((ev) =>
+        ev.variables.some((v) => valueOf(t, ev.uuid, v.name) === null),
+      ),
+    );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -74,6 +89,18 @@ export function MissingValuesDialog({
               ? "This trace is missing a value"
               : "A trace is missing a value"}
         </h2>
+        {nothingToAdd ? (
+          <p className="text-sm md:text-base text-foreground mb-5">
+            No test can be added.{" "}
+            {totalTraces === 1
+              ? evaluators.length === 1
+                ? "This trace has no value for the only evaluator you picked."
+                : "This trace has no value for any evaluator you picked."
+              : "None of these traces has a value for any evaluator you picked."}{" "}
+            Go back and pick another evaluator, or set this one up to read a
+            different part of the trace
+          </p>
+        ) : (
         <p className="text-sm md:text-base text-foreground mb-5">
           <span className="font-semibold">
             {missing} of {totalTraces}
@@ -92,6 +119,7 @@ export function MissingValuesDialog({
               ? " The other trace has every value."
               : ` The other ${complete} traces have every value.`)}
         </p>
+        )}
         <div className="min-h-0 overflow-auto border border-border rounded-md mb-6">
           <table className="w-full text-sm md:text-base">
             <thead className="bg-muted/30">
@@ -154,7 +182,13 @@ export function MissingValuesDialog({
           <Button variant="secondary" size="md" onClick={onBack} disabled={busy}>
             Back
           </Button>
-          <Button variant="primary" size="md" onClick={onConfirm} isLoading={busy}>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={onConfirm}
+            isLoading={busy}
+            disabled={nothingToAdd}
+          >
             {outcome === "tests" ? "Add without them" : "Add with them blank"}
           </Button>
         </div>
