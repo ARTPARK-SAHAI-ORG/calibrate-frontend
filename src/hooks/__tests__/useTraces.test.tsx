@@ -908,9 +908,7 @@ describe("useTraces averages after scoring finishes", () => {
     unmount();
     setIntervalSpy.mockRestore();
   });
-});
 
-describe("useTraces averages after a page turn", () => {
   it("does not read them again when a page turn lands on finished rows", async () => {
     mockFetchTraces
       .mockResolvedValueOnce({
@@ -935,6 +933,39 @@ describe("useTraces averages after a page turn", () => {
       "tok",
       expect.objectContaining({ offset: 50, includeScoreAverages: false }),
     );
+  });
+
+  it("does not read them when a page turn fails after a scoring check", async () => {
+    const setIntervalSpy = jest.spyOn(window, "setInterval");
+    const pending = page([{ uuid: "t1", latest_run_status: "pending" }], 120);
+    mockFetchTraces
+      .mockResolvedValueOnce({ ...pending, score_averages: [] })
+      .mockResolvedValueOnce(pending)
+      .mockRejectedValueOnce(new Error("down"))
+      .mockResolvedValue(
+        page([{ uuid: "t2", latest_run_status: "completed" }], 120),
+      );
+
+    const { result, unmount } = renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1", pageSize: 50 }),
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    const pollCall = setIntervalSpy.mock.calls.find(
+      (call) => call[1] === POLLING_INTERVAL_MS,
+    );
+    await act(async () => {
+      (pollCall![0] as () => void)();
+    });
+
+    act(() => result.current.nextPage());
+    await waitFor(() =>
+      expect(result.current.error).toBe("Failed to load traces"),
+    );
+    await act(async () => {});
+    expect(mockFetchTraces).toHaveBeenCalledTimes(3);
+    expect(result.current.items).toEqual([]);
+    unmount();
+    setIntervalSpy.mockRestore();
   });
 });
 

@@ -128,6 +128,8 @@ export function useTraces({
         if (requestId !== requestIdRef.current) return 0;
         reportError("Error fetching traces:", err);
         if (silent) return 0;
+        // The rows emptied below are not a scoring run finishing.
+        lastReadSkippedAveragesRef.current = false;
         // Drop the last page too: leaving it on screen next to the message
         // would let the reader tick and delete rows from a failed load.
         setItems([]);
