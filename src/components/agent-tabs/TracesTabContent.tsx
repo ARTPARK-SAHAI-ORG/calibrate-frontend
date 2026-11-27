@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { TracesTable } from "@/components/traces/TracesTable";
@@ -508,20 +514,28 @@ export function TracesTabContent({
   // True during every read, the first and each one after. An evaluator linked
   // since the last read has no type yet, so its cells wait for this one.
   const [evaluatorTypesReading, setEvaluatorTypesReading] = useState(true);
-  // Whether an evaluator is still on the agent, whether or not it can score.
+  // Every evaluator still on the agent, whether or not it can score. Null
+  // until the eligibility is read.
+  const eligibilityIds = useMemo(
+    () =>
+      eligibility
+        ? new Set(
+            [...eligibility.eligible, ...eligibility.ineligible].map(
+              (item) => item.evaluator_uuid,
+            ),
+          )
+        : null,
+    [eligibility],
+  );
   // Nothing passes until the eligibility is read, so a removed evaluator never
   // shows in the meantime; everything passes if that read failed, so the scores
   // do not all vanish with it.
   const eligibilityFailed = traceScoring.eligibilityError !== null;
-  const isLinkedEvaluator = useMemo(() => {
-    if (!eligibility) return () => eligibilityFailed;
-    const ids = new Set(
-      [...eligibility.eligible, ...eligibility.ineligible].map(
-        (item) => item.evaluator_uuid,
-      ),
-    );
-    return (evaluatorUuid: string) => ids.has(evaluatorUuid);
-  }, [eligibility, eligibilityFailed]);
+  const isLinkedEvaluator = useCallback(
+    (evaluatorUuid: string) =>
+      eligibilityIds ? eligibilityIds.has(evaluatorUuid) : eligibilityFailed,
+    [eligibilityIds, eligibilityFailed],
+  );
   // One column per evaluator that can score now, plus any other evaluator on
   // the agent that scored a trace on this page. An evaluator taken off the
   // agent loses its column; its scores stay in each trace's own window.
@@ -651,13 +665,6 @@ export function TracesTabContent({
   const linkedTypes = evaluatorTypes ? Object.values(evaluatorTypes) : null;
   // The evaluator list and the eligibility are read separately, so one can
   // arrive before the other. Null until both name the same evaluators.
-  const eligibilityIds = eligibility
-    ? new Set(
-        [...eligibility.eligible, ...eligibility.ineligible].map(
-          (item) => item.evaluator_uuid,
-        ),
-      )
-    : null;
   const scoringTypes =
     eligibility &&
     evaluatorTypes &&

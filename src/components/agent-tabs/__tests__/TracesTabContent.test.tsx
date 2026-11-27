@@ -1154,19 +1154,35 @@ describe("TracesTabContent", () => {
       expect(screen.queryByText("0%")).not.toBeInTheDocument();
     });
 
-    it("shows no cards until it is known which evaluators are on the agent", () => {
+    it("shows no cards or score columns until it is known which evaluators are on the agent", () => {
       mockUseTraces.mockReturnValue(
-        tracesResult([trace()], {
-          scoreAverages: [
-            {
-              evaluator_uuid: "ev-1",
-              name: "Tone",
-              output_type: "binary",
-              traces_scored: 4,
-              average: 0.5,
-            },
+        tracesResult(
+          [
+            trace({
+              latest_run_status: "completed",
+              results: [
+                {
+                  evaluator_uuid: "ev-1",
+                  name: "Tone",
+                  output_type: "binary",
+                  value: 1,
+                  passed: true,
+                },
+              ],
+            }),
           ],
-        }),
+          {
+            scoreAverages: [
+              {
+                evaluator_uuid: "ev-1",
+                name: "Tone",
+                output_type: "binary",
+                traces_scored: 4,
+                average: 0.5,
+              },
+            ],
+          },
+        ),
       );
       render(
         <TracesTabContent
@@ -1175,6 +1191,7 @@ describe("TracesTabContent", () => {
         />,
       );
       expect(screen.queryByText("Production quality")).not.toBeInTheDocument();
+      expect(screen.queryByText("Tone")).not.toBeInTheDocument();
     });
 
     it("still shows the cards and score columns when the agent's evaluators could not be checked", () => {
