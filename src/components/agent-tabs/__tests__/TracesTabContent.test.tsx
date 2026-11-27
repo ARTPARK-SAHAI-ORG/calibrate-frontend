@@ -487,7 +487,6 @@ const onTestsCreated = jest.fn();
 const onGoToEvaluators = jest.fn();
 const onGoToSettings = jest.fn();
 const setEnabled = jest.fn(async () => {});
-// Scoring off, with one evaluator able to score, unless a test says otherwise.
 // One evaluator's passing verdict on a trace, as a list row carries it.
 const scored = (evaluator_uuid: string, name: string) => ({
   evaluator_uuid,
@@ -497,6 +496,7 @@ const scored = (evaluator_uuid: string, name: string) => ({
   passed: true,
 });
 
+// Scoring off, with one evaluator able to score, unless a test says otherwise.
 const traceScoring = {
   enabled: false,
   saving: false,
