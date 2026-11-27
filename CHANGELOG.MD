@@ -1,5 +1,6 @@
 ## November 2026
 
+- You can now use evaluators with variables when adding traces to tests or submitting them for labelling, with a way to set up the variables and a warning when a trace is missing a value ([#906](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/906))
 - The Monitoring tab no longer shows a score card or a table column for an evaluator that has been taken off the agent, and its scores still appear in each trace's own window ([#913](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/913))
 - The monitoring setting in an agent's Settings tab now says new traces are scored using the evaluators added in the Evaluators tab, without the word "valid" and its hover explanation ([#908](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/908))
 - You can now choose which part of a trace fills each variable of an evaluator, with a Configure button on the Evaluators tab and a Configure now prompt on the Monitoring tab that lets you try your choices on a recent trace ([#809](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/809))
