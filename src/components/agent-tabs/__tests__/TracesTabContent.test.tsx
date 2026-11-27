@@ -2883,7 +2883,7 @@ describe("TracesTabContent", () => {
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
-        "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
+        "The selected traces contain a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
       ),
     );
     expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
@@ -3532,7 +3532,7 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByText("Add to tests (2)"));
 
     expect(toast.error).toHaveBeenCalledWith(
-      "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
+      "The selected traces contain a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
     );
     expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
   });

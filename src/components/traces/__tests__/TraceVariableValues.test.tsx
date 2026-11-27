@@ -45,9 +45,34 @@ describe("TraceVariableValues", () => {
     );
     expect(
       screen.getByText(
-        "This trace has no metadata entry called city, so this item will have it left blank",
+        (_, el) =>
+          el?.tagName === "P" &&
+          el.textContent ===
+            "This trace has no metadata entry called city, so this item will have it left blank",
       ),
     ).toBeInTheDocument();
+    // The field's name is set apart from the words around it.
+    expect(screen.getByText("city").tagName).toBe("CODE");
+  });
+
+  it("sets a missing metadata field's name apart in the list of traces", () => {
+    render(
+      <TraceVariableValues
+        rows={[
+          row(
+            [
+              { traceId: "t1", label: "Hi", value: null },
+              { traceId: "t2", label: "Bye", value: "Pune" },
+            ],
+            "metadata.city",
+          ),
+        ]}
+        outcome="tests"
+      />,
+    );
+    const key = screen.getByText("city");
+    expect(key.tagName).toBe("CODE");
+    expect(key.parentElement?.textContent).toBe("No city in the metadata");
   });
 
   it("lists every trace with its value, or what it lacks", () => {

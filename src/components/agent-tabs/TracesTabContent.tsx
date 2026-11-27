@@ -1230,7 +1230,7 @@ export function TracesTabContent({
                       if (!everyTraceMatching) {
                         if (isMixedSelection) {
                           toast.error(
-                            "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
+                            "The selected traces contain a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
                           );
                           return;
                         }
@@ -1246,7 +1246,7 @@ export function TracesTabContent({
                       if (!kind) return;
                       if (kind === "mixed") {
                         toast.error(
-                          "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
+                          "The selected traces contain a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
                         );
                         return;
                       }

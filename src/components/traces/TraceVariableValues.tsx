@@ -8,11 +8,37 @@ import {
   traceSourceHint,
   traceSourceLabel,
 } from "@/lib/traceScoring";
-import { VARIABLE_CHIP } from "@/lib/variableChip";
+import { METADATA_KEY_CODE, VARIABLE_CHIP } from "@/lib/variableChip";
 import type { AgentNature } from "./ingestSnippets";
 import { WarningBox } from "./WarningBox";
 
 export type TraceVariableOutcome = "tests" | "labelling";
+
+/** What is missing, with a metadata field's name set apart from the words. */
+function MissingText({
+  source,
+  agentNature,
+  sentence,
+}: {
+  source: string;
+  agentNature?: AgentNature;
+  sentence?: boolean;
+}) {
+  if (!isMetadataSource(source))
+    return (
+      <>
+        {sentence
+          ? missingValueSentence(source, agentNature)
+          : missingValueText(source, agentNature)}
+      </>
+    );
+  const key = <code className={METADATA_KEY_CODE}>{metadataKey(source)}</code>;
+  return sentence ? (
+    <>This trace has no metadata entry called {key}</>
+  ) : (
+    <>No {key} in the metadata</>
+  );
+}
 
 export type TraceVariableRow = {
   variable: string;
@@ -118,7 +144,7 @@ function Values({
           <WarningTriangleIcon className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
         }
       >
-        {missingValueSentence(row.source, agentNature)}
+        <MissingText source={row.source} agentNature={agentNature} sentence />
         {outcome === "tests"
           ? ", so the test will be added without this evaluator"
           : ", so this item will have it left blank"}
@@ -147,7 +173,9 @@ function Values({
               ) : (
                 <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
                   <WarningTriangleIcon className="w-4 h-4 flex-shrink-0" />
-                  {missingValueText(row.source, agentNature)}
+                  <span>
+                    <MissingText source={row.source} agentNature={agentNature} />
+                  </span>
                 </span>
               )}
             </td>

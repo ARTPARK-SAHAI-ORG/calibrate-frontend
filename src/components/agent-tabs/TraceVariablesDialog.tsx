@@ -47,7 +47,7 @@ import {
   type TraceSummary,
   type TraceVariablePreview,
 } from "@/lib/tracesApi";
-import { VARIABLE_CHIP } from "@/lib/variableChip";
+import { VARIABLE_CHIP, METADATA_KEY_CODE } from "@/lib/variableChip";
 
 type TraceVariablesDialogProps = {
   agentUuid: string;
@@ -69,7 +69,7 @@ type TraceVariablesDialogProps = {
 const RECENT_TRACES = 20;
 const OTHER_KEY = "\u0000other";
 
-const CODE = "font-mono text-[13px] px-1 py-px rounded bg-amber-700/10";
+const CODE = METADATA_KEY_CODE;
 const PILL =
   "flex-shrink-0 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[11px] font-medium";
 const BACK_BUTTON =
