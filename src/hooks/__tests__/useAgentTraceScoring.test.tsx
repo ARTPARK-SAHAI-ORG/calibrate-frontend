@@ -394,3 +394,14 @@ it("leaves the switch open while scoring is already on", async () => {
   await waitFor(() => expect(result.current.eligibility).not.toBeNull());
   expect(result.current.cannotEnable).toBe(false);
 });
+
+it("asks again which evaluators can score when told to", async () => {
+  mockEligibility.mockResolvedValueOnce(blocked);
+  const { result } = setup(true);
+  await waitFor(() => expect(result.current.eligibility).toEqual(blocked));
+
+  mockEligibility.mockResolvedValueOnce(eligible);
+  await act(() => result.current.refreshEligibility());
+
+  expect(result.current.eligibility).toEqual(eligible);
+});

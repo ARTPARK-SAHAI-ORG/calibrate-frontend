@@ -8,10 +8,9 @@ import {
   EVALUATOR_CARD_BUTTON_CLASS,
 } from "@/components/evaluators/DuplicateEvaluatorButton";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
-import { PreBuiltPill } from "@/components/EvaluatorPills";
 import { EyeIcon, XIcon } from "@/components/icons";
 import { Tooltip } from "@/components/Tooltip";
-import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
+import { type EvaluatorData } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
 
 // Same fixed tints the agent's Evaluators tab uses, so the two read alike.
@@ -176,7 +175,6 @@ export function RunEvaluatorsPanel({
                     <h3 className="text-base font-semibold text-foreground">
                       {evaluator.name}
                     </h3>
-                    {isDefaultEvaluator(evaluator) && <PreBuiltPill />}
                   </div>
                   {evaluator.description && (
                     <p className="text-sm text-muted-foreground mt-0.5">

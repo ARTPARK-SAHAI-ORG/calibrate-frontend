@@ -1,9 +1,91 @@
 import type { EvaluatorType } from "@/components/EvaluatorPills";
+import type { AgentNature } from "@/components/traces/ingestSnippets";
+import type { EvaluatorData } from "./evaluatorApi";
+import { fitsTaskType } from "./labellingItem";
 import type {
   TraceScoringIneligibleReason,
   TraceScoringStatus,
   TraceSummary,
 } from "./tracesApi";
+
+export const METADATA_SOURCE = "metadata.";
+
+const CONVERSATION_SOURCES = [
+  { value: "input", label: "Conversation" },
+  { value: "output.response", label: "Agent reply" },
+  { value: "output.tool_calls", label: "Tool calls" },
+  { value: METADATA_SOURCE, label: "Metadata" },
+  { value: "labels", label: "Labels" },
+  { value: "conversation_id", label: "Conversation ID" },
+  { value: "message_id", label: "Message ID" },
+];
+
+// A general agent has no conversation, so nothing to identify one by.
+const GENERAL_SOURCES = [
+  { value: "input", label: "Input" },
+  { value: "output.response", label: "Output" },
+  { value: "output.tool_calls", label: "Tool calls" },
+  { value: METADATA_SOURCE, label: "Metadata" },
+  { value: "labels", label: "Labels" },
+];
+
+export const isMetadataSource = (source: string) =>
+  source.startsWith(METADATA_SOURCE);
+export const metadataKey = (source: string) =>
+  source.slice(METADATA_SOURCE.length).trim();
+
+/** The parts of a trace a variable can read from, for this kind of agent. */
+export function traceSources(agentNature: AgentNature) {
+  return agentNature === "general" ? GENERAL_SOURCES : CONVERSATION_SOURCES;
+}
+
+/**
+ * The name of a part of a trace. With no agent type, the input keeps a name that
+ * is true of both kinds of agent. A value this agent's list does not offer still
+ * gets its name, and one nothing has a name for reads as it is.
+ */
+export function traceSourceLabel(
+  source: string,
+  agentNature?: AgentNature,
+): string {
+  const first =
+    agentNature === "general"
+      ? GENERAL_SOURCES
+      : agentNature
+        ? []
+        : [{ value: "input", label: "Input" }];
+  return (
+    [...first, ...CONVERSATION_SOURCES].find((s) => s.value === source)?.label ??
+    source
+  );
+}
+
+export const lowerFirst = (text: string) => text[0].toLowerCase() + text.slice(1);
+
+/** The part of a trace a variable is mapped to, to follow "is mapped to". */
+export function missingSourcePhrase(
+  source: string,
+  agentNature?: AgentNature,
+): string {
+  return `the trace's ${lowerFirst(traceSourceLabel(source, agentNature))}`;
+}
+
+/**
+ * The rows that say where a variable reads from. Rows left as Not set, and
+ * Metadata rows with no key yet, say nothing and are left out.
+ */
+export function traceChoices(
+  values: Record<string, string>,
+): Record<string, string> {
+  const choices: Record<string, string> = {};
+  for (const [name, value] of Object.entries(values)) {
+    const source = isMetadataSource(value)
+      ? METADATA_SOURCE + metadataKey(value)
+      : value;
+    if (source && source !== METADATA_SOURCE) choices[name] = source;
+  }
+  return choices;
+}
 
 /** The only two things about a trace's output that decide how it is labelled.
  * The traces list has them as a preview and a count, the labelling dialog has
@@ -59,16 +141,62 @@ export function isTraceScoringInProgress(
   return status === "pending" || status === "processing";
 }
 
+/** The variables of an evaluator that have no trace value saved for this agent. */
+export function missingTraceValues(evaluator: EvaluatorData) {
+  return (evaluator.live_version?.variables ?? []).filter(
+    (variable) => !evaluator.trace_variables?.[variable.name],
+  );
+}
+
+export function isMissingTraceValue(evaluator: EvaluatorData) {
+  return missingTraceValues(evaluator).length > 0;
+}
+
+export function fitsAgent(evaluator: EvaluatorData, agentNature: AgentNature) {
+  return fitsTaskType(
+    evaluator.evaluator_type ?? undefined,
+    agentTaskType(agentNature),
+  );
+}
+
+/** An evaluator of a type that scores this agent's traces, with variables to fill from them. */
+export function takesTraceValues(
+  evaluator: EvaluatorData,
+  agentNature: AgentNature,
+) {
+  return (
+    fitsAgent(evaluator, agentNature) &&
+    !!evaluator.live_version?.variables?.length
+  );
+}
+
+/** One that takes trace values and still has a variable with none chosen. */
+export function needsTraceValues(
+  evaluator: EvaluatorData,
+  agentNature: AgentNature,
+) {
+  return takesTraceValues(evaluator, agentNature) && isMissingTraceValue(evaluator);
+}
+
+export const EVERY_EVALUATOR_NEEDS_VALUES =
+  "None of the evaluators added to this agent have been configured for traces.";
+
+/** Whether every evaluator that cannot score is only waiting for trace values. */
+export const everyEvaluatorNeedsValues = (ineligible: { reason: string }[]) =>
+  ineligible.length > 0 &&
+  ineligible.every((item) => item.reason === "declares_variables");
+
+export const NOT_CONFIGURED_FOR_TRACES = "Has not been configured for traces";
+
 const NOTHING_CAN_SCORE_BY_REASON: Record<
   TraceScoringIneligibleReason,
   { one: string; every: string; some: string; fix: string }
 > = {
   declares_variables: {
-    one: "Uses variables, which cannot be filled for a trace automatically",
-    every:
-      "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically.",
-    some: "some use variables",
-    fix: "Add an evaluator without variables in the",
+    one: `${NOT_CONFIGURED_FOR_TRACES}. Set it up in the Evaluators tab`,
+    every: EVERY_EVALUATOR_NEEDS_VALUES,
+    some: "some have not been configured for traces",
+    fix: "Configure them in the",
   },
   wrong_type_for_agent: {
     one: "Is not the kind of evaluator this agent uses",
@@ -148,6 +276,8 @@ export function scoringRunErrorCopy(error: string | null | undefined): string {
       return "Monitoring was turned off before this trace was scored";
     case "unsupported_interaction_type":
       return "This kind of agent cannot be scored yet";
+    case "missing_trace_values":
+      return "This trace is missing a value that its evaluators need";
     default:
       return "Scoring did not finish";
   }

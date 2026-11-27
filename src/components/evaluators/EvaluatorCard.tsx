@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, type HTMLAttributes, type ReactNode } from "react";
-import { EvaluatorTypePill, PreBuiltPill } from "@/components/EvaluatorPills";
+import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
-import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
+import { type EvaluatorData } from "@/lib/evaluatorApi";
 import { EyeIcon } from "@/components/icons";
 import { EVALUATOR_CARD_BUTTON_CLASS } from "./DuplicateEvaluatorButton";
 
@@ -14,7 +14,7 @@ type Props = {
 } & HTMLAttributes<HTMLDivElement>;
 
 /**
- * One evaluator as a card: name, type pill, pre-built pill, description, View and the
+ * One evaluator as a card: name, type pill, description, View and the
  * caller's own actions. Clicking anywhere on the card, or View, opens how
  * the evaluator judges in `EvaluatorPreviewModal`, which carries the links to
  * the evaluator's own page. Shared by the evaluator library pages and the
@@ -36,7 +36,7 @@ export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
         aria-label={`Open ${evaluator.name}`}
         className="absolute inset-0 rounded-xl z-0 cursor-pointer"
       />
-      <div className="relative z-10 pointer-events-none flex items-start justify-between gap-3">
+      <div className="relative z-10 pointer-events-none flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-base font-semibold text-foreground">
@@ -52,7 +52,6 @@ export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
                 <EvaluatorTypePill evaluatorType={evaluator.evaluator_type} />
               </span>
             )}
-            {isDefaultEvaluator(evaluator) && <PreBuiltPill />}
           </div>
           {evaluator.description && (
             <p className="text-sm text-muted-foreground mt-0.5">
@@ -60,7 +59,7 @@ export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0 pointer-events-auto">
+        <div className="flex flex-wrap items-center gap-1 sm:flex-shrink-0 pointer-events-auto">
           <button
             type="button"
             onClick={() => setPreviewOpen(true)}

@@ -55,6 +55,11 @@ export type EvaluatorData = {
   is_protected?: boolean | null;
   /** Returned by `GET /evaluators?include_defaults=true`. */
   live_version?: { variables?: EvaluatorVariableDef[] | null } | null;
+  /**
+   * On `GET /agents/{uuid}/evaluators` only: which part of a trace fills each
+   * variable for this agent, such as `{ nurse_reply: "metadata.expert_answer" }`.
+   */
+  trace_variables?: Record<string, string> | null;
 };
 
 /**
@@ -268,6 +273,32 @@ export async function detachEvaluatorFromAgent(
   if (!response.ok) {
     throw new Error(
       await getEvaluatorErrorMessage(response, "Failed to remove evaluator"),
+    );
+  }
+}
+
+/** Replace which part of a trace fills each variable; `{}` clears them all. */
+export async function saveEvaluatorTraceVariables(
+  agentUuid: string,
+  evaluatorUuid: string,
+  traceVariables: Record<string, string>,
+  accessToken: string,
+): Promise<void> {
+  const response = await fetch(
+    `${getBackendUrl()}/agents/${agentUuid}/evaluators/${evaluatorUuid}/trace-variables`,
+    {
+      method: "PUT",
+      headers: {
+        ...getDefaultHeaders(accessToken),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ trace_variables: traceVariables }),
+    },
+  );
+  if (await handledUnauthorized(response)) return;
+  if (!response.ok) {
+    throw new Error(
+      await getEvaluatorErrorMessage(response, "Failed to save trace values"),
     );
   }
 }

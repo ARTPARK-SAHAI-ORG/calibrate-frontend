@@ -623,6 +623,37 @@ it("navigates with arrow keys but leaves the disabled side alone", async () => {
   expect(onNext).toHaveBeenCalledTimes(1);
 });
 
+it("leaves Escape and the arrow keys alone while a window is open on top", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  const onClose = jest.fn();
+  const onPrev = jest.fn();
+  const onNext = jest.fn();
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={onClose}
+      accessToken="tok"
+      traceUuid="t1"
+      onPrev={onPrev}
+      onNext={onNext}
+      hasPrev
+      hasNext
+      position={{ index: 1, total: 3 }}
+      keysPaused
+    />,
+  );
+  await waitFor(() => expect(screen.getByText("msg-1")).toBeInTheDocument());
+
+  act(() => {
+    for (const key of ["Escape", "ArrowLeft", "ArrowRight"]) {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key }));
+    }
+  });
+  expect(onClose).not.toHaveBeenCalled();
+  expect(onPrev).not.toHaveBeenCalled();
+  expect(onNext).not.toHaveBeenCalled();
+});
+
 it("surfaces an error when the fetch fails", async () => {
   mockFetchTrace.mockRejectedValue(new Error("boom"));
   render(
@@ -767,6 +798,77 @@ it("says what each evaluator is for, from the words the agent page passes in", a
   );
   // An evaluator with no words has none put under its name.
   expect(screen.getAllByText("Helpfulness").length).toBeGreaterThan(0);
+});
+
+it("hands the evaluators not configured for traces to both score panels", async () => {
+  const user = setupUser();
+  const onConfigure = jest.fn();
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-new",
+        status: "completed",
+        created_at: "2026-08-29T12:00:00Z",
+        error: null,
+        results: [],
+        unconfigured_evaluators: [{ evaluator_uuid: "ev-5", name: "Accuracy" }],
+      },
+    ],
+  });
+
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+      unconfiguredEvaluators={[{ evaluator_uuid: "ev-5", name: "Accuracy" }]}
+      onConfigureEvaluator={onConfigure}
+      configuringEvaluatorUuid={null}
+    />,
+  );
+
+  const buttons = await screen.findAllByRole("button", { name: "Configure for traces" });
+  expect(buttons).toHaveLength(2);
+  await user.click(buttons[1]);
+  expect(onConfigure).toHaveBeenCalledWith("ev-5");
+});
+
+it("keeps the scores column for a run skipped over a missing value", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-new",
+        status: "skipped",
+        created_at: "2026-08-29T12:00:00Z",
+        error: "missing_trace_values",
+        results: [],
+        missing_values: [
+          {
+            evaluator_uuid: "ev-1",
+            name: "Tone",
+            variable: "x",
+            source: "metadata.k",
+          },
+        ],
+      },
+    ],
+  });
+
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+    />,
+  );
+
+  expect(
+    (await screen.findAllByText(/and this trace has no value for it/)).length,
+  ).toBeGreaterThan(0);
 });
 
 it("refetches scores while a run is still in progress", async () => {
@@ -1156,7 +1258,7 @@ describe("showing a whole conversation", () => {
     ).toBeInTheDocument();
   });
 
-  it("draws the newest turn's trace under the conversation id, with no scores", async () => {
+  it("draws the newest turn's trace under the conversation ID, with no scores", async () => {
     mockFetchTrace.mockResolvedValue({ ...detail, uuid: "t-last" });
 
     render(
@@ -1574,4 +1676,97 @@ describe("Score this trace", () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(onNext).not.toHaveBeenCalled();
   });
+});
+
+it("scores a completed trace again for evaluators set up since, keeping its scores", async () => {
+  const user = setupUser();
+  mockScoreTrace.mockReset();
+  mockScoreTrace.mockResolvedValue({ run_uuid: "run-again", status: "pending" });
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-old",
+        status: "completed",
+        created_at: "2026-08-29T12:00:00Z",
+        error: null,
+        results: [
+          {
+            evaluator_uuid: "ev-1",
+            name: "Helpfulness",
+            output_type: "binary",
+            value: 1,
+            reasoning: "Fine.",
+            passed: true,
+          },
+        ],
+        unconfigured_evaluators: [
+          { evaluator_uuid: "ev-5", name: "Correctness" },
+          { evaluator_uuid: "ev-6", name: "Tone check" },
+        ],
+      },
+    ],
+  });
+
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+      unconfiguredEvaluators={[]}
+      scoringEvaluatorNames={["Correctness", "Tone check"]}
+      scoringEvaluatorUuids={["ev-5", "ev-6"]}
+    />,
+  );
+
+  const buttons = await screen.findAllByRole("button", {
+    name: "Score this trace again",
+  });
+  // One in the mobile panel, one in the desktop column.
+  expect(buttons).toHaveLength(2);
+  await user.click(buttons[1]);
+  expect(mockScoreTrace).toHaveBeenCalledWith("tok", "t1");
+  expect(
+    (await screen.findAllByText("Running the remaining evaluators on this trace"))
+      .length,
+  ).toBeGreaterThan(0);
+  expect(screen.getAllByText("Helpfulness").length).toBeGreaterThan(0);
+  expect(
+    screen.queryByRole("button", { name: "Score this trace again" }),
+  ).not.toBeInTheDocument();
+});
+
+it("offers no second scoring at the workspace scoring limit", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-old",
+        status: "completed",
+        created_at: "2026-08-29T12:00:00Z",
+        error: null,
+        results: [],
+        unconfigured_evaluators: [{ evaluator_uuid: "ev-5", name: "Correctness" }],
+      },
+    ],
+  });
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+      unconfiguredEvaluators={[]}
+      scoringEvaluatorNames={[]}
+      scoringEvaluatorUuids={["ev-5"]}
+    />,
+  );
+  expect(
+    (await screen.findAllByText("This run produced no scores.")).length,
+  ).toBeGreaterThan(0);
+  expect(
+    screen.queryByRole("button", { name: "Score this trace again" }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText(/can score it now/)).not.toBeInTheDocument();
 });

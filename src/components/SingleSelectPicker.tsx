@@ -33,6 +33,12 @@ type SingleSelectPickerProps<T> = {
   // Content pinned above the options inside the open panel, e.g. a form that
   // creates a new item. `close` shuts the panel once that action is done.
   renderHeader?: (close: () => void) => React.ReactNode;
+  // Replaces the trigger's height, padding and corners.
+  triggerClassName?: string;
+  // Panel width in pixels when it should differ from the trigger's.
+  panelWidth?: number;
+  // Draws a line above this option.
+  isItemSeparated?: (item: T) => boolean;
 };
 
 type Rect = { left: number; top: number; width: number; bottom: number };
@@ -57,6 +63,9 @@ export function SingleSelectPicker<T>({
   compact = false,
   isItemDisabled,
   renderHeader,
+  triggerClassName,
+  panelWidth,
+  isItemSeparated,
 }: SingleSelectPickerProps<T>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -92,9 +101,9 @@ export function SingleSelectPicker<T>({
     };
   }, [open]);
 
-  const triggerSizeClass = compact
-    ? "h-9 px-3 rounded-lg"
-    : "h-11 px-4 rounded-xl";
+  const triggerSizeClass =
+    triggerClassName ??
+    (compact ? "h-9 px-3 rounded-lg" : "h-11 px-4 rounded-xl");
   const optionPaddingClass = compact ? "px-3 py-1.5" : "px-4 py-3";
   const statusPaddingClass = compact ? "px-3 py-2" : "px-4 py-3";
 
@@ -107,7 +116,7 @@ export function SingleSelectPicker<T>({
           spaceBelow < dropdownEstHeight && rect.top > dropdownEstHeight;
         return {
           left: rect.left,
-          width: rect.width,
+          width: panelWidth ?? rect.width,
           ...(openAbove
             ? { bottom: window.innerHeight - rect.top + margin }
             : { top: rect.bottom + margin }),
@@ -141,7 +150,7 @@ export function SingleSelectPicker<T>({
           }`}
         >
           <span
-            className={`truncate ${
+            className={`flex-1 min-w-0 truncate text-left ${
               selected ? "text-foreground" : "text-muted-foreground"
             }`}
           >
@@ -289,23 +298,27 @@ export function SingleSelectPicker<T>({
                       );
                     }
                     return (
-                      <button
-                        key={id}
-                        type="button"
-                        role="option"
-                        aria-selected={isSelected}
-                        onClick={() => {
-                          onSelect(item);
-                          setOpen(false);
-                        }}
-                        className={`w-full ${optionPaddingClass} text-left text-sm transition-colors cursor-pointer flex items-center justify-between gap-2 ${
-                          isSelected
-                            ? "bg-accent text-foreground"
-                            : "text-foreground hover:bg-muted"
-                        }`}
-                      >
-                        {renderOption(item, isSelected)}
-                      </button>
+                      <React.Fragment key={id}>
+                        {isItemSeparated?.(item) && (
+                          <div className="my-1 border-t border-border" />
+                        )}
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => {
+                            onSelect(item);
+                            setOpen(false);
+                          }}
+                          className={`w-full ${optionPaddingClass} text-left text-sm transition-colors cursor-pointer flex items-center justify-between gap-2 ${
+                            isSelected
+                              ? "bg-accent text-foreground"
+                              : "text-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {renderOption(item, isSelected)}
+                        </button>
+                      </React.Fragment>
                     );
                   })
                 )}

@@ -21,6 +21,10 @@ export type SnippetValues = {
   /** A general agent answers one input at a time, so its input is a single
    * piece of text rather than a conversation history. */
   agentNature?: AgentNature;
+  /** Show the input, reply and tool calls as "..." so only the shape is read. */
+  placeholders?: boolean;
+  /** Metadata entries written after the output. */
+  metadata?: { key: string; value: string }[];
 };
 
 export type AgentNature = "conversation" | "general";
@@ -40,22 +44,60 @@ const OPTIONAL_JAVASCRIPT = `    // Optional
     labels: ["production", "v2.1"],
     metadata: [{ key: "env", value: "production" }],`;
 
-function curl({
-  backendUrl,
-  agentUuid,
-  apiKey,
-  includeOptional = false,
-  agentNature = "conversation",
-}: SnippetValues): string {
+const PLACEHOLDER = "...";
+
+/** What every language fills in the same way. */
+function fill({ placeholders = false }: SnippetValues) {
+  return {
+    content: placeholders ? PLACEHOLDER : EXAMPLE_INPUT,
+    response: placeholders ? PLACEHOLDER : "At 14 weeks, for OPV and DPT.",
+  };
+}
+
+/** The metadata array, one `{key, value}` entry per line, or "" for none. */
+function metadataBlock(
+  metadata: SnippetValues["metadata"],
+  open: string,
+  entry: (key: string, value: string) => string,
+  indent: string,
+  step = "  ",
+): string {
+  if (!metadata?.length) return "";
+  const entries = metadata
+    .map((m) => `${indent}${step}${entry(JSON.stringify(m.key), JSON.stringify(m.value))}`)
+    .join(",\n");
+  return `,\n${indent}${open}\n${entries}\n${indent}]`;
+}
+
+function curl(values: SnippetValues): string {
+  const {
+    backendUrl,
+    agentUuid,
+    apiKey,
+    includeOptional = false,
+    agentNature = "conversation",
+    placeholders = false,
+  } = values;
+  const { content, response } = fill(values);
   const inputBlock =
     agentNature === "general"
-      ? `"input": "${EXAMPLE_INPUT}"`
+      ? `"input": "${content}"`
       : `"input": [
       {
         "role": "user",
-        "content": "${EXAMPLE_INPUT}"
+        "content": "${content}"
       }
     ]`;
+  const toolCalls = placeholders
+    ? "[...]"
+    : `[
+        {
+          "tool": "book_appointment",
+          "arguments": {
+            "date": "2026-03-14"
+          }
+        }
+      ]`;
   const optionalBlock = includeOptional
     ? `,
     "message_id": "your-message-id",
@@ -63,6 +105,12 @@ function curl({
     "labels": ["production", "v2.1"],
     "metadata": [{"key": "env", "value": "production"}]`
     : "";
+  const metadata = metadataBlock(
+    values.metadata,
+    `"metadata": [`,
+    (k, v) => `{"key": ${k}, "value": ${v}}`,
+    "    ",
+  );
   return `curl -X POST ${backendUrl}/traces \\
   -H "X-API-Key: ${apiKey}" \\
   -H "Content-Type: application/json" \\
@@ -70,36 +118,47 @@ function curl({
     "agent_id": "${agentUuid}",
     ${inputBlock},
     "output": {
-      "response": "At 14 weeks, for OPV and DPT.",
-      "tool_calls": [
-        {
-          "tool": "book_appointment",
-          "arguments": {
-            "date": "2026-03-14"
-          }
-        }
-      ]
-    }${optionalBlock}
+      "response": "${response}",
+      "tool_calls": ${toolCalls}
+    }${optionalBlock}${metadata}
   }'`;
 }
 
-function python({
-  backendUrl,
-  agentUuid,
-  apiKey,
-  includeOptional = false,
-  agentNature = "conversation",
-}: SnippetValues): string {
+function python(values: SnippetValues): string {
+  const {
+    backendUrl,
+    agentUuid,
+    apiKey,
+    includeOptional = false,
+    agentNature = "conversation",
+    placeholders = false,
+  } = values;
+  const { content, response } = fill(values);
   const inputBlock =
     agentNature === "general"
-      ? `"input": "${EXAMPLE_INPUT}"`
+      ? `"input": "${content}"`
       : `"input": [
             {
                 "role": "user",
-                "content": "${EXAMPLE_INPUT}",
+                "content": "${content}",
             }
         ]`;
+  const toolCalls = placeholders
+    ? "[...]"
+    : `[
+                {
+                    "tool": "book_appointment",
+                    "arguments": {"date": "2026-03-14"},
+                }
+            ]`;
   const optionalBlock = includeOptional ? `,\n${OPTIONAL_PYTHON}` : "";
+  const metadata = metadataBlock(
+    values.metadata,
+    `"metadata": [`,
+    (k, v) => `{"key": ${k}, "value": ${v}}`,
+    "        ",
+    "    ",
+  );
   return `requests.post(
     "${backendUrl}/traces",
     headers={"X-API-Key": "${apiKey}"},
@@ -107,35 +166,47 @@ function python({
         "agent_id": "${agentUuid}",
         ${inputBlock},
         "output": {
-            "response": "At 14 weeks, for OPV and DPT.",
-            "tool_calls": [
-                {
-                    "tool": "book_appointment",
-                    "arguments": {"date": "2026-03-14"},
-                }
-            ],
-        }${optionalBlock}
+            "response": "${response}",
+            "tool_calls": ${toolCalls},
+        }${optionalBlock}${metadata}
     },
 )`;
 }
 
-function javascript({
-  backendUrl,
-  agentUuid,
-  apiKey,
-  includeOptional = false,
-  agentNature = "conversation",
-}: SnippetValues): string {
+function javascript(values: SnippetValues): string {
+  const {
+    backendUrl,
+    agentUuid,
+    apiKey,
+    includeOptional = false,
+    agentNature = "conversation",
+    placeholders = false,
+  } = values;
+  const { content, response } = fill(values);
   const inputBlock =
     agentNature === "general"
-      ? `input: "${EXAMPLE_INPUT}"`
+      ? `input: "${content}"`
       : `input: [
       {
         role: "user",
-        content: "${EXAMPLE_INPUT}",
+        content: "${content}",
       },
     ]`;
+  const toolCalls = placeholders
+    ? "[...]"
+    : `[
+        {
+          tool: "book_appointment",
+          arguments: { date: "2026-03-14" },
+        },
+      ]`;
   const optionalBlock = includeOptional ? `,\n${OPTIONAL_JAVASCRIPT}` : "";
+  const metadata = metadataBlock(
+    values.metadata,
+    "metadata: [",
+    (k, v) => `{ key: ${k}, value: ${v} }`,
+    "    ",
+  );
   return `await fetch("${backendUrl}/traces", {
   method: "POST",
   headers: {
@@ -146,14 +217,9 @@ function javascript({
     agent_id: "${agentUuid}",
     ${inputBlock},
     output: {
-      response: "At 14 weeks, for OPV and DPT.",
-      tool_calls: [
-        {
-          tool: "book_appointment",
-          arguments: { date: "2026-03-14" },
-        },
-      ],
-    }${optionalBlock}
+      response: "${response}",
+      tool_calls: ${toolCalls},
+    }${optionalBlock}${metadata}
   }),
 });`;
 }

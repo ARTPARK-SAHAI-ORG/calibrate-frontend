@@ -1,10 +1,18 @@
+import type { EvaluatorData } from "../evaluatorApi";
 import {
   ineligibleReasonCopy,
+  isMissingTraceValue,
   isToolCallTraceRow,
   isTraceScoringInProgress,
+  missingSourcePhrase,
+  missingTraceValues,
+  needsTraceValues,
   nothingCanScoreCopy,
   scoringFailedCopy,
   scoringRunErrorCopy,
+  traceChoices,
+  traceSourceLabel,
+  traceSources,
   traceRowOutputFacts,
 } from "../traceScoring";
 
@@ -52,7 +60,7 @@ describe("copy", () => {
     );
     expect(ineligibleReasonCopy("no_live_version")).toBe("Has no live version");
     expect(ineligibleReasonCopy("declares_variables")).toBe(
-      "Uses variables, which cannot be filled for a trace automatically",
+      "Has not been configured for traces. Set it up in the Evaluators tab",
     );
   });
 
@@ -65,6 +73,9 @@ describe("copy", () => {
     );
     expect(scoringRunErrorCopy("unsupported_interaction_type")).toMatch(
       /cannot be scored yet/,
+    );
+    expect(scoringRunErrorCopy("missing_trace_values")).toBe(
+      "This trace is missing a value that its evaluators need",
     );
     expect(scoringRunErrorCopy("")).toBe("Scoring did not finish");
     expect(scoringRunErrorCopy(null)).toBe("Scoring did not finish");
@@ -91,7 +102,7 @@ describe("nothingCanScoreCopy", () => {
         { reason: "declares_variables" },
       ]),
     ).toBe(
-      "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically. Add an evaluator without variables in the",
+      "None of the evaluators added to this agent have been configured for traces. Configure them in the",
     );
     expect(nothingCanScoreCopy([{ reason: "wrong_type_for_agent" }])).toBe(
       "None of the evaluators added to this agent are the kind that can score its traces. Add an evaluator that fits this agent in the",
@@ -115,7 +126,7 @@ describe("nothingCanScoreCopy", () => {
         { reason: "declares_variables" },
       ]),
     ).toBe(
-      "None of this agent's evaluators can score traces: some use variables, some have no live version. Add an evaluator that can score traces in the",
+      "None of this agent's evaluators can score traces: some have not been configured for traces, some have no live version. Add an evaluator that can score traces in the",
     );
   });
 });
@@ -127,6 +138,123 @@ describe("scoringFailedCopy", () => {
     );
     expect(scoringFailedCopy(null)).toBe("Scoring failed");
     expect(scoringFailedCopy("")).toBe("Scoring failed");
+  });
+});
+
+describe("missing trace values", () => {
+  const evaluator = (trace_variables?: Record<string, string> | null) =>
+    ({
+      uuid: "ev",
+      live_version: { variables: [{ name: "a" }, { name: "b" }] },
+      trace_variables,
+    }) as EvaluatorData;
+
+  it("names only the variables with nothing saved", () => {
+    expect(
+      missingTraceValues(evaluator({ a: "input" })).map((v) => v.name),
+    ).toEqual(["b"]);
+    expect(isMissingTraceValue(evaluator({ a: "input" }))).toBe(true);
+    expect(isMissingTraceValue(evaluator(null))).toBe(true);
+  });
+
+  it("is not missing anything when every variable has a value", () => {
+    expect(isMissingTraceValue(evaluator({ a: "input", b: "labels" }))).toBe(
+      false,
+    );
+  });
+
+  it("is not missing anything when the evaluator has no variables", () => {
+    expect(isMissingTraceValue({ uuid: "ev" } as EvaluatorData)).toBe(false);
+  });
+});
+
+describe("naming a part of a trace", () => {
+  it("offers each kind of agent its own list", () => {
+    expect(traceSources("conversation").map((s) => s.label)).toEqual([
+      "Conversation",
+      "Agent reply",
+      "Tool calls",
+      "Metadata",
+      "Labels",
+      "Conversation ID",
+      "Message ID",
+    ]);
+    expect(traceSources("general").map((s) => s.label)).toEqual([
+      "Input",
+      "Output",
+      "Tool calls",
+      "Metadata",
+      "Labels",
+    ]);
+  });
+
+  it("names the input and reply by agent type, neutrally when it is not known", () => {
+    expect(traceSourceLabel("input", "conversation")).toBe("Conversation");
+    expect(traceSourceLabel("input", "general")).toBe("Input");
+    expect(traceSourceLabel("input")).toBe("Input");
+    expect(traceSourceLabel("output.response", "conversation")).toBe(
+      "Agent reply",
+    );
+    expect(traceSourceLabel("output.response", "general")).toBe("Output");
+    expect(traceSourceLabel("output.response")).toBe("Agent reply");
+  });
+
+  it("names a value this agent's list does not offer, or leaves it as it is", () => {
+    expect(traceSourceLabel("message_id", "general")).toBe("Message ID");
+    expect(traceSourceLabel("somewhere_new")).toBe("somewhere_new");
+  });
+
+  it("says where a variable is mapped to", () => {
+    expect(missingSourcePhrase("output.response")).toBe("the trace's agent reply");
+    expect(missingSourcePhrase("input", "conversation")).toBe(
+      "the trace's conversation",
+    );
+  });
+});
+
+describe("traceChoices", () => {
+  it("trims a metadata key and drops rows that say nothing", () => {
+    expect(
+      traceChoices({
+        a: "input",
+        b: "",
+        c: "metadata. k ",
+        d: "metadata.",
+        e: "metadata.  ",
+      }),
+    ).toEqual({ a: "input", c: "metadata.k" });
+  });
+});
+
+describe("naming a part of a trace in a sentence", () => {
+  it("keeps ID in capitals", () => {
+    expect(missingSourcePhrase("message_id")).toBe("the trace's message ID");
+  });
+});
+
+describe("needsTraceValues", () => {
+  const evaluator = (evaluator_type: string, trace_variables = {}) =>
+    ({
+      uuid: "e1",
+      name: "Judge",
+      evaluator_type,
+      live_version: { variables: [{ name: "x" }] },
+      trace_variables,
+    }) as unknown as EvaluatorData;
+
+  it("counts only an evaluator whose type can score the agent's traces", () => {
+    expect(needsTraceValues(evaluator("llm"), "conversation")).toBe(true);
+    expect(needsTraceValues(evaluator("llm-general"), "conversation")).toBe(false);
+    expect(needsTraceValues(evaluator("llm-general"), "general")).toBe(true);
+    expect(needsTraceValues(evaluator("llm"), "general")).toBe(false);
+    expect(needsTraceValues(evaluator("tool-call"), "conversation")).toBe(true);
+    expect(needsTraceValues(evaluator("tool-call"), "general")).toBe(true);
+  });
+
+  it("is false once every variable has a trace value", () => {
+    expect(
+      needsTraceValues(evaluator("llm", { x: "input" }), "conversation"),
+    ).toBe(false);
   });
 });
 

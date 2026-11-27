@@ -13,12 +13,15 @@ export function DialogStepper({
   current,
   isDone,
   onSelect,
+  disabled = false,
 }: {
   steps: DialogStep[];
   current: number;
   /** The step is answered. */
   isDone: (n: number) => boolean;
   onSelect: (n: number) => void;
+  /** Every step is shut, for example while saving. */
+  disabled?: boolean;
 }) {
   const canOpen = (n: number) => steps.every((s) => s.n >= n || isDone(s.n));
   return (
@@ -31,7 +34,7 @@ export function DialogStepper({
             <button
               type="button"
               onClick={() => onSelect(s.n)}
-              disabled={!canOpen(s.n)}
+              disabled={disabled || !canOpen(s.n)}
               className="flex items-center gap-2 cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span
