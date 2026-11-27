@@ -164,6 +164,18 @@ export function useTraces({
     return () => window.clearInterval(timer);
   }, [poll, accessToken, isLoading, hasOpenScoring, offset, load]);
 
+  // The polls above skip the averages, so the scores a run just finished
+  // would never reach them: a first scored trace would show no card at all.
+  // Read them once when the last row on the page stops being scored.
+  const wasScoringRef = useRef(false);
+  useEffect(() => {
+    if (wasScoringRef.current && !hasOpenScoring && !isLoading) {
+      void load(offset, { silent: true, withAverages: true });
+    }
+    wasScoringRef.current = hasOpenScoring;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasOpenScoring]);
+
   /** Re-sync after `count` rows were deleted, clamping the page back into
    *  range when the current offset would land past the new end. */
   const handleDeleted = useCallback(

@@ -630,7 +630,8 @@ describe("useTraces", () => {
       resolveSlow = resolve;
     });
     mockFetchTraces.mockReturnValueOnce(slow);
-    mockFetchTraces.mockResolvedValueOnce(
+    // The second answer, then the read of the averages it sets off.
+    mockFetchTraces.mockResolvedValue(
       page(
         [
           {
@@ -856,6 +857,54 @@ describe("useTraces score averages", () => {
       expect.objectContaining({ includeScoreAverages: false }),
     );
     expect(result.current.scoreAverages).toEqual(averages);
+    unmount();
+    setIntervalSpy.mockRestore();
+  });
+});
+
+describe("useTraces averages after scoring finishes", () => {
+  it("reads the averages again once the last row on the page is scored", async () => {
+    const setIntervalSpy = jest.spyOn(window, "setInterval");
+    const scored = [
+      {
+        evaluator_uuid: "ev-1",
+        name: "Tool call correctness",
+        output_type: "binary" as const,
+        traces_scored: 1,
+        average: 0,
+      },
+    ];
+    mockFetchTraces
+      .mockResolvedValueOnce({
+        ...page([{ uuid: "t1", latest_run_status: "pending" }], 1),
+        score_averages: [],
+      })
+      .mockResolvedValueOnce(
+        page([{ uuid: "t1", latest_run_status: "completed" }], 1),
+      )
+      .mockResolvedValue({
+        ...page([{ uuid: "t1", latest_run_status: "completed" }], 1),
+        score_averages: scored,
+      });
+
+    const { result, unmount } = renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1" }),
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.scoreAverages).toEqual([]);
+
+    const pollCall = setIntervalSpy.mock.calls.find(
+      (call) => call[1] === POLLING_INTERVAL_MS,
+    );
+    await act(async () => {
+      (pollCall![0] as () => void)();
+    });
+
+    await waitFor(() => expect(result.current.scoreAverages).toEqual(scored));
+    expect(mockFetchTraces).toHaveBeenLastCalledWith(
+      "tok",
+      expect.objectContaining({ includeScoreAverages: true }),
+    );
     unmount();
     setIntervalSpy.mockRestore();
   });
