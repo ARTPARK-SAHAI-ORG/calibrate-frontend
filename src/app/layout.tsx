@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter, DM_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { pageMetadata, SITE_URL } from "@/lib/site";
 import { SessionProvider } from "@/components/providers/SessionProvider";
@@ -10,25 +10,34 @@ import { Analytics } from "@vercel/analytics/next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { Toaster } from "sonner";
 
-const geistSans = Geist({
+// The fonts are kept in the repo rather than read from Google Fonts, so a
+// build or a dev server never waits on fonts.gstatic.com. When that download
+// failed, the dev server never started and CI ran no tests. These are the
+// latin files Google Fonts serves; each font is under the SIL Open Font
+// License, whose text sits beside it.
+const geistSans = localFont({
+  src: "./fonts/Geist-Variable.woff2",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  weight: "100 900",
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/GeistMono-Variable.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: "100 900",
 });
 
-const inter = Inter({
+const inter = localFont({
+  src: "./fonts/Inter-Variable.woff2",
   variable: "--font-inter",
-  subsets: ["latin"],
+  weight: "100 900",
 });
 
-const dmSans = DM_Sans({
+// Google Fonts serves this one file for each of the weights 400 to 700.
+const dmSans = localFont({
+  src: "./fonts/DMSans-Variable.woff2",
   variable: "--font-dm-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: "400 700",
 });
 
 export const metadata: Metadata = {
