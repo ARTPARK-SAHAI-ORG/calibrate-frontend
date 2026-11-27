@@ -179,19 +179,8 @@ export function SettingsTabContent({
                 <h3 className="text-sm md:text-base font-medium text-foreground">
                   Enable continuous monitoring
                 </h3>
-                {/* A div, not a p: the hover text wraps its trigger in a div,
-                    which a paragraph cannot hold. */}
-                <div className="text-xs md:text-sm text-muted-foreground mt-0.5">
-                  New traces for this agent are scored using the{" "}
-                  <Tooltip
-                    content="Evaluators that fit this agent, have a live version, and either use no variables or have every variable configured for traces"
-                    position="top"
-                    className="inline"
-                  >
-                    <span className="text-foreground font-medium decoration-dotted decoration-muted-foreground underline underline-offset-2 cursor-pointer">
-                      valid evaluators
-                    </span>
-                  </Tooltip>{" "}
+                <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                  New traces for this agent are scored using the evaluators
                   added in the{" "}
                   <button
                     type="button"
@@ -200,7 +189,7 @@ export function SettingsTabContent({
                   >
                     Evaluators tab
                   </button>
-                </div>
+                </p>
                 {traceScoring.saveError || traceScoring.eligibilityError ? (
                   <p className="text-xs md:text-sm text-red-600 dark:text-red-400 mt-1">
                     {traceScoring.saveError ?? traceScoring.eligibilityError}
