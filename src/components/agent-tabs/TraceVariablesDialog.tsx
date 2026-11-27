@@ -101,7 +101,6 @@ const PICKER = {
   panelWidth: 300,
 };
 
-
 /** An option's name, with the value it would take under it when there is one. */
 function OptionRow({
   name,
@@ -248,7 +247,10 @@ export function TraceVariablesDialog({
         const keys = [...new Set((detail.metadata ?? []).map((m) => m.key))];
         setMetaKeys(keys);
         // Each part is sent as its own variable, so one call reads them all.
-        const parts = [...FIXED_SOURCES, ...keys.map((k) => METADATA_SOURCE + k)];
+        const parts = [
+          ...FIXED_SOURCES,
+          ...keys.map((k) => METADATA_SOURCE + k),
+        ];
         const { values } = await previewTraceVariables(
           accessToken,
           agentUuid,
@@ -533,11 +535,17 @@ export function TraceVariablesDialog({
             placeholder="Choose a trace"
             renderTrigger={(trace) =>
               trace && (
-                <TraceRow trace={trace} current={trace.uuid === fromTrace?.uuid} />
+                <TraceRow
+                  trace={trace}
+                  current={trace.uuid === fromTrace?.uuid}
+                />
               )
             }
             renderOption={(trace) => (
-              <TraceRow trace={trace} current={trace.uuid === fromTrace?.uuid} />
+              <TraceRow
+                trace={trace}
+                current={trace.uuid === fromTrace?.uuid}
+              />
             )}
             onSelect={(trace) => setTraceUuid(trace.uuid)}
           />
@@ -558,19 +566,20 @@ export function TraceVariablesDialog({
                   {!answer ? (
                     <Waiting />
                   ) : value?.value === null ? (
-                    <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
-                      <WarningTriangleIcon className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                      <p>
-                        {isMetadataSource(source) ? (
-                          <>
-                            This trace has no metadata entry called{" "}
-                            <code className={CODE}>{metadataKey(source)}</code>
-                          </>
-                        ) : (
-                          `This trace has no ${lowerFirst(traceSourceLabel(source, agentNature))}`
-                        )}
-                      </p>
-                    </div>
+                    <WarningBox
+                      icon={
+                        <WarningTriangleIcon className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-700 dark:text-amber-300" />
+                      }
+                    >
+                      {isMetadataSource(source) ? (
+                        <>
+                          This trace has no metadata entry called{" "}
+                          <code className={CODE}>{metadataKey(source)}</code>
+                        </>
+                      ) : (
+                        `This trace has no ${lowerFirst(traceSourceLabel(source, agentNature))}`
+                      )}
+                    </WarningBox>
                   ) : (
                     value && (
                       <p className="text-sm text-foreground whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
