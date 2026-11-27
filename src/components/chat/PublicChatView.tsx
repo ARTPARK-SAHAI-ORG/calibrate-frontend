@@ -14,12 +14,14 @@ import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToT
 import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
 import {
   AddRunToLabellingTaskDialog,
+  isLabellableOutput,
   type SourceEvaluatorRef,
   type TraceLabellingItem,
 } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { toast } from "sonner";
 import { setActiveOrgUuid } from "@/lib/orgs";
 import { reportError } from "@/lib/reportError";
+import { isToolCallOutput } from "@/lib/traceScoring";
 import {
   fetchTrace,
   traceToLabellingItem,
@@ -352,8 +354,12 @@ export function PublicChatView({ token }: { token: string }) {
     const asked = turns[index - 1];
     return asked?.role === "user" ? asked.text : null;
   };
+  const outputFacts = (turn: Extract<Turn, { role: "agent" }>) => ({
+    hasResponse: !!turn.reply,
+    hasToolCalls: turn.toolCalls.length > 0,
+  });
   const isToolCallOnly = (turn: Extract<Turn, { role: "agent" }>) =>
-    !turn.reply && turn.toolCalls.length > 0;
+    isToolCallOutput(outputFacts(turn));
 
   const addToTests =
     agentId && orgUuid
@@ -509,11 +515,12 @@ export function PublicChatView({ token }: { token: string }) {
               onSubmitForLabelling={
                 submitForLabelling &&
                 // Nothing to label without a reply or a tool call.
-                (turn.reply || turn.toolCalls.length > 0)
+                isLabellableOutput(outputFacts(turn))
                   ? () => void submitForLabelling(turn, i)
                   : undefined
               }
-              labellingBusy={labellingLoad === turn.traceUuid}
+              labellingBusy={labellingLoad !== null}
+              loadingForLabelling={labellingLoad === turn.traceUuid}
             />
           ),
         )}
@@ -721,6 +728,7 @@ function AgentTurn({
   onAddToTests,
   onSubmitForLabelling,
   labellingBusy,
+  loadingForLabelling,
 }: {
   turn: Extract<Turn, { role: "agent" }>;
   feedback: Feedback;
@@ -737,8 +745,10 @@ function AgentTurn({
   onAddToTests?: () => void;
   /** Set only for a signed-in member of the agent's workspace. */
   onSubmitForLabelling?: () => void;
-  /** This reply is being loaded for labelling. */
+  /** A reply is being loaded for labelling, so neither button can be used. */
   labellingBusy?: boolean;
+  /** This reply is the one being loaded. */
+  loadingForLabelling?: boolean;
 }) {
   const picked = feedback.isCorrect;
   // The comment box opens under the reply; bring it into view, clear of the
@@ -860,7 +870,7 @@ function AgentTurn({
               disabled={feedback.saving || labellingBusy}
               className="h-8 px-3 inline-flex items-center rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {labellingBusy ? "Loading..." : "Submit for labelling"}
+              {loadingForLabelling ? "Loading..." : "Submit for labelling"}
             </button>
           )}
           {feedback.failed && (

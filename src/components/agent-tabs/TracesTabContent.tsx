@@ -291,7 +291,8 @@ export function TracesTabContent({
   );
   const labellableUuids = labellableTraces.map((trace) => trace.uuid);
   // How a trace is named in the evaluator windows: what the user said.
-  const traceLabel = (trace: TraceSummary) => trace.input_preview || trace.uuid;
+  const traceLabel = (trace: TraceSummary) =>
+    trace.input_preview || trace.uuid;
   // A selection that is nothing but tool calls skips the evaluator step: a
   // tool-call row is answered only against the tool-call evaluator, so there
   // is nothing to pick.
@@ -940,7 +941,9 @@ export function TracesTabContent({
   );
 
   const scoringWarning = (message: React.ReactNode) => (
-    <WarningBox action={needValues.length > 0 && configureTraceValues.button}>
+    <WarningBox
+      action={needValues.length > 0 && configureTraceValues.button}
+    >
       {message}
     </WarningBox>
   );

@@ -93,6 +93,7 @@ jest.mock("../../traces/TraceLabellingEvaluatorsDialog", () => ({
 }));
 
 jest.mock("../../human-labelling/AddRunToLabellingTaskDialog", () => ({
+  ...jest.requireActual("../../human-labelling/AddRunToLabellingTaskDialog"),
   AddRunToLabellingTaskDialog: (props: {
     source: unknown;
     openTaskInNewTab?: boolean;
@@ -1018,6 +1019,35 @@ describe("Submit for labelling", () => {
     await user.click(await screen.findByLabelText("Good reply"));
     expect(await screen.findByText("Add to tests")).toBeInTheDocument();
     expect(screen.queryByText("Submit for labelling")).not.toBeInTheDocument();
+  });
+
+  it("locks every reply's buttons while one reply loads", async () => {
+    const user = setupUser();
+    mockSend
+      .mockResolvedValueOnce(reply())
+      .mockResolvedValueOnce(reply({ trace_uuid: "t2" }));
+    mockFetchTrace.mockReturnValue(new Promise(() => {}));
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Good reply"));
+    await sendMessage(user, "Again");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("Good reply")).toHaveLength(2),
+    );
+    await user.click(screen.getAllByLabelText("Good reply")[1]);
+    await waitFor(() =>
+      expect(screen.getAllByText("Submit for labelling")).toHaveLength(2),
+    );
+    await user.click(screen.getAllByText("Submit for labelling")[0]);
+    await user.click(screen.getByText("Choose evaluators"));
+
+    // Only the reply being loaded says so; the other cannot be used either.
+    expect(screen.getAllByText("Loading...")).toHaveLength(1);
+    const other = screen.getByText("Submit for labelling").closest("button");
+    expect(other).toBeDisabled();
+    for (const button of screen.getAllByText("Add to tests")) {
+      expect(button.closest("button")).toBeDisabled();
+    }
   });
 
   it("drops a reply still loading when a new chat is started", async () => {
