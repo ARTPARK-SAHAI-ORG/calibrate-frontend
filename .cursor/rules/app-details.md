@@ -1084,10 +1084,10 @@ This enables:
 - **React**: 19.2.3
 - **Styling**: Tailwind CSS 4 with CSS variables for theming
 - **Fonts**:
-  - **Geist** - Default app font (via `--font-geist-sans`)
+  - The app uses the system font (`--font-sans` is Tailwind's default stack)
   - **Geist Mono** - Monospace font (via `--font-geist-mono`)
-  - **Inter** - Available via `--font-inter`
   - **DM Sans** - Used on landing page for Coval-style typography (via `--font-dm-sans`)
+  - All are files in `src/app/fonts/`, loaded with `next/font/local`; nothing is downloaded from Google Fonts
 - **Authentication**: NextAuth.js v5 (beta) with Google OAuth
 - **Charts**: Recharts 3.6.0
 - **CSV Parsing**: PapaParse (bulk CSV — agent tests in `BulkUploadTestsModal`, labelling task items in `BulkUploadLlmItemsDialog` / `BulkUploadSttItemsDialog` / `BulkUploadSimulationItemsDialog`)
