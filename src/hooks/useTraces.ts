@@ -70,6 +70,9 @@ export function useTraces({
   // result and asked for again only when the filters change.
   const [scoreAverages, setScoreAverages] = useState<TraceScoreAverage[]>([]);
   const averagesKeyRef = useRef<string | null>(null);
+  // Whether the page on screen came from a 3-second check that left the
+  // averages out, the one case where scoring can finish unseen by them.
+  const lastReadSkippedAveragesRef = useRef(false);
   const requestIdRef = useRef(0);
   // The normal load whose spinner is on screen. A silent re-read must not
   // stop it from clearing that spinner when it answers.
@@ -116,6 +119,7 @@ export function useTraces({
           averagesKeyRef.current = filterKey;
           setScoreAverages(page.score_averages ?? []);
         }
+        lastReadSkippedAveragesRef.current = silent && !wantAverages;
         setTotal(nextTotal);
         setLoadedFilters(filters);
         setLoadedOffset(targetOffset);
@@ -166,10 +170,16 @@ export function useTraces({
 
   // The polls above skip the averages, so the scores a run just finished
   // would never reach them: a first scored trace would show no card at all.
-  // Read them once when the last row on the page stops being scored.
+  // Read them once when a poll finds the last row on the page scored. A page
+  // turn or a new filter that lands on finished rows already decided for
+  // itself whether to read them.
   const wasScoringRef = useRef(false);
   useEffect(() => {
-    if (wasScoringRef.current && !hasOpenScoring && !isLoading) {
+    if (
+      wasScoringRef.current &&
+      !hasOpenScoring &&
+      lastReadSkippedAveragesRef.current
+    ) {
       void load(offset, { silent: true, withAverages: true });
     }
     wasScoringRef.current = hasOpenScoring;

@@ -910,6 +910,34 @@ describe("useTraces averages after scoring finishes", () => {
   });
 });
 
+describe("useTraces averages after a page turn", () => {
+  it("does not read them again when a page turn lands on finished rows", async () => {
+    mockFetchTraces
+      .mockResolvedValueOnce({
+        ...page([{ uuid: "t1", latest_run_status: "pending" }], 120),
+        score_averages: [],
+      })
+      .mockResolvedValue(
+        page([{ uuid: "t2", latest_run_status: "completed" }], 120),
+      );
+
+    const { result } = renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1", pageSize: 50 }),
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => result.current.nextPage());
+    await waitFor(() => expect(result.current.items[0].uuid).toBe("t2"));
+    // Let any read the page turn would set off go out.
+    await act(async () => {});
+    expect(mockFetchTraces).toHaveBeenCalledTimes(2);
+    expect(mockFetchTraces).toHaveBeenLastCalledWith(
+      "tok",
+      expect.objectContaining({ offset: 50, includeScoreAverages: false }),
+    );
+  });
+});
+
 describe("useTraces score filters and evaluator sorting", () => {
   it("sends the picked score conditions and the evaluator to sort by", async () => {
     mockFetchTraces.mockResolvedValue(page([{ uuid: "t1" }], 1));
