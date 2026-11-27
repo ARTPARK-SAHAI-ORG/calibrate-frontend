@@ -182,7 +182,11 @@ export function useTraces({
       !hasOpenScoring &&
       lastReadSkippedAveragesRef.current
     ) {
-      void load(offset, { silent: true, withAverages: true });
+      // Forgetting which filters the averages belong to, rather than asking
+      // for them on this one read, means a page turn that cuts this read off
+      // asks for them instead.
+      averagesKeyRef.current = null;
+      void load(offset, { silent: true });
     }
     wasScoringRef.current = hasOpenScoring;
     // eslint-disable-next-line react-hooks/exhaustive-deps
