@@ -128,11 +128,22 @@ function OptionRow({
   );
 }
 
-function TraceRow({ trace }: { trace: TraceSummary }) {
+function TraceRow({
+  trace,
+  current,
+}: {
+  trace: TraceSummary;
+  current: boolean;
+}) {
   return (
     <span className="flex items-center gap-2 min-w-0 text-sm">
       <span className={PILL}>Input</span>
       <span className="flex-1 min-w-0 truncate">{trace.input_preview}</span>
+      {current && (
+        <span className="flex-shrink-0 px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-700 dark:text-teal-300 text-[11px] font-medium">
+          Current trace
+        </span>
+      )}
       <span className={PILL}>
         {upperFirst(formatRelativeTime(trace.created_at))}
       </span>
@@ -484,7 +495,6 @@ export function TraceVariablesDialog({
         <p className="text-sm text-muted-foreground">
           Check your choices on an earlier trace, to be sure they will work on
           new traces as they arrive.
-          {fromTrace && " The trace you opened this from is selected."}
         </p>
         <p className="text-sm font-medium text-foreground pt-2">
           Select a trace
@@ -498,8 +508,14 @@ export function TraceVariablesDialog({
             selectedId={traceUuid}
             getId={(trace) => trace.uuid}
             placeholder="Choose a trace"
-            renderTrigger={(trace) => trace && <TraceRow trace={trace} />}
-            renderOption={(trace) => <TraceRow trace={trace} />}
+            renderTrigger={(trace) =>
+              trace && (
+                <TraceRow trace={trace} current={trace.uuid === fromTrace?.uuid} />
+              )
+            }
+            renderOption={(trace) => (
+              <TraceRow trace={trace} current={trace.uuid === fromTrace?.uuid} />
+            )}
             onSelect={(trace) => setTraceUuid(trace.uuid)}
           />
         )}

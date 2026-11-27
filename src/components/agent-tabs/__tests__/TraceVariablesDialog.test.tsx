@@ -548,11 +548,8 @@ it("reads from and tests on the trace it was opened from", async () => {
 
   await user.click(screen.getByRole("button", { name: "Next" }));
   expect(
-    screen.getByText(/The trace you opened this from is selected\./),
-  ).toBeInTheDocument();
-  expect(
     screen.getByRole("button", { name: "Select a trace" }),
-  ).toHaveTextContent("Can I give honey?");
+  ).toHaveTextContent("Can I give honey?Current trace");
   await waitFor(() =>
     expect(mockPreview).toHaveBeenCalledWith(
       "tok",
