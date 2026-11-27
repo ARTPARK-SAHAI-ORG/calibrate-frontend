@@ -107,23 +107,29 @@ export function MissingValuesDialog({
               : "This item is added with that value left blank."}
           </p>
         ) : (
-        <p className="text-sm md:text-base text-foreground mb-5">
-          <span className="font-semibold">
-            {missing} of {totalTraces}
-          </span>{" "}
-          traces {missing === 1 ? "is" : "are"} missing a value.{" "}
-          {outcome === "tests"
-            ? missing === 1
-              ? "This test is added without the evaluator it has no value for. If that leaves it with no evaluator, it is not added."
-              : "Each of these tests is added without the evaluator it has no value for. A trace left with no evaluator is not added."
-            : missing === 1
-              ? "This item is added with that value left blank."
-              : "These items are added with that value left blank."}
-          {complete > 0 &&
-            (complete === 1
-              ? " The other trace has every value."
-              : ` The other ${complete} traces have every value.`)}
-        </p>
+          <p className="text-sm md:text-base text-foreground mb-5">
+            <span className="font-semibold">
+              {missing} of {totalTraces}
+            </span>{" "}
+            traces {missing === 1 ? "is" : "are"} missing a value.{" "}
+            {outcome === "tests"
+              ? (missing === 1
+                  ? "This test is added without the evaluator it has no value for."
+                  : "Each of these tests is added without the evaluator it has no value for.") +
+                // Every trace keeps the evaluator that needs no values.
+                (hasOtherEvaluators
+                  ? ""
+                  : missing === 1
+                    ? " If that leaves it with no evaluator, it is not added."
+                    : " A trace left with no evaluator is not added.")
+              : missing === 1
+                ? "This item is added with that value left blank."
+                : "These items are added with that value left blank."}
+            {complete > 0 &&
+              (complete === 1
+                ? " The other trace has every value."
+                : ` The other ${complete} traces have every value.`)}
+          </p>
         )}
         <div className="min-h-0 overflow-auto border border-border rounded-md mb-6">
           <table className="w-full text-sm md:text-base">
@@ -184,7 +190,12 @@ export function MissingValuesDialog({
           </table>
         </div>
         <div className="flex items-center justify-end gap-2 md:gap-3">
-          <Button variant="secondary" size="md" onClick={onBack} disabled={busy}>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={onBack}
+            disabled={busy}
+          >
             Back
           </Button>
           <Button

@@ -122,6 +122,15 @@ describe("MissingValuesDialog", () => {
     );
   });
 
+  it("does not say a trace may be left out when another evaluator needs no values", () => {
+    setup({ hasOtherEvaluators: true });
+    expect(
+      screen.getByText(/This test is added without the evaluator/),
+    ).toHaveTextContent(
+      "1 of 3 traces is missing a value. This test is added without the evaluator it has no value for. The other 2 traces have every value.",
+    );
+  });
+
   it("says some traces are missing a value when more than one is", () => {
     setup({
       traces: [

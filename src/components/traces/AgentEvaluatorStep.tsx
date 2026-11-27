@@ -44,25 +44,28 @@ function variablesOf(evaluator: EvaluatorData) {
   }));
 }
 
-const mapValues = <A, B>(record: Record<string, A>, f: (value: A) => B) =>
-  Object.fromEntries(
-    Object.entries(record).map(([key, value]) => [key, f(value)]),
-  );
-
 /** What each trace holds for each evaluator's variables, by trace, then
- *  evaluator, then variable. A trace with no label is named by what the user
- *  said in it, else by its id. */
+ *  evaluator, then variable, and the same with a blank where a trace holds
+ *  nothing. A trace with no label is named by what the user said in it, else
+ *  by its id. */
 function indexTraceValues(items: TraceVariableValuesItem[]) {
   const values: Record<string, MissingValues["traces"][number]["values"]> = {};
+  const filled: Record<string, Record<string, Record<string, string>>> = {};
   const previews: Record<string, string> = {};
   for (const item of items) {
     if (item.input_preview) previews[item.trace_id] = item.input_preview;
     const forTrace = (values[item.trace_id] ??= {});
     const forEvaluator = (forTrace[item.evaluator_id] ??= {});
-    for (const v of item.values) forEvaluator[v.variable] = v.value;
+    const filledForEvaluator = ((filled[item.trace_id] ??= {})[
+      item.evaluator_id
+    ] ??= {});
+    for (const v of item.values) {
+      forEvaluator[v.variable] = v.value;
+      filledForEvaluator[v.variable] = v.value ?? "";
+    }
   }
   const labelOf = (t: StepTrace) => t.label || previews[t.uuid] || t.uuid;
-  return { values, labelOf };
+  return { values, filled, labelOf };
 }
 
 /**
@@ -85,12 +88,8 @@ export async function readTraceValues(
     traces.map((t) => t.uuid),
     evaluators.map((e) => e.uuid),
   );
-  const { values, labelOf } = indexTraceValues(items);
+  const { values, filled, labelOf } = indexTraceValues(items);
   const anyMissing = items.some((i) => i.values.some((v) => v.value === null));
-  // The same values with a blank where a trace holds nothing.
-  const filled = mapValues(values, (byEvaluator) =>
-    mapValues(byEvaluator, (byName) => mapValues(byName, (v) => v ?? "")),
-  );
   return {
     filled,
     missing: anyMissing
@@ -300,7 +299,11 @@ export function AgentEvaluatorStep({
           onToggle={(uuid) => {
             const evaluator = evaluators.find((e) => e.uuid === uuid);
             // A ticked one always unticks; only ticking waits for set-up.
-            if (evaluator && !selectedUuids.has(uuid) && isMissingTraceValue(evaluator)) {
+            if (
+              evaluator &&
+              !selectedUuids.has(uuid) &&
+              isMissingTraceValue(evaluator)
+            ) {
               setSettingUp(evaluator);
             } else list.toggle(uuid);
           }}
@@ -321,7 +324,9 @@ export function AgentEvaluatorStep({
               ? "a single output"
               : "a reply in a conversation"
           }, so create one to continue.`}
-          emptyAction={createButton("h-9 md:h-10 px-3 md:px-4 text-sm md:text-base")}
+          emptyAction={createButton(
+            "h-9 md:h-10 px-3 md:px-4 text-sm md:text-base",
+          )}
           previewUuid={shownUuid}
           fillHeight
           selectedFirst={selectedFirst}

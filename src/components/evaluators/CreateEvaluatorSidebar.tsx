@@ -4,6 +4,7 @@ import { InfoNote } from "@/components/ui";
 import { ModelProblemNote } from "@/components/ModelProblemNote";
 import { useModelAvailability } from "@/hooks/useModelAvailability";
 import { modelProblem, modelProblemBorder } from "@/lib/modelAvailability";
+import { VARIABLE_COLORS } from "@/lib/variableChip";
 import type { Dispatch, SetStateAction } from "react";
 import {
   EVALUATOR_TYPE_LABELS,
@@ -313,7 +314,9 @@ export function CreateEvaluatorSidebar({
                           i > 0 ? "border-t border-border" : ""
                         }`}
                       >
-                        <code className="self-start inline-flex items-center px-2 py-0.5 rounded-md text-sm font-mono font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 md:flex-shrink-0 md:mt-1.5">
+                        <code
+                          className={`self-start inline-flex items-center px-2 py-0.5 rounded-md text-sm font-mono md:flex-shrink-0 md:mt-1.5 ${VARIABLE_COLORS}`}
+                        >
                           {`{{${name}}}`}
                         </code>
                         <input

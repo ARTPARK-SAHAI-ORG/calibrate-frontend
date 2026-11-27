@@ -50,6 +50,7 @@ import { coerceBinaryValue, defaultBinaryLabel } from "@/lib/binaryLabels";
 import { liveVersionOf } from "@/lib/evaluatorVersions";
 import { VersionCard } from "@/components/evaluators/VersionCard";
 import { extractVariableNames } from "@/lib/evaluatorVariables";
+import { VARIABLE_COLORS } from "@/lib/variableChip";
 import {
   isReservedEvaluatorName,
   reservedEvaluatorNameError,
@@ -1049,10 +1050,7 @@ function EvaluatorDetailPageInner() {
                               </button>
                             </Tooltip>
                             {!isCurrent && (
-                              <Tooltip
-                                content="Mark as current"
-                                position="top"
-                              >
+                              <Tooltip content="Mark as current" position="top">
                                 <button
                                   aria-label="Mark as current"
                                   onClick={() => setVersionLive(v.uuid)}
@@ -1471,7 +1469,9 @@ function EvaluatorDetailPageInner() {
                                     i > 0 ? "border-t border-border" : ""
                                   }`}
                                 >
-                                  <code className="self-start inline-flex items-center px-2 py-0.5 rounded-md text-sm font-mono font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 md:flex-shrink-0 md:mt-1.5">
+                                  <code
+                                    className={`self-start inline-flex items-center px-2 py-0.5 rounded-md text-sm font-mono md:flex-shrink-0 md:mt-1.5 ${VARIABLE_COLORS}`}
+                                  >
                                     {`{{${variable.name}}}`}
                                   </code>
                                   <input
@@ -1842,7 +1842,9 @@ function AgreementTrendTab({
                         uuid: version.version_id,
                         version_number: version.version_number,
                       }}
-                      liveVersionId={version.is_live ? version.version_id : null}
+                      liveVersionId={
+                        version.is_live ? version.version_id : null
+                      }
                     />
                   }
                 >
