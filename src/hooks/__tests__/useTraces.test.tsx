@@ -945,6 +945,15 @@ describe("useTraces averages after scoring finishes", () => {
     setIntervalSpy.mockRestore();
   });
 
+  it("reads an answer with no rows as an empty page", async () => {
+    mockFetchTraces.mockResolvedValue({ total: 0, limit: 50, offset: 0 });
+    const { result } = renderHook(() =>
+      useTraces({ accessToken: "tok", agentId: "ag-1" }),
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.items).toEqual([]);
+  });
+
   it("does not read them again when a page turn lands on finished rows", async () => {
     mockFetchTraces
       .mockResolvedValueOnce({

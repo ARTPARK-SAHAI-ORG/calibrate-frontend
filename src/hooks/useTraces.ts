@@ -111,7 +111,8 @@ export function useTraces({
         });
         if (requestId !== requestIdRef.current) return 0;
         const nextTotal = page.total ?? 0;
-        setItems(page.items ?? []);
+        const nextItems = page.items ?? [];
+        setItems(nextItems);
         if (wantAverages) {
           averagesKeyRef.current = filterKey;
           setScoreAverages(page.score_averages ?? []);
@@ -124,9 +125,7 @@ export function useTraces({
         if (
           silent &&
           !wantAverages &&
-          !(page.items ?? []).some((t) =>
-            isTraceScoringInProgress(t.latest_run_status),
-          )
+          !nextItems.some((t) => isTraceScoringInProgress(t.latest_run_status))
         ) {
           averagesKeyRef.current = null;
           void load(targetOffset, { silent: true });
