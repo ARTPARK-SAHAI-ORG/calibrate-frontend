@@ -5,10 +5,10 @@ import { useHideFloatingButton } from "@/components/AppLayout";
 import { Button, LoadingState } from "@/components/ui";
 import { useAgentLlmEvaluators } from "@/hooks/useAgentLlmEvaluators";
 import { reportError } from "@/lib/reportError";
+import { declaresVariables } from "@/lib/traceScoring";
 import type { TraceSummary } from "@/lib/tracesApi";
 import {
   AgentEvaluatorStep,
-  hasVariables,
   readTraceValues,
   READ_VALUES_ERROR,
   type StepTrace,
@@ -75,7 +75,7 @@ export function TraceLabellingEvaluatorsDialog({
   const refs = chosen.map((e) => ({ uuid: e.uuid, name: e.name }));
 
   const handleContinue = async () => {
-    const withVariables = chosen.filter(hasVariables);
+    const withVariables = chosen.filter(declaresVariables);
     if (withVariables.length === 0 || !accessToken) {
       onChosen(refs, {});
       return;

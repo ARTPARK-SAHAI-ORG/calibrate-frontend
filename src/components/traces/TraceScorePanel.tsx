@@ -18,9 +18,10 @@ import {
   lowerFirst,
   isTraceScoringInProgress,
   metadataKey,
-  missingSourcePhrase,
   scoringRunErrorCopy,
+  traceSourceName,
 } from "@/lib/traceScoring";
+import { METADATA_KEY_CODE, VARIABLE_CHIP } from "@/lib/variableChip";
 import type {
   TraceMissingValue,
   TraceScoreResult,
@@ -175,17 +176,17 @@ function MissingValueBlocks({
             {missing.map(({ variable, source }) => (
               <p key={variable} className={DID_NOT_RUN_TEXT}>
                 Could not run. The variable{" "}
-                <code className="inline-flex px-1.5 rounded-md text-xs font-mono font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 break-all">{`{{${variable}}}`}</code>{" "}
+                <code className={VARIABLE_CHIP}>{`{{${variable}}}`}</code>{" "}
                 is mapped to{" "}
                 {isMetadataSource(source) ? (
                   <>
                     the metadata key{" "}
-                    <code className="font-mono text-xs px-1 rounded bg-amber-700/10 dark:bg-amber-300/15 break-all">
+                    <code className={METADATA_KEY_CODE}>
                       {metadataKey(source)}
                     </code>
                   </>
                 ) : (
-                  missingSourcePhrase(source, agentNature)
+                  `the trace's ${traceSourceName(source, agentNature)}`
                 )}
                 , and this trace has no value for it.
               </p>

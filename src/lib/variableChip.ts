@@ -4,7 +4,7 @@ export const VARIABLE_COLORS =
 
 /** A metadata field's name inside a sentence, set apart from the words around it. */
 export const METADATA_KEY_CODE =
-  "font-mono text-[13px] px-1 py-px rounded bg-amber-700/10";
+  "font-mono text-[13px] px-1 py-px rounded bg-amber-700/10 dark:bg-amber-300/15";
 
 /** A `{{variable}}` on a line of its own. */
 export const VARIABLE_CHIP = `inline-block self-start max-w-full px-2 py-0.5 rounded-md text-sm font-mono break-all ${VARIABLE_COLORS}`;

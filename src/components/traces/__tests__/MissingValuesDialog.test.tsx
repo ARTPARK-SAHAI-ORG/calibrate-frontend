@@ -44,7 +44,7 @@ describe("MissingValuesDialog", () => {
   it("says no test can be added when the only evaluator has no value", () => {
     setup({ traces: [traces[1]], totalTraces: 1 });
     expect(screen.getByText(/No test can be added/)).toHaveTextContent(
-      "No test can be added. This trace has no value for the only evaluator you picked. Go back and pick another evaluator, or set this one up to read a different part of the trace",
+      "No test can be added. This trace has no value for the evaluator you picked. Go back and pick another evaluator.",
     );
     expect(
       screen.getByRole("button", { name: "Add without them" }),
@@ -60,17 +60,43 @@ describe("MissingValuesDialog", () => {
       ],
       totalTraces: 2,
     });
-    expect(
-      screen.getByText(/None of these traces has a value/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No test can be added/)).toHaveTextContent(
+      "No test can be added. None of these traces has a value for any evaluator you picked. Go back and pick another evaluator.",
+    );
     expect(
       screen.getByRole("button", { name: "Add without them" }),
     ).toBeDisabled();
   });
 
+  it("says no test can be added when one trace has no value for any of several evaluators", () => {
+    setup({
+      evaluators: [
+        evaluators[0],
+        {
+          uuid: "e2",
+          name: "City check",
+          variables: [{ name: "city", source: "metadata.city" }],
+        },
+      ],
+      traces: [
+        { traceId: "t2", label: "Lacks it", values: { e1: { comment: null } } },
+      ],
+      totalTraces: 1,
+    });
+    expect(screen.getByText(/No test can be added/)).toHaveTextContent(
+      "No test can be added. This trace has no value for any evaluator you picked. Go back and pick another evaluator.",
+    );
+  });
+
   it("still adds when another ticked evaluator needs no values", () => {
     setup({ traces: [traces[1]], totalTraces: 1, hasOtherEvaluators: true });
     expect(screen.queryByText(/No test can be added/)).toBeNull();
+    // One trace: the heading says it is missing a value, so the text does not.
+    expect(
+      screen.getByText(
+        "This test is added without the evaluator it has no value for.",
+      ),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Add without them" }),
     ).toBeEnabled();
@@ -108,13 +134,12 @@ describe("MissingValuesDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("drops the last sentence when every trace is missing one", () => {
+  it("says only what happens to the item when there is one trace", () => {
     setup({ traces: [traces[1]], totalTraces: 1, outcome: "labelling" });
     expect(
-      screen.getByText(/This item is added with that value left blank/),
-    ).toHaveTextContent(
-      "1 of 1 trace is missing a value. This item is added with that value left blank.",
-    );
+      screen.getByText("This item is added with that value left blank."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/1 of 1/)).toBeNull();
     // One trace is not "some traces".
     expect(
       screen.getByText("This trace is missing a value"),

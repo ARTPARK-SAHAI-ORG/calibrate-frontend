@@ -32,12 +32,12 @@ import { reportError } from "@/lib/reportError";
 import {
   isMetadataSource,
   isMissingTraceValue,
-  lowerFirst,
   METADATA_SOURCE,
   metadataKey,
   traceChoices,
   traceSourceHint,
   traceSourceLabel,
+  traceSourceName,
   traceSources,
 } from "@/lib/traceScoring";
 import {
@@ -627,7 +627,7 @@ export function TraceVariablesDialog({
                   entry in each trace&apos;s metadata
                 </>
               ) : (
-                `the ${lowerFirst(traceSourceLabel(source, agentNature))} in each trace`
+                `the ${traceSourceName(source, agentNature)} in each trace`
               )}
             </React.Fragment>
           ))}

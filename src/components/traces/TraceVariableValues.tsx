@@ -3,10 +3,9 @@ import { SpinnerIcon, WarningTriangleIcon } from "@/components/icons";
 import {
   isMetadataSource,
   metadataKey,
-  missingValueSentence,
-  missingValueText,
   traceSourceHint,
   traceSourceLabel,
+  traceSourceName,
 } from "@/lib/traceScoring";
 import { METADATA_KEY_CODE, VARIABLE_CHIP } from "@/lib/variableChip";
 import type { AgentNature } from "./ingestSnippets";
@@ -27,9 +26,8 @@ export function MissingText({
   if (!isMetadataSource(source))
     return (
       <>
-        {sentence
-          ? missingValueSentence(source, agentNature)
-          : missingValueText(source, agentNature)}
+        {sentence ? "This trace has no" : "No"}{" "}
+        {traceSourceName(source, agentNature)}
       </>
     );
   const key = <code className={METADATA_KEY_CODE}>{metadataKey(source)}</code>;
@@ -40,7 +38,7 @@ export function MissingText({
   );
 }
 
-export type TraceVariableRow = {
+type TraceVariableRow = {
   variable: string;
   source: string;
   perTrace: { traceId: string; label: string; value: string | null }[];

@@ -4,10 +4,8 @@ import {
   isMissingTraceValue,
   isToolCallTraceRow,
   isTraceScoringInProgress,
-  missingSourcePhrase,
+  declaresVariables,
   missingTraceValues,
-  missingValueSentence,
-  missingValueText,
   needsTraceValues,
   nothingCanScoreCopy,
   scoringFailedCopy,
@@ -15,6 +13,7 @@ import {
   traceChoices,
   traceSourceHint,
   traceSourceLabel,
+  traceSourceName,
   traceSources,
   traceRowOutputFacts,
 } from "../traceScoring";
@@ -220,12 +219,6 @@ describe("naming a part of a trace", () => {
     expect(traceSourceLabel("somewhere_new")).toBe("somewhere_new");
   });
 
-  it("says where a variable is mapped to", () => {
-    expect(missingSourcePhrase("output.response")).toBe("the trace's agent reply");
-    expect(missingSourcePhrase("input", "conversation")).toBe(
-      "the trace's conversation",
-    );
-  });
 });
 
 describe("traceChoices", () => {
@@ -242,29 +235,24 @@ describe("traceChoices", () => {
   });
 });
 
-describe("naming a part of a trace in a sentence", () => {
-  it("keeps ID in capitals", () => {
-    expect(missingSourcePhrase("message_id")).toBe("the trace's message ID");
+describe("traceSourceName", () => {
+  it("names a part of a trace inside a sentence, keeping ID in capitals", () => {
+    expect(traceSourceName("output.response")).toBe("agent reply");
+    expect(traceSourceName("input", "conversation")).toBe("conversation");
+    expect(traceSourceName("output.response", "general")).toBe("output");
+    expect(traceSourceName("feedback.comment")).toBe("user feedback comment");
+    expect(traceSourceName("conversation_id")).toBe("conversation ID");
+    expect(traceSourceName("message_id")).toBe("message ID");
   });
 });
 
-describe("missingValueText", () => {
-  it("names the part of the trace that is empty", () => {
-    expect(missingValueText("feedback.comment")).toBe("No user feedback comment");
-    expect(missingValueText("output.tool_calls")).toBe("No tool calls");
-    expect(missingValueText("labels")).toBe("No labels");
-    expect(missingValueText("conversation_id")).toBe("No conversation ID");
-    expect(missingValueText("message_id")).toBe("No message ID");
-    expect(missingValueText("output.response", "general")).toBe("No output");
-  });
-});
-
-describe("missingValueSentence", () => {
-  it("says it as a sentence about one trace", () => {
-    expect(missingValueSentence("feedback.comment")).toBe(
-      "This trace has no user feedback comment",
-    );
-    expect(missingValueSentence("labels")).toBe("This trace has no labels");
+describe("declaresVariables", () => {
+  it("is true only when the live version has variables", () => {
+    const withVariables = (variables?: { name: string }[]) =>
+      ({ live_version: variables ? { variables } : null }) as EvaluatorData;
+    expect(declaresVariables(withVariables([{ name: "a" }]))).toBe(true);
+    expect(declaresVariables(withVariables([]))).toBe(false);
+    expect(declaresVariables(withVariables())).toBe(false);
   });
 });
 

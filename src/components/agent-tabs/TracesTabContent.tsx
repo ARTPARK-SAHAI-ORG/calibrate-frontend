@@ -90,6 +90,9 @@ import { reportError } from "@/lib/reportError";
 import { fetchChatLink, type ChatLink } from "@/lib/chatLinkApi";
 import { WarningBox } from "@/components/traces/WarningBox";
 
+const MIXED_SELECTION_ERROR =
+  "The selected traces contain a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.";
+
 /**
  * A number of traces, said the way a person says it: "1 trace", "50,000
  * traces". Both limit lines use it so neither can end up with "1 traces".
@@ -1229,9 +1232,7 @@ export function TracesTabContent({
                     onClick={async () => {
                       if (!everyTraceMatching) {
                         if (isMixedSelection) {
-                          toast.error(
-                            "The selected traces contain a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
-                          );
+                          toast.error(MIXED_SELECTION_ERROR);
                           return;
                         }
                         setConvertOpen(true);
@@ -1245,9 +1246,7 @@ export function TracesTabContent({
                           : facets.outputType;
                       if (!kind) return;
                       if (kind === "mixed") {
-                        toast.error(
-                          "The selected traces contain a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
-                        );
+                        toast.error(MIXED_SELECTION_ERROR);
                         return;
                       }
                       setConvertOpen(true);

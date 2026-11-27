@@ -75,29 +75,13 @@ export function traceSourceLabel(
 
 export const lowerFirst = (text: string) => text[0].toLowerCase() + text.slice(1);
 
-/** The part of a trace a variable is mapped to, to follow "is mapped to". */
-export function missingSourcePhrase(
+/** The name of a part of a trace inside a sentence, e.g. "agent reply" or
+ *  "message ID". Not for metadata, whose field name is set apart instead. */
+export function traceSourceName(
   source: string,
   agentNature?: AgentNature,
 ): string {
-  return `the trace's ${lowerFirst(traceSourceLabel(source, agentNature))}`;
-}
-
-/** What a trace lacks when a variable's part of it is empty, e.g. "No labels".
- *  Not for metadata: `MissingText` sets the field's name apart. */
-export function missingValueText(
-  source: string,
-  agentNature?: AgentNature,
-): string {
-  return `No ${lowerFirst(traceSourceLabel(source, agentNature))}`;
-}
-
-/** The same, as the start of a sentence about one trace. */
-export function missingValueSentence(
-  source: string,
-  agentNature?: AgentNature,
-): string {
-  return `This trace has no ${lowerFirst(traceSourceLabel(source, agentNature))}`;
+  return lowerFirst(traceSourceLabel(source, agentNature));
 }
 
 /**
@@ -189,15 +173,16 @@ export function fitsAgent(evaluator: EvaluatorData, agentNature: AgentNature) {
   );
 }
 
+/** An evaluator whose prompt has variables to fill. */
+export const declaresVariables = (evaluator: EvaluatorData) =>
+  !!evaluator.live_version?.variables?.length;
+
 /** An evaluator of a type that scores this agent's traces, with variables to fill from them. */
 export function takesTraceValues(
   evaluator: EvaluatorData,
   agentNature: AgentNature,
 ) {
-  return (
-    fitsAgent(evaluator, agentNature) &&
-    !!evaluator.live_version?.variables?.length
-  );
+  return fitsAgent(evaluator, agentNature) && declaresVariables(evaluator);
 }
 
 /** One that takes trace values and still has a variable with none chosen. */

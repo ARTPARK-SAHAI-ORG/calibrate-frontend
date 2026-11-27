@@ -94,19 +94,24 @@ export function MissingValuesDialog({
             No test can be added.{" "}
             {totalTraces === 1
               ? evaluators.length === 1
-                ? "This trace has no value for the only evaluator you picked."
+                ? "This trace has no value for the evaluator you picked."
                 : "This trace has no value for any evaluator you picked."
               : "None of these traces has a value for any evaluator you picked."}{" "}
-            Go back and pick another evaluator, or set this one up to read a
-            different part of the trace
+            Go back and pick another evaluator.
+          </p>
+        ) : totalTraces === 1 ? (
+          // The heading already says this trace is missing a value.
+          <p className="text-sm md:text-base text-foreground mb-5">
+            {outcome === "tests"
+              ? "This test is added without the evaluator it has no value for."
+              : "This item is added with that value left blank."}
           </p>
         ) : (
         <p className="text-sm md:text-base text-foreground mb-5">
           <span className="font-semibold">
             {missing} of {totalTraces}
           </span>{" "}
-          {totalTraces === 1 ? "trace" : "traces"}{" "}
-          {missing === 1 ? "is" : "are"} missing a value.{" "}
+          traces {missing === 1 ? "is" : "are"} missing a value.{" "}
           {outcome === "tests"
             ? missing === 1
               ? "This test is added without the evaluator it has no value for. If that leaves it with no evaluator, it is not added."

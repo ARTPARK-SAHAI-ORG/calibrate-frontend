@@ -12,7 +12,11 @@ import {
   type EvaluatorData,
 } from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
-import { agentTaskType, isMissingTraceValue } from "@/lib/traceScoring";
+import {
+  agentTaskType,
+  declaresVariables,
+  isMissingTraceValue,
+} from "@/lib/traceScoring";
 import {
   fetchTraceVariableValues,
   type TraceSummary,
@@ -33,20 +37,33 @@ const READ_VALUES_FAILED = "Could not read the values from these traces";
 export const READ_VALUES_ERROR = `${READ_VALUES_FAILED}. Please try again.`;
 
 /** Each variable an evaluator declares, with the part of the trace saved for it. */
-export function variablesOf(evaluator: EvaluatorData) {
+function variablesOf(evaluator: EvaluatorData) {
   return (evaluator.live_version?.variables ?? []).map((v) => ({
     name: v.name,
     source: evaluator.trace_variables?.[v.name] ?? "",
   }));
 }
 
-export const hasVariables = (evaluator: EvaluatorData) =>
-  !!evaluator.live_version?.variables?.length;
-
 const mapValues = <A, B>(record: Record<string, A>, f: (value: A) => B) =>
   Object.fromEntries(
     Object.entries(record).map(([key, value]) => [key, f(value)]),
   );
+
+/** What each trace holds for each evaluator's variables, by trace, then
+ *  evaluator, then variable. A trace with no label is named by what the user
+ *  said in it, else by its id. */
+function indexTraceValues(items: TraceVariableValuesItem[]) {
+  const values: Record<string, MissingValues["traces"][number]["values"]> = {};
+  const previews: Record<string, string> = {};
+  for (const item of items) {
+    if (item.input_preview) previews[item.trace_id] = item.input_preview;
+    const forTrace = (values[item.trace_id] ??= {});
+    const forEvaluator = (forTrace[item.evaluator_id] ??= {});
+    for (const v of item.values) forEvaluator[v.variable] = v.value;
+  }
+  const labelOf = (t: StepTrace) => t.label || previews[t.uuid] || t.uuid;
+  return { values, labelOf };
+}
 
 /**
  * Reads what each evaluator's variables hold in each trace. `filled` has a
@@ -68,18 +85,8 @@ export async function readTraceValues(
     traces.map((t) => t.uuid),
     evaluators.map((e) => e.uuid),
   );
-  const values: Record<string, MissingValues["traces"][number]["values"]> = {};
-  const previews: Record<string, string> = {};
-  let anyMissing = false;
-  for (const item of items) {
-    if (item.input_preview) previews[item.trace_id] = item.input_preview;
-    const forTrace = (values[item.trace_id] ??= {});
-    const forEvaluator = (forTrace[item.evaluator_id] ??= {});
-    for (const v of item.values) {
-      forEvaluator[v.variable] = v.value;
-      if (v.value === null) anyMissing = true;
-    }
-  }
+  const { values, labelOf } = indexTraceValues(items);
+  const anyMissing = items.some((i) => i.values.some((v) => v.value === null));
   // The same values with a blank where a trace holds nothing.
   const filled = mapValues(values, (byEvaluator) =>
     mapValues(byEvaluator, (byName) => mapValues(byName, (v) => v ?? "")),
@@ -95,7 +102,7 @@ export async function readTraceValues(
           })),
           traces: traces.map((t) => ({
             traceId: t.uuid,
-            label: t.label || previews[t.uuid] || t.uuid,
+            label: labelOf(t),
             values: values[t.uuid] ?? {},
           })),
         }
@@ -153,7 +160,7 @@ export function AgentEvaluatorStep({
 
   // The values of every set-up evaluator with variables, read in one go.
   const evaluatorKey = evaluators
-    .filter((e) => hasVariables(e) && !isMissingTraceValue(e))
+    .filter((e) => declaresVariables(e) && !isMissingTraceValue(e))
     .map((e) => e.uuid)
     .join(",");
   const traceKey = traces.map((t) => t.uuid).join(",");
@@ -187,10 +194,11 @@ export function AgentEvaluatorStep({
   }, [accessToken, agentUuid, evaluatorKey, traceKey, readKey]);
 
   const current = read?.key === readKey ? read : null;
+  const index = current?.items ? indexTraceValues(current.items) : null;
 
   const renderVariablesPanel = (uuid: string) => {
     const evaluator = evaluators.find((e) => e.uuid === uuid);
-    if (!evaluator || !hasVariables(evaluator)) return undefined;
+    if (!evaluator || !declaresVariables(evaluator)) return undefined;
     if (isMissingTraceValue(evaluator)) {
       return (
         <div className="space-y-2">
@@ -225,23 +233,18 @@ export function AgentEvaluatorStep({
         </ErrorNote>
       );
     }
-    const items = current?.items?.filter((i) => i.evaluator_id === uuid);
-    const loading = traces.length > 0 && !items;
     return (
       <TraceVariableValues
         outcome={outcome}
         agentNature={agentNature}
-        loading={loading}
+        loading={traces.length > 0 && !index}
         rows={variablesOf(evaluator).map((v) => ({
           variable: v.name,
           source: v.source,
           perTrace: traces.map((t) => ({
             traceId: t.uuid,
-            label: t.label,
-            value:
-              items
-                ?.find((i) => i.trace_id === t.uuid)
-                ?.values.find((x) => x.variable === v.name)?.value ?? null,
+            label: index ? index.labelOf(t) : t.label,
+            value: index?.values[t.uuid]?.[uuid]?.[v.name] ?? null,
           })),
         }))}
       />

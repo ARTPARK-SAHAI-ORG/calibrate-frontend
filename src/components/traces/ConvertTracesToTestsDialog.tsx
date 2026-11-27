@@ -11,6 +11,7 @@ import {
 } from "@/components/ui";
 import { useAgentLlmEvaluators } from "@/hooks/useAgentLlmEvaluators";
 import { reportError } from "@/lib/reportError";
+import { declaresVariables } from "@/lib/traceScoring";
 import {
   convertMissingValues,
   convertTracesToTests,
@@ -23,7 +24,6 @@ import {
 } from "@/lib/tracesApi";
 import {
   AgentEvaluatorStep,
-  hasVariables,
   readTraceValues,
   READ_VALUES_ERROR,
   type StepTrace,
@@ -55,9 +55,9 @@ type ConvertTracesToTestsDialogProps = {
   traceLabels?: Record<string, string>;
   /** The trace setting up an evaluator's variables is tried on first. */
   fromTrace?: TraceSummary;
-  /** Called with the backend result after a successful conversion. */
-  /** The second argument is the evaluators the created tests were given, so
-   *  the caller can offer to attach any the agent does not have yet. */
+  /** Called after a successful conversion with the backend result and the
+   *  evaluators the created tests were given, so the caller can offer to
+   *  attach any the agent does not have yet. */
   onConverted: (
     result: ConvertTracesToTestsResult,
     evaluatorsUsed: { uuid: string; name: string }[],
@@ -144,7 +144,7 @@ export function ConvertTracesToTestsDialog({
   const chosen = needsEvaluator
     ? evaluators.filter((e) => selectedEvaluators.has(e.uuid))
     : [];
-  const withVariables = chosen.filter(hasVariables);
+  const withVariables = chosen.filter(declaresVariables);
   // Blank for a trace not on the page; the values read then name it.
   const stepTraces = (uuids: string[]): StepTrace[] =>
     uuids.map((uuid) => ({ uuid, label: traceLabels?.[uuid] ?? "" }));
