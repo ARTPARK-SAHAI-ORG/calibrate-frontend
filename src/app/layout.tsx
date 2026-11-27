@@ -15,21 +15,9 @@ import { Toaster } from "sonner";
 // failed, the dev server never started and CI ran no tests. These are the
 // latin files Google Fonts serves; each font is under the SIL Open Font
 // License, whose text sits beside it.
-const geistSans = localFont({
-  src: "./fonts/Geist-Variable.woff2",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-
 const geistMono = localFont({
   src: "./fonts/GeistMono-Variable.woff2",
   variable: "--font-geist-mono",
-  weight: "100 900",
-});
-
-const inter = localFont({
-  src: "./fonts/Inter-Variable.woff2",
-  variable: "--font-inter",
   weight: "100 900",
 });
 
@@ -74,7 +62,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${dmSans.variable} antialiased`}
+        className={`${geistMono.variable} ${dmSans.variable} antialiased`}
       >
         <SessionProvider>
           <OrganizationBootstrapper />
