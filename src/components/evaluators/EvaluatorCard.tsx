@@ -17,8 +17,7 @@ type Props = {
  * One evaluator as a card: name, type pill, description, View and the
  * caller's own actions. Clicking anywhere on the card, or View, opens how
  * the evaluator judges in `EvaluatorPreviewModal`, which carries the links to
- * the evaluator's own page. Shared by the evaluator library pages and the
- * agent Evaluators tab, so the two read and behave the same.
+ * the evaluator's own page. Used by the evaluator library pages.
  */
 export function EvaluatorCard({ evaluator, actions, ...rest }: Props) {
   const [previewOpen, setPreviewOpen] = useState(false);
