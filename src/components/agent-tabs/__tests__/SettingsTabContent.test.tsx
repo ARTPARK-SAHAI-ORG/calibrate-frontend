@@ -251,12 +251,8 @@ describe("SettingsTabContent", () => {
       screen.getByRole("heading", { name: "Enable continuous monitoring" }),
     ).toBeInTheDocument();
 
-    const validEvaluators = screen.getByText("valid evaluators");
-    await user.hover(validEvaluators);
     expect(
-      await screen.findByText(
-        "Evaluators that fit this agent, have a live version, and either use no variables or have every variable configured for traces",
-      ),
+      screen.getByText(/New traces for this agent are scored using the evaluators added in the/),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
