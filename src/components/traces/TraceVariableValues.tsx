@@ -152,36 +152,44 @@ function Values({
     );
   }
   return (
-    <table className="w-full text-sm mt-4">
-      <thead>
-        <tr>
-          <th className={`${SMALL_HEADING} text-left align-top pr-4 pb-1`}>
-            Trace
-          </th>
-          <th className={`${SMALL_HEADING} text-left align-top pb-1`}>Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        {row.perTrace.map((t) => (
-          <tr key={t.traceId} className="border-t border-border">
-            <td className="py-2 pr-4 align-top text-muted-foreground break-words">
-              {t.label}
-            </td>
-            <td className="py-2 align-top break-words whitespace-pre-wrap">
-              {t.value !== null ? (
-                <span className="text-foreground">{t.value}</span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
-                  <WarningTriangleIcon className="w-4 h-4 flex-shrink-0" />
-                  <span>
-                    <MissingText source={row.source} agentNature={agentNature} />
-                  </span>
-                </span>
-              )}
-            </td>
+    // Its own box inside the variable's, like the missing-values table.
+    <div className="mt-3 border border-border rounded-md overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/30">
+          <tr>
+            <th className={`${SMALL_HEADING} text-left align-top px-3 py-2`}>
+              Trace
+            </th>
+            <th className={`${SMALL_HEADING} text-left align-top px-3 py-2`}>
+              Value
+            </th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {row.perTrace.map((t) => (
+            <tr key={t.traceId} className="border-t border-border">
+              <td className="px-3 py-2 align-top text-muted-foreground break-words">
+                {t.label}
+              </td>
+              <td className="px-3 py-2 align-top break-words whitespace-pre-wrap">
+                {t.value !== null ? (
+                  <span className="text-foreground">{t.value}</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
+                    <WarningTriangleIcon className="w-4 h-4 flex-shrink-0" />
+                    <span>
+                      <MissingText
+                        source={row.source}
+                        agentNature={agentNature}
+                      />
+                    </span>
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
