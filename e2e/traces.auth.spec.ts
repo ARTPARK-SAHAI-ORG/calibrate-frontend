@@ -297,6 +297,70 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     await deleteAgent(page, name);
   });
 
+  test("shows the score cards once the first trace is scored, without a reload", async ({
+    page,
+  }) => {
+    test.skip(!process.env.E2E_FAKE_AI, "needs the FAKE_AI_PROVIDERS backend");
+    // The backend waits about 15 seconds before it scores a new trace.
+    test.setTimeout(150_000);
+    const stamp = Date.now();
+    const name = `E2E Traces Scores ${stamp}`;
+    const agentUuid = await createAgent(page, name);
+    const headers = await ingestHeaders(page);
+
+    // A plain yes-or-no evaluator with no variables, so it can score a trace
+    // with nothing to set up.
+    const evaluatorName = `E2E Polite ${stamp}`;
+    const created = await page.request.post(`${BACKEND}/evaluators`, {
+      headers,
+      data: {
+        name: evaluatorName,
+        evaluator_type: "llm",
+        output_type: "binary",
+        version: {
+          judge_model: "openai/gpt-5.4-mini",
+          system_prompt: "Is the reply polite?",
+        },
+      },
+    });
+    expect(created.ok()).toBeTruthy();
+    const evaluatorUuid = (await created.json()).uuid as string;
+    const linked = await page.request.post(
+      `${BACKEND}/agents/${agentUuid}/evaluators`,
+      { headers, data: { evaluator_ids: [evaluatorUuid] } },
+    );
+    expect(linked.ok()).toBeTruthy();
+
+    const msgId = `e2e-scores-${stamp}`;
+    const ingested = await page.request.post(`${BACKEND}/traces`, {
+      headers,
+      data: {
+        agent_id: agentUuid,
+        message_id: msgId,
+        input: [{ role: "user", content: `Hello there ${msgId}` }],
+        output: { response: "Hello, how can I help?" },
+      },
+    });
+    expect(ingested.ok()).toBeTruthy();
+
+    // The backend waits a while before scoring a new trace, so the tab opens
+    // while it is still waiting and there are no scores yet.
+    await openTracesTab(page);
+    await expect(page.getByText(msgId).first()).toBeVisible({ timeout: 15000 });
+    const heading = page.getByText("Production quality", { exact: true });
+    await expect(heading).toHaveCount(0);
+
+    // Once the trace is scored the card appears on its own.
+    await expect(heading).toBeVisible({ timeout: 90000 });
+    await expect(page.getByText(evaluatorName).first()).toBeVisible();
+
+    await deleteAllTracesOfAgent(page, headers, agentUuid);
+    await deleteAgent(page, name);
+    await page.request.delete(`${BACKEND}/evaluators/${evaluatorUuid}`, {
+      headers,
+    });
+  });
+
   test("adds a selected trace to tests on the same agent", async ({ page }) => {
     const name = `E2E Traces Convert ${Date.now()}`;
     const agentUuid = await createAgent(page, name);
