@@ -25,7 +25,7 @@ import {
   deleteEvaluatorWarning,
   canDeleteEvaluator,
 } from "@/lib/evaluatorApi";
-import { fetchTraces } from "@/lib/tracesApi";
+import { fetchHasTrace } from "@/lib/tracesApi";
 import {
   agentTaskType,
   fitsAgent,
@@ -150,13 +150,9 @@ export function EvaluatorsTabContent({
   useEffect(() => {
     if (!isActive || !traceScoringOn || !backendAccessToken) return;
     let cancelled = false;
-    fetchTraces(backendAccessToken, {
-      agentId: agentUuid,
-      limit: 1,
-      offset: 0,
-    })
-      .then((page) => {
-        if (!cancelled) setHasTraces(page.total > 0);
+    fetchHasTrace(backendAccessToken, agentUuid, {})
+      .then((found) => {
+        if (!cancelled) setHasTraces(found);
       })
       .catch((err) => reportError("Error checking for agent traces:", err));
     return () => {

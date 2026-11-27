@@ -18,8 +18,10 @@ beforeAll(() => {
 
 // The tab only needs a stable access token to kick off its loads.
 const mockFetchTraces = jest.fn();
+const mockFetchHasTrace = jest.fn();
 jest.mock("../../../lib/tracesApi", () => ({
   fetchTraces: (...args: unknown[]) => mockFetchTraces(...args),
+  fetchHasTrace: (...args: unknown[]) => mockFetchHasTrace(...args),
 }));
 
 jest.mock("../../../hooks", () => ({
@@ -613,6 +615,8 @@ describe("EvaluatorsTabContent", () => {
     beforeEach(() => {
       mockFetchTraces.mockReset();
       mockFetchTraces.mockResolvedValue({ total: 1, items: [] });
+      mockFetchHasTrace.mockReset();
+      mockFetchHasTrace.mockResolvedValue(true);
     });
     const dialogTitle = () =>
       screen.queryByRole("heading", { name: "Configure for traces" });
@@ -650,11 +654,11 @@ describe("EvaluatorsTabContent", () => {
       render(<EvaluatorsTabContent agentUuid="agent-1" />);
 
       await screen.findByRole("button", { name: "Configure for traces" });
-      expect(mockFetchTraces).not.toHaveBeenCalled();
+      expect(mockFetchHasTrace).not.toHaveBeenCalled();
     });
 
     it("does not warn while the agent has no traces", async () => {
-      mockFetchTraces.mockResolvedValue({ total: 0, items: [] });
+      mockFetchHasTrace.mockResolvedValue(false);
       mockFetchAgentEvaluators.mockResolvedValue([withVariables()]);
       mockFetchAllEvaluators.mockResolvedValue([]);
 
@@ -662,28 +666,29 @@ describe("EvaluatorsTabContent", () => {
 
       await screen.findByRole("button", { name: "Configure for traces" });
       await waitFor(() =>
-        expect(mockFetchTraces).toHaveBeenCalledWith(
+        expect(mockFetchHasTrace).toHaveBeenCalledWith(
           expect.anything(),
-          expect.objectContaining({ agentId: "agent-1", limit: 1 }),
+          "agent-1",
+          {},
         ),
       );
       expect(configure()).not.toHaveClass(AMBER);
     });
 
     it("does not warn when the check for traces fails", async () => {
-      mockFetchTraces.mockRejectedValue(new Error("boom"));
+      mockFetchHasTrace.mockRejectedValue(new Error("boom"));
       mockFetchAgentEvaluators.mockResolvedValue([withVariables()]);
       mockFetchAllEvaluators.mockResolvedValue([]);
 
       render(<EvaluatorsTabContent agentUuid="agent-1" traceScoringOn />);
 
       await screen.findByRole("button", { name: "Configure for traces" });
-      await waitFor(() => expect(mockFetchTraces).toHaveBeenCalled());
+      await waitFor(() => expect(mockFetchHasTrace).toHaveBeenCalled());
       expect(configure()).not.toHaveClass(AMBER);
     });
 
     it("checks for traces again each time the tab is opened", async () => {
-      mockFetchTraces.mockResolvedValue({ total: 0, items: [] });
+      mockFetchHasTrace.mockResolvedValue(false);
       mockFetchAgentEvaluators.mockResolvedValue([withVariables()]);
       mockFetchAllEvaluators.mockResolvedValue([]);
 
@@ -691,7 +696,7 @@ describe("EvaluatorsTabContent", () => {
         <EvaluatorsTabContent agentUuid="agent-1" traceScoringOn isActive />,
       );
       await screen.findByRole("button", { name: "Configure for traces" });
-      await waitFor(() => expect(mockFetchTraces).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(mockFetchHasTrace).toHaveBeenCalledTimes(1));
       expect(configure()).not.toHaveClass(AMBER);
 
       rerender(
@@ -701,13 +706,13 @@ describe("EvaluatorsTabContent", () => {
           isActive={false}
         />,
       );
-      mockFetchTraces.mockResolvedValue({ total: 1, items: [] });
+      mockFetchHasTrace.mockResolvedValue(true);
       rerender(
         <EvaluatorsTabContent agentUuid="agent-1" traceScoringOn isActive />,
       );
 
       expect(await setUpButton()).toBeInTheDocument();
-      expect(mockFetchTraces).toHaveBeenCalledTimes(2);
+      expect(mockFetchHasTrace).toHaveBeenCalledTimes(2);
     });
 
     it("offers the button only on evaluators with variables", async () => {
@@ -951,12 +956,12 @@ describe("EvaluatorsTabContent", () => {
     });
 
     it.each([
-      ["the agent has no traces", true, 0],
-      ["trace scoring is off", false, 1],
+      ["the agent has no traces", true, false],
+      ["trace scoring is off", false, true],
     ])(
       "does not open by itself when %s",
-      async (_label, traceScoringOn, total) => {
-        mockFetchTraces.mockResolvedValue({ total, items: [] });
+      async (_label, traceScoringOn, hasTrace) => {
+        mockFetchHasTrace.mockResolvedValue(hasTrace);
         mockFetchAgentEvaluators.mockResolvedValueOnce([
           evaluator({ uuid: "ev-1", name: "Tone check" }),
         ]);

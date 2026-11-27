@@ -237,6 +237,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     ineligibleEvaluators,
     addToolCallEvaluator,
     scoringEvaluatorNames,
+    scoringEvaluatorUuids,
     unconfiguredEvaluators,
     onConfigureEvaluator,
     keysPaused,
@@ -255,6 +256,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     ineligibleEvaluators?: { name: string }[];
     addToolCallEvaluator?: React.ReactNode;
     scoringEvaluatorNames?: string[];
+    scoringEvaluatorUuids?: string[];
     unconfiguredEvaluators?: { evaluator_uuid: string; name: string }[];
     onConfigureEvaluator?: (uuid: string) => void;
     keysPaused?: boolean;
@@ -265,6 +267,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
         data-keys-paused={String(!!keysPaused)}
         data-can-score={String((scoringEvaluatorNames ?? []).length > 0)}
         data-scoring-names={(scoringEvaluatorNames ?? []).join(",")}
+        data-scoring-uuids={(scoringEvaluatorUuids ?? []).join(",")}
       >
         {traceUuid}
         <div data-testid="trace-detail-add-tool-call">
@@ -3980,6 +3983,10 @@ describe("TracesTabContent", () => {
           "data-can-score",
           String(expected),
         ),
+      );
+      expect(screen.getByTestId("trace-detail")).toHaveAttribute(
+        "data-scoring-uuids",
+        expected ? "ev-1" : "",
       );
     },
   );

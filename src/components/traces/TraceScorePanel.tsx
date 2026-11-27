@@ -100,6 +100,9 @@ export type TraceScorePanelProps = {
   scoreAgain?: React.ReactNode;
   /** The agent's evaluators that can score this trace now, named beside it. */
   scoringEvaluatorNames?: string[];
+  /** The same evaluators by id. Only these are offered to score a completed
+   *  trace again. */
+  scoringEvaluatorUuids?: string[];
   /** Scores the trace again after its scoring failed. */
   onTryAgain?: () => void;
   /** Picks the agent's own name for the trace's input. */
@@ -223,15 +226,14 @@ function VerdictCards({
 }
 
 /** Evaluators a completed run left out for not being set up for traces,
- *  that are set up now and so can score the trace if it is scored again. */
+ *  that can score the trace now if it is scored again. */
 export function evaluatorsSetUpSince(
   run: TraceScoringRun | null,
-  unconfigured: TraceUnconfiguredEvaluator[] = [],
+  scoringUuids: string[] = [],
 ): TraceUnconfiguredEvaluator[] {
   if (run?.status !== "completed") return [];
-  const stillUnconfigured = new Set(unconfigured.map((e) => e.evaluator_uuid));
-  return (run.unconfigured_evaluators ?? []).filter(
-    (e) => !stillUnconfigured.has(e.evaluator_uuid),
+  return (run.unconfigured_evaluators ?? []).filter((e) =>
+    scoringUuids.includes(e.evaluator_uuid),
   );
 }
 
@@ -275,7 +277,7 @@ function RunBody({
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <SpinnerIcon className="w-4 h-4 animate-spin text-amber-500" />
         {limitedTo.length > 0
-          ? `Running ${limitedTo.map((e) => e.name).join(", ")} on this trace`
+          ? "Running the remaining evaluators on this trace"
           : "Running the evaluators on this trace"}
       </p>
     );
@@ -458,6 +460,7 @@ export function TraceScorePanel({
   scoreTrace,
   scoreAgain,
   scoringEvaluatorNames,
+  scoringEvaluatorUuids,
   onTryAgain,
   agentNature,
   unconfigured = [],
@@ -486,7 +489,7 @@ export function TraceScorePanel({
               stillUnconfigured.has(item.evaluator_uuid),
           )
         : [];
-  const setUpSince = error ? [] : evaluatorsSetUpSince(run, unconfigured);
+  const setUpSince = error ? [] : evaluatorsSetUpSince(run, scoringEvaluatorUuids);
   const hasCard = (uuid: string) =>
     cards.some((e) => e.evaluator_uuid === uuid);
   return (
@@ -520,13 +523,7 @@ export function TraceScorePanel({
         <>
           <WarningBox>
             These evaluators were not set up when this trace was scored, and
-            can score it now:{" "}
-            {setUpSince.map(({ evaluator_uuid, name }, i) => (
-              <span key={evaluator_uuid}>
-                {i > 0 && " "}
-                <span className={EVALUATOR_PILL_CLASSES}>{name}</span>
-              </span>
-            ))}
+            can score it now: {pills(setUpSince.map((e) => e.name))}
           </WarningBox>
           {scoreAgain && <div className="flex">{scoreAgain}</div>}
         </>

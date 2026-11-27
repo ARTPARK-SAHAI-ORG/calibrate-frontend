@@ -1,13 +1,16 @@
 "use client";
 
-import { CloseIcon } from "@/components/icons";
 import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { SingleSelectPicker } from "@/components/SingleSelectPicker";
+import { DialogStepper, type DialogStep } from "@/components/ui/DialogStepper";
 import { Tooltip } from "@/components/Tooltip";
-import { traceValue } from "@/components/agent-tabs/traceValue";
 import { MAX_KEY_LENGTH } from "@/components/human-labelling/MetadataFieldsEditor";
-import { SpinnerIcon, WarningTriangleIcon } from "@/components/icons";
+import {
+  CloseIcon,
+  SpinnerIcon,
+  WarningTriangleIcon,
+} from "@/components/icons";
 import {
   CodeTabsBox,
   snippetBackendUrl,
@@ -38,7 +41,6 @@ import {
   fetchTrace,
   fetchTraces,
   previewTraceVariables,
-  type TraceDetail,
   type TraceSummary,
   type TraceVariablePreview,
 } from "@/lib/tracesApi";
@@ -69,10 +71,15 @@ const BACK_BUTTON =
   "h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium border border-border bg-background dark:bg-muted hover:bg-muted/50 dark:hover:bg-accent transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
 const MAIN_BUTTON =
   "h-9 md:h-10 px-4 rounded-md text-sm md:text-base font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
-const STEPS = [
+const STEPS: DialogStep[] = [
   { n: 1, label: "Choose values" },
   { n: 2, label: "Test on a trace" },
-] as const;
+];
+
+// Every part of a trace but metadata, whose keys differ from trace to trace.
+const FIXED_SOURCES = traceSources("conversation")
+  .map((s) => s.value)
+  .filter((s) => s !== METADATA_SOURCE);
 
 const chip = (name: string) => `{{${name}}}`;
 const upperFirst = (text: string) => text[0].toUpperCase() + text.slice(1);
@@ -100,11 +107,13 @@ function OptionRow({
   name,
   detail,
   muted,
+  fromTrace,
 }: {
   name: string;
-  /** Undefined draws no second line; null says the latest trace lacks it. */
+  /** Undefined draws no second line; null says the trace lacks it. */
   detail?: string | null;
   muted?: boolean;
+  fromTrace?: boolean;
 }) {
   return (
     <span className="block min-w-0 flex-1">
@@ -115,7 +124,7 @@ function OptionRow({
       </span>
       {detail === null ? (
         <span className="block truncate text-xs italic text-muted-foreground/60">
-          Not in the latest trace
+          {fromTrace ? "Not in this trace" : "Not in the latest trace"}
         </span>
       ) : (
         detail !== undefined && (
@@ -156,12 +165,10 @@ export function TraceVariablesDialog({
   agentUuid,
   evaluators,
   agentNature,
-  fromTrace: openedFrom,
+  fromTrace,
   onClose,
   onSave,
 }: TraceVariablesDialogProps) {
-  // Kept from the first render: the trace window passes a fresh object each time.
-  const [fromTrace] = useState(openedFrom);
   // Hide the floating "Talk to Us" button while the modal is open.
   useHideFloatingButton(true);
   const accessToken = useAccessToken();
@@ -179,7 +186,11 @@ export function TraceVariablesDialog({
   const [typed, setTyped] = useState<Record<string, boolean>>({});
   const [step, setStep] = useState<1 | 2>(1);
   const [traces, setTraces] = useState<TraceSummary[] | null>(null);
-  const [latest, setLatest] = useState<TraceDetail | null>(null);
+  // What the trace the menus read from holds at each part, keyed by part.
+  const [latest, setLatest] = useState<Record<string, string | null> | null>(
+    null,
+  );
+  const [metaKeys, setMetaKeys] = useState<string[]>([]);
   const [traceUuid, setTraceUuid] = useState(fromTrace?.uuid ?? "");
   const [preview, setPreview] = useState<{
     key: string;
@@ -206,9 +217,8 @@ export function TraceVariablesDialog({
     ...sources.filter((s) => s.value !== METADATA_SOURCE),
     ...sources.filter((s) => s.value === METADATA_SOURCE),
   ];
-  const metaKeys = [...new Set((latest?.metadata ?? []).map((m) => m.key))];
   const latestValue = (source: string) =>
-    latest ? traceValue(latest, source) : undefined;
+    latest ? (latest[source] ?? null) : undefined;
   const valuesHeading = () => (
     <p className="text-xs text-muted-foreground">
       {fromTrace ? "Values from this trace" : "Values from your latest trace"}
@@ -232,10 +242,21 @@ export function TraceVariablesDialog({
             : items,
         );
         const readFrom = fromTrace?.uuid ?? items[0]?.uuid;
-        if (readFrom) {
-          const detail = await fetchTrace(accessToken, readFrom);
-          if (live) setLatest(detail);
-        }
+        if (!readFrom) return;
+        const detail = await fetchTrace(accessToken, readFrom);
+        if (!live) return;
+        const keys = [...new Set((detail.metadata ?? []).map((m) => m.key))];
+        setMetaKeys(keys);
+        // Each part is sent as its own variable, so one call reads them all.
+        const parts = [...FIXED_SOURCES, ...keys.map((k) => METADATA_SOURCE + k)];
+        const { values } = await previewTraceVariables(
+          accessToken,
+          agentUuid,
+          readFrom,
+          Object.fromEntries(parts.map((part) => [part, part])),
+        );
+        if (live)
+          setLatest(Object.fromEntries(values.map((v) => [v.source, v.value])));
       } catch (err) {
         // With no traces to read, the dialog still saves in one step.
         reportError("Error fetching traces:", err);
@@ -381,6 +402,7 @@ export function TraceVariablesDialog({
             }
             renderOption={(source) => (
               <OptionRow
+                fromTrace={!!fromTrace}
                 name={source.label}
                 detail={
                   !latest
@@ -412,6 +434,7 @@ export function TraceVariablesDialog({
                   <OptionRow name="Other key" muted />
                 ) : (
                   <OptionRow
+                    fromTrace={!!fromTrace}
                     name={k}
                     detail={latestValue(METADATA_SOURCE + k)}
                   />
@@ -504,7 +527,7 @@ export function TraceVariablesDialog({
             compact
             triggerClassName="h-10 px-3 rounded-md"
             ariaLabel="Select a trace"
-            items={traces ?? []}
+            items={traces}
             selectedId={traceUuid}
             getId={(trace) => trace.uuid}
             placeholder="Choose a trace"
@@ -644,46 +667,13 @@ export function TraceVariablesDialog({
                   again.
                 </WarningBox>
               </div>
-              <div className="mt-5 flex items-center gap-2">
-                {STEPS.map((s, i) => {
-                  const active = step === s.n;
-                  const done = !active && s.n === 1;
-                  return (
-                    <div key={s.n} className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setStep(s.n)}
-                        disabled={saving || (s.n === 2 && !complete)}
-                        className="flex items-center gap-2 cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <span
-                          className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold transition-colors ${
-                            active
-                              ? "bg-foreground text-background"
-                              : done
-                                ? "bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/40"
-                                : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {done ? "✓" : s.n}
-                        </span>
-                        <span
-                          className={`text-xs md:text-sm font-medium transition-colors ${
-                            active
-                              ? "text-foreground"
-                              : "text-muted-foreground group-hover:text-foreground"
-                          }`}
-                        >
-                          {s.label}
-                        </span>
-                      </button>
-                      {i < STEPS.length - 1 && (
-                        <span className="w-6 h-px bg-border" />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <DialogStepper
+                steps={STEPS}
+                current={step}
+                isDone={(n) => n === 1 && complete}
+                onSelect={(n) => setStep(n as 1 | 2)}
+                disabled={saving}
+              />
             </>
           )}
         </div>

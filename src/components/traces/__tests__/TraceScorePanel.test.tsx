@@ -791,7 +791,13 @@ describe("evaluators not configured for traces", () => {
   });
 
   it("names an evaluator configured since in the offer, not in a card", () => {
-    render(<TraceScorePanel run={recorded} unconfigured={[]} />);
+    render(
+      <TraceScorePanel
+        run={recorded}
+        unconfigured={[]}
+        scoringEvaluatorUuids={["ev-5", "ev-9"]}
+      />,
+    );
     expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
     expect(
       screen.getByText("Accuracy").closest('[class*="border-orange-500"]'),
@@ -811,6 +817,7 @@ describe("evaluators not configured for traces", () => {
         unconfigured={[
           { evaluator_uuid: "ev-9", name: "Agrees with the nurse" },
         ]}
+        scoringEvaluatorUuids={["ev-5"]}
         onConfigure={jest.fn()}
       />,
     );
@@ -1128,12 +1135,13 @@ describe("scoring a trace again with evaluators set up since", () => {
       <TraceScorePanel
         run={recorded}
         unconfigured={[{ evaluator_uuid: "ev-9", name: "Accuracy" }]}
+        scoringEvaluatorUuids={["ev-5", "ev-6"]}
         scoreAgain={again}
       />,
     );
     const box = screen.getByText(OFFER);
     expect(box).toHaveTextContent(
-      "can score it now: Correctness Tone check",
+      "can score it now: Correctness and Tone check",
     );
     expect(box).not.toHaveTextContent("Accuracy");
     expect(screen.getByText("Correctness").className).toContain("rounded-md");
@@ -1143,6 +1151,31 @@ describe("scoring a trace again with evaluators set up since", () => {
     expect(
       screen.getByText("Did not run as it has not been configured for traces"),
     ).toBeInTheDocument();
+  });
+
+  it("offers only the evaluators that can score the trace now", () => {
+    render(
+      <TraceScorePanel
+        run={recorded}
+        unconfigured={[]}
+        scoringEvaluatorUuids={["ev-6", "ev-7"]}
+        scoreAgain={again}
+      />,
+    );
+    const box = screen.getByText(OFFER);
+    expect(box).toHaveTextContent("can score it now: Tone check");
+    expect(box).not.toHaveTextContent("Correctness");
+  });
+
+  it("offers nothing when no evaluator can score the trace now", () => {
+    // Scoring off, evaluators removed from the agent, or not loaded yet.
+    render(
+      <TraceScorePanel run={recorded} unconfigured={[]} scoreAgain={again} />,
+    );
+    expect(screen.queryByText(OFFER)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Score this trace again" }),
+    ).not.toBeInTheDocument();
   });
 
   it("offers nothing while every recorded evaluator is still not set up", () => {
@@ -1159,7 +1192,7 @@ describe("scoring a trace again with evaluators set up since", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows the scores carried over and names the evaluators still running", () => {
+  it("shows the scores carried over while the remaining evaluators run", () => {
     render(
       <TraceScorePanel
         run={{
@@ -1178,7 +1211,7 @@ describe("scoring a trace again with evaluators set up since", () => {
     expect(screen.getByTestId("verdict-Tone")).toBeInTheDocument();
     expect(screen.getByTestId("verdict-Helpfulness")).toBeInTheDocument();
     expect(
-      screen.getByText("Running Correctness, Tone check on this trace"),
+      screen.getByText("Running the remaining evaluators on this trace"),
     ).toBeInTheDocument();
     expect(screen.queryByText(OFFER)).not.toBeInTheDocument();
   });

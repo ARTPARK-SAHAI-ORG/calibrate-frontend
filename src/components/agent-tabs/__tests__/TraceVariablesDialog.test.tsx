@@ -37,6 +37,32 @@ const LATEST: TraceDetail = {
   updated_at: "2026-11-26T10:00:00Z",
 };
 
+// What the backend reads from LATEST at each part.
+const LATEST_PARTS: Record<string, string> = {
+  input: "My child has loose motions",
+  "output.response": "Give fluids and ORS",
+  labels: "pilot, hindi",
+  "metadata.expert_answer": "Give ORS after every stool",
+  "metadata.language": "Hindi",
+};
+
+// The dialog reads the menus' values by sending each part as its own variable;
+// any other call is the test on a trace, answered with `answer`.
+function answerPreview(answer: { values: unknown[] } = { values: [] }) {
+  mockPreview.mockImplementation(
+    async (_tok, _agent, _trace, vars: Record<string, string>) =>
+      vars.input === "input"
+        ? {
+            values: Object.keys(vars).map((part) => ({
+              variable: part,
+              source: part,
+              value: LATEST_PARTS[part] ?? null,
+            })),
+          }
+        : answer,
+  );
+}
+
 const evaluator = (
   traceVariables?: Record<string, string> | null,
   over: Partial<EvaluatorData> = {},
@@ -76,6 +102,7 @@ beforeEach(() => {
   mockFetchTraces.mockReset();
   mockFetchTrace.mockReset();
   mockPreview.mockReset();
+  answerPreview();
   withTraces();
 });
 afterEach(() => localStorage.removeItem("access_token"));
@@ -139,6 +166,18 @@ it("lists every part of a trace with its value in the latest trace", async () =>
   const { user } = setup();
   await loaded();
   await waitFor(() => expect(mockFetchTrace).toHaveBeenCalledWith("tok", "t1"));
+  await waitFor(() =>
+    expect(mockPreview).toHaveBeenCalledWith("tok", "agent-1", "t1", {
+      input: "input",
+      "output.response": "output.response",
+      "output.tool_calls": "output.tool_calls",
+      labels: "labels",
+      conversation_id: "conversation_id",
+      message_id: "message_id",
+      "metadata.expert_answer": "metadata.expert_answer",
+      "metadata.language": "metadata.language",
+    }),
+  );
 
   await user.click(source("nurse_reply"));
 
@@ -200,7 +239,7 @@ it("offers the latest trace's metadata keys, and a typed key under Other key", a
   await user.type(keyInput("language"), "lang");
   expect(button("Next")).toBeEnabled();
 
-  mockPreview.mockResolvedValue({ values: [] });
+  answerPreview();
   await user.click(button("Next"));
   await user.click(button("Save"));
   expect(onSave).toHaveBeenCalledWith("ev-1", {
@@ -349,7 +388,7 @@ describe("testing on a trace", () => {
   const chosen = { nurse_reply: "metadata.expert_answer", language: "metadata.language" };
 
   it("shows what the evaluator gets from the chosen trace", async () => {
-    mockPreview.mockResolvedValue({
+    answerPreview({
       values: [
         { variable: "nurse_reply", source: chosen.nurse_reply, value: "Give ORS" },
         { variable: "language", source: chosen.language, value: "Hindi" },
@@ -368,7 +407,7 @@ describe("testing on a trace", () => {
     expect(
       screen.queryByText("What the evaluator will be given from this trace"),
     ).not.toBeInTheDocument();
-    expect(mockPreview).not.toHaveBeenCalled();
+    expect(mockPreview).toHaveBeenCalledTimes(1);
 
     await pick(user, button("Select a trace"), "Input My child has loose motions");
     expect(await screen.findByText("Give ORS")).toBeInTheDocument();
@@ -386,7 +425,7 @@ describe("testing on a trace", () => {
   });
 
   it("warns about a value the trace does not have", async () => {
-    mockPreview.mockResolvedValue({
+    answerPreview({
       values: [
         { variable: "nurse_reply", source: "labels", value: null },
         { variable: "language", source: chosen.language, value: null },
@@ -416,7 +455,7 @@ describe("testing on a trace", () => {
   });
 
   it("shows a failed save at the top and stays open", async () => {
-    mockPreview.mockResolvedValue({ values: [] });
+    answerPreview();
     const { user, onClose } = setup({
       evaluators: [evaluator(chosen)],
       onSave: jest.fn().mockRejectedValue(new Error("Unknown trace value")),
@@ -436,7 +475,7 @@ describe("testing on a trace", () => {
   });
 
   it("says a general error when the failure has no message", async () => {
-    mockPreview.mockResolvedValue({ values: [] });
+    answerPreview();
     const { user } = setup({
       evaluators: [evaluator(chosen)],
       onSave: jest.fn().mockRejectedValue("nope"),
@@ -534,7 +573,7 @@ it("reads from and tests on the trace it was opened from", async () => {
     input_preview: "Can I give honey?",
   } as TraceSummary;
   mockFetchTrace.mockResolvedValue({ ...LATEST, uuid: "t2" });
-  mockPreview.mockResolvedValue({ values: [] });
+  answerPreview();
   const { user } = setup({
     evaluators: [evaluator({ nurse_reply: "input", language: "labels" })],
     fromTrace: opened,
@@ -544,6 +583,8 @@ it("reads from and tests on the trace it was opened from", async () => {
 
   await user.click(source("nurse_reply"));
   expect(await screen.findByText("Values from this trace")).toBeInTheDocument();
+  expect(options()).toContain("Tool callsNot in this trace");
+  expect(screen.queryByText("Not in the latest trace")).not.toBeInTheDocument();
   await user.keyboard("{Escape}");
 
   await user.click(screen.getByRole("button", { name: "Next" }));
@@ -555,7 +596,7 @@ it("reads from and tests on the trace it was opened from", async () => {
       "tok",
       "agent-1",
       "t2",
-      expect.anything(),
+      { nurse_reply: "input", language: "labels" },
     ),
   );
 });

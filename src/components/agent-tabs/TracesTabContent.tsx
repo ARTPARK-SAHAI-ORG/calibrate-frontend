@@ -85,7 +85,7 @@ import {
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
 import { fetchChatLink, type ChatLink } from "@/lib/chatLinkApi";
-import { WARNING_BOX, WarningBox } from "@/components/traces/WarningBox";
+import { WarningBox } from "@/components/traces/WarningBox";
 
 /**
  * A number of traces, said the way a person says it: "1 trace", "50,000
@@ -825,20 +825,18 @@ export function TracesTabContent({
   // fit, so every evaluator that can score is named; the backend skips it
   // again if none fits.
   const eligibleEvaluators = eligibility?.eligible ?? [];
-  const scoringNamesForOpenTrace = !openTraceItem
-    ? eligibleEvaluators.map((item) => item.name)
-    : evaluatorTypes
-      ? eligibleEvaluators
-          .filter(
-            (item) =>
-              !!evaluatorTypes[item.evaluator_uuid] &&
-              evaluatorFitsItem(
-                evaluatorTypes[item.evaluator_uuid],
-                openTraceIsToolCall,
-              ),
-          )
-          .map((item) => item.name)
-      : eligibleEvaluators.map((item) => item.name);
+  const scoringForOpenTrace =
+    openTraceItem && evaluatorTypes
+      ? eligibleEvaluators.filter(
+          (item) =>
+            !!evaluatorTypes[item.evaluator_uuid] &&
+            evaluatorFitsItem(
+              evaluatorTypes[item.evaluator_uuid],
+              openTraceIsToolCall,
+            ),
+        )
+      : eligibleEvaluators;
+  const scoringNamesForOpenTrace = scoringForOpenTrace.map((item) => item.name);
   const closeTrace = () => {
     itemPager.cancel();
     setOpenTraceUuid(null);
@@ -903,12 +901,11 @@ export function TracesTabContent({
   );
 
   const scoringWarning = (message: React.ReactNode) => (
-    <div
-      className={`flex flex-wrap items-center justify-between gap-2 ${WARNING_BOX}`}
+    <WarningBox
+      action={needValues.length > 0 && configureTraceValues.button}
     >
-      <p className="text-sm text-amber-700 dark:text-amber-300">{message}</p>
-      {needValues.length > 0 && configureTraceValues.button}
-    </div>
+      {message}
+    </WarningBox>
   );
 
   const emptyState = (
@@ -1351,6 +1348,11 @@ export function TracesTabContent({
         scoringEvaluatorNames={
           traceScoring.enabled && !scoredTracesFull
             ? scoringNamesForOpenTrace
+            : []
+        }
+        scoringEvaluatorUuids={
+          traceScoring.enabled
+            ? scoringForOpenTrace.map((item) => item.evaluator_uuid)
             : []
         }
         onScored={() => void refetch()}

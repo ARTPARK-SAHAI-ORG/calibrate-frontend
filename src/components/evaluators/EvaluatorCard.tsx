@@ -11,11 +11,10 @@ type Props = {
   evaluator: EvaluatorData;
   /** Drawn after View: Duplicate, then Remove on an agent or Delete in the library. */
   actions?: ReactNode;
-  /** One line under the description, for something the reader needs to fix. */
 } & HTMLAttributes<HTMLDivElement>;
 
 /**
- * One evaluator as a card: name, type pill, pre-built pill, description, View and the
+ * One evaluator as a card: name, type pill, description, View and the
  * caller's own actions. Clicking anywhere on the card, or View, opens how
  * the evaluator judges in `EvaluatorPreviewModal`, which carries the links to
  * the evaluator's own page. Shared by the evaluator library pages and the

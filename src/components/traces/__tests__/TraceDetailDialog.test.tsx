@@ -1715,6 +1715,8 @@ it("scores a completed trace again for evaluators set up since, keeping its scor
       accessToken="tok"
       traceUuid="t1"
       unconfiguredEvaluators={[]}
+      scoringEvaluatorNames={["Correctness", "Tone check"]}
+      scoringEvaluatorUuids={["ev-5", "ev-6"]}
     />,
   );
 
@@ -1726,11 +1728,45 @@ it("scores a completed trace again for evaluators set up since, keeping its scor
   await user.click(buttons[1]);
   expect(mockScoreTrace).toHaveBeenCalledWith("tok", "t1");
   expect(
-    (await screen.findAllByText("Running Correctness, Tone check on this trace"))
+    (await screen.findAllByText("Running the remaining evaluators on this trace"))
       .length,
   ).toBeGreaterThan(0);
   expect(screen.getAllByText("Helpfulness").length).toBeGreaterThan(0);
   expect(
     screen.queryByRole("button", { name: "Score this trace again" }),
   ).not.toBeInTheDocument();
+});
+
+it("offers no second scoring at the workspace scoring limit", async () => {
+  mockFetchTrace.mockResolvedValue(detail);
+  mockFetchTraceScores.mockResolvedValue({
+    runs: [
+      {
+        run_uuid: "run-old",
+        status: "completed",
+        created_at: "2026-08-29T12:00:00Z",
+        error: null,
+        results: [],
+        unconfigured_evaluators: [{ evaluator_uuid: "ev-5", name: "Correctness" }],
+      },
+    ],
+  });
+  render(
+    <TraceDetailDialog
+      isOpen
+      onClose={jest.fn()}
+      accessToken="tok"
+      traceUuid="t1"
+      unconfiguredEvaluators={[]}
+      scoringEvaluatorNames={[]}
+      scoringEvaluatorUuids={["ev-5"]}
+    />,
+  );
+  expect(
+    (await screen.findAllByText("This run produced no scores.")).length,
+  ).toBeGreaterThan(0);
+  expect(
+    screen.queryByRole("button", { name: "Score this trace again" }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText(/can score it now/)).not.toBeInTheDocument();
 });

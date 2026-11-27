@@ -74,6 +74,8 @@ type TraceDetailDialogProps = {
   /** The agent's evaluators that can score this trace now. With any, a trace
    *  skipped for lacking one can be scored again. */
   scoringEvaluatorNames?: string[];
+  /** The same evaluators by id. */
+  scoringEvaluatorUuids?: string[];
   /** Told once a new scoring run was started, so the list can show it. */
   onScored?: () => void;
   /** The button that adds a tool call evaluator, for a trace skipped because
@@ -400,6 +402,7 @@ export function TraceDetailDialog({
   conversation = null,
   ineligibleEvaluators,
   scoringEvaluatorNames = [],
+  scoringEvaluatorUuids = [],
   onScored,
   unconfiguredEvaluators,
   onConfigureEvaluator,
@@ -537,7 +540,7 @@ export function TraceDetailDialog({
       // Scoring a completed trace again keeps its scores and judges only the
       // evaluators set up since, as the backend's new run does.
       setLatestRun((previous) => {
-        const limitedTo = evaluatorsSetUpSince(previous, unconfiguredEvaluators);
+        const limitedTo = evaluatorsSetUpSince(previous, scoringEvaluatorUuids);
         return {
           run_uuid: run.run_uuid,
           status: run.status,
@@ -558,27 +561,18 @@ export function TraceDetailDialog({
       setScoringUuid((current) => (current === scored ? null : current));
     }
   };
-  const scoreTraceButton =
-    scoringEvaluatorNames.length > 0 ? (
+  const canScore = scoringEvaluatorNames.length > 0;
+  const scoreButton = (label: string) =>
+    canScore ? (
       <Button
         size="sm"
         onClick={() => void startScoring()}
         isLoading={scoringUuid === traceUuid}
       >
-        Score this trace
+        {label}
       </Button>
     ) : undefined;
-  const scoreAgainButton = (
-    <Button
-      size="sm"
-      onClick={() => void startScoring()}
-      isLoading={scoringUuid === traceUuid}
-    >
-      Score this trace again
-    </Button>
-  );
-  const tryAgain =
-    scoringEvaluatorNames.length > 0 ? () => void startScoring() : undefined;
+  const tryAgain = canScore ? () => void startScoring() : undefined;
 
   useDialogNavKeys({
     isOpen: isOpen && !keysPaused,
@@ -772,9 +766,10 @@ export function TraceDetailDialog({
                   ineligible={ineligibleEvaluators}
                   addToolCallEvaluator={addToolCallEvaluator}
                   onGoToEvaluators={onGoToEvaluators}
-                  scoreTrace={scoreTraceButton}
-                  scoreAgain={scoreAgainButton}
+                  scoreTrace={scoreButton("Score this trace")}
+                  scoreAgain={scoreButton("Score this trace again")}
                   scoringEvaluatorNames={scoringEvaluatorNames}
+                  scoringEvaluatorUuids={canScore ? scoringEvaluatorUuids : []}
                   onTryAgain={tryAgain}
                   agentNature={agentNature}
                   unconfigured={unconfiguredEvaluators}
@@ -806,9 +801,10 @@ export function TraceDetailDialog({
                     ineligible={ineligibleEvaluators}
                     addToolCallEvaluator={addToolCallEvaluator}
                     onGoToEvaluators={onGoToEvaluators}
-                    scoreTrace={scoreTraceButton}
-                    scoreAgain={scoreAgainButton}
+                    scoreTrace={scoreButton("Score this trace")}
+                    scoreAgain={scoreButton("Score this trace again")}
                     scoringEvaluatorNames={scoringEvaluatorNames}
+                    scoringEvaluatorUuids={canScore ? scoringEvaluatorUuids : []}
                     onTryAgain={tryAgain}
                     agentNature={agentNature}
                     unconfigured={unconfiguredEvaluators}
