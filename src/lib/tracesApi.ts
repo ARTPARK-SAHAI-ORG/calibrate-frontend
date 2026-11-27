@@ -1,4 +1,5 @@
 import type { MetadataEntry } from "@/components/ui";
+import type { TraceLabellingItem } from "@/components/human-labelling/AddRunToLabellingTaskDialog";
 import { MAX_METADATA_ENTRIES } from "@/components/human-labelling/MetadataFieldsEditor";
 import { apiGet, apiPost, apiPut, getBackendUrl, Paginated } from "./api";
 
@@ -170,6 +171,28 @@ export function traceLabellingMetadata(trace: TraceDetail): MetadataEntry[] {
     entries.push({ key: "labels", value: trace.labels.join(", ") });
   }
   return entries.slice(0, MAX_METADATA_ENTRIES);
+}
+
+/** One trace as an item for a labelling task. */
+export function traceToLabellingItem(
+  trace: TraceDetail,
+  evaluatorVariables?: Record<string, Record<string, string>>,
+): TraceLabellingItem {
+  return {
+    // Names are unique within a task, so the trace's own id names it.
+    // Anything drawn from the conversation repeats across calls that
+    // open the same way, which the backend rejects for the whole batch.
+    name: trace.uuid,
+    // The agent's own instructions are not part of the conversation the
+    // annotators read, so they are never stored with the item.
+    input:
+      typeof trace.input === "string"
+        ? trace.input
+        : (trace.input ?? []).filter((turn) => turn.role !== "system"),
+    output: trace.output,
+    metadata: traceLabellingMetadata(trace),
+    evaluatorVariables,
+  };
 }
 
 /**

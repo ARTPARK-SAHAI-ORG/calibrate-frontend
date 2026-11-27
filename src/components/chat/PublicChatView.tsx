@@ -11,8 +11,22 @@ import { Tooltip } from "@/components/Tooltip";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { AddedToTestsDialog } from "@/components/traces/AddedToTestsDialog";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
+import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
+import {
+  AddRunToLabellingTaskDialog,
+  isLabellableOutput,
+  type SourceEvaluatorRef,
+  type TraceLabellingItem,
+} from "@/components/human-labelling/AddRunToLabellingTaskDialog";
+import { toast } from "sonner";
 import { setActiveOrgUuid } from "@/lib/orgs";
-import type { ConvertTestType } from "@/lib/tracesApi";
+import { reportError } from "@/lib/reportError";
+import { isToolCallOutput } from "@/lib/traceScoring";
+import {
+  fetchTrace,
+  traceToLabellingItem,
+  type ConvertTestType,
+} from "@/lib/tracesApi";
 import {
   ChatIcon,
   InfoIcon,
@@ -136,6 +150,17 @@ export function PublicChatView({ token }: { token: string }) {
   } | null>(null);
   // The tests just made from a reply, for the confirmation to link to.
   const [addedTests, setAddedTests] = useState<string[] | null>(null);
+  // The reply whose evaluators are being picked for labelling.
+  const [labelling, setLabelling] = useState<{
+    traceUuid: string;
+    userMessage: string | null;
+  } | null>(null);
+  // The reply being loaded in full before the task window opens.
+  const [labellingLoad, setLabellingLoad] = useState<string | null>(null);
+  const [labellingSource, setLabellingSource] = useState<{
+    traces: TraceLabellingItem[];
+    evaluators: SourceEvaluatorRef[];
+  } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const messageRef = useRef<HTMLTextAreaElement>(null);
   // Bumped by New chat, so a reply still on its way to the old chat is dropped.
@@ -305,34 +330,91 @@ export function PublicChatView({ token }: { token: string }) {
 
   // Only a member of the agent's workspace is sent these.
   const { agent_id: agentId, org_uuid: orgUuid } = agent;
+  /**
+   * Gets a reply ready for Add to tests or Submit for labelling. Returns the
+   * user message before it, or undefined when its comment could not be saved.
+   */
+  const prepareTurn = async (
+    turn: Extract<Turn, { role: "agent" }>,
+    index: number,
+  ): Promise<string | null | undefined> => {
+    // An evaluator can read the user's comment from the trace, so a
+    // comment changed but not saved (cleared included) is saved first,
+    // or the test or item would be made without what is on screen.
+    const f = feedback[turn.traceUuid!];
+    if (
+      f?.open &&
+      f.draft.trim() !== (f.comment ?? "") &&
+      !(await saveComment(turn.traceUuid!))
+    ) {
+      return undefined;
+    }
+    // The dialogs' requests go to the agent's workspace.
+    setActiveOrgUuid(orgUuid!);
+    const asked = turns[index - 1];
+    return asked?.role === "user" ? asked.text : null;
+  };
+  const outputFacts = (turn: Extract<Turn, { role: "agent" }>) => ({
+    hasResponse: !!turn.reply,
+    hasToolCalls: turn.toolCalls.length > 0,
+  });
+  const isToolCallOnly = (turn: Extract<Turn, { role: "agent" }>) =>
+    isToolCallOutput(outputFacts(turn));
+
   const addToTests =
     agentId && orgUuid
       ? async (turn: Extract<Turn, { role: "agent" }>, index: number) => {
-          // An evaluator can read the user's comment from the trace, so a
-          // comment changed but not saved (cleared included) is saved first,
-          // or the test would be made without what is on screen.
-          const f = feedback[turn.traceUuid!];
-          if (
-            f?.open &&
-            f.draft.trim() !== (f.comment ?? "") &&
-            !(await saveComment(turn.traceUuid!))
-          ) {
-            return;
-          }
-          // The dialog's requests go to the agent's workspace.
-          setActiveOrgUuid(orgUuid);
-          const asked = turns[index - 1];
+          const userMessage = await prepareTurn(turn, index);
+          if (userMessage === undefined) return;
           setConverting({
             traceUuid: turn.traceUuid!,
-            userMessage: asked?.role === "user" ? asked.text : null,
+            userMessage,
             // The same rule as the Monitoring tab's Add to tests.
-            testType:
-              !turn.reply && turn.toolCalls.length > 0
-                ? "tool_call"
-                : agent.interaction_type === "general"
-                  ? "general"
-                  : "response",
+            testType: isToolCallOnly(turn)
+              ? "tool_call"
+              : agent.interaction_type === "general"
+                ? "general"
+                : "response",
           });
+        }
+      : undefined;
+
+  const loadForLabelling = async (
+    traceUuid: string,
+    evaluators: SourceEvaluatorRef[],
+    variables: Record<string, Record<string, string>> | undefined,
+  ) => {
+    setLabelling(null);
+    setLabellingLoad(traceUuid);
+    const run = chatRun.current;
+    try {
+      const trace = await fetchTrace(accessToken!, traceUuid);
+      // A new chat was started while it loaded, so the reply is gone.
+      if (run !== chatRun.current) return;
+      setLabellingSource({
+        traces: [traceToLabellingItem(trace, variables)],
+        evaluators,
+      });
+    } catch (error) {
+      reportError("Error loading the reply for labelling:", error);
+      toast.error("This reply could not be loaded. Try again.");
+    } finally {
+      setLabellingLoad(null);
+    }
+  };
+
+  const submitForLabelling =
+    agentId && orgUuid && accessToken
+      ? async (turn: Extract<Turn, { role: "agent" }>, index: number) => {
+          const userMessage = await prepareTurn(turn, index);
+          if (userMessage === undefined) return;
+          // A tool call has no text reply to pick evaluators for, the same
+          // as on the Monitoring tab.
+          if (isToolCallOnly(turn)) {
+            await loadForLabelling(turn.traceUuid!, [], undefined);
+          } else {
+            setLabelling({ traceUuid: turn.traceUuid!, userMessage });
+          }
         }
       : undefined;
 
@@ -430,6 +512,15 @@ export function PublicChatView({ token }: { token: string }) {
               }
               onSave={() => turn.traceUuid && void saveComment(turn.traceUuid)}
               onAddToTests={addToTests && (() => void addToTests(turn, i))}
+              onSubmitForLabelling={
+                submitForLabelling &&
+                // Nothing to label without a reply or a tool call.
+                isLabellableOutput(outputFacts(turn))
+                  ? () => void submitForLabelling(turn, i)
+                  : undefined
+              }
+              labellingBusy={labellingLoad !== null}
+              loadingForLabelling={labellingLoad === turn.traceUuid}
             />
           ),
         )}
@@ -573,6 +664,41 @@ export function PublicChatView({ token }: { token: string }) {
           }}
         />
       )}
+      {labelling && agentId && (
+        <TraceLabellingEvaluatorsDialog
+          onClose={() => setLabelling(null)}
+          agentUuid={agentId}
+          agentNature={agent.interaction_type}
+          accessToken={accessToken}
+          traces={[
+            {
+              uuid: labelling.traceUuid,
+              label: labelling.userMessage ?? labelling.traceUuid,
+            },
+          ]}
+          onChosen={(evaluators, variables) =>
+            void loadForLabelling(
+              labelling.traceUuid,
+              evaluators,
+              variables[labelling.traceUuid],
+            )
+          }
+        />
+      )}
+      {labellingSource && agentId && (
+        <AddRunToLabellingTaskDialog
+          isOpen
+          onClose={() => setLabellingSource(null)}
+          openTaskInNewTab
+          source={{
+            type: "traces",
+            agentUuid: agentId,
+            traces: labellingSource.traces,
+            evaluators: labellingSource.evaluators,
+            agentNature: agent.interaction_type,
+          }}
+        />
+      )}
       {addedTests && agentId && (
         <AddedToTestsDialog
           testUuids={addedTests}
@@ -600,6 +726,9 @@ function AgentTurn({
   onCancel,
   onSave,
   onAddToTests,
+  onSubmitForLabelling,
+  labellingBusy,
+  loadingForLabelling,
 }: {
   turn: Extract<Turn, { role: "agent" }>;
   feedback: Feedback;
@@ -614,6 +743,12 @@ function AgentTurn({
   onSave: () => void;
   /** Set only for a member of the agent's workspace. */
   onAddToTests?: () => void;
+  /** Set only for a signed-in member of the agent's workspace. */
+  onSubmitForLabelling?: () => void;
+  /** A reply is being loaded for labelling, so neither button can be used. */
+  labellingBusy?: boolean;
+  /** This reply is the one being loaded. */
+  loadingForLabelling?: boolean;
 }) {
   const picked = feedback.isCorrect;
   // The comment box opens under the reply; bring it into view, clear of the
@@ -693,7 +828,7 @@ function AgentTurn({
       )}
       {turn.stoppedEarly && <StoppedEarlyNote />}
       {turn.traceUuid && (
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {thumb(true)}
           {thumb(false)}
           {feedback.comment && (
@@ -721,11 +856,21 @@ function AgentTurn({
             <button
               type="button"
               onClick={onAddToTests}
-              disabled={feedback.saving}
+              disabled={feedback.saving || labellingBusy}
               className="ml-2 h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <PlusIcon className="w-4 h-4" />
               Add to tests
+            </button>
+          )}
+          {onSubmitForLabelling && picked !== null && (
+            <button
+              type="button"
+              onClick={onSubmitForLabelling}
+              disabled={feedback.saving || labellingBusy}
+              className="h-8 px-3 inline-flex items-center rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loadingForLabelling ? "Loading..." : "Submit for labelling"}
             </button>
           )}
           {feedback.failed && (

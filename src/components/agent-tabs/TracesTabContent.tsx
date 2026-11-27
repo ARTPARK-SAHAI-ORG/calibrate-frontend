@@ -89,7 +89,7 @@ import {
   traceFilterKey,
   type TraceUsage,
   type TraceDetail,
-  traceLabellingMetadata,
+  traceToLabellingItem,
   type TraceSummary,
 } from "@/lib/tracesApi";
 import { reportError } from "@/lib/reportError";
@@ -368,21 +368,9 @@ export function TracesTabContent({
       }
       setLabellingEvaluators(chosen);
       setLabellingTraces(
-        loaded.map((trace) => ({
-          // Names are unique within a task, so the trace's own id names it.
-          // Anything drawn from the conversation repeats across calls that
-          // open the same way, which the backend rejects for the whole batch.
-          name: trace.uuid,
-          // The agent's own instructions are not part of the conversation the
-          // annotators read, so they are never stored with the item.
-          input:
-            typeof trace.input === "string"
-              ? trace.input
-              : (trace.input ?? []).filter((turn) => turn.role !== "system"),
-          output: trace.output,
-          metadata: traceLabellingMetadata(trace),
-          evaluatorVariables: variables[trace.uuid],
-        })),
+        loaded.map((trace) =>
+          traceToLabellingItem(trace, variables[trace.uuid]),
+        ),
       );
     } finally {
       setIsPreparingLabelling(false);
