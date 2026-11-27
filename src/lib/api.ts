@@ -6,7 +6,7 @@ import {
   isWorkspaceFreePath,
 } from "@/lib/orgs";
 import { clearOrgsCache } from "@/hooks/useOrganizations";
-import { SESSION_EXPIRED_MESSAGE } from "@/lib/reportError";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/sessionExpired";
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
