@@ -158,7 +158,7 @@ it("shows both evaluator groups and the note for turning it on, on hover", async
   ).toBeInTheDocument();
   expect(
     screen.getByText(
-      "Uses variables, which cannot be filled for a trace automatically",
+      "Has not been configured for traces. Set it up in the Evaluators tab",
     ),
   ).toBeInTheDocument();
 

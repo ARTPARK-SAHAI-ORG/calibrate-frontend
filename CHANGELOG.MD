@@ -1,5 +1,6 @@
 ## November 2026
 
+- You can now choose which part of a trace fills each variable of an evaluator, with a Configure button on the Evaluators tab and a Configure now prompt on the Monitoring tab that lets you try your choices on a recent trace ([#809](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/809))
 - Members of an agent's workspace can now add a rated reply to the agent's tests straight from its chat page, using a new Add to tests button beside the thumbs ([#898](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/898))
 - You can now pick connection agents that have custom fields for a simulation and start a text simulation with them ([#900](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/900))
 - The form for adding or editing an item on an input and output labelling task now has columns you can drag wider or narrower, shows the evaluators column at all times, lets a tool call item drop its text reply, and takes you to the first field to fix when a save is refused ([#890](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend/pull/890))

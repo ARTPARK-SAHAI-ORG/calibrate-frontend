@@ -35,6 +35,9 @@ jest.mock("../../../hooks", () => ({
   usePageSize: jest.requireActual("../../../hooks/usePageSize").usePageSize,
   PAGE_SIZE_OPTIONS: jest.requireActual("../../../hooks/usePageSize")
     .PAGE_SIZE_OPTIONS,
+  // Real, so the trace values dialog's source lists open and close.
+  useDismissOnOutside: jest.requireActual("../../../hooks/useDismissOnOutside")
+    .useDismissOnOutside,
 }));
 
 const fetchTrace = jest.fn();
@@ -78,10 +81,13 @@ const fetchAgentEvaluators = jest.fn(
     [] as { uuid: string; description?: string; evaluator_type?: string }[],
 );
 const addEvaluatorsToAgent = jest.fn(async (..._args: unknown[]) => ({}));
+const saveEvaluatorTraceVariables = jest.fn();
 jest.mock("../../../lib/evaluatorApi", () => ({
   fetchAgentEvaluators: () => fetchAgentEvaluators(),
   fetchAllEvaluators: async () => [],
   addEvaluatorsToAgent: (...args: unknown[]) => addEvaluatorsToAgent(...args),
+  saveEvaluatorTraceVariables: (...args: unknown[]) =>
+    saveEvaluatorTraceVariables(...args),
 }));
 
 jest.mock("../../traces/ConversationsView", () => ({
@@ -231,6 +237,9 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     ineligibleEvaluators,
     addToolCallEvaluator,
     scoringEvaluatorNames,
+    scoringEvaluatorUuids,
+    unconfiguredEvaluators,
+    onConfigureEvaluator,
     keysPaused,
   }: {
     isOpen: boolean;
@@ -247,6 +256,9 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
     ineligibleEvaluators?: { name: string }[];
     addToolCallEvaluator?: React.ReactNode;
     scoringEvaluatorNames?: string[];
+    scoringEvaluatorUuids?: string[];
+    unconfiguredEvaluators?: { evaluator_uuid: string; name: string }[];
+    onConfigureEvaluator?: (uuid: string) => void;
     keysPaused?: boolean;
   }) =>
     isOpen ? (
@@ -255,6 +267,7 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
         data-keys-paused={String(!!keysPaused)}
         data-can-score={String((scoringEvaluatorNames ?? []).length > 0)}
         data-scoring-names={(scoringEvaluatorNames ?? []).join(",")}
+        data-scoring-uuids={(scoringEvaluatorUuids ?? []).join(",")}
       >
         {traceUuid}
         <div data-testid="trace-detail-add-tool-call">
@@ -276,6 +289,15 @@ jest.mock("../../traces/TraceDetailDialog", () => ({
           {isSelected ? "remove from selection" : "add to selection"}
         </button>
         <span data-testid="trace-detail-count">{selectedCount}</span>
+        {unconfiguredEvaluators?.map((e) => (
+          <button
+            key={e.evaluator_uuid}
+            type="button"
+            onClick={() => onConfigureEvaluator?.(e.evaluator_uuid)}
+          >
+            {`configure ${e.name}`}
+          </button>
+        ))}
         <span data-testid="trace-detail-position">
           {position ? `${position.index + 1} of ${position.total}` : ""}
         </span>
@@ -1224,6 +1246,31 @@ describe("TracesTabContent", () => {
       expect(screen.getAllByText("Tone")).toHaveLength(2);
     });
 
+    it("does not blame the evaluators while scoring is off", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={{
+            ...traceScoring,
+            enabled: false,
+            eligibility: {
+              eligible: [],
+              ineligible: [
+                {
+                  evaluator_uuid: "ev-1",
+                  name: "Correctness",
+                  reason: "declares_variables" as const,
+                },
+              ],
+            },
+          }}
+        />,
+      );
+      expect(
+        screen.queryByText(/None of the evaluators added to this agent have been configured/),
+      ).not.toBeInTheDocument();
+    });
+
     it("shows a dash where a column's evaluator does not judge that kind of trace", async () => {
       fetchAgentEvaluators.mockResolvedValue([
         { uuid: "ev-1", evaluator_type: "llm" },
@@ -1953,20 +2000,128 @@ describe("TracesTabContent", () => {
       expect(container.textContent).toBe(before);
     });
 
-    it("says nothing is being scored when no evaluator can, and points at the Evaluators tab", async () => {
+    const blockedBy = (...reasons: string[]) => ({
+      ...traceScoring,
+      enabled: true,
+      eligibility: {
+        eligible: [],
+        ineligible: reasons.map((reason, i) => ({
+          evaluator_uuid: `ev-${i}`,
+          name: `Evaluator ${i}`,
+          reason: reason as "declares_variables",
+        })),
+      },
+    });
+    const configureNow = () =>
+      screen.getByRole("button", { name: "Configure now" });
+
+    it("says plainly what is wrong and offers the button when every evaluator needs values", async () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={blockedBy("declares_variables")}
+        />,
+      );
+      expect(
+        screen.getByText(
+          "None of the evaluators added to this agent have been configured for traces.",
+        ),
+      ).toBeInTheDocument();
+      expect(configureNow()).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Evaluators tab" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the link and adds the button when only some evaluators need values", async () => {
       const user = setupUser();
       render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={blockedBy("declares_variables", "no_live_version")}
+        />,
+      );
+      expect(configureNow()).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
+      expect(onGoToEvaluators).toHaveBeenCalled();
+    });
+
+    it("has no button when no evaluator needs values", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={blockedBy("no_live_version")}
+        />,
+      );
+      expect(
+        screen.getByRole("button", { name: "Evaluators tab" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Configure now" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the dialog open when the first save ends the warning", async () => {
+      const user = setupUser();
+      const needsValues = (uuid: string, name: string) => ({
+        uuid,
+        name,
+        description: "",
+        evaluator_type: "llm",
+        live_version: { variables: [{ name: "reply" }] },
+      });
+      fetchAgentEvaluators.mockResolvedValue([
+        needsValues("ev-1", "Alpha"),
+        needsValues("ev-2", "Bravo"),
+      ]);
+      const onAgentDefaultsAttached = jest.fn();
+      const { rerender } = render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={blockedBy("declares_variables", "declares_variables")}
+          onAgentDefaultsAttached={onAgentDefaultsAttached}
+        />,
+      );
+      await user.click(configureNow());
+      await screen.findByRole("heading", { name: "Configure Alpha for traces" });
+      await waitFor(() =>
+        expect(fetchTraces).toHaveBeenCalledWith("test-token", {
+          limit: 20,
+          offset: 0,
+          agentId: "agent-1",
+        }),
+      );
+
+      await user.click(
+        screen.getByRole("button", { name: "Source for reply" }),
+      );
+      await user.click(screen.getByRole("option", { name: "Conversation" }));
+      await user.click(screen.getByRole("button", { name: "Save and next" }));
+      await waitFor(() =>
+        expect(saveEvaluatorTraceVariables).toHaveBeenCalledWith(
+          "agent-1",
+          "ev-1",
+          { reply: "input" },
+          "test-token",
+        ),
+      );
+      expect(traceScoring.refreshEligibility).toHaveBeenCalled();
+      // The Evaluators tab reloads, so its warning goes too.
+      expect(onAgentDefaultsAttached).toHaveBeenCalled();
+
+      // One evaluator can score now, so the banner goes away.
+      rerender(
         <TracesTabContent
           {...tabProps}
           traceScoring={{
             ...traceScoring,
             enabled: true,
             eligibility: {
-              eligible: [],
+              eligible: [{ evaluator_uuid: "ev-1", name: "Alpha" }],
               ineligible: [
                 {
                   evaluator_uuid: "ev-2",
-                  name: "Correctness",
+                  name: "Bravo",
                   reason: "declares_variables" as const,
                 },
               ],
@@ -1974,12 +2129,122 @@ describe("TracesTabContent", () => {
           }}
         />,
       );
-      // The sentence and the link share one line, so read the whole line.
+
       expect(
-        screen.getByRole("button", { name: "Evaluators tab" }).parentElement,
-      ).toHaveTextContent(/Every evaluator added to this agent uses variables/);
-      await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
-      expect(onGoToEvaluators).toHaveBeenCalled();
+        screen.queryByRole("button", { name: "Configure now" }),
+      ).not.toBeInTheDocument();
+      expect(
+        await screen.findByRole("heading", { name: "Configure Bravo for traces" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("the note above the setup steps", () => {
+    const empty = tracesResult([]);
+    const noteFor = (reasons: string[], enabled = true) => ({
+      ...traceScoring,
+      enabled,
+      eligibility: {
+        eligible: [],
+        ineligible: reasons.map((reason, i) => ({
+          evaluator_uuid: `ev-${i}`,
+          name: `Evaluator ${i}`,
+          reason: reason as "declares_variables",
+        })),
+      },
+    });
+
+    beforeEach(() => {
+      mockUseTraces.mockReturnValue(empty);
+    });
+
+    it("counts the evaluators that need values", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={noteFor([
+            "declares_variables",
+            "declares_variables",
+            "no_live_version",
+          ])}
+        />,
+      );
+      expect(
+        screen.getByText(
+          "2 evaluators have not been configured for traces",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Configure now" }),
+      ).toBeInTheDocument();
+    });
+
+    it("says it in the singular for one", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={noteFor(["declares_variables"])}
+        />,
+      );
+      expect(
+        screen.getByText(
+          "1 evaluator has not been configured for traces",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("is absent while scoring is off", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={noteFor(["declares_variables"], false)}
+        />,
+      );
+      expect(screen.queryByText(/has not been configured for traces/)).not.toBeInTheDocument();
+    });
+
+    it("is absent when nothing is missing values", () => {
+      render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={noteFor(["no_live_version"])}
+        />,
+      );
+      expect(
+        screen.queryByRole("button", { name: "Configure now" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("opens the dialog even when the list then fails to load", async () => {
+      const user = setupUser();
+      fetchAgentEvaluators.mockResolvedValue([
+        {
+          uuid: "ev-1",
+          name: "Alpha",
+          evaluator_type: "llm",
+          live_version: { variables: [{ name: "reply" }] },
+        } as never,
+      ]);
+      mockUseTraces.mockReturnValue(empty);
+      const { rerender } = render(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={noteFor(["declares_variables"])}
+        />,
+      );
+      mockUseTraces.mockReturnValue({ ...empty, error: "Could not load" });
+      rerender(
+        <TracesTabContent
+          {...tabProps}
+          traceScoring={noteFor(["declares_variables"])}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Configure now" }));
+
+      expect(
+        await screen.findByRole("heading", { name: "Configure for traces" }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -3719,6 +3984,10 @@ describe("TracesTabContent", () => {
           String(expected),
         ),
       );
+      expect(screen.getByTestId("trace-detail")).toHaveAttribute(
+        "data-scoring-uuids",
+        expected ? "ev-1" : "",
+      );
     },
   );
 
@@ -3741,6 +4010,76 @@ describe("TracesTabContent", () => {
     await user.click(screen.getAllByText("Second")[0]);
 
     expect(screen.getByTestId("trace-detail")).toHaveTextContent("trace-2");
+  });
+
+  it("hands the trace window the evaluators not configured for traces, while scoring is on", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(tracesResult([trace()]));
+    const scoring = (enabled: boolean) => ({
+      ...traceScoring,
+      enabled,
+      eligibility: {
+        eligible: [],
+        ineligible: [
+          { evaluator_uuid: "ev-1", name: "Alpha", reason: "declares_variables" as const },
+          { evaluator_uuid: "ev-2", name: "Beta", reason: "no_live_version" as const },
+          { evaluator_uuid: "ev-3", name: "Gamma", reason: "declares_variables" as const },
+        ],
+      },
+    });
+    fetchAgentEvaluators.mockResolvedValue([
+      { uuid: "ev-1", name: "Alpha", evaluator_type: "llm", live_version: { variables: [{ name: "reply" }] } },
+      { uuid: "ev-3", name: "Gamma", evaluator_type: "llm", live_version: { variables: [{ name: "reply" }] } },
+    ] as never);
+    const { rerender } = render(
+      <TracesTabContent {...tabProps} traceScoring={scoring(false)} />,
+    );
+    await user.click(screen.getAllByText(trace().input_preview as string)[0]);
+    expect(screen.queryByText(/^configure /)).not.toBeInTheDocument();
+
+    rerender(<TracesTabContent {...tabProps} traceScoring={scoring(true)} />);
+    expect(screen.getByText("configure Alpha")).toBeInTheDocument();
+    expect(screen.getByText("configure Gamma")).toBeInTheDocument();
+    expect(screen.queryByText("configure Beta")).not.toBeInTheDocument();
+
+    expect(screen.getByTestId("trace-detail")).toHaveAttribute(
+      "data-keys-paused",
+      "false",
+    );
+    await user.click(screen.getByText("configure Gamma"));
+    expect(
+      await screen.findByRole("heading", { name: "Configure for traces" }),
+    ).toBeInTheDocument();
+    // The trace window keeps its keys off while the configure window is on top.
+    expect(screen.getByTestId("trace-detail")).toHaveAttribute(
+      "data-keys-paused",
+      "true",
+    );
+    // Only Gamma is handed over, so the dialog does not count evaluators.
+    expect(screen.queryByText(/^Evaluator \d of/)).not.toBeInTheDocument();
+
+    saveEvaluatorTraceVariables.mockResolvedValue(undefined);
+    await user.click(screen.getByRole("button", { name: "Source for reply" }));
+    await user.click(screen.getByRole("option", { name: "Conversation" }));
+    // Opened from a trace, so the dialog has a test step before Save.
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(await screen.findByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(traceScoring.refreshEligibility).toHaveBeenCalled(),
+    );
+    expect(saveEvaluatorTraceVariables).toHaveBeenCalledWith(
+      "agent-1",
+      "ev-3",
+      { reply: "input" },
+      "test-token",
+    );
+    const refreshed = scoring(true);
+    refreshed.eligibility.ineligible = refreshed.eligibility.ineligible.filter(
+      (item) => item.evaluator_uuid !== "ev-3",
+    );
+    rerender(<TracesTabContent {...tabProps} traceScoring={refreshed} />);
+    expect(screen.queryByText("configure Gamma")).not.toBeInTheDocument();
+    expect(screen.getByText("configure Alpha")).toBeInTheDocument();
   });
 
   it("links each trace row to that trace on this agent's Monitoring tab", () => {

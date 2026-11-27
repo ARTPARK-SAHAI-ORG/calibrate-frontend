@@ -49,8 +49,11 @@ import {
   TraceFeedbackThumb,
   TraceSourceLabel,
 } from "./TracesTable";
-import { TraceScorePanel } from "./TraceScorePanel";
-import { WARNING_BUTTON_CLASS } from "./AddToolCallEvaluatorButton";
+import {
+  evaluatorsSetUpSince,
+  TraceScorePanel,
+  type TraceScorePanelProps,
+} from "./TraceScorePanel";
 
 type TraceDetailDialogProps = {
   isOpen: boolean;
@@ -71,6 +74,8 @@ type TraceDetailDialogProps = {
   /** The agent's evaluators that can score this trace now. With any, a trace
    *  skipped for lacking one can be scored again. */
   scoringEvaluatorNames?: string[];
+  /** The same evaluators by id. */
+  scoringEvaluatorUuids?: string[];
   /** Told once a new scoring run was started, so the list can show it. */
   onScored?: () => void;
   /** The button that adds a tool call evaluator, for a trace skipped because
@@ -93,6 +98,12 @@ type TraceDetailDialogProps = {
   /** Show this conversation instead of a single trace. Its newest trace's
    *  stored history plus its reply is the whole conversation. */
   conversation?: TraceConversation | null;
+  /** Passed to the scores panel to name the trace's input the agent's way. */
+  agentNature?: TraceScorePanelProps["agentNature"];
+  /** Passed to the scores panel, which offers Configure on each. */
+  unconfiguredEvaluators?: TraceScorePanelProps["unconfigured"];
+  onConfigureEvaluator?: (evaluatorUuid: string) => void;
+  configuringEvaluatorUuid?: string | null;
 };
 
 /** Last user turn, else a generic heading when the history has no user text. */
@@ -391,7 +402,12 @@ export function TraceDetailDialog({
   conversation = null,
   ineligibleEvaluators,
   scoringEvaluatorNames = [],
+  scoringEvaluatorUuids = [],
   onScored,
+  unconfiguredEvaluators,
+  onConfigureEvaluator,
+  configuringEvaluatorUuid,
+  agentNature,
   addToolCallEvaluator,
   onGoToEvaluators,
   keysPaused = false,
@@ -521,12 +537,18 @@ export function TraceDetailDialog({
       // The reader may have moved to another trace while this was sent.
       if (shownTraceRef.current !== scored) return;
       // A pending run shows the spinner, and the poll above takes it from there.
-      setLatestRun({
-        run_uuid: run.run_uuid,
-        status: run.status,
-        created_at: new Date().toISOString(),
-        error: null,
-        results: [],
+      // Scoring a completed trace again keeps its scores and judges only the
+      // evaluators set up since, as the backend's new run does.
+      setLatestRun((previous) => {
+        const newlyScored = evaluatorsSetUpSince(previous, scoringEvaluatorUuids);
+        return {
+          run_uuid: run.run_uuid,
+          status: run.status,
+          created_at: new Date().toISOString(),
+          error: null,
+          results: newlyScored.length > 0 ? (previous?.results ?? []) : [],
+          newly_scored_evaluators: newlyScored,
+        };
       });
     } catch (err) {
       toast.error(
@@ -539,19 +561,18 @@ export function TraceDetailDialog({
       setScoringUuid((current) => (current === scored ? null : current));
     }
   };
-  const scoreTraceButton =
-    scoringEvaluatorNames.length > 0 ? (
-      <button
-        type="button"
+  const canScore = scoringEvaluatorNames.length > 0;
+  const scoreButton = (label: string) =>
+    canScore ? (
+      <Button
+        size="sm"
         onClick={() => void startScoring()}
-        disabled={scoringUuid === traceUuid}
-        className={`${WARNING_BUTTON_CLASS} disabled:opacity-60 disabled:cursor-not-allowed`}
+        isLoading={scoringUuid === traceUuid}
       >
-        Score this trace
-      </button>
+        {label}
+      </Button>
     ) : undefined;
-  const tryAgain =
-    scoringEvaluatorNames.length > 0 ? () => void startScoring() : undefined;
+  const tryAgain = canScore ? () => void startScoring() : undefined;
 
   useDialogNavKeys({
     isOpen: isOpen && !keysPaused,
@@ -745,9 +766,15 @@ export function TraceDetailDialog({
                   ineligible={ineligibleEvaluators}
                   addToolCallEvaluator={addToolCallEvaluator}
                   onGoToEvaluators={onGoToEvaluators}
-                  scoreTrace={scoreTraceButton}
+                  scoreTrace={scoreButton("Score this trace")}
+                  scoreAgain={scoreButton("Score this trace again")}
                   scoringEvaluatorNames={scoringEvaluatorNames}
+                  scoringEvaluatorUuids={canScore ? scoringEvaluatorUuids : []}
                   onTryAgain={tryAgain}
+                  agentNature={agentNature}
+                  unconfigured={unconfiguredEvaluators}
+                  onConfigure={onConfigureEvaluator}
+                  configuringUuid={configuringEvaluatorUuid}
                 />
               </div>
             )}
@@ -774,9 +801,15 @@ export function TraceDetailDialog({
                     ineligible={ineligibleEvaluators}
                     addToolCallEvaluator={addToolCallEvaluator}
                     onGoToEvaluators={onGoToEvaluators}
-                    scoreTrace={scoreTraceButton}
+                    scoreTrace={scoreButton("Score this trace")}
+                    scoreAgain={scoreButton("Score this trace again")}
                     scoringEvaluatorNames={scoringEvaluatorNames}
+                    scoringEvaluatorUuids={canScore ? scoringEvaluatorUuids : []}
                     onTryAgain={tryAgain}
+                    agentNature={agentNature}
+                    unconfigured={unconfiguredEvaluators}
+                    onConfigure={onConfigureEvaluator}
+                    configuringUuid={configuringEvaluatorUuid}
                   />
                 </div>
               </div>

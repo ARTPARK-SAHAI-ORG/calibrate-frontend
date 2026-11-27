@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { EvaluatorTypePill, PreBuiltPill } from "@/components/EvaluatorPills";
+import { EvaluatorTypePill } from "@/components/EvaluatorPills";
 import { EvaluatorPreviewModal } from "@/components/evaluators/EvaluatorPreviewModal";
 import { EVALUATOR_CARD_BUTTON_CLASS } from "@/components/evaluators/DuplicateEvaluatorButton";
 import { EyeIcon } from "@/components/icons";
@@ -9,14 +9,17 @@ import {
   SelectCheckbox,
   type SelectCheckboxProps,
 } from "@/components/ui/SelectCheckbox";
-import { isDefaultEvaluator, type EvaluatorData } from "@/lib/evaluatorApi";
+import { type EvaluatorData } from "@/lib/evaluatorApi";
 
-// One grid for the header and every row, so the columns line up. The last
-// column fits View, Duplicate and Remove, which leaves the name and the
-// description too little room below `xl`. Until then a row is the tick box
-// beside the name, with the description and the buttons below the name.
+// The table is one grid and each row takes its columns from it, so the
+// buttons column is as wide as the row with the most buttons and every row
+// lines up. Those buttons leave the name and the description too little room
+// below `xl`. Until then a row is the tick box beside the name, with the
+// description and the buttons below the name.
+const TABLE_GRID =
+  "grid grid-cols-[auto_minmax(0,1fr)] xl:grid-cols-[auto_minmax(0,1fr)_minmax(0,1.4fr)_auto] gap-x-4";
 const ROW_GRID =
-  "grid grid-cols-[20px_minmax(0,1fr)] xl:grid-cols-[20px_minmax(0,1fr)_minmax(0,1.4fr)_320px] gap-x-4 gap-y-2 items-center px-4";
+  "col-span-full grid grid-cols-subgrid gap-y-2 items-center px-4";
 
 type Props = {
   evaluators: EvaluatorData[];
@@ -26,7 +29,7 @@ type Props = {
   onToggleAll: () => void;
   selectedCount: number;
   onRemoveSelected: () => void;
-  /** Drawn after View on each row: Duplicate, then Remove. */
+  /** Drawn after View on each row: Duplicate, Configure for traces, Remove. */
   renderActions: (evaluator: EvaluatorData) => ReactNode;
 };
 
@@ -68,7 +71,7 @@ export function AgentEvaluatorsTable({
         <div className="xl:hidden">{removeSelectedButton}</div>
       </div>
 
-      <div className="border border-border rounded-xl overflow-hidden">
+      <div className={`${TABLE_GRID} border border-border rounded-xl overflow-hidden`}>
         <div className={`${ROW_GRID} py-2 bg-muted/30`}>
           <SelectCheckbox
             checked={allSelected}
@@ -107,7 +110,6 @@ export function AgentEvaluatorsTable({
               {evaluator.evaluator_type && (
                 <EvaluatorTypePill evaluatorType={evaluator.evaluator_type} />
               )}
-              {isDefaultEvaluator(evaluator) && <PreBuiltPill />}
             </button>
             {/* Holds its column on a wide screen even when empty. */}
             <p

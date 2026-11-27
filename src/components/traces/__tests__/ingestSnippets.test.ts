@@ -61,6 +61,37 @@ describe("buildSnippet", () => {
       expect(snippet).not.toContain("role");
     }
   });
+
+  it("shows only the shape, with the given metadata, when asked", () => {
+    const metadata = [
+      { key: "language", value: 'Says "hi"' },
+      { key: "district", value: "..." },
+    ];
+    const expected = {
+      curl: '    "metadata": [\n      {"key": "language", "value": "Says \\"hi\\""},\n      {"key": "district", "value": "..."}\n    ]\n  }\'',
+      python: '        "metadata": [\n            {"key": "language", "value": "Says \\"hi\\""},\n            {"key": "district", "value": "..."}\n        ]\n    },',
+      javascript: '    metadata: [\n      { key: "language", value: "Says \\"hi\\"" },\n      { key: "district", value: "..." }\n    ]\n  }),',
+    };
+    for (const language of ["curl", "python", "javascript"] as const) {
+      const snippet = buildSnippet(language, {
+        ...values,
+        placeholders: true,
+        metadata,
+      });
+      expect(snippet).not.toContain("When is the next vaccination?");
+      expect(snippet).not.toContain("book_appointment");
+      expect(snippet).toMatch(/"?content"?: "\.\.\."/);
+      expect(snippet).toMatch(/"?response"?: "\.\.\."/);
+      expect(snippet).toMatch(/"?tool_calls"?: \[\.\.\.\]/);
+      expect(snippet).toContain(expected[language]);
+    }
+  });
+
+  it("leaves metadata out when the list is empty", () => {
+    expect(buildSnippet("curl", { ...values, metadata: [] })).not.toContain(
+      "metadata",
+    );
+  });
 });
 
 describe("snippetFields", () => {

@@ -255,7 +255,7 @@ describe("SettingsTabContent", () => {
     await user.hover(validEvaluators);
     expect(
       await screen.findByText(
-        "Evaluators that fit this agent, have a live version, and use no variables",
+        "Evaluators that fit this agent, have a live version, and either use no variables or have every variable configured for traces",
       ),
     ).toBeInTheDocument();
 
@@ -307,7 +307,7 @@ describe("SettingsTabContent", () => {
       await screen.findAllByRole("button", { name: "Evaluators tab" })
     ).find((el) =>
       el.parentElement?.textContent?.includes(
-        "Every evaluator added to this agent uses variables",
+        "None of the evaluators added to this agent have been configured for traces",
       ),
     );
     expect(inTooltip).toBeDefined();

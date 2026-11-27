@@ -6,8 +6,8 @@ export type MetadataRow = { key: string; value: string };
 
 /** The backend's limits on one item's metadata. */
 export const MAX_METADATA_ENTRIES = 100;
-const MAX_KEY_LENGTH = 256;
-const MAX_VALUE_LENGTH = 8192;
+export const MAX_KEY_LENGTH = 256;
+const MAX_VALUE_LENGTH = 50000;
 
 const RemoveIcon = ({ className }: { className: string }) => (
   <svg

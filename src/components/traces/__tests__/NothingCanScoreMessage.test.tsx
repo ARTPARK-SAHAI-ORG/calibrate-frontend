@@ -4,23 +4,26 @@ import { NothingCanScoreMessage } from "../NothingCanScoreMessage";
 it("says variables are the reason and offers the way to fix it", async () => {
   const user = setupUser();
   const onGoToEvaluators = jest.fn();
-  render(
+  const { container } = render(
     <NothingCanScoreMessage
       ineligible={[{ reason: "declares_variables" }]}
       onGoToEvaluators={onGoToEvaluators}
     />,
   );
 
-  expect(document.body).toHaveTextContent(
-    "Every evaluator added to this agent uses variables, and variables cannot be filled for a trace automatically. Add an evaluator without variables in the Evaluators tab.",
+  // The copy names the tab once, as the link.
+  expect(container).toHaveTextContent(
+    /^None of the evaluators added to this agent have been configured for traces\. Configure them in the Evaluators tab\.$/,
   );
   await user.click(screen.getByRole("button", { name: "Evaluators tab" }));
   expect(onGoToEvaluators).toHaveBeenCalled();
 });
 
 it("says an agent with no evaluators has none to score with", () => {
-  render(
+  const { container } = render(
     <NothingCanScoreMessage ineligible={[]} onGoToEvaluators={jest.fn()} />,
   );
-  expect(screen.getByText(/This agent has no evaluators/)).toBeInTheDocument();
+  expect(container).toHaveTextContent(
+    "This agent has no evaluators, so its traces are not scored. Add one in the Evaluators tab.",
+  );
 });

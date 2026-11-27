@@ -16,6 +16,7 @@ import {
   NothingCanScoreMessage,
 } from "@/components/traces/NothingCanScoreMessage";
 import { AddToolCallEvaluatorButton } from "@/components/traces/AddToolCallEvaluatorButton";
+import { useConfigureTraceValues } from "@/components/traces/useConfigureTraceValues";
 import { TraceScoringChip } from "@/components/traces/TraceScoringChip";
 import {
   AddRunToLabellingTaskDialog,
@@ -62,7 +63,12 @@ import type { TraceScoringControls } from "@/hooks/useAgentTraceScoring";
 import { ExtendLimitsLink } from "@/constants/limits";
 import { fetchAgentEvaluators } from "@/lib/evaluatorApi";
 import type { EvaluatorType } from "@/components/EvaluatorPills";
-import { isToolCallTraceRow, traceRowOutputFacts } from "@/lib/traceScoring";
+import {
+  EVERY_EVALUATOR_NEEDS_VALUES,
+  everyEvaluatorNeedsValues,
+  isToolCallTraceRow,
+  traceRowOutputFacts,
+} from "@/lib/traceScoring";
 import { evaluatorFitsItem } from "@/lib/labellingItem";
 import { EvaluatorScoreCards } from "@/components/human-labelling/EvaluatorScoreCards";
 import { formatEvaluatorResultStat } from "@/lib/evaluatorResultStat";
@@ -117,7 +123,8 @@ export function TracesTabContent({
   isActive?: boolean;
   /** Called after traces are turned into tests, so the Tests tab reloads. */
   onTestsCreated: () => void;
-  /** Called after evaluators are attached here, so the Evaluators tab reloads. */
+  /** Called after evaluators are attached or configured here, so the
+   * Evaluators tab reloads. */
   onAgentDefaultsAttached?: () => void;
 }) {
   const accessToken = useAccessToken();
@@ -478,6 +485,18 @@ export function TracesTabContent({
   const eligibility = traceScoring.eligibility;
   const nothingCanScore =
     eligibility !== null && eligibility.eligible.length === 0;
+  const needValues = ineligible.filter(
+    (item) => item.reason === "declares_variables",
+  );
+  const configureTraceValues = useConfigureTraceValues({
+    agentUuid,
+    agentNature,
+    accessToken,
+    onRefresh: () => {
+      void traceScoring.refreshEligibility();
+      onAgentDefaultsAttached?.();
+    },
+  });
   // What each column's evaluator judges, so a row it does not apply to reads
   // as empty rather than as waiting. Filled with the descriptions below.
   // Null until a read succeeds. A failed re-read keeps the last known types,
@@ -806,20 +825,18 @@ export function TracesTabContent({
   // fit, so every evaluator that can score is named; the backend skips it
   // again if none fits.
   const eligibleEvaluators = eligibility?.eligible ?? [];
-  const scoringNamesForOpenTrace = !openTraceItem
-    ? eligibleEvaluators.map((item) => item.name)
-    : evaluatorTypes
-      ? eligibleEvaluators
-          .filter(
-            (item) =>
-              !!evaluatorTypes[item.evaluator_uuid] &&
-              evaluatorFitsItem(
-                evaluatorTypes[item.evaluator_uuid],
-                openTraceIsToolCall,
-              ),
-          )
-          .map((item) => item.name)
-      : eligibleEvaluators.map((item) => item.name);
+  const scoringForOpenTrace =
+    openTraceItem && evaluatorTypes
+      ? eligibleEvaluators.filter(
+          (item) =>
+            !!evaluatorTypes[item.evaluator_uuid] &&
+            evaluatorFitsItem(
+              evaluatorTypes[item.evaluator_uuid],
+              openTraceIsToolCall,
+            ),
+        )
+      : eligibleEvaluators;
+  const scoringNamesForOpenTrace = scoringForOpenTrace.map((item) => item.name);
   const closeTrace = () => {
     itemPager.cancel();
     setOpenTraceUuid(null);
@@ -864,8 +881,9 @@ export function TracesTabContent({
   const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const currentPage = Math.floor(offset / pageSize) + 1;
 
+  const scoringBlocked = traceScoring.enabled && nothingCanScore;
   const hasWarning =
-    nothingCanScore ||
+    scoringBlocked ||
     overLimit ||
     missingToolCallEvaluator ||
     toolCallEvaluatorCannotScore ||
@@ -882,17 +900,34 @@ export function TracesTabContent({
     </Button>
   );
 
+  const scoringWarning = (message: React.ReactNode) => (
+    <WarningBox
+      action={needValues.length > 0 && configureTraceValues.button}
+    >
+      {message}
+    </WarningBox>
+  );
+
   const emptyState = (
-    <TracesEmptyState
-      agentUuid={agentUuid}
-      agentNature={agentNature}
-      onCheckForTraces={async () => {
-        // The first trace is also the first chance to have labels.
-        refetchLabels();
-        refetchConversationIds();
-        return refetch();
-      }}
-    />
+    <>
+      {traceScoring.enabled &&
+        needValues.length > 0 &&
+        scoringWarning(
+          needValues.length === 1
+            ? "1 evaluator has not been configured for traces"
+            : `${needValues.length} evaluators have not been configured for traces`,
+        )}
+      <TracesEmptyState
+        agentUuid={agentUuid}
+        agentNature={agentNature}
+        onCheckForTraces={async () => {
+          // The first trace is also the first chance to have labels.
+          refetchLabels();
+          refetchConversationIds();
+          return refetch();
+        }}
+      />
+    </>
   );
 
   // A list that failed to load has nothing behind it, so the failure is all
@@ -933,6 +968,7 @@ export function TracesTabContent({
           </button>
         </ErrorNote>
         {showEmptyState && emptyState}
+        {configureTraceValues.dialog}
       </div>
     );
   }
@@ -1005,23 +1041,26 @@ export function TracesTabContent({
           and its detail. Only a real problem takes a row of its own. */}
         {hasLoaded && !showEmptyState && hasWarning && (
           <div className="space-y-2">
-            {nothingCanScore && (
-              <WarningBox>
-                <NothingCanScoreMessage
-                  ineligible={ineligible}
-                  onGoToEvaluators={onGoToEvaluators}
-                />
-              </WarningBox>
-            )}
+            {scoringBlocked &&
+              scoringWarning(
+                everyEvaluatorNeedsValues(ineligible) ? (
+                  EVERY_EVALUATOR_NEEDS_VALUES
+                ) : (
+                  <NothingCanScoreMessage
+                    ineligible={ineligible}
+                    onGoToEvaluators={onGoToEvaluators}
+                  />
+                ),
+              )}
             {/* One warning for one problem: the line above already points
               to the Evaluators tab, where a tool call evaluator can be added. */}
-            {missingToolCallEvaluator && !nothingCanScore && (
+            {missingToolCallEvaluator && !scoringBlocked && (
               <WarningBox>
                 This agent has no tool call evaluator, so its tool calls are not
                 checked. {addToolCallEvaluatorButton()}
               </WarningBox>
             )}
-            {toolCallEvaluatorCannotScore && !nothingCanScore && (
+            {toolCallEvaluatorCannotScore && !scoringBlocked && (
               <WarningBox>
                 No tool call evaluator on this agent can score traces, so its
                 tool calls are not checked. Add one that can in the{" "}
@@ -1311,7 +1350,18 @@ export function TracesTabContent({
             ? scoringNamesForOpenTrace
             : []
         }
+        scoringEvaluatorUuids={
+          traceScoring.enabled
+            ? scoringForOpenTrace.map((item) => item.evaluator_uuid)
+            : []
+        }
         onScored={() => void refetch()}
+        agentNature={agentNature}
+        unconfiguredEvaluators={traceScoring.enabled ? needValues : undefined}
+        onConfigureEvaluator={(uuid) =>
+          configureTraceValues.configure(uuid, openTraceItem)
+        }
+        configuringEvaluatorUuid={configureTraceValues.loadingFor}
         onGoToEvaluators={
           // Pointing at the Evaluators tab helps only when no evaluator that
           // fits this trace is added yet.
@@ -1322,7 +1372,7 @@ export function TracesTabContent({
                 onGoToEvaluators();
               }
         }
-        keysPaused={toolCallPickerOpen}
+        keysPaused={toolCallPickerOpen || configureTraceValues.isOpen}
         isOpen={openTraceUuid != null}
         onClose={closeTrace}
         accessToken={accessToken}
@@ -1465,6 +1515,10 @@ export function TracesTabContent({
           onConfirm={agentDefaults.confirm}
         />
       )}
+
+      {/* Here, not beside its button: the first save can end the warning the
+          button sits in while other evaluators are still waiting. */}
+      {configureTraceValues.dialog}
 
       <DeleteConfirmationDialog
         isOpen={deletion.deleteDialogOpen}
