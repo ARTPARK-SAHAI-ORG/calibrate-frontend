@@ -42,6 +42,10 @@ type EvaluatorPickerProps = {
   /** One list with the ticked evaluators at the top and how many are ticked,
    *  instead of the "My evaluators" and "Default" sections. */
   selectedFirst?: boolean;
+  /** Drawn under the previewed evaluator's prompt as its Variables section. */
+  renderVariablesPanel?: (evaluatorUuid: string) => React.ReactNode;
+  /** Drawn at the right end of an evaluator's row. */
+  renderRowAction?: (evaluator: EvaluatorData) => React.ReactNode;
 };
 
 /**
@@ -60,6 +64,8 @@ export function EvaluatorPicker({
   allowConversationType = false,
   onDeleteEvaluator,
   selectedFirst = false,
+  renderVariablesPanel,
+  renderRowAction,
 }: EvaluatorPickerProps) {
   const [search, setSearch] = useState("");
   // Everything this picker could offer, before the reader's own search.
@@ -117,6 +123,7 @@ export function EvaluatorPicker({
         ) : undefined
       }
       description={ev.description}
+      action={renderRowAction?.(ev)}
     />
   );
 
@@ -264,6 +271,9 @@ export function EvaluatorPicker({
         <EvaluatorPromptPreview
           evaluatorUuid={previewUuid}
           onDelete={onDeleteEvaluator}
+          variablesPanel={
+            previewUuid ? renderVariablesPanel?.(previewUuid) : undefined
+          }
         />
       </div>
     </div>

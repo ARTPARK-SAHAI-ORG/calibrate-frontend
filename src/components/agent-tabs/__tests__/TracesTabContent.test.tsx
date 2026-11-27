@@ -113,25 +113,48 @@ jest.mock("../../../lib/reportError", () => ({
 // evaluators and continues.
 jest.mock("../../traces/TraceLabellingEvaluatorsDialog", () => ({
   TraceLabellingEvaluatorsDialog: ({
-    isOpen,
     agentUuid,
+    traces,
+    fromTrace,
     onChosen,
+    onEvaluatorSetUp,
   }: {
-    isOpen: boolean;
     agentUuid: string;
-    onChosen: (evaluators: { uuid: string; name?: string }[]) => void;
-  }) =>
-    isOpen ? (
-      <div data-testid="labelling-evaluators">
-        <span data-testid="labelling-evaluators-agent">{agentUuid}</span>
-        <button
-          type="button"
-          onClick={() => onChosen([{ uuid: "ev-1", name: "Correctness" }])}
-        >
-          choose evaluators
-        </button>
-      </div>
-    ) : null,
+    traces: { uuid: string; label: string }[];
+    fromTrace?: { uuid: string };
+    onChosen: (
+      evaluators: { uuid: string; name?: string }[],
+      variables: Record<string, Record<string, Record<string, string>>>,
+    ) => void;
+    onEvaluatorSetUp?: () => void;
+  }) => (
+    <div data-testid="labelling-evaluators">
+      <button type="button" onClick={() => onEvaluatorSetUp?.()}>
+        set up an evaluator for labelling
+      </button>
+      <span data-testid="labelling-evaluators-agent">{agentUuid}</span>
+      <span data-testid="labelling-evaluators-traces">
+        {JSON.stringify(traces)}
+      </span>
+      <span data-testid="labelling-evaluators-from">{fromTrace?.uuid}</span>
+      <button
+        type="button"
+        onClick={() => onChosen([{ uuid: "ev-1", name: "Correctness" }], {})}
+      >
+        choose evaluators
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onChosen([{ uuid: "ev-1", name: "Correctness" }], {
+            [traces[0].uuid]: { "ev-1": { topic: "vaccines" } },
+          })
+        }
+      >
+        choose evaluators with values
+      </button>
+    </div>
+    ),
 }));
 // The stub prints what the dialog was handed, so the mapping from traces to
 // labelling items is exercised rather than assumed.
@@ -331,10 +354,16 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     selectAll,
     agentNature,
     nameFrom,
+    traceLabels,
+    fromTrace,
     onConverted,
+    onEvaluatorSetUp,
   }: {
     isOpen: boolean;
+    onEvaluatorSetUp?: () => void;
     nameFrom?: { comment?: string | null; userMessage?: string | null };
+    traceLabels?: Record<string, string>;
+    fromTrace?: { uuid: string };
     agentUuid: string;
     traceUuids: string[];
     testType: "response" | "tool_call" | "general";
@@ -358,6 +387,10 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
         <span data-testid="convert-agent">{agentUuid}</span>
         <span data-testid="convert-traces">{traceUuids.join(",")}</span>
         <span data-testid="convert-type">{testType}</span>
+        <span data-testid="convert-labels">
+          {JSON.stringify(traceLabels ?? null)}
+        </span>
+        <span data-testid="convert-from">{fromTrace?.uuid ?? "none"}</span>
         <span data-testid="convert-name-from">
           {JSON.stringify(nameFrom ?? null)}
         </span>
@@ -378,6 +411,9 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
           {selectAll?.createdBefore ?? "none"}
         </span>
         <span data-testid="convert-nature">{agentNature}</span>
+        <button type="button" onClick={() => onEvaluatorSetUp?.()}>
+          set up an evaluator for tests
+        </button>
         <button
           type="button"
           onClick={() => onConverted({ created: 2, test_uuids: ["t1", "t2"] })}
@@ -2515,6 +2551,41 @@ describe("TracesTabContent", () => {
     expect(lastTracesArgs()).not.toHaveProperty("createdBefore");
   });
 
+  it("names the picked traces by what the user said, and sets up from the first", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Add to tests (1)"));
+    expect(
+      JSON.parse(screen.getByTestId("convert-labels").textContent!),
+    ).toEqual({ "trace-1": "When is the next vaccination?" });
+    expect(screen.getByTestId("convert-from")).toHaveTextContent("trace-1");
+  });
+
+  it.each([
+    ["Add to tests (1)", "set up an evaluator for tests"],
+    ["Submit for labelling (1)", "set up an evaluator for labelling"],
+  ])(
+    "reads the scoring state again after an evaluator is set up from %s",
+    async (open, setUp) => {
+      const user = setupUser();
+      const onAgentDefaultsAttached = jest.fn();
+      render(
+        <TracesTabContent
+          {...tabProps}
+          onAgentDefaultsAttached={onAgentDefaultsAttached}
+        />,
+      );
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+      await user.click(screen.getByText(open));
+      await user.click(screen.getByText(setUp));
+
+      expect(traceScoring.refreshEligibility).toHaveBeenCalledTimes(1);
+      expect(onAgentDefaultsAttached).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it("names one trace's test from its message when it has no comment", async () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
@@ -2524,6 +2595,20 @@ describe("TracesTabContent", () => {
     expect(
       JSON.parse(screen.getByTestId("convert-name-from").textContent!),
     ).toEqual({ userMessage: "When is the next vaccination?" });
+  });
+
+  it("names a trace with no question by its id in the evaluator windows", async () => {
+    const user = setupUser();
+    mockUseTraces.mockReturnValue(
+      tracesResult([trace({ input_preview: null })]),
+    );
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Add to tests (1)"));
+    expect(
+      JSON.parse(screen.getByTestId("convert-labels").textContent!),
+    ).toEqual({ "trace-1": "trace-1" });
   });
 
   it("hands over the comment left with a trace's feedback", async () => {
@@ -2876,7 +2961,7 @@ describe("TracesTabContent", () => {
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
-        "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
+        "The selected traces contain a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
       ),
     );
     expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
@@ -3525,7 +3610,7 @@ describe("TracesTabContent", () => {
     await user.click(screen.getByText("Add to tests (2)"));
 
     expect(toast.error).toHaveBeenCalledWith(
-      "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
+      "The selected traces contain a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
     );
     expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
   });
@@ -3582,6 +3667,31 @@ describe("TracesTabContent", () => {
       await user.click(screen.getAllByLabelText("Select trace")[0]);
 
       expect(screen.getByText("Submit for labelling (1)")).toBeInTheDocument();
+    });
+
+    it("hands the picked traces to the evaluator step and their values to each item", async () => {
+      const user = setupUser();
+      fetchTrace.mockImplementation(async (_token: string, uuid: string) =>
+        detail({ uuid }),
+      );
+      render(<TracesTabContent {...tabProps} />);
+
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+      await user.click(screen.getByText("Submit for labelling (1)"));
+      expect(
+        JSON.parse(
+          screen.getByTestId("labelling-evaluators-traces").textContent!,
+        ),
+      ).toEqual([{ uuid: "trace-1", label: "When is the next vaccination?" }]);
+      expect(screen.getByTestId("labelling-evaluators-from")).toHaveTextContent(
+        "trace-1",
+      );
+      await user.click(screen.getByText("choose evaluators with values"));
+
+      const payload = await screen.findByTestId("labelling-payload");
+      expect(
+        JSON.parse(payload.textContent ?? "[]")[0].evaluatorVariables,
+      ).toEqual({ "ev-1": { topic: "vaccines" } });
     });
 
     it("sends a general agent's trace as plain text, not as turns", async () => {
@@ -3658,6 +3768,12 @@ describe("TracesTabContent", () => {
       // Both can be labelled, so neither is dropped and the count is 2. The
       // evaluator step still runs, because the reply needs a judge picked.
       await user.click(screen.getByText("Submit for labelling (2)"));
+      // Only the reply carries evaluator values, so only it is read for them.
+      expect(
+        JSON.parse(
+          screen.getByTestId("labelling-evaluators-traces").textContent!,
+        ).map((t: { uuid: string }) => t.uuid),
+      ).toEqual(["trace-1"]);
       await user.click(screen.getByText("choose evaluators"));
 
       await waitFor(() =>

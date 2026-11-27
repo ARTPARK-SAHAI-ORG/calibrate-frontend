@@ -6,10 +6,15 @@ import type { EvaluatorData } from "@/lib/evaluatorApi";
 jest.mock("../EvaluatorPromptPreview", () => ({
   EvaluatorPromptPreview: ({
     evaluatorUuid,
+    variablesPanel,
   }: {
     evaluatorUuid: string | null;
+    variablesPanel?: React.ReactNode;
   }) => (
-    <div data-testid="prompt-preview">preview:{evaluatorUuid ?? "none"}</div>
+    <div data-testid="prompt-preview">
+      preview:{evaluatorUuid ?? "none"}
+      {variablesPanel}
+    </div>
   ),
 }));
 
@@ -370,5 +375,14 @@ describe("EvaluatorPicker hidden types", () => {
     );
     expect(screen.getByText("Conversation reply")).toBeInTheDocument();
     expect(screen.queryByText("Binary")).not.toBeInTheDocument();
+  });
+
+  it("draws what the caller gives for the previewed evaluator under its prompt", () => {
+    setup({
+      evaluators: [evaluator({ uuid: "ev-a" })],
+      previewUuid: "ev-a",
+      renderVariablesPanel: (uuid) => <span>extra for {uuid}</span>,
+    });
+    expect(screen.getByText("extra for ev-a")).toBeInTheDocument();
   });
 });

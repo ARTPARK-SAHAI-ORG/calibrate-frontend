@@ -408,3 +408,53 @@ describe("VersionCard", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("VersionCard variables", () => {
+  const version = makeVersion({
+    system_prompt: "Check {{tone}} here.",
+    variables: [{ name: "tone", description: "The tone wanted" }],
+  });
+
+  it("shows the prompt as plain text and the variable definitions without a panel", () => {
+    const { container } = setup({ version, isDefault: true, isLive: true });
+    expect(container.querySelector("mark")).toBeNull();
+    expect(screen.getByText("Check {{tone}} here.")).toBeInTheDocument();
+    expect(screen.getByText("The tone wanted")).toBeInTheDocument();
+    expect(
+      screen.getByText(/fill in the value of each variable/),
+    ).toBeInTheDocument();
+  });
+
+  it("marks each variable and draws the panel instead of the definitions", () => {
+    const { container } = setup({
+      version,
+      isDefault: true,
+      isLive: true,
+      variablesPanel: <p>Panel here</p>,
+    });
+    const marks = container.querySelectorAll("mark");
+    expect(marks).toHaveLength(1);
+    expect(marks[0]).toHaveTextContent("{{tone}}");
+    expect(container.querySelector("pre")).toHaveTextContent(
+      "Check {{tone}} here.",
+    );
+    expect(screen.getByText("Panel here")).toBeInTheDocument();
+    expect(screen.getByText("Variables")).toBeInTheDocument();
+    expect(screen.queryByText("The tone wanted")).not.toBeInTheDocument();
+  });
+
+  it("marks only braces holding a variable name", () => {
+    const { container } = setup({
+      version: makeVersion({
+        system_prompt: "Use {{ tone }}, not {{ my var }} or {{}}.",
+        variables: [{ name: "tone", description: "The tone wanted" }],
+      }),
+      isDefault: true,
+      isLive: true,
+      variablesPanel: <p>Panel here</p>,
+    });
+    const marks = container.querySelectorAll("mark");
+    expect(marks).toHaveLength(1);
+    expect(marks[0]).toHaveTextContent("{{ tone }}");
+  });
+});

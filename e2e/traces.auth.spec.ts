@@ -387,9 +387,8 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     await page.getByRole("button", { name: "Select trace" }).first().click();
 
     // Open the add-to-tests dialog and submit. The agent is new so it has no
-    // evaluators of its own, and the built-in reply evaluator asks for a
-    // criteria value, which puts it out of reach here. So nothing starts
-    // ticked and the first evaluator on offer has to be picked by hand.
+    // evaluators of its own, so nothing starts ticked. Helpfulness is picked
+    // by hand because it has no variables to fill from the trace.
     await page.getByRole("button", { name: /^Add to tests \(/ }).click();
     const dialog = page.locator(".fixed.inset-0.z-50");
     await expect(
@@ -406,9 +405,9 @@ test.describe("Agent Traces tab (authenticated, real backend)", () => {
     });
     // Wait for the evaluators to arrive before reading the button, otherwise
     // it is only disabled because the list is still loading.
-    const firstEvaluator = dialog.getByRole("checkbox").first();
-    await expect(firstEvaluator).toBeVisible({ timeout: 15000 });
-    if (!(await submit.isEnabled())) await firstEvaluator.check();
+    const helpfulness = dialog.getByRole("checkbox", { name: /Helpfulness/ });
+    await expect(helpfulness).toBeVisible({ timeout: 15000 });
+    if (!(await helpfulness.isChecked())) await helpfulness.check();
     // The dialog no longer asks which agents to link: the created tests always
     // belong to the agent whose tab this is.
     await expect(dialog.getByText("Link to agents")).toHaveCount(0);

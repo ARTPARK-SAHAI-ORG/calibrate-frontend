@@ -2,30 +2,47 @@
 
 import React, { useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
-import { EvaluatorPicker } from "@/components/evaluators/EvaluatorPicker";
-import { LoadingState } from "@/components/ui";
+import { Button, LoadingState } from "@/components/ui";
 import { useAgentLlmEvaluators } from "@/hooks/useAgentLlmEvaluators";
-import { agentTaskType } from "@/lib/traceScoring";
+import { reportError } from "@/lib/reportError";
+import { declaresVariables } from "@/lib/traceScoring";
+import type { TraceSummary } from "@/lib/tracesApi";
+import {
+  AgentEvaluatorStep,
+  readTraceValues,
+  READ_VALUES_ERROR,
+  type StepTrace,
+} from "./AgentEvaluatorStep";
+import { MissingValuesDialog, type MissingValues } from "./MissingValuesDialog";
+
+/** Each trace's value for each variable, by trace, then evaluator. Blank
+ *  where the trace had nothing. */
+export type TraceEvaluatorVariables = Record<
+  string,
+  Record<string, Record<string, string>>
+>;
 
 type TraceLabellingEvaluatorsDialogProps = {
-  isOpen: boolean;
   onClose: () => void;
   /** The agent whose traces are being sent, used to seed the selection. */
   agentUuid: string;
   /** Decides which kind of evaluator can judge these traces. */
   agentNature?: "conversation" | "general";
   accessToken: string | null;
-  /** Called with the chosen evaluators when the reader continues. */
-  onChosen: (evaluators: { uuid: string; name?: string }[]) => void;
+  /** The traces whose items carry evaluator values, named the way the
+   *  reader knows them. */
+  traces: StepTrace[];
+  /** The trace set-up is tried on first. */
+  fromTrace?: TraceSummary;
+  /** Called with the chosen evaluators, and what their variables read from
+   *  each trace, when the reader continues. */
+  onChosen: (
+    evaluators: { uuid: string; name?: string }[],
+    variables: TraceEvaluatorVariables,
+  ) => void;
+  /** Called once an evaluator's variables are set up from here. */
+  onEvaluatorSetUp?: () => void;
 };
-
-function toggle(set: Set<string>, uuid: string): Set<string> {
-  const next = new Set(set);
-  if (next.has(uuid)) next.delete(uuid);
-  else next.add(uuid);
-  return next;
-}
 
 /**
  * The first step of sending traces for labelling: which evaluators annotators
@@ -33,34 +50,55 @@ function toggle(set: Set<string>, uuid: string): Set<string> {
  * because that one needs its items ready before it opens.
  */
 export function TraceLabellingEvaluatorsDialog({
-  isOpen,
   onClose,
   agentUuid,
   agentNature = "conversation",
   accessToken,
+  traces,
+  fromTrace,
   onChosen,
+  onEvaluatorSetUp,
 }: TraceLabellingEvaluatorsDialogProps) {
-  useHideFloatingButton(isOpen);
+  useHideFloatingButton(true);
 
-  const { evaluators, preselectedUuids, isLoading, error, addEvaluator } =
-    useAgentLlmEvaluators({
-      agentUuid,
-      accessToken,
-      enabled: isOpen,
-      agentNature,
-    });
-  // Null until the reader ticks something: until then the agent's own
-  // evaluators are what is selected.
-  const [picked, setPicked] = useState<Set<string> | null>(null);
-  const [createFlowOpen, setCreateFlowOpen] = useState(false);
-  // The evaluator made from inside this dialog, so its prompt opens on the
-  // right as well as its box being ticked.
-  const [createdUuid, setCreatedUuid] = useState<string | null>(null);
-  const selected = picked ?? preselectedUuids;
+  const list = useAgentLlmEvaluators({ agentUuid, accessToken, agentNature });
+  const { evaluators, selectedUuids: selected, isLoading, error } = list;
+  const [reading, setReading] = useState(false);
+  const [readError, setReadError] = useState<string | null>(null);
+  const [missing, setMissing] = useState<{
+    shown: MissingValues;
+    filled: TraceEvaluatorVariables;
+  } | null>(null);
 
-  if (!isOpen) return null;
+  const canContinue = !isLoading && !reading && selected.size > 0;
+  const chosen = evaluators.filter((e) => selected.has(e.uuid));
+  const refs = chosen.map((e) => ({ uuid: e.uuid, name: e.name }));
 
-  const canContinue = !isLoading && selected.size > 0;
+  const handleContinue = async () => {
+    const withVariables = chosen.filter(declaresVariables);
+    if (withVariables.length === 0 || !accessToken) {
+      onChosen(refs, {});
+      return;
+    }
+    setReading(true);
+    setReadError(null);
+    try {
+      // A value the trace does not have is left blank for the annotator.
+      const { filled, missing: gaps } = await readTraceValues(
+        accessToken,
+        agentUuid,
+        withVariables,
+        traces,
+      );
+      if (gaps) setMissing({ shown: gaps, filled });
+      else onChosen(refs, filled);
+    } catch (err) {
+      reportError("Error reading trace values:", err);
+      setReadError(READ_VALUES_ERROR);
+    } finally {
+      setReading(false);
+    }
+  };
 
   return (
     <>
@@ -80,101 +118,58 @@ export function TraceLabellingEvaluatorsDialog({
             {isLoading ? (
               <LoadingState />
             ) : (
-              <>
-                {evaluators.length > 0 && (
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-foreground">
-                      Evaluators
-                    </div>
-                    {/* The same offer the empty picker makes, kept in reach
-                        once there is a list to read. */}
-                    <button
-                    type="button"
-                    onClick={() => setCreateFlowOpen(true)}
-                    className="h-8 px-3 rounded-md text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
-                    >
-                    Create evaluator
-                  </button>
+              <AgentEvaluatorStep
+                list={list}
+                agentUuid={agentUuid}
+                accessToken={accessToken}
+                agentNature={agentNature}
+                heading={
+                  <div className="text-sm font-semibold text-foreground">
+                    Evaluators
                   </div>
-                )}
-                <div className="flex-1 min-h-0">
-                  <EvaluatorPicker
-                    evaluators={evaluators}
-                    selectedIds={selected}
-                    onToggle={(uuid) =>
-                      setPicked((prev) =>
-                        toggle(prev ?? preselectedUuids, uuid),
-                      )
-                    }
-                    emptyMessage={
-                      agentNature === "general"
-                        ? "Annotators score each trace against at least one evaluator. Your workspace has none that score a single output, so create one to continue."
-                        : "Annotators score each trace against at least one evaluator. Your workspace has none that score a reply in a conversation, so create one to continue."
-                    }
-                    emptyAction={
-                      <button
-                        type="button"
-                        onClick={() => setCreateFlowOpen(true)}
-                        className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
-                      >
-                        Create evaluator
-                      </button>
-                    }
-                    previewUuid={createdUuid}
-                    fillHeight
-                  />
-                </div>
-
-                {error && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    {error}
-                  </p>
-                )}
-              </>
+                }
+                emptyLead="Annotators score each trace against at least one evaluator."
+                error={error ?? readError}
+                onSetUp={onEvaluatorSetUp}
+                traces={traces}
+                fromTrace={fromTrace}
+                outcome="labelling"
+              />
             )}
           </div>
 
           <div className="flex items-center justify-end gap-2 md:gap-3 p-5 md:p-6 border-t border-border">
-            <button
-              type="button"
+            {/* Held while the values are read, so the next window cannot
+                open after the reader has left this one. */}
+            <Button
+              variant="secondary"
+              size="md"
               onClick={onClose}
-              className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+              disabled={reading}
             >
               Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                onChosen(
-                  evaluators
-                    .filter((e) => selected.has(e.uuid))
-                    .map((e) => ({ uuid: e.uuid, name: e.name })),
-                )
-              }
+            </Button>
+            <Button
+              size="md"
+              onClick={() => void handleContinue()}
               disabled={!canContinue}
-              className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Continue
-            </button>
+              {reading ? "Loading..." : "Continue"}
+            </Button>
           </div>
         </div>
       </div>
 
-      <CreateEvaluatorFlow
-        open={createFlowOpen}
-        onClose={() => setCreateFlowOpen(false)}
-        existingEvaluators={evaluators}
-        onCreated={(created) => {
-          addEvaluator(created);
-          setCreatedUuid(created.uuid);
-          // Ticking already started, so the new one has to join that set
-          // rather than the untouched default.
-          setPicked((prev) => (prev ? new Set(prev).add(created.uuid) : prev));
-          setCreateFlowOpen(false);
-        }}
-        // Single type only, so the flow skips the "what is this for?" step.
-        useCaseTypes={[agentTaskType(agentNature)]}
-      />
+      {missing && (
+        <MissingValuesDialog
+          missing={missing.shown}
+          totalTraces={traces.length}
+          outcome="labelling"
+          agentNature={agentNature}
+          onBack={() => setMissing(null)}
+          onConfirm={() => onChosen(refs, missing.filled)}
+        />
+      )}
     </>
   );
 }

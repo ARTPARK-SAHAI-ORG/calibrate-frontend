@@ -292,19 +292,33 @@ export function PublicChatView({ token }: { token: string }) {
     }
   };
 
+  /** True when it saved. */
   const saveComment = async (traceUuid: string) => {
     const f = feedback[traceUuid] ?? NO_FEEDBACK;
     const comment = f.draft.trim() || null;
     if (await saveFeedback(traceUuid, f.isCorrect, comment)) {
       patchFeedback(traceUuid, { open: false, comment });
+      return true;
     }
+    return false;
   };
 
   // Only a member of the agent's workspace is sent these.
   const { agent_id: agentId, org_uuid: orgUuid } = agent;
   const addToTests =
     agentId && orgUuid
-      ? (turn: Extract<Turn, { role: "agent" }>, index: number) => {
+      ? async (turn: Extract<Turn, { role: "agent" }>, index: number) => {
+          // An evaluator can read the user's comment from the trace, so a
+          // comment changed but not saved (cleared included) is saved first,
+          // or the test would be made without what is on screen.
+          const f = feedback[turn.traceUuid!];
+          if (
+            f?.open &&
+            f.draft.trim() !== (f.comment ?? "") &&
+            !(await saveComment(turn.traceUuid!))
+          ) {
+            return;
+          }
           // The dialog's requests go to the agent's workspace.
           setActiveOrgUuid(orgUuid);
           const asked = turns[index - 1];
@@ -415,7 +429,7 @@ export function PublicChatView({ token }: { token: string }) {
                 patchFeedback(turn.traceUuid, { open: false, draft: "" })
               }
               onSave={() => turn.traceUuid && void saveComment(turn.traceUuid)}
-              onAddToTests={addToTests && (() => addToTests(turn, i))}
+              onAddToTests={addToTests && (() => void addToTests(turn, i))}
             />
           ),
         )}
@@ -543,13 +557,14 @@ export function PublicChatView({ token }: { token: string }) {
           nameFrom={
             converting
               ? {
-                  // A comment typed but not saved yet is what is on screen.
-                  comment: (() => {
-                    const f = feedback[converting.traceUuid];
-                    return f?.open && f.draft.trim() ? f.draft : f?.comment;
-                  })(),
+                  comment: feedback[converting.traceUuid]?.comment,
                   userMessage: converting.userMessage,
                 }
+              : undefined
+          }
+          traceLabels={
+            converting?.userMessage
+              ? { [converting.traceUuid]: converting.userMessage }
               : undefined
           }
           onConverted={(result) => {
@@ -706,7 +721,8 @@ function AgentTurn({
             <button
               type="button"
               onClick={onAddToTests}
-              className="ml-2 h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
+              disabled={feedback.saving}
+              className="ml-2 h-8 px-3 inline-flex items-center gap-1.5 rounded-md text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <PlusIcon className="w-4 h-4" />
               Add to tests

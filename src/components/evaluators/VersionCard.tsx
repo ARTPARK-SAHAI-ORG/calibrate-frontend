@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ViewMoreToggle, InfoNote } from "@/components/ui";
 import { getBinaryLabel } from "@/lib/binaryLabels";
@@ -7,6 +8,7 @@ import { ratingRank, scaleBounds } from "@/lib/ratingRank";
 import { RANKS, RatingRankPill } from "./RatingScaleEditor";
 import { ModelProblemNote } from "@/components/ModelProblemNote";
 import type { ModelProblem } from "@/lib/modelAvailability";
+import { VARIABLE_COLORS } from "@/lib/variableChip";
 
 // Pixel height used as the collapsed cap for prompt bodies. Matches the
 // max-h-[7.5rem] applied to the <pre> below (7.5rem at 16px root).
@@ -48,7 +50,27 @@ type VersionCardProps = {
   isSelectedDetail?: boolean;
   /** Why this version's model cannot be used, or soon will not be. */
   modelProblem?: ModelProblem | null;
+  /** Drawn under the prompt in place of the variable definitions, headed
+   *  "Variables". When given, each `{{variable}}` in the prompt is marked. */
+  variablesPanel?: React.ReactNode;
 };
+
+const PROMPT_VARIABLE = `${VARIABLE_COLORS} rounded px-1`;
+
+/** The prompt with each `{{variable}}` marked. */
+function highlightVariables(prompt: string) {
+  // The capture group keeps each `{{name}}` in the split, at the odd indexes.
+  // Same rule for a name as extractVariableNames.
+  return prompt.split(/(\{\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\}\})/).map((part, i) =>
+    i % 2 ? (
+      <mark key={i} className={PROMPT_VARIABLE}>
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  );
+}
 
 export function VersionCard({
   version,
@@ -60,6 +82,7 @@ export function VersionCard({
   formatDateTime,
   modelProblem = null,
   isSelectedDetail = false,
+  variablesPanel,
 }: VersionCardProps) {
   const [promptVisible, setPromptVisible] = useState(
     isLive || isDefault || isSelectedDetail,
@@ -276,7 +299,9 @@ export function VersionCard({
                   : ""
               }`}
             >
-              {version.system_prompt}
+              {variablesPanel
+                ? highlightVariables(version.system_prompt)
+                : version.system_prompt}
             </pre>
             {clampPrompt && !promptExpanded && (
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 flex items-end justify-center rounded-b-md bg-gradient-to-t from-background via-background/85 to-transparent">
@@ -300,46 +325,50 @@ export function VersionCard({
         </div>
       )}
 
-      {version.variables?.length ? (
+      {variablesPanel || version.variables?.length ? (
         <div className="space-y-2">
           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Variables
           </div>
-          <InfoNote>
-            <span>
-              When this evaluator is added to an LLM test, you will be able to
-              fill in the value of each variable for that test
-            </span>
-          </InfoNote>
-          <div className="border border-border rounded-md overflow-hidden">
-            {version.variables.map((variable, i) => (
-              <div
-                key={variable.name}
-                className={`p-3 md:p-4 bg-background ${
-                  i > 0 ? "border-t border-border" : ""
-                }`}
-              >
-                <code className="text-sm font-mono font-semibold text-foreground">
-                  {`{{${variable.name}}}`}
-                </code>
-                {variable.description && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {variable.description}
-                  </p>
-                )}
-                {variable.default ? (
-                  <div className="mt-2">
-                    <div className="text-[11px] text-muted-foreground mb-1">
-                      Default
-                    </div>
-                    <pre className="text-xs text-foreground whitespace-pre-wrap font-mono bg-muted/30 rounded-md p-2">
-                      {variable.default}
-                    </pre>
+          {variablesPanel || (
+            <>
+              <InfoNote>
+                <span>
+                  When this evaluator is added to an LLM test, you will be able
+                  to fill in the value of each variable for that test
+                </span>
+              </InfoNote>
+              <div className="border border-border rounded-md overflow-hidden">
+                {version.variables!.map((variable, i) => (
+                  <div
+                    key={variable.name}
+                    className={`p-3 md:p-4 bg-background ${
+                      i > 0 ? "border-t border-border" : ""
+                    }`}
+                  >
+                    <code className="text-sm font-mono font-semibold text-foreground">
+                      {`{{${variable.name}}}`}
+                    </code>
+                    {variable.description && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {variable.description}
+                      </p>
+                    )}
+                    {variable.default ? (
+                      <div className="mt-2">
+                        <div className="text-[11px] text-muted-foreground mb-1">
+                          Default
+                        </div>
+                        <pre className="text-xs text-foreground whitespace-pre-wrap font-mono bg-muted/30 rounded-md p-2">
+                          {variable.default}
+                        </pre>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
       ) : null}
 

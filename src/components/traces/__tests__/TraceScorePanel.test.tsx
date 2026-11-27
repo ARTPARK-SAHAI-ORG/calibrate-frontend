@@ -25,6 +25,7 @@ jest.mock("../../EvaluatorVerdictCard", () => ({
     scaleMax,
     versionLabel,
     enableLink,
+    variableValues,
   }: {
     name: string;
     description?: string | null;
@@ -35,11 +36,16 @@ jest.mock("../../EvaluatorVerdictCard", () => ({
     scaleMax?: number;
     versionLabel?: string | null;
     enableLink?: boolean;
+    variableValues?: Record<string, string> | null;
   }) => (
     <div data-testid={`verdict-${name}`}>
       {name} {outputType} match:{String(match)} score:{String(score)} max:
       {String(scaleMax)} {reasoning} version:{String(versionLabel)} link:
       {String(enableLink)} about:{String(description)}
+      {variableValues &&
+        Object.entries(variableValues).map(([k, v]) => (
+          <span key={k}>{`var:${k}=${v}`}</span>
+        ))}
     </div>
   ),
 }));
@@ -102,6 +108,26 @@ it("draws one card per evaluator of the run it is given, with no id pill", () =>
     screen.queryByText(/Latest scores|Earlier scores/),
   ).not.toBeInTheDocument();
   expect(screen.queryByText(/Completed|Scored/)).not.toBeInTheDocument();
+});
+
+it("passes each evaluator the values it was given for this trace, and nothing when there are none", () => {
+  render(
+    <TraceScorePanel
+      run={{
+        ...completed,
+        results: [
+          { ...completed.results[0], variable_values: { language: "Hindi" } },
+          { ...completed.results[1], variable_values: null },
+        ],
+      }}
+    />,
+  );
+  expect(screen.getByTestId("verdict-Tone")).toHaveTextContent(
+    "var:language=Hindi",
+  );
+  expect(screen.getByTestId("verdict-Helpfulness")).not.toHaveTextContent(
+    "var:",
+  );
 });
 
 it("shows a spinner while scoring, the reason when it was skipped, and empty results", () => {

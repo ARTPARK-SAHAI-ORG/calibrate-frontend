@@ -15,6 +15,9 @@ type PickerRowProps = {
   /** A small pill next to the name, e.g. the item's type. */
   badge?: React.ReactNode;
   description?: string;
+  /** Drawn at the right end of the row, such as a button to finish setting
+   *  the item up. */
+  action?: React.ReactNode;
 };
 
 /**
@@ -31,6 +34,7 @@ export function PickerRow({
   name,
   badge,
   description,
+  action,
 }: PickerRowProps) {
   return (
     <div
@@ -67,6 +71,7 @@ export function PickerRow({
           </div>
         )}
       </button>
+      {action && <span className="flex-shrink-0">{action}</span>}
     </div>
   );
 }

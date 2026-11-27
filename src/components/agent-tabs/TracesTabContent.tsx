@@ -15,7 +15,10 @@ import { TraceDetailDialog } from "@/components/traces/TraceDetailDialog";
 import { TracesEmptyState } from "@/components/traces/TracesEmptyState";
 import { AddedToTestsDialog } from "@/components/traces/AddedToTestsDialog";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
-import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
+import {
+  TraceLabellingEvaluatorsDialog,
+  type TraceEvaluatorVariables,
+} from "@/components/traces/TraceLabellingEvaluatorsDialog";
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
 import {
   EvaluatorsTabLink,
@@ -92,6 +95,9 @@ import {
 import { reportError } from "@/lib/reportError";
 import { fetchChatLink, type ChatLink } from "@/lib/chatLinkApi";
 import { WarningBox } from "@/components/traces/WarningBox";
+
+const MIXED_SELECTION_ERROR =
+  "The selected traces contain a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.";
 
 /**
  * A number of traces, said the way a person says it: "1 trace", "50,000
@@ -284,11 +290,19 @@ export function TracesTabContent({
     isLabellableOutput(traceRowOutputFacts(trace)),
   );
   const labellableUuids = labellableTraces.map((trace) => trace.uuid);
+  // How a trace is named in the evaluator windows: what the user said.
+  const traceLabel = (trace: TraceSummary) =>
+    trace.input_preview || trace.uuid;
   // A selection that is nothing but tool calls skips the evaluator step: a
   // tool-call row is answered only against the tool-call evaluator, so there
   // is nothing to pick.
   const labellingIsToolCallOnly =
     labellableTraces.length > 0 && labellableTraces.every(isToolCallTraceRow);
+  // A tool-call item carries no evaluator values, so only the rest are read
+  // and checked for them.
+  const replyTraces = labellableTraces.filter(
+    (trace) => !isToolCallTraceRow(trace),
+  );
 
   // Send selected traces for labelling. Step one asks which evaluators the
   // annotators score against; step two needs the full traces, which the list
@@ -307,7 +321,10 @@ export function TracesTabContent({
   const labellableRef = useRef(labellableUuids);
   labellableRef.current = labellableUuids;
 
-  const prepareLabelling = async (chosen: SourceEvaluatorRef[]) => {
+  const prepareLabelling = async (
+    chosen: SourceEvaluatorRef[],
+    variables: TraceEvaluatorVariables,
+  ) => {
     setEvaluatorStepOpen(false);
     if (!accessToken) return;
     const uuids = labellableRef.current;
@@ -364,6 +381,7 @@ export function TracesTabContent({
               : (trace.input ?? []).filter((turn) => turn.role !== "system"),
           output: trace.output,
           metadata: traceLabellingMetadata(trace),
+          evaluatorVariables: variables[trace.uuid],
         })),
       );
     } finally {
@@ -494,14 +512,17 @@ export function TracesTabContent({
   const needValues = ineligible.filter(
     (item) => item.reason === "declares_variables",
   );
+  // Setting up an evaluator's variables can link it to the agent and lets it
+  // score, so the scoring state and the agent's evaluators are read again.
+  const afterEvaluatorSetUp = () => {
+    void traceScoring.refreshEligibility();
+    onAgentDefaultsAttached?.();
+  };
   const configureTraceValues = useConfigureTraceValues({
     agentUuid,
     agentNature,
     accessToken,
-    onRefresh: () => {
-      void traceScoring.refreshEligibility();
-      onAgentDefaultsAttached?.();
-    },
+    onRefresh: afterEvaluatorSetUp,
   });
   // What each column's evaluator judges, so a row it does not apply to reads
   // as empty rather than as waiting. Filled with the descriptions below.
@@ -1242,9 +1263,7 @@ export function TracesTabContent({
                     onClick={async () => {
                       if (!everyTraceMatching) {
                         if (isMixedSelection) {
-                          toast.error(
-                            "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
-                          );
+                          toast.error(MIXED_SELECTION_ERROR);
                           return;
                         }
                         setConvertOpen(true);
@@ -1258,9 +1277,7 @@ export function TracesTabContent({
                           : facets.outputType;
                       if (!kind) return;
                       if (kind === "mixed") {
-                        toast.error(
-                          "The selected traces contains a mix of responses and tool calls. Select all traces having the same type of output at a time to add them as a group.",
-                        );
+                        toast.error(MIXED_SELECTION_ERROR);
                         return;
                       }
                       setConvertOpen(true);
@@ -1278,7 +1295,7 @@ export function TracesTabContent({
                       }
                       onOpen={() =>
                         labellingIsToolCallOnly
-                          ? prepareLabelling([])
+                          ? prepareLabelling([], {})
                           : setEvaluatorStepOpen(true)
                       }
                       className={SUBMIT_FOR_LABELLING_CLASS}
@@ -1462,6 +1479,11 @@ export function TracesTabContent({
               }
             : undefined
         }
+        traceLabels={Object.fromEntries(
+          selectedTraces.map((trace) => [trace.uuid, traceLabel(trace)]),
+        )}
+        fromTrace={selectedTraces[0]}
+        onEvaluatorSetUp={afterEvaluatorSetUp}
         onConverted={(result, evaluatorsUsed = []) => {
           setConvertOpen(false);
           const created = result.created;
@@ -1501,12 +1523,17 @@ export function TracesTabContent({
           evaluators rather than the last visit's ticks. */}
       {evaluatorStepOpen && (
         <TraceLabellingEvaluatorsDialog
-          isOpen
           onClose={() => setEvaluatorStepOpen(false)}
           agentUuid={agentUuid}
           agentNature={agentNature}
           accessToken={accessToken}
+          traces={replyTraces.map((trace) => ({
+            uuid: trace.uuid,
+            label: traceLabel(trace),
+          }))}
+          fromTrace={replyTraces[0]}
           onChosen={prepareLabelling}
+          onEvaluatorSetUp={afterEvaluatorSetUp}
         />
       )}
 

@@ -4,14 +4,16 @@ import {
   isMissingTraceValue,
   isToolCallTraceRow,
   isTraceScoringInProgress,
-  missingSourcePhrase,
+  declaresVariables,
   missingTraceValues,
   needsTraceValues,
   nothingCanScoreCopy,
   scoringFailedCopy,
   scoringRunErrorCopy,
   traceChoices,
+  traceSourceHint,
   traceSourceLabel,
+  traceSourceName,
   traceSources,
   traceRowOutputFacts,
 } from "../traceScoring";
@@ -174,6 +176,7 @@ describe("naming a part of a trace", () => {
       "Conversation",
       "Agent reply",
       "Tool calls",
+      "User feedback comment",
       "Metadata",
       "Labels",
       "Conversation ID",
@@ -183,6 +186,7 @@ describe("naming a part of a trace", () => {
       "Input",
       "Output",
       "Tool calls",
+      "User feedback comment",
       "Metadata",
       "Labels",
     ]);
@@ -199,17 +203,22 @@ describe("naming a part of a trace", () => {
     expect(traceSourceLabel("output.response")).toBe("Agent reply");
   });
 
+  it("names the user's feedback comment and says what it holds", () => {
+    expect(traceSourceLabel("feedback.comment")).toBe("User feedback comment");
+    expect(traceSourceHint("feedback.comment")).toBe(
+      "The comment given by the user along with the feedback for the trace",
+    );
+    expect(traceSourceHint("metadata.language")).toBe(
+      "A field your code sent in the trace's metadata",
+    );
+    expect(traceSourceHint("input")).toBeNull();
+  });
+
   it("names a value this agent's list does not offer, or leaves it as it is", () => {
     expect(traceSourceLabel("message_id", "general")).toBe("Message ID");
     expect(traceSourceLabel("somewhere_new")).toBe("somewhere_new");
   });
 
-  it("says where a variable is mapped to", () => {
-    expect(missingSourcePhrase("output.response")).toBe("the trace's agent reply");
-    expect(missingSourcePhrase("input", "conversation")).toBe(
-      "the trace's conversation",
-    );
-  });
 });
 
 describe("traceChoices", () => {
@@ -226,9 +235,24 @@ describe("traceChoices", () => {
   });
 });
 
-describe("naming a part of a trace in a sentence", () => {
-  it("keeps ID in capitals", () => {
-    expect(missingSourcePhrase("message_id")).toBe("the trace's message ID");
+describe("traceSourceName", () => {
+  it("names a part of a trace inside a sentence, keeping ID in capitals", () => {
+    expect(traceSourceName("output.response")).toBe("agent reply");
+    expect(traceSourceName("input", "conversation")).toBe("conversation");
+    expect(traceSourceName("output.response", "general")).toBe("output");
+    expect(traceSourceName("feedback.comment")).toBe("user feedback comment");
+    expect(traceSourceName("conversation_id")).toBe("conversation ID");
+    expect(traceSourceName("message_id")).toBe("message ID");
+  });
+});
+
+describe("declaresVariables", () => {
+  it("is true only when the live version has variables", () => {
+    const withVariables = (variables?: { name: string }[]) =>
+      ({ live_version: variables ? { variables } : null }) as EvaluatorData;
+    expect(declaresVariables(withVariables([{ name: "a" }]))).toBe(true);
+    expect(declaresVariables(withVariables([]))).toBe(false);
+    expect(declaresVariables(withVariables())).toBe(false);
   });
 });
 
