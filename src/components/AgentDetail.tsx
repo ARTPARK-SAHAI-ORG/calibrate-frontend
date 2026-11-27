@@ -26,6 +26,7 @@ import {
   AgentTabContent,
   AgentConnectionTabContent,
   ToolsTabContent,
+  KnowledgeBaseTabContent,
   // DataExtractionTabContent, // TODO: temporarily disabled — extraction UI removed for now
   TestsTabContent,
   RunsTabContent,
@@ -38,6 +39,11 @@ import type {
   DataExtractionFieldData,
 } from "@/components/agent-tabs";
 import { resolveSavedModel } from "@/lib/modelAvailability";
+import {
+  knowledgeBaseOverBy,
+  knowledgeBaseTooLongToDuplicate,
+  knowledgeBaseTooLongToSave,
+} from "@/lib/knowledgeBase";
 import {
   useOpenRouterModels,
   useVerifyConnection,
@@ -108,6 +114,7 @@ type TabType =
   | "agent"
   | "connection"
   | "tools"
+  | "knowledge-base"
   | "data-extraction"
   | "tests"
   | "runs"
@@ -119,6 +126,7 @@ const tabLabels: Record<TabType, string> = {
   agent: "Agent",
   connection: "Connection",
   tools: "Tools",
+  "knowledge-base": "Knowledge base",
   "data-extraction": "Data extraction",
   tests: "Tests",
   runs: "Evaluations",
@@ -134,6 +142,7 @@ const tabLabels: Record<TabType, string> = {
 const calibrateTabs: TabType[] = [
   "agent",
   "tools",
+  "knowledge-base",
   // "data-extraction", // TODO: temporarily disabled — extraction UI removed for now
   "runs",
   "tests",
@@ -326,9 +335,12 @@ export function AgentDetail({
   // The agent's own limit on chat link messages a day; null until someone
   // sets one, which leaves the workspace default in charge.
   const [messagesPerDay, setMessagesPerDay] = useState<number | null>(null);
+  const [knowledgeBaseText, setKnowledgeBaseText] = useState("");
   const [activeOrgUuid] = useActiveOrgUuid();
   const { organizations } = useOrganizations(backendAccessToken);
-  const messagesPerDayMaximum = useOrgLimits().max_chat_replies_per_day;
+  const orgLimits = useOrgLimits();
+  const messagesPerDayMaximum = orgLimits.max_chat_replies_per_day;
+  const knowledgeBaseMaxChars = orgLimits.max_knowledge_base_chars;
   const shownMessagesPerDay =
     messagesPerDay ??
     workspaceDefaultMessagesPerDay(
@@ -579,6 +591,9 @@ export function AgentDetail({
           if (data.config.talk_to_agent?.messages_per_day !== undefined) {
             setMessagesPerDay(data.config.talk_to_agent.messages_per_day);
           }
+          if (typeof data.config.knowledge_base?.text === "string") {
+            setKnowledgeBaseText(data.config.knowledge_base.text);
+          }
           if (data.config.system_tools?.end_call !== undefined) {
             setEndConversationEnabled(data.config.system_tools.end_call);
           }
@@ -725,6 +740,13 @@ export function AgentDetail({
         if (!silent) toast.error(messagesPerDayProblem);
         return false;
       }
+      if (agent.type !== "connection") {
+        const over = knowledgeBaseOverBy(knowledgeBaseText, knowledgeBaseMaxChars);
+        if (over > 0) {
+          if (!silent) toast.error(knowledgeBaseTooLongToSave(over));
+          return false;
+        }
+      }
       // Written only once someone has set a number for this agent.
       const talkToAgent =
         messagesPerDay === null
@@ -766,6 +788,7 @@ export function AgentDetail({
                   max_assistant_turns: maxAssistantTurns,
                 },
                 ...talkToAgent,
+                knowledge_base: { text: knowledgeBaseText },
                 system_tools: { end_call: endConversationEnabled },
                 data_extraction_fields: dataExtractionFields.map((field) => ({
                   name: field.name,
@@ -862,6 +885,8 @@ export function AgentDetail({
     maxAssistantTurns,
     messagesPerDay,
     messagesPerDayMaximum,
+    knowledgeBaseText,
+    knowledgeBaseMaxChars,
     endConversationEnabled,
     dataExtractionFields,
     connectionUrl,
@@ -1415,6 +1440,19 @@ export function AgentDetail({
           </div>
         )}
 
+        {/* Knowledge Base Tab Content */}
+        {agent.type !== "connection" && shouldRenderTab("knowledge-base") && (
+          <div
+            className={activeTab === "knowledge-base" ? undefined : "hidden"}
+          >
+            <KnowledgeBaseTabContent
+              text={knowledgeBaseText}
+              onTextChange={setKnowledgeBaseText}
+              maxChars={knowledgeBaseMaxChars}
+            />
+          </div>
+        )}
+
         {/* Data Extraction Tab Content */}
         {/* TODO: temporarily disabled — extraction UI removed for now
         {activeTab === "data-extraction" && (
@@ -1542,8 +1580,15 @@ export function AgentDetail({
             router.push(`/agents/${newAgentUuid}`)
           }
           // The copy is made from the agent stored on the server, so save what
-          // is on screen first.
-          onBeforeDuplicate={() => saveRef.current({ silent: true })}
+          // is on screen first, and say why when that save cannot happen.
+          onBeforeDuplicate={async () => {
+            const over =
+              agent.type === "connection"
+                ? 0
+                : knowledgeBaseOverBy(knowledgeBaseText, knowledgeBaseMaxChars);
+            if (over > 0) return knowledgeBaseTooLongToDuplicate(over);
+            return saveRef.current({ silent: true });
+          }}
         />
       )}
 

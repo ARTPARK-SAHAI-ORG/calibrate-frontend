@@ -4,6 +4,7 @@ export type { LLMModel } from "./AgentTabContent";
 export type { LLMProvider } from "./constants/providers";
 
 export { ToolsTabContent } from "./ToolsTabContent";
+export { KnowledgeBaseTabContent } from "./KnowledgeBaseTabContent";
 
 export { DataExtractionTabContent } from "./DataExtractionTabContent";
 export type { DataExtractionFieldData } from "./DataExtractionTabContent";

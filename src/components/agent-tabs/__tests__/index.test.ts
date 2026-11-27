@@ -10,6 +10,7 @@ describe("agent-tabs barrel", () => {
       "AgentTabContent",
       "AgentConnectionTabContent",
       "ToolsTabContent",
+      "KnowledgeBaseTabContent",
       "DataExtractionTabContent",
       "EvaluationTabContent",
       "TestsTabContent",

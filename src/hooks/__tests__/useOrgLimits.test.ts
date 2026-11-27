@@ -110,15 +110,18 @@ describe("getOrgLimits", () => {
     await expect(getOrgLimits("token-clear")).resolves.toEqual({
       uses_own_provider_keys: false,
       max_chat_replies_per_day: 200,
+      max_knowledge_base_chars: null,
     });
     clearOrgLimitsCache();
     mockApiGet.mockResolvedValue({
       uses_own_provider_keys: true,
       max_chat_replies_per_day: null,
+      max_knowledge_base_chars: 5000,
     });
     await expect(getOrgLimits("token-clear")).resolves.toEqual({
       uses_own_provider_keys: true,
       max_chat_replies_per_day: null,
+      max_knowledge_base_chars: 5000,
     });
     expect(mockApiGet).toHaveBeenCalledTimes(2);
   });

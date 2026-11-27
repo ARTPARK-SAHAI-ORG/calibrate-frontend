@@ -4,7 +4,9 @@ import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 import { AgentDetail } from "../AgentDetail";
 
-jest.mock("sonner", () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
+jest.mock("sonner", () => ({
+  toast: { success: jest.fn(), error: jest.fn() },
+}));
 
 const useAccessTokenMock = jest.fn();
 const usePageErrorStateMock = jest.fn();
@@ -28,7 +30,10 @@ jest.mock("../../hooks", () => ({
       },
     ],
   }),
-  useOrgLimits: () => ({ max_chat_replies_per_day: 300 }),
+  useOrgLimits: () => ({
+    max_chat_replies_per_day: 300,
+    max_knowledge_base_chars: 5000,
+  }),
 }));
 
 jest.mock("../../lib/reportError", () => ({
@@ -87,6 +92,22 @@ jest.mock("../agent-tabs", () => ({
   ),
   ToolsTabContent: () => (
     <div data-testid="tools-tab-content">ToolsTabContent</div>
+  ),
+  KnowledgeBaseTabContent: (props: {
+    text: string;
+    onTextChange: (text: string) => void;
+    maxChars: number | null;
+  }) => (
+    <div data-testid="knowledge-base-tab">
+      <span data-testid="knowledge-base-text">{props.text}</span>
+      <span data-testid="knowledge-base-max">{String(props.maxChars)}</span>
+      <button onClick={() => props.onTextChange("Clinic hours: 9 to 5")}>
+        SetKnowledgeBase
+      </button>
+      <button onClick={() => props.onTextChange("a".repeat(5007))}>
+        SetLongKnowledgeBase
+      </button>
+    </div>
   ),
   DataExtractionTabContent: () => (
     <div data-testid="data-extraction-tab-content">
@@ -459,6 +480,7 @@ describe("AgentDetail", () => {
           "Monitoring",
           "Connection",
           "Tools",
+          "Knowledge base",
           "Settings",
         ].includes(label ?? ""),
       );
@@ -487,6 +509,7 @@ describe("AgentDetail", () => {
         [
           "Agent",
           "Tools",
+          "Knowledge base",
           "Evaluations",
           "Tests",
           "Evaluators",
@@ -497,6 +520,7 @@ describe("AgentDetail", () => {
     expect(tabNames).toEqual([
       "Agent",
       "Tools",
+      "Knowledge base",
       "Evaluations",
       "Tests",
       "Evaluators",
@@ -623,9 +647,7 @@ describe("AgentDetail", () => {
     mockFetchSequenceForAgent(generalAgent);
     render(<AgentDetail agentUuid={generalAgent.uuid} />);
 
-    await waitFor(() =>
-      expect(screen.getByText("Basic")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("Basic")).toBeInTheDocument());
   });
 
   it("defaults the agent's nature to conversation when interaction_type is absent", async () => {
@@ -1037,6 +1059,160 @@ describe("AgentDetail", () => {
     await waitFor(() =>
       expect(screen.getByText("Saved successfully")).toBeInTheDocument(),
     );
+  });
+
+  describe("knowledge base", () => {
+    const lastPutBody = () => {
+      const put = (global.fetch as jest.Mock).mock.calls
+        .filter(([, init]) => init?.method === "PUT")
+        .at(-1);
+      return put ? JSON.parse(put[1].body) : null;
+    };
+
+    it("shows the stored text on the tab and saves it, empty when none was stored", async () => {
+      mockFetchSequenceForAgent(buildAgent);
+      const user = setupUser();
+      render(<AgentDetail agentUuid={buildAgent.uuid} />);
+      await waitFor(() =>
+        expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+      );
+
+      await clickLastSaveButton(user);
+      await waitFor(() => expect(lastPutBody()).not.toBeNull());
+      expect(lastPutBody().config.knowledge_base).toEqual({ text: "" });
+
+      await user.click(screen.getByText("Knowledge base"));
+      expectVisibleTab("knowledge-base-tab", "agent-tab-content");
+      expect(screen.getByTestId("knowledge-base-max")).toHaveTextContent("5000");
+      await user.click(screen.getByText("SetKnowledgeBase"));
+      expect(screen.getByTestId("knowledge-base-text")).toHaveTextContent(
+        "Clinic hours: 9 to 5",
+      );
+      await clickLastSaveButton(user);
+      await waitFor(() =>
+        expect(lastPutBody().config.knowledge_base).toEqual({
+          text: "Clinic hours: 9 to 5",
+        }),
+      );
+    });
+
+    it("loads the stored knowledge base into the tab", async () => {
+      mockFetchSequenceForAgent({
+        ...buildAgent,
+        config: {
+          ...buildAgent.config,
+          knowledge_base: { text: "Refunds take 7 days" },
+        },
+      });
+      const user = setupUser();
+      render(<AgentDetail agentUuid={buildAgent.uuid} />);
+      await waitFor(() =>
+        expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Knowledge base"));
+      expect(screen.getByTestId("knowledge-base-text")).toHaveTextContent(
+        "Refunds take 7 days",
+      );
+
+      await clickLastSaveButton(user);
+      await waitFor(() =>
+        expect(lastPutBody().config.knowledge_base).toEqual({
+          text: "Refunds take 7 days",
+        }),
+      );
+    });
+
+    it("refuses to save a knowledge base over the limit, and says by how much", async () => {
+      mockFetchSequenceForAgent(buildAgent);
+      const user = setupUser();
+      render(<AgentDetail agentUuid={buildAgent.uuid} />);
+      await waitFor(() =>
+        expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Knowledge base"));
+      await user.click(screen.getByText("SetLongKnowledgeBase"));
+      await clickLastSaveButton(user);
+
+      expect(toast.error).toHaveBeenCalledWith(
+        "The knowledge base is 7 characters over the limit. Shorten it to save.",
+      );
+      expect(lastPutBody()).toBeNull();
+    });
+
+    it("does not duplicate, and says why in the Duplicate window, when the knowledge base is over the limit", async () => {
+      mockFetchSequenceForAgent(buildAgent);
+      const user = setupUser();
+      render(<AgentDetail agentUuid={buildAgent.uuid} />);
+      await waitFor(() =>
+        expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Knowledge base"));
+      await user.click(screen.getByText("SetLongKnowledgeBase"));
+      await clickHeaderDuplicate(user);
+      await clickConfirmDuplicate(user);
+
+      expect(
+        await screen.findByText(
+          "The knowledge base is 7 characters over the limit. Shorten it on the Knowledge base tab, then duplicate.",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/Your latest changes could not be saved/),
+      ).not.toBeInTheDocument();
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(lastPutBody()).toBeNull();
+      expect(
+        (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+          String(url).endsWith("/duplicate"),
+        ),
+      ).toBe(false);
+    });
+
+    it("opens on the tab from ?tab=knowledge-base, and a connection agent ignores it", async () => {
+      const navigation = jest.requireMock("next/navigation") as {
+        useSearchParams: () => URLSearchParams;
+      };
+      const original = navigation.useSearchParams;
+      navigation.useSearchParams = () =>
+        new URLSearchParams("tab=knowledge-base");
+      try {
+        mockFetchSequenceForAgent(buildAgent);
+        const { unmount } = render(<AgentDetail agentUuid={buildAgent.uuid} />);
+        await waitFor(() =>
+          expect(screen.getByText("Build Agent")).toBeInTheDocument(),
+        );
+        expect(tabWrapper("knowledge-base-tab")).not.toHaveClass("hidden");
+        expect(
+          screen.queryByTestId("agent-tab-content"),
+        ).not.toBeInTheDocument();
+        unmount();
+
+        mockFetchSequenceForAgent(connectionAgent);
+        render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+        await waitFor(() =>
+          expect(screen.getByTestId("runs-tab-content")).toBeInTheDocument(),
+        );
+        expect(
+          screen.queryByTestId("knowledge-base-tab"),
+        ).not.toBeInTheDocument();
+      } finally {
+        navigation.useSearchParams = original;
+      }
+    });
+
+    it("has no Knowledge base tab and saves no knowledge base for a connection agent", async () => {
+      mockFetchSequenceForAgent(connectionAgent);
+      const user = setupUser();
+      render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+      await waitFor(() =>
+        expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Knowledge base")).not.toBeInTheDocument();
+
+      await clickLastSaveButton(user);
+      await waitFor(() => expect(lastPutBody()).not.toBeNull());
+      expect(lastPutBody().config).not.toHaveProperty("knowledge_base");
+    });
   });
 
   describe("messages per day", () => {
@@ -1547,6 +1723,30 @@ describe("AgentDetail", () => {
       return Promise.resolve(jsonResponse([]));
     });
   }
+
+  it("duplicates a connection agent whatever its stored knowledge base, which it never uses", async () => {
+    mockFetchSequenceForAgent({
+      ...connectionAgent,
+      config: {
+        ...connectionAgent.config,
+        knowledge_base: { text: "a".repeat(5007) },
+      },
+    });
+    const user = setupUser();
+    render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+    await waitFor(() =>
+      expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
+    );
+
+    await clickHeaderDuplicate(user);
+    mockSaveThenDuplicate(jsonResponse({ uuid: "dup-uuid" }));
+    await clickConfirmDuplicate(user);
+
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/agents/dup-uuid"),
+    );
+    expect(screen.queryByText(/over the limit/)).not.toBeInTheDocument();
+  });
 
   it("saves the on-screen changes, duplicates the agent, and opens the copy", async () => {
     mockFetchSequenceForAgent(buildAgent);

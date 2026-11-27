@@ -21,7 +21,8 @@ import {
  *
  * The backend copies the agent it has stored, so a caller that holds edits the
  * person has not saved yet passes `onBeforeDuplicate` to save them first. It
- * returns false when that save fails, and nothing is copied.
+ * returns false when that save fails, or the reason in words when it knows why,
+ * and nothing is copied.
  *
  * The copy can be a different kind of agent from the original, which is the
  * only way to move an agent between holding a conversation and answering once:
@@ -49,7 +50,7 @@ export function DuplicateAgentDialog({
     name: string,
     interactionType: InteractionType,
   ) => void;
-  onBeforeDuplicate?: () => Promise<boolean>;
+  onBeforeDuplicate?: () => Promise<boolean | string>;
 }) {
   const backendAccessToken = useAccessToken();
   const [agentName, setAgentName] = useState(`Copy of ${originalName}`);
@@ -75,9 +76,12 @@ export function DuplicateAgentDialog({
         throw new Error("BACKEND_URL environment variable is not set");
       }
 
-      if (onBeforeDuplicate && !(await onBeforeDuplicate())) {
+      const saved = onBeforeDuplicate ? await onBeforeDuplicate() : true;
+      if (saved !== true) {
         setError(
-          "Your latest changes could not be saved, so the copy was not created. Try again.",
+          typeof saved === "string"
+            ? saved
+            : "Your latest changes could not be saved, so the copy was not created. Try again.",
         );
         setIsDuplicating(false);
         return;
