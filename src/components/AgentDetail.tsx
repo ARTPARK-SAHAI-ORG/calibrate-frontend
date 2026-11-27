@@ -39,7 +39,11 @@ import type {
   DataExtractionFieldData,
 } from "@/components/agent-tabs";
 import { resolveSavedModel } from "@/lib/modelAvailability";
-import { knowledgeBaseOverBy } from "@/lib/knowledgeBase";
+import {
+  knowledgeBaseOverBy,
+  knowledgeBaseTooLongToDuplicate,
+  knowledgeBaseTooLongToSave,
+} from "@/lib/knowledgeBase";
 import {
   useOpenRouterModels,
   useVerifyConnection,
@@ -334,7 +338,9 @@ export function AgentDetail({
   const [knowledgeBaseText, setKnowledgeBaseText] = useState("");
   const [activeOrgUuid] = useActiveOrgUuid();
   const { organizations } = useOrganizations(backendAccessToken);
-  const messagesPerDayMaximum = useOrgLimits().max_chat_replies_per_day;
+  const orgLimits = useOrgLimits();
+  const messagesPerDayMaximum = orgLimits.max_chat_replies_per_day;
+  const knowledgeBaseMaxChars = orgLimits.max_knowledge_base_chars;
   const shownMessagesPerDay =
     messagesPerDay ??
     workspaceDefaultMessagesPerDay(
@@ -735,13 +741,9 @@ export function AgentDetail({
         return false;
       }
       if (agent.type !== "connection") {
-        const over = knowledgeBaseOverBy(knowledgeBaseText);
+        const over = knowledgeBaseOverBy(knowledgeBaseText, knowledgeBaseMaxChars);
         if (over > 0) {
-          if (!silent) {
-            toast.error(
-              `The knowledge base is ${over.toLocaleString("en-US")} characters over the limit. Shorten it to save.`,
-            );
-          }
+          if (!silent) toast.error(knowledgeBaseTooLongToSave(over));
           return false;
         }
       }
@@ -884,6 +886,7 @@ export function AgentDetail({
     messagesPerDay,
     messagesPerDayMaximum,
     knowledgeBaseText,
+    knowledgeBaseMaxChars,
     endConversationEnabled,
     dataExtractionFields,
     connectionUrl,
@@ -1445,6 +1448,7 @@ export function AgentDetail({
             <KnowledgeBaseTabContent
               text={knowledgeBaseText}
               onTextChange={setKnowledgeBaseText}
+              maxChars={knowledgeBaseMaxChars}
             />
           </div>
         )}
@@ -1576,8 +1580,15 @@ export function AgentDetail({
             router.push(`/agents/${newAgentUuid}`)
           }
           // The copy is made from the agent stored on the server, so save what
-          // is on screen first.
-          onBeforeDuplicate={() => saveRef.current({ silent: true })}
+          // is on screen first, and say why when that save cannot happen.
+          onBeforeDuplicate={async () => {
+            const over =
+              agent.type === "connection"
+                ? 0
+                : knowledgeBaseOverBy(knowledgeBaseText, knowledgeBaseMaxChars);
+            if (over > 0) return knowledgeBaseTooLongToDuplicate(over);
+            return saveRef.current({ silent: true });
+          }}
         />
       )}
 

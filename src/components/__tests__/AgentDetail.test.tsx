@@ -30,7 +30,10 @@ jest.mock("../../hooks", () => ({
       },
     ],
   }),
-  useOrgLimits: () => ({ max_chat_replies_per_day: 300 }),
+  useOrgLimits: () => ({
+    max_chat_replies_per_day: 300,
+    max_knowledge_base_chars: 5000,
+  }),
 }));
 
 jest.mock("../../lib/reportError", () => ({
@@ -93,9 +96,11 @@ jest.mock("../agent-tabs", () => ({
   KnowledgeBaseTabContent: (props: {
     text: string;
     onTextChange: (text: string) => void;
+    maxChars: number | null;
   }) => (
     <div data-testid="knowledge-base-tab">
       <span data-testid="knowledge-base-text">{props.text}</span>
+      <span data-testid="knowledge-base-max">{String(props.maxChars)}</span>
       <button onClick={() => props.onTextChange("Clinic hours: 9 to 5")}>
         SetKnowledgeBase
       </button>
@@ -1078,6 +1083,7 @@ describe("AgentDetail", () => {
 
       await user.click(screen.getByText("Knowledge base"));
       expectVisibleTab("knowledge-base-tab", "agent-tab-content");
+      expect(screen.getByTestId("knowledge-base-max")).toHaveTextContent("5000");
       await user.click(screen.getByText("SetKnowledgeBase"));
       expect(screen.getByTestId("knowledge-base-text")).toHaveTextContent(
         "Clinic hours: 9 to 5",
@@ -1133,7 +1139,7 @@ describe("AgentDetail", () => {
       expect(lastPutBody()).toBeNull();
     });
 
-    it("does not duplicate, and says nothing, when the knowledge base is over the limit", async () => {
+    it("does not duplicate, and says why in the Duplicate window, when the knowledge base is over the limit", async () => {
       mockFetchSequenceForAgent(buildAgent);
       const user = setupUser();
       render(<AgentDetail agentUuid={buildAgent.uuid} />);
@@ -1145,6 +1151,14 @@ describe("AgentDetail", () => {
       await clickHeaderDuplicate(user);
       await clickConfirmDuplicate(user);
 
+      expect(
+        await screen.findByText(
+          "The knowledge base is 7 characters over the limit. Shorten it on the Knowledge base tab, then duplicate.",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/Your latest changes could not be saved/),
+      ).not.toBeInTheDocument();
       expect(toast.error).not.toHaveBeenCalled();
       expect(lastPutBody()).toBeNull();
       expect(
@@ -1709,6 +1723,30 @@ describe("AgentDetail", () => {
       return Promise.resolve(jsonResponse([]));
     });
   }
+
+  it("duplicates a connection agent whatever its stored knowledge base, which it never uses", async () => {
+    mockFetchSequenceForAgent({
+      ...connectionAgent,
+      config: {
+        ...connectionAgent.config,
+        knowledge_base: { text: "a".repeat(5007) },
+      },
+    });
+    const user = setupUser();
+    render(<AgentDetail agentUuid={connectionAgent.uuid} />);
+    await waitFor(() =>
+      expect(screen.getByText("Connect Agent")).toBeInTheDocument(),
+    );
+
+    await clickHeaderDuplicate(user);
+    mockSaveThenDuplicate(jsonResponse({ uuid: "dup-uuid" }));
+    await clickConfirmDuplicate(user);
+
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/agents/dup-uuid"),
+    );
+    expect(screen.queryByText(/over the limit/)).not.toBeInTheDocument();
+  });
 
   it("saves the on-screen changes, duplicates the agent, and opens the copy", async () => {
     mockFetchSequenceForAgent(buildAgent);

@@ -12,11 +12,14 @@ export type OrgLimits = {
   uses_own_provider_keys: boolean;
   /** Replies one chat link may send a day; null means no limit. */
   max_chat_replies_per_day: number | null;
+  /** Characters an agent's knowledge base may hold; null until the backend says. */
+  max_knowledge_base_chars: number | null;
 };
 
 const FALLBACK: OrgLimits = {
   uses_own_provider_keys: false,
   max_chat_replies_per_day: LIMITS.DEFAULT_MAX_CHAT_REPLIES_PER_DAY,
+  max_knowledge_base_chars: null,
 };
 
 // One request per signed-in user and workspace, shared by every caller.
@@ -53,6 +56,10 @@ export function getOrgLimits(
           data.max_chat_replies_per_day === undefined
             ? LIMITS.DEFAULT_MAX_CHAT_REPLIES_PER_DAY
             : data.max_chat_replies_per_day,
+        max_knowledge_base_chars:
+          typeof data.max_knowledge_base_chars === "number"
+            ? data.max_knowledge_base_chars
+            : null,
       }))
       .catch(() => {
         cachedPromise = null;

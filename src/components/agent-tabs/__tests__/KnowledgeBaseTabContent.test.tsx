@@ -2,8 +2,18 @@ import React from "react";
 import { render, screen, setupUser } from "@/test-utils";
 import { KnowledgeBaseTabContent } from "../KnowledgeBaseTabContent";
 
-function renderComponent(text = "", onTextChange = jest.fn()) {
-  render(<KnowledgeBaseTabContent text={text} onTextChange={onTextChange} />);
+function renderComponent(
+  text = "",
+  onTextChange = jest.fn(),
+  maxChars: number | null = 5000,
+) {
+  render(
+    <KnowledgeBaseTabContent
+      text={text}
+      onTextChange={onTextChange}
+      maxChars={maxChars}
+    />,
+  );
   return { onTextChange };
 }
 
@@ -83,5 +93,24 @@ describe("KnowledgeBaseTabContent", () => {
         "When you update the text, the agent uses the updated information from its next reply.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("shows the count alone, never red, until the limit is known", () => {
+    renderComponent("a".repeat(9000), jest.fn(), null);
+    expect(screen.getByText("9,000 characters")).toHaveClass(
+      "text-muted-foreground",
+    );
+    expect(screen.queryByText(/over the limit/)).not.toBeInTheDocument();
+  });
+
+  it("measures against whatever limit the backend gives", () => {
+    renderComponent("a".repeat(30), jest.fn(), 20);
+    expect(screen.getByText("30 of 20 characters")).toBeInTheDocument();
+    expect(screen.getByText("10 characters over the limit")).toBeInTheDocument();
+  });
+
+  it("says character, not characters, when one over", () => {
+    renderComponent("a".repeat(5001));
+    expect(screen.getByText("1 character over the limit")).toBeInTheDocument();
   });
 });

@@ -217,6 +217,29 @@ describe("DuplicateAgentDialog", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("shows the caller's reason when it says why the save cannot happen", async () => {
+    const user = setupUser();
+    const onBeforeDuplicate = jest
+      .fn()
+      .mockResolvedValue(
+        "The knowledge base is 7 characters over the limit. Shorten it on the Knowledge base tab, then duplicate.",
+      );
+    const { onDuplicated } = renderDialog({ onBeforeDuplicate });
+
+    await duplicate(user);
+
+    expect(
+      await screen.findByText(
+        "The knowledge base is 7 characters over the limit. Shorten it on the Knowledge base tab, then duplicate.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Your latest changes could not be saved/),
+    ).not.toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(onDuplicated).not.toHaveBeenCalled();
+  });
+
   it("sends the copy once the caller's save succeeds", async () => {
     const user = setupUser();
     const onBeforeDuplicate = jest.fn().mockResolvedValue(true);

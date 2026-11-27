@@ -13,9 +13,6 @@ export const LIMITS = {
   SIMULATION_MAX_PERSONAS: 2,
   SIMULATION_MAX_SCENARIOS: 5,
 
-  // Characters in an agent's knowledge base; the backend refuses more
-  KNOWLEDGE_BASE_MAX_CHARS: 5000,
-
   // Replies one chat link may send a day when the limits API does not say
   DEFAULT_MAX_CHAT_REPLIES_PER_DAY: 200,
 

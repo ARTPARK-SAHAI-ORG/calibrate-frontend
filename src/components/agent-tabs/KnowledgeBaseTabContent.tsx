@@ -2,20 +2,26 @@
 
 import React, { useId } from "react";
 import { InfoNote } from "@/components/ui";
-import { LIMITS } from "@/constants/limits";
-import { knowledgeBaseLength, knowledgeBaseOverBy } from "@/lib/knowledgeBase";
+import {
+  characterCount,
+  knowledgeBaseLength,
+  knowledgeBaseOverBy,
+} from "@/lib/knowledgeBase";
 
 type KnowledgeBaseTabContentProps = {
   text: string;
   onTextChange: (text: string) => void;
+  /** The backend's limit; null until it has answered. */
+  maxChars: number | null;
 };
 
 export function KnowledgeBaseTabContent({
   text,
   onTextChange,
+  maxChars,
 }: KnowledgeBaseTabContentProps) {
   const textareaId = useId();
-  const overBy = knowledgeBaseOverBy(text);
+  const overBy = knowledgeBaseOverBy(text, maxChars);
   const isOver = overBy > 0;
 
   return (
@@ -47,14 +53,16 @@ export function KnowledgeBaseTabContent({
         <div className="flex items-center justify-between gap-3 mt-2 text-xs md:text-sm">
           {isOver ? (
             <p className="text-red-500">
-              {overBy.toLocaleString("en-US")} characters over the limit
+              {characterCount(overBy)} over the limit
             </p>
           ) : (
             <span />
           )}
           <p className={isOver ? "text-red-500" : "text-muted-foreground"}>
-            {knowledgeBaseLength(text).toLocaleString("en-US")} of{" "}
-            {LIMITS.KNOWLEDGE_BASE_MAX_CHARS.toLocaleString("en-US")} characters
+            {knowledgeBaseLength(text).toLocaleString("en-US")}
+            {maxChars === null
+              ? " characters"
+              : ` of ${maxChars.toLocaleString("en-US")} characters`}
           </p>
         </div>
       </div>
