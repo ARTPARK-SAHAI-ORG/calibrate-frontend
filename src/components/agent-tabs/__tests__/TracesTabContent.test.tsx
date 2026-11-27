@@ -488,6 +488,15 @@ const onGoToEvaluators = jest.fn();
 const onGoToSettings = jest.fn();
 const setEnabled = jest.fn(async () => {});
 // Scoring off, with one evaluator able to score, unless a test says otherwise.
+// One evaluator's passing verdict on a trace, as a list row carries it.
+const scored = (evaluator_uuid: string, name: string) => ({
+  evaluator_uuid,
+  name,
+  output_type: "binary" as const,
+  value: 1,
+  passed: true,
+});
+
 const traceScoring = {
   enabled: false,
   saving: false,
@@ -1160,15 +1169,7 @@ describe("TracesTabContent", () => {
           [
             trace({
               latest_run_status: "completed",
-              results: [
-                {
-                  evaluator_uuid: "ev-1",
-                  name: "Tone",
-                  output_type: "binary",
-                  value: 1,
-                  passed: true,
-                },
-              ],
+              results: [scored("ev-1", "Tone")],
             }),
           ],
           {
@@ -1200,15 +1201,7 @@ describe("TracesTabContent", () => {
           [
             trace({
               latest_run_status: "completed",
-              results: [
-                {
-                  evaluator_uuid: "ev-1",
-                  name: "Tone",
-                  output_type: "binary",
-                  value: 1,
-                  passed: true,
-                },
-              ],
+              results: [scored("ev-1", "Tone")],
             }),
           ],
           {
@@ -2038,13 +2031,6 @@ describe("TracesTabContent", () => {
     });
 
     it("drops the column of an evaluator taken off the agent, and keeps one for an evaluator still on it", () => {
-      const scored = (evaluator_uuid: string, name: string) => ({
-        evaluator_uuid,
-        name,
-        output_type: "binary" as const,
-        value: 1,
-        passed: true,
-      });
       mockUseTraces.mockReturnValue(
         tracesResult([
           trace({
