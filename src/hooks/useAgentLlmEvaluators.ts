@@ -29,9 +29,8 @@ export type UseAgentLlmEvaluatorsResult = {
   /** Library evaluators that can judge a reply. Each carries the trace values
    *  saved for it on this agent, as `trace_variables`. */
   evaluators: EvaluatorData[];
-  /** What to start with ticked: the agent's own, else the reply default. */
-  preselectedUuids: Set<string>;
-  /** What is ticked now: the preselection until the reader ticks something. */
+  /** What is ticked now: the agent's own (else the reply default) until the
+   *  reader ticks something. */
   selectedUuids: Set<string>;
   toggle: (uuid: string) => void;
   /** Ticks one, keeping whatever else is ticked. */
@@ -45,7 +44,8 @@ export type UseAgentLlmEvaluatorsResult = {
   isLoading: boolean;
   error: string | null;
   /** Put a just-created evaluator on the list and tick it, so a reader who
-   * makes one from an empty picker does not have to reopen the dialog. */
+   * makes one from an empty picker does not have to reopen the dialog. One
+   * with variables still to set up is left unticked. */
   addEvaluator: (evaluator: EvaluatorData) => void;
 };
 
@@ -117,7 +117,11 @@ export function useAgentLlmEvaluators({
         );
         // Nothing attached: seed the built-in evaluator for this kind of agent,
         // matching how the tests UI seeds.
-        const fallback = llm.find((e) => defaultOriginSlug(e) === defaultSlug);
+        // Left unticked when it still needs set-up, like the agent's own.
+        const fallback = llm.find(
+          (e) =>
+            defaultOriginSlug(e) === defaultSlug && !isMissingTraceValue(e),
+        );
         const seed =
           preselect.length > 0 ? preselect : fallback ? [fallback] : [];
         setPreselectedUuids(new Set(seed.map((e) => e.uuid)));
@@ -138,6 +142,7 @@ export function useAgentLlmEvaluators({
     setEvaluators((prev) =>
       prev.some((e) => e.uuid === evaluator.uuid) ? prev : [...prev, evaluator],
     );
+    if (isMissingTraceValue(evaluator)) return;
     setPreselectedUuids((prev) => new Set(prev).add(evaluator.uuid));
     // Ticking already started, so the new one has to join that set.
     setPicked((prev) => (prev ? new Set(prev).add(evaluator.uuid) : prev));
@@ -172,7 +177,6 @@ export function useAgentLlmEvaluators({
 
   return {
     evaluators,
-    preselectedUuids,
     selectedUuids,
     toggle,
     tick,

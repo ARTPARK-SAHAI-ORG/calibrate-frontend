@@ -289,6 +289,11 @@ export function TracesTabContent({
   // is nothing to pick.
   const labellingIsToolCallOnly =
     labellableTraces.length > 0 && labellableTraces.every(isToolCallTraceRow);
+  // A tool-call item carries no evaluator values, so only the rest are read
+  // and checked for them.
+  const replyTraces = labellableTraces.filter(
+    (trace) => !isToolCallTraceRow(trace),
+  );
 
   // Send selected traces for labelling. Step one asks which evaluators the
   // annotators score against; step two needs the full traces, which the list
@@ -498,14 +503,17 @@ export function TracesTabContent({
   const needValues = ineligible.filter(
     (item) => item.reason === "declares_variables",
   );
+  // Setting up an evaluator's variables can link it to the agent and lets it
+  // score, so the scoring state and the agent's evaluators are read again.
+  const afterEvaluatorSetUp = () => {
+    void traceScoring.refreshEligibility();
+    onAgentDefaultsAttached?.();
+  };
   const configureTraceValues = useConfigureTraceValues({
     agentUuid,
     agentNature,
     accessToken,
-    onRefresh: () => {
-      void traceScoring.refreshEligibility();
-      onAgentDefaultsAttached?.();
-    },
+    onRefresh: afterEvaluatorSetUp,
   });
   // What each column's evaluator judges, so a row it does not apply to reads
   // as empty rather than as waiting. Filled with the descriptions below.
@@ -1445,6 +1453,7 @@ export function TracesTabContent({
           selectedTraces.map((trace) => [trace.uuid, traceLabel(trace)]),
         )}
         fromTrace={selectedTraces[0]}
+        onEvaluatorSetUp={afterEvaluatorSetUp}
         onConverted={(result, evaluatorsUsed = []) => {
           setConvertOpen(false);
           const created = result.created;
@@ -1484,17 +1493,17 @@ export function TracesTabContent({
           evaluators rather than the last visit's ticks. */}
       {evaluatorStepOpen && (
         <TraceLabellingEvaluatorsDialog
-          isOpen
           onClose={() => setEvaluatorStepOpen(false)}
           agentUuid={agentUuid}
           agentNature={agentNature}
           accessToken={accessToken}
-          traces={labellableTraces.map((trace) => ({
+          traces={replyTraces.map((trace) => ({
             uuid: trace.uuid,
             label: traceLabel(trace),
           }))}
-          fromTrace={labellableTraces[0]}
+          fromTrace={replyTraces[0]}
           onChosen={prepareLabelling}
+          onEvaluatorSetUp={afterEvaluatorSetUp}
         />
       )}
 

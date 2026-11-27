@@ -28,6 +28,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     agentUuid: string;
     agentNature: string;
     nameFrom?: { comment?: string | null; userMessage?: string | null };
+    traceLabels?: Record<string, string>;
     accessToken: string | null;
     onClose: () => void;
     onConverted: (result: { created: number; test_uuids: string[] }) => void;
@@ -41,6 +42,7 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
             agentUuid: props.agentUuid,
             agentNature: props.agentNature,
             nameFrom: props.nameFrom,
+            traceLabels: props.traceLabels,
           })}
         </pre>
         <button
@@ -724,6 +726,8 @@ describe("Add to tests", () => {
       agentNature: kind,
       // The test is named after what was asked, there being no comment.
       nameFrom: { comment: null, userMessage: "Hi" },
+      // Each trace is named in the dialog by what was asked.
+      traceLabels: { t1: "Hi" },
     });
     await user.click(screen.getByText("Dismiss"));
     expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
@@ -751,6 +755,56 @@ describe("Add to tests", () => {
       null,
     );
     expect(await screen.findByTestId("convert-dialog")).toBeInTheDocument();
+    expect(dialogProps().nameFrom).toEqual({
+      comment: "Too short",
+      userMessage: "Hi",
+    });
+  });
+
+  const saveThenReopenComment = async (user: ReturnType<typeof setupUser>) => {
+    mockSend.mockResolvedValue(reply());
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Bad reply"));
+    await user.type(
+      await screen.findByLabelText(
+        "What was wrong with this reply? (optional)",
+      ),
+      "Too short",
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Edit your comment" }),
+    );
+    mockFeedback.mockClear();
+  };
+
+  it("saves a cleared comment before opening the dialog", async () => {
+    const user = setupUser();
+    await saveThenReopenComment(user);
+    await user.clear(
+      screen.getByLabelText("What was wrong with this reply? (optional)"),
+    );
+    await user.click(screen.getByText("Add to tests"));
+    expect(mockFeedback).toHaveBeenCalledWith(
+      "tok",
+      "t1",
+      { is_correct: false, comment: null },
+      null,
+    );
+    expect(await screen.findByTestId("convert-dialog")).toBeInTheDocument();
+    expect(dialogProps().nameFrom).toEqual({
+      comment: null,
+      userMessage: "Hi",
+    });
+  });
+
+  it("does not save again when the reopened comment is unchanged", async () => {
+    const user = setupUser();
+    await saveThenReopenComment(user);
+    await user.click(screen.getByText("Add to tests"));
+    expect(await screen.findByTestId("convert-dialog")).toBeInTheDocument();
+    expect(mockFeedback).not.toHaveBeenCalled();
     expect(dialogProps().nameFrom).toEqual({
       comment: "Too short",
       userMessage: "Hi",

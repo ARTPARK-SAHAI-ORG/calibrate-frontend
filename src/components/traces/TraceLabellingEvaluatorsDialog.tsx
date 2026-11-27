@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
-import { LoadingState } from "@/components/ui";
+import { Button, LoadingState } from "@/components/ui";
 import { useAgentLlmEvaluators } from "@/hooks/useAgentLlmEvaluators";
 import { reportError } from "@/lib/reportError";
 import type { TraceSummary } from "@/lib/tracesApi";
@@ -10,6 +10,7 @@ import {
   AgentEvaluatorStep,
   hasVariables,
   readTraceValues,
+  READ_VALUES_ERROR,
   type MissingValues,
   type StepTrace,
 } from "./AgentEvaluatorStep";
@@ -23,14 +24,14 @@ export type TraceEvaluatorVariables = Record<
 >;
 
 type TraceLabellingEvaluatorsDialogProps = {
-  isOpen: boolean;
   onClose: () => void;
   /** The agent whose traces are being sent, used to seed the selection. */
   agentUuid: string;
   /** Decides which kind of evaluator can judge these traces. */
   agentNature?: "conversation" | "general";
   accessToken: string | null;
-  /** The traces being sent, named the way the reader knows them. */
+  /** The traces whose items carry evaluator values, named the way the
+   *  reader knows them. */
   traces: StepTrace[];
   /** The trace set-up is tried on first. */
   fromTrace?: TraceSummary;
@@ -40,6 +41,8 @@ type TraceLabellingEvaluatorsDialogProps = {
     evaluators: { uuid: string; name?: string }[],
     variables: TraceEvaluatorVariables,
   ) => void;
+  /** Called once an evaluator's variables are set up from here. */
+  onEvaluatorSetUp?: () => void;
 };
 
 /**
@@ -48,7 +51,6 @@ type TraceLabellingEvaluatorsDialogProps = {
  * because that one needs its items ready before it opens.
  */
 export function TraceLabellingEvaluatorsDialog({
-  isOpen,
   onClose,
   agentUuid,
   agentNature = "conversation",
@@ -56,15 +58,11 @@ export function TraceLabellingEvaluatorsDialog({
   traces,
   fromTrace,
   onChosen,
+  onEvaluatorSetUp,
 }: TraceLabellingEvaluatorsDialogProps) {
-  useHideFloatingButton(isOpen);
+  useHideFloatingButton(true);
 
-  const list = useAgentLlmEvaluators({
-    agentUuid,
-    accessToken,
-    enabled: isOpen,
-    agentNature,
-  });
+  const list = useAgentLlmEvaluators({ agentUuid, accessToken, agentNature });
   const { evaluators, selectedUuids: selected, isLoading, error } = list;
   const [reading, setReading] = useState(false);
   const [readError, setReadError] = useState<string | null>(null);
@@ -72,8 +70,14 @@ export function TraceLabellingEvaluatorsDialog({
     shown: MissingValues;
     finish: () => void;
   } | null>(null);
-
-  if (!isOpen) return null;
+  // A read that answers after the window has gone must not open the next one.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const canContinue = !isLoading && !reading && selected.size > 0;
 
@@ -94,6 +98,7 @@ export function TraceLabellingEvaluatorsDialog({
         withVariables,
         traces,
       );
+      if (!mounted.current) return;
       // A value the trace does not have is left blank for the annotator.
       const filled: TraceEvaluatorVariables = {};
       for (const [traceId, byEvaluator] of Object.entries(values)) {
@@ -109,9 +114,9 @@ export function TraceLabellingEvaluatorsDialog({
       else finish();
     } catch (err) {
       reportError("Error reading trace values:", err);
-      setReadError("Could not read the values from the traces. Please try again.");
+      if (mounted.current) setReadError(READ_VALUES_ERROR);
     } finally {
-      setReading(false);
+      if (mounted.current) setReading(false);
     }
   };
 
@@ -133,52 +138,44 @@ export function TraceLabellingEvaluatorsDialog({
             {isLoading ? (
               <LoadingState />
             ) : (
-              <>
-                <AgentEvaluatorStep
-                  list={list}
-                  agentUuid={agentUuid}
-                  accessToken={accessToken}
-                  agentNature={agentNature}
-                  heading={
-                    <div className="text-sm font-semibold text-foreground">
-                      Evaluators
-                    </div>
-                  }
-                  emptyMessage={
-                    agentNature === "general"
-                      ? "Annotators score each trace against at least one evaluator. Your workspace has none that score a single output, so create one to continue."
-                      : "Annotators score each trace against at least one evaluator. Your workspace has none that score a reply in a conversation, so create one to continue."
-                  }
-                  traces={traces}
-                  fromTrace={fromTrace}
-                  outcome="labelling"
-                />
-
-                {(error ?? readError) && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    {error ?? readError}
-                  </p>
-                )}
-              </>
+              <AgentEvaluatorStep
+                list={list}
+                agentUuid={agentUuid}
+                accessToken={accessToken}
+                agentNature={agentNature}
+                heading={
+                  <div className="text-sm font-semibold text-foreground">
+                    Evaluators
+                  </div>
+                }
+                emptyLead="Annotators score each trace against at least one evaluator."
+                error={error ?? readError}
+                onSetUp={onEvaluatorSetUp}
+                traces={traces}
+                fromTrace={fromTrace}
+                outcome="labelling"
+              />
             )}
           </div>
 
           <div className="flex items-center justify-end gap-2 md:gap-3 p-5 md:p-6 border-t border-border">
-            <button
-              type="button"
+            {/* Held while the values are read, so the next window cannot
+                open after the reader has left this one. */}
+            <Button
+              variant="secondary"
+              size="md"
               onClick={onClose}
-              className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer"
+              disabled={reading}
             >
               Cancel
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              size="md"
               onClick={() => void handleContinue()}
               disabled={!canContinue}
-              className="h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {reading ? "Loading..." : "Continue"}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

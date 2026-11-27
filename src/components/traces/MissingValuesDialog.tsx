@@ -69,7 +69,9 @@ export function MissingValuesDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-background rounded-xl w-full max-w-6xl max-h-full flex flex-col p-5 md:p-8 shadow-2xl">
         <h2 className="text-base md:text-lg font-semibold text-foreground mb-2">
-          Some traces are missing a value
+          {totalTraces === 1
+            ? "This trace is missing a value"
+            : "Some traces are missing a value"}
         </h2>
         <p className="text-sm md:text-base text-foreground mb-5">
           <span className="font-semibold">

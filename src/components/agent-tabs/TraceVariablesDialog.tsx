@@ -35,7 +35,7 @@ import {
   METADATA_SOURCE,
   metadataKey,
   traceChoices,
-  TRACE_SOURCE_HINTS,
+  traceSourceHint,
   traceSourceLabel,
   traceSources,
 } from "@/lib/traceScoring";
@@ -46,6 +46,7 @@ import {
   type TraceSummary,
   type TraceVariablePreview,
 } from "@/lib/tracesApi";
+import { VARIABLE_CHIP } from "@/lib/variableChip";
 
 type TraceVariablesDialogProps = {
   agentUuid: string;
@@ -67,8 +68,6 @@ type TraceVariablesDialogProps = {
 const RECENT_TRACES = 20;
 const OTHER_KEY = "\u0000other";
 
-const CHIP =
-  "inline-block self-start max-w-full px-2 py-0.5 rounded-md text-sm font-mono font-semibold break-all bg-blue-500/10 text-blue-700 dark:text-blue-300";
 const CODE = "font-mono text-[13px] px-1 py-px rounded bg-amber-700/10";
 const PILL =
   "flex-shrink-0 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[11px] font-medium";
@@ -101,7 +100,7 @@ function Waiting() {
 // Props shared by the pickers that sit beside a variable, so they look like `Select`.
 const PICKER = {
   compact: true,
-  className: "w-56",
+  className: "w-40",
   triggerClassName: "h-10 px-3 rounded-md",
   panelWidth: 300,
 };
@@ -406,10 +405,11 @@ export function TraceVariablesDialog({
         : [];
     return (
       <React.Fragment key={name}>
-        <code className={CHIP}>{chip(name)}</code>
+        <code className={VARIABLE_CHIP}>{chip(name)}</code>
         <div className="flex gap-2">
           <SingleSelectPicker
             {...PICKER}
+            className="w-56"
             ariaLabel={`Source for ${name}`}
             items={[...orderedSources, ...offList]}
             selectedId={isMeta ? METADATA_SOURCE : value}
@@ -426,7 +426,7 @@ export function TraceVariablesDialog({
               <OptionRow
                 fromTrace={!!fromTrace}
                 name={source.label}
-                hint={TRACE_SOURCE_HINTS[source.value]}
+                hint={traceSourceHint(source.value)}
                 detail={
                   !latest
                     ? undefined
@@ -481,7 +481,7 @@ export function TraceVariablesDialog({
               disabled={saving}
               maxLength={MAX_KEY_LENGTH}
               placeholder="Type a metadata key"
-              className="w-56 h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-40 h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
             />
           )}
         </div>
@@ -583,7 +583,7 @@ export function TraceVariablesDialog({
               const value = answer?.values.find((v) => v.variable === name);
               return (
                 <div key={name} className="p-4 flex flex-col gap-2">
-                  <code className={CHIP}>{chip(name)}</code>
+                  <code className={VARIABLE_CHIP}>{chip(name)}</code>
                   {!answer ? (
                     <Waiting />
                   ) : value?.value === null ? (
@@ -663,17 +663,18 @@ export function TraceVariablesDialog({
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base md:text-lg font-semibold text-foreground flex flex-wrap items-center gap-2">
-                {title ?? (saved.length > 1 ? (
-                  <>
-                    Configure
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted border border-border">
-                      {current.name}
-                    </span>
-                    for traces
-                  </>
-                ) : (
-                  "Configure for traces"
-                ))}
+                {title ??
+                  (saved.length > 1 ? (
+                    <>
+                      Configure
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted border border-border">
+                        {current.name}
+                      </span>
+                      for traces
+                    </>
+                  ) : (
+                    "Configure for traces"
+                  ))}
               </h2>
               <p className="text-xs md:text-sm text-muted-foreground mt-1.5">
                 This evaluator has variables. Map each one to a part of the

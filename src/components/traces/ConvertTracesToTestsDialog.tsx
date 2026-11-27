@@ -3,7 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { CloseIcon } from "@/components/icons";
-import { DialogStepper, LoadingState } from "@/components/ui";
+import {
+  Button,
+  DialogStepper,
+  ErrorNote,
+  LoadingState,
+} from "@/components/ui";
 import { useAgentLlmEvaluators } from "@/hooks/useAgentLlmEvaluators";
 import { reportError } from "@/lib/reportError";
 import {
@@ -20,7 +25,9 @@ import {
   AgentEvaluatorStep,
   hasVariables,
   readTraceValues,
+  READ_VALUES_ERROR,
   type MissingValues,
+  type StepTrace,
 } from "./AgentEvaluatorStep";
 import { MissingValuesDialog } from "./MissingValuesDialog";
 
@@ -56,12 +63,9 @@ type ConvertTracesToTestsDialogProps = {
     result: ConvertTracesToTestsResult,
     evaluatorsUsed: { uuid: string; name: string }[],
   ) => void;
+  /** Called once an evaluator's variables are set up from here. */
+  onEvaluatorSetUp?: () => void;
 };
-
-const SECONDARY_BUTTON =
-  "h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
-const PRIMARY_BUTTON =
-  "h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
 
 /**
  * Convert selected traces into regression tests. `response` and `general`
@@ -85,6 +89,7 @@ export function ConvertTracesToTestsDialog({
   traceLabels,
   fromTrace,
   onConverted,
+  onEvaluatorSetUp,
 }: ConvertTracesToTestsDialogProps) {
   useHideFloatingButton(isOpen);
 
@@ -141,7 +146,9 @@ export function ConvertTracesToTestsDialog({
     ? evaluators.filter((e) => selectedEvaluators.has(e.uuid))
     : [];
   const withVariables = chosen.filter(hasVariables);
-  const labelOf = (uuid: string) => traceLabels?.[uuid] ?? uuid;
+  // Blank for a trace not on the page; the values read then name it.
+  const stepTraces = (uuids: string[]): StepTrace[] =>
+    uuids.map((uuid) => ({ uuid, label: traceLabels?.[uuid] ?? "" }));
 
   const convert = (skipMissingValues: boolean) =>
     convertTracesToTests(accessToken as string, {
@@ -171,6 +178,25 @@ export function ConvertTracesToTestsDialog({
     );
   };
 
+  // The traces lacking a value, null when none does, or undefined when the
+  // values could not be read, which has already been said in the window.
+  const readGaps = async (token: string, uuids: string[]) => {
+    try {
+      return (
+        await readTraceValues(
+          token,
+          agentUuid,
+          withVariables,
+          stepTraces(uuids),
+        )
+      ).missing;
+    } catch (err) {
+      reportError("Error reading trace values:", err);
+      setError(READ_VALUES_ERROR);
+      return undefined;
+    }
+  };
+
   const submit = async () => {
     if (!accessToken || !canSubmit) return;
     setSubmitting(true);
@@ -179,14 +205,9 @@ export function ConvertTracesToTestsDialog({
       // Picked traces are checked first. Every trace the list matches has no
       // ids to check, so the backend says which ones lack a value instead.
       if (!selectAll && withVariables.length > 0) {
-        const { missing: gaps } = await readTraceValues(
-          accessToken,
-          agentUuid,
-          withVariables,
-          traceUuids.map((uuid) => ({ uuid, label: labelOf(uuid) })),
-        );
-        if (gaps) {
-          setMissing(gaps);
+        const gaps = await readGaps(accessToken, traceUuids);
+        if (gaps !== null) {
+          if (gaps) setMissing(gaps);
           return;
         }
       }
@@ -196,12 +217,8 @@ export function ConvertTracesToTestsDialog({
         const refused = convertMissingValues(err);
         if (!refused) throw err;
         const ids = Array.from(new Set(refused.map((m) => m.trace_id)));
-        const { missing: gaps } = await readTraceValues(
-          accessToken,
-          agentUuid,
-          withVariables,
-          ids.map((uuid) => ({ uuid, label: labelOf(uuid) })),
-        );
+        const gaps = await readGaps(accessToken, ids);
+        if (gaps === undefined) return;
         if (!gaps) throw err;
         setMissing(gaps);
       }
@@ -226,11 +243,6 @@ export function ConvertTracesToTestsDialog({
 
   const count = traceCount ?? traceUuids.length;
   const showPicker = needsEvaluator && !(stepped && step === 1);
-  // Says what is needed, why nothing is on offer, and what to do about it.
-  const emptyEvaluatorMessage =
-    agentNature === "general"
-      ? "Each test needs at least one evaluator to score the agent's output. Your workspace has none that score a single output, so create one to continue."
-      : "Each test needs at least one evaluator to score the agent's reply. Your workspace has none that score a reply in a conversation, so create one to continue.";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -322,15 +334,12 @@ export function ConvertTracesToTestsDialog({
                       agent&apos;s performance
                     </p>
                   }
-                  emptyMessage={emptyEvaluatorMessage}
-                  traces={
-                    selectAll
-                      ? []
-                      : traceUuids.map((uuid) => ({
-                          uuid,
-                          label: labelOf(uuid),
-                        }))
-                  }
+                  emptyLead={`Each test needs at least one evaluator to score the agent's ${
+                    agentNature === "general" ? "output" : "reply"
+                  }.`}
+                  error={error ?? loadError}
+                  onSetUp={onEvaluatorSetUp}
+                  traces={selectAll ? [] : stepTraces(traceUuids)}
                   fromTrace={fromTrace}
                   outcome="tests"
                   selectedFirst
@@ -342,12 +351,7 @@ export function ConvertTracesToTestsDialog({
                   output. This can be changed later for each test.
                 </p>
               )}
-
-              {(error ?? loadError) && (
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {error ?? loadError}
-                </p>
-              )}
+              {!needsEvaluator && error && <ErrorNote>{error}</ErrorNote>}
             </>
           )}
         </div>
@@ -355,43 +359,41 @@ export function ConvertTracesToTestsDialog({
         <div className="flex items-center justify-end gap-2 md:gap-3 p-5 md:p-6 border-t border-border">
           {stepped ? (
             step === 2 && (
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="md"
                 onClick={() => setStep(1)}
                 disabled={submitting}
-                className={SECONDARY_BUTTON}
               >
                 Back
-              </button>
+              </Button>
             )
           ) : (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="md"
               onClick={onClose}
               disabled={submitting}
-              className={SECONDARY_BUTTON}
             >
               Cancel
-            </button>
+            </Button>
           )}
           {stepped && step === 1 ? (
-            <button
-              type="button"
+            <Button
+              size="md"
               onClick={() => setStep(2)}
               disabled={name.length === 0}
-              className={PRIMARY_BUTTON}
             >
               Next
-            </button>
+            </Button>
           ) : (
-            <button
-              type="button"
-              onClick={submit}
+            <Button
+              size="md"
+              onClick={() => void submit()}
               disabled={!canSubmit}
-              className={PRIMARY_BUTTON}
             >
               {submitting ? "Adding..." : "Add to tests"}
-            </button>
+            </Button>
           )}
         </div>
       </div>

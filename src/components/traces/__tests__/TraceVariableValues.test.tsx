@@ -37,7 +37,9 @@ describe("TraceVariableValues", () => {
   it("warns that the item has it left blank when labelling", () => {
     render(
       <TraceVariableValues
-        rows={[row([{ traceId: "t1", label: "Hi", value: null }], "metadata.city")]}
+        rows={[
+          row([{ traceId: "t1", label: "Hi", value: null }], "metadata.city"),
+        ]}
         outcome="labelling"
       />,
     );
@@ -72,7 +74,9 @@ describe("TraceVariableValues", () => {
     const user = setupUser();
     render(
       <TraceVariableValues
-        rows={[row([{ traceId: "t1", label: "Hi", value: "x" }], "metadata.city")]}
+        rows={[
+          row([{ traceId: "t1", label: "Hi", value: "x" }], "metadata.city"),
+        ]}
         outcome="tests"
       />,
     );
@@ -80,6 +84,13 @@ describe("TraceVariableValues", () => {
     expect(
       await screen.findByText("A field your code sent in the trace's metadata"),
     ).toBeInTheDocument();
+  });
+
+  it("names a source with no hint, and only the source when no trace is named", () => {
+    render(<TraceVariableValues rows={[row([], "input")]} outcome="tests" />);
+    expect(screen.getByText("{{comment}}")).toBeInTheDocument();
+    expect(screen.getByText("Input")).toBeInTheDocument();
+    expect(screen.queryByText("Trace")).not.toBeInTheDocument();
   });
 
   it("shows loading in place of the values", () => {

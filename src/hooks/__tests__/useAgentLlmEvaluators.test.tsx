@@ -85,7 +85,7 @@ it("starts from the agent's own evaluators, skipping ones still to set up", asyn
   const { result } = setup();
 
   await waitFor(() =>
-    expect(Array.from(result.current.preselectedUuids)).toEqual(["ev-custom"]),
+    expect(Array.from(result.current.selectedUuids)).toEqual(["ev-custom"]),
   );
   expect(Array.from(result.current.needsSetup)).toEqual(["ev-vars"]);
   expect(Array.from(result.current.linkedUuids)).toEqual([
@@ -135,12 +135,45 @@ it("toggles, ticks, and records values just saved", async () => {
   expect(result.current.selectedUuids.has("ev-new")).toBe(true);
 });
 
+it("lists but does not tick a new evaluator whose variables need setting up", async () => {
+  const { result } = setup();
+  await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+  act(() =>
+    result.current.addEvaluator({
+      uuid: "ev-made",
+      name: "Made",
+      live_version: { variables: [{ name: "topic" }] },
+    } as never),
+  );
+
+  expect(result.current.evaluators.some((e) => e.uuid === "ev-made")).toBe(
+    true,
+  );
+  expect(result.current.needsSetup.has("ev-made")).toBe(true);
+  expect(result.current.selectedUuids.has("ev-made")).toBe(false);
+});
+
 it("falls back to the built-in reply evaluator when the agent has none", async () => {
   const { result } = setup();
 
   await waitFor(() =>
-    expect(Array.from(result.current.preselectedUuids)).toEqual(["ev-default"]),
+    expect(Array.from(result.current.selectedUuids)).toEqual(["ev-default"]),
   );
+});
+
+it("does not tick the built-in evaluator while its variables need setting up", async () => {
+  mockFetchEvals.mockResolvedValue([
+    {
+      ...EVALUATORS[0],
+      live_version: { variables: [{ name: "criteria" }] },
+    },
+  ]);
+  const { result } = setup();
+
+  await waitFor(() => expect(result.current.isLoading).toBe(false));
+  expect(result.current.needsSetup.has("ev-default")).toBe(true);
+  expect(result.current.selectedUuids.size).toBe(0);
 });
 
 it("falls back the same way when the agent's evaluators fail to load", async () => {
@@ -148,7 +181,7 @@ it("falls back the same way when the agent's evaluators fail to load", async () 
   const { result } = setup();
 
   await waitFor(() =>
-    expect(Array.from(result.current.preselectedUuids)).toEqual(["ev-default"]),
+    expect(Array.from(result.current.selectedUuids)).toEqual(["ev-default"]),
   );
   expect(result.current.error).toBeNull();
 });
@@ -160,7 +193,7 @@ it("preselects nothing when neither the agent nor the library has a default", as
   const { result } = setup();
 
   await waitFor(() => expect(result.current.isLoading).toBe(false));
-  expect(Array.from(result.current.preselectedUuids)).toEqual([]);
+  expect(Array.from(result.current.selectedUuids)).toEqual([]);
 });
 
 it("reports a failure to load the library", async () => {
@@ -223,7 +256,7 @@ it("ticks the built-in output evaluator when a general agent has none", async ()
 
   await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-  expect(Array.from(result.current.preselectedUuids)).toEqual([
+  expect(Array.from(result.current.selectedUuids)).toEqual([
     "ev-general-default",
   ]);
 });

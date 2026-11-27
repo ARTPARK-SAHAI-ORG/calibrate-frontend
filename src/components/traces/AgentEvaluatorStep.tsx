@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { TraceVariablesDialog } from "@/components/agent-tabs/TraceVariablesDialog";
 import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
 import { EvaluatorPicker } from "@/components/evaluators/EvaluatorPicker";
-import { Button } from "@/components/ui/Button";
+import { Button, ErrorNote } from "@/components/ui";
 import type { UseAgentLlmEvaluatorsResult } from "@/hooks/useAgentLlmEvaluators";
 import {
   addEvaluatorsToAgent,
@@ -23,7 +23,13 @@ import {
   type TraceVariableOutcome,
 } from "./TraceVariableValues";
 
+/** A blank label names the trace by what the user said in it, read with
+ *  its values, else by its id. */
 export type StepTrace = { uuid: string; label: string };
+
+/** Shown when reading the values fails as the reader continues. */
+export const READ_VALUES_ERROR =
+  "Could not read the values from these traces. Please try again.";
 
 type ValuesByTrace = Record<string, Record<string, Record<string, string | null>>>;
 
@@ -68,8 +74,10 @@ export async function readTraceValues(
     evaluators.map((e) => e.uuid),
   );
   const values: ValuesByTrace = {};
+  const previews: Record<string, string> = {};
   let anyMissing = false;
   for (const item of items) {
+    if (item.input_preview) previews[item.trace_id] = item.input_preview;
     const forTrace = (values[item.trace_id] ??= {});
     const forEvaluator = (forTrace[item.evaluator_id] ??= {});
     for (const v of item.values) {
@@ -88,7 +96,7 @@ export async function readTraceValues(
           })),
           traces: traces.map((t) => ({
             traceId: t.uuid,
-            label: t.label,
+            label: t.label || previews[t.uuid] || t.uuid,
             values: values[t.uuid] ?? {},
           })),
         }
@@ -109,8 +117,13 @@ type AgentEvaluatorStepProps = {
   agentNature: "conversation" | "general";
   /** Shown above the list, beside the Create evaluator button. */
   heading: React.ReactNode;
-  /** Shown when there is no evaluator to pick. */
-  emptyMessage: string;
+  /** Says what the evaluators are needed for, when there is none to pick. */
+  emptyLead: string;
+  /** What went wrong, shown under the list. */
+  error?: string | null;
+  /** Called once an evaluator's variables are set up from here, which links
+   *  it to the agent if it was not already. */
+  onSetUp?: () => void;
   /** The traces picked, for the values beside each variable. Empty when every
    *  trace the list matches was asked for, since there are no ids then. */
   traces: StepTrace[];
@@ -131,7 +144,9 @@ export function AgentEvaluatorStep({
   accessToken,
   agentNature,
   heading,
-  emptyMessage,
+  emptyLead,
+  error,
+  onSetUp,
   traces,
   fromTrace,
   outcome,
@@ -145,6 +160,8 @@ export function AgentEvaluatorStep({
   const [values, setValues] = useState<
     Record<string, TraceVariableValuesItem[] | undefined>
   >({});
+  // Evaluators whose values could not be read, offered a retry.
+  const [failed, setFailed] = useState<Set<string>>(() => new Set());
   const requested = useRef(new Set<string>());
   // One stable function per evaluator, so showing it again asks nothing.
   const loaders = useRef(new Map<string, () => void>());
@@ -164,7 +181,8 @@ export function AgentEvaluatorStep({
           .then((items) => setValues((prev) => ({ ...prev, [uuid]: items })))
           .catch((err) => {
             reportError("Error reading trace values:", err);
-            setValues((prev) => ({ ...prev, [uuid]: [] }));
+            requested.current.delete(uuid);
+            setFailed((prev) => new Set(prev).add(uuid));
           });
       };
       loaders.current.set(uuid, load);
@@ -176,6 +194,28 @@ export function AgentEvaluatorStep({
     const evaluator = evaluators.find((e) => e.uuid === uuid);
     if (!evaluator || !hasVariables(evaluator) || needsSetup.has(uuid)) {
       return undefined;
+    }
+    if (failed.has(uuid)) {
+      return (
+        <ErrorNote className="flex items-center justify-between gap-3">
+          Could not read the values from these traces
+          <Button
+            variant="secondary"
+            size="sm"
+            className="shrink-0"
+            // Clearing the failure shows the loader again, which asks again.
+            onClick={() =>
+              setFailed((prev) => {
+                const next = new Set(prev);
+                next.delete(uuid);
+                return next;
+              })
+            }
+          >
+            Try again
+          </Button>
+        </ErrorNote>
+      );
     }
     const items = values[uuid];
     const loading = traces.length > 0 && !items;
@@ -222,6 +262,7 @@ export function AgentEvaluatorStep({
     );
     list.updateTraceVariables(evaluatorUuid, traceVariables);
     list.tick(evaluatorUuid);
+    onSetUp?.();
     setShownUuid(evaluatorUuid);
   };
 
@@ -251,8 +292,10 @@ export function AgentEvaluatorStep({
           selectedIds={selectedUuids}
           onToggle={(uuid) => {
             const evaluator = evaluators.find((e) => e.uuid === uuid);
-            if (evaluator && needsSetup.has(uuid)) setSettingUp(evaluator);
-            else list.toggle(uuid);
+            // A ticked one always unticks; only ticking waits for set-up.
+            if (evaluator && !selectedUuids.has(uuid) && needsSetup.has(uuid)) {
+              setSettingUp(evaluator);
+            } else list.toggle(uuid);
           }}
           renderRowAction={(evaluator) =>
             needsSetup.has(evaluator.uuid) ? (
@@ -266,13 +309,19 @@ export function AgentEvaluatorStep({
             ) : undefined
           }
           renderPreviewExtra={renderPreviewExtra}
-          emptyMessage={emptyMessage}
+          emptyMessage={`${emptyLead} Your workspace has none that score ${
+            agentNature === "general"
+              ? "a single output"
+              : "a reply in a conversation"
+          }, so create one to continue.`}
           emptyAction={createButton("h-9 md:h-10 px-3 md:px-4 text-sm md:text-base")}
           previewUuid={shownUuid}
           fillHeight
           selectedFirst={selectedFirst}
         />
       </div>
+
+      {error && <ErrorNote>{error}</ErrorNote>}
 
       <CreateEvaluatorFlow
         open={createFlowOpen}

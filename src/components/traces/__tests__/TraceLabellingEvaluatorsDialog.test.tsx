@@ -89,6 +89,9 @@ jest.mock("../../evaluators/CreateEvaluatorFlow", () => ({
             name: "Made just now",
             evaluator_type: "llm",
             is_default: false,
+            ...(mockMadeWithVariables.current
+              ? { live_version: { variables: [{ name: "topic" }] } }
+              : {}),
           })
         }
       >
@@ -102,6 +105,8 @@ jest.mock("../../../lib/reportError", () => ({
 }));
 
 const mockFetchEvals = fetchAllEvaluators as jest.Mock;
+// Whether the evaluator the create flow hands back declares a variable.
+const mockMadeWithVariables = { current: false };
 const mockFetchAgentEvals = fetchAgentEvaluators as jest.Mock;
 const mockAdd = addEvaluatorsToAgent as jest.Mock;
 const mockSave = saveEvaluatorTraceVariables as jest.Mock;
@@ -149,9 +154,8 @@ function setup(
 ) {
   const onChosen = jest.fn();
   const onClose = jest.fn();
-  render(
+  const view = render(
     <TraceLabellingEvaluatorsDialog
-      isOpen
       onClose={onClose}
       agentUuid="ag-1"
       accessToken="tok"
@@ -160,7 +164,7 @@ function setup(
       {...overrides}
     />,
   );
-  return { onChosen, onClose };
+  return { onChosen, onClose, unmount: view.unmount };
 }
 
 beforeEach(() => {
@@ -175,21 +179,7 @@ beforeEach(() => {
   mockValues.mockReset();
   mockValues.mockResolvedValue([]);
   mockReportError.mockReset();
-});
-
-it("renders nothing when closed and never fetches", () => {
-  const { container } = render(
-    <TraceLabellingEvaluatorsDialog
-      isOpen={false}
-      onClose={jest.fn()}
-      agentUuid="ag-1"
-      accessToken="tok"
-      traces={[]}
-      onChosen={jest.fn()}
-    />,
-  );
-  expect(container).toBeEmptyDOMElement();
-  expect(mockFetchEvals).not.toHaveBeenCalled();
+  mockMadeWithVariables.current = false;
 });
 
 it("offers exactly two actions", async () => {
@@ -409,10 +399,91 @@ describe("an evaluator with variables", () => {
 
     expect(
       await screen.findByText(
-        "Could not read the values from the traces. Please try again.",
+        "Could not read the values from these traces. Please try again.",
       ),
     ).toBeInTheDocument();
     expect(onChosen).not.toHaveBeenCalled();
     expect(mockReportError).toHaveBeenCalled();
+  });
+
+  const LINKED = () => {
+    mockFetchEvals.mockResolvedValue([VARS]);
+    mockFetchAgentEvals.mockResolvedValue([
+      { uuid: "ev-vars", trace_variables: { topic: "input" } },
+    ]);
+  };
+
+  it("holds Cancel while the values are read, and opens nothing once gone", async () => {
+    const user = setupUser();
+    LINKED();
+    const { onChosen, unmount } = setup({ traces: TRACES });
+    await screen.findByText("Topic judge");
+    // The right column's own read answers; the one Continue makes waits.
+    let answer: (items: unknown) => void = () => {};
+    mockValues.mockImplementationOnce(
+      () => new Promise((resolve) => (answer = resolve)),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    unmount();
+    answer(valuesFor(["order", "cancel"]));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onChosen).not.toHaveBeenCalled();
+  });
+
+  it("says so beside the prompt when the values cannot be read, and tries again", async () => {
+    const user = setupUser();
+    LINKED();
+    mockValues.mockRejectedValueOnce(new Error("boom"));
+    setup({ traces: TRACES });
+
+    expect(
+      await screen.findByText("Could not read the values from these traces"),
+    ).toBeInTheDocument();
+    // Nothing reads as missing when the values are not known.
+    expect(screen.queryByText("order")).not.toBeInTheDocument();
+
+    mockValues.mockResolvedValueOnce(valuesFor(["order", "cancel"]));
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByText("order")).toBeInTheDocument();
+    expect(mockValues).toHaveBeenCalledTimes(2);
+  });
+
+  it("tells the page once one is set up", async () => {
+    const user = setupUser();
+    mockFetchEvals.mockResolvedValue([VARS]);
+    const onEvaluatorSetUp = jest.fn();
+    setup({ traces: TRACES, onEvaluatorSetUp });
+
+    await user.click(
+      await screen.findByRole("button", { name: "Set up variables" }),
+    );
+    await user.click(screen.getByRole("button", { name: "save mapping" }));
+
+    await waitFor(() => expect(onEvaluatorSetUp).toHaveBeenCalledTimes(1));
+  });
+
+  it("is not ticked when made here, since it still needs setting up", async () => {
+    const user = setupUser();
+    setup();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled(),
+    );
+    mockMadeWithVariables.current = true;
+
+    await user.click(screen.getByRole("button", { name: "Create evaluator" }));
+    await user.click(screen.getByRole("button", { name: "finish creating" }));
+
+    expect(
+      screen.getByRole("checkbox", { name: "Select Made just now" }),
+    ).not.toBeChecked();
+    // Ticking it asks for the set-up first.
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select Made just now" }),
+    );
+    expect(screen.getByText("Set up the variables")).toBeInTheDocument();
   });
 });

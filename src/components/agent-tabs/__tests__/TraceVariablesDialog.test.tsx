@@ -218,7 +218,7 @@ it("lists a conversation agent's parts by their names for it", async () => {
   ]);
 });
 
-it("says what the user feedback comment holds on hovering its icon", async () => {
+it("says what the user feedback comment and metadata hold on hovering their icons", async () => {
   const { user } = setup();
   await loaded();
   await user.click(source("nurse_reply"));
@@ -226,12 +226,17 @@ it("says what the user feedback comment holds on hovering its icon", async () =>
   const icons = screen.getAllByRole("img", { name: /^About / });
   expect(icons.map((i) => i.getAttribute("aria-label"))).toEqual([
     "About User feedback comment",
+    "About Metadata",
   ]);
   await user.hover(icons[0]);
   expect(
     await screen.findByText(
       "The comment given by the user along with the feedback for the trace",
     ),
+  ).toBeInTheDocument();
+  await user.hover(icons[1]);
+  expect(
+    await screen.findByText("A field your code sent in the trace's metadata"),
   ).toBeInTheDocument();
 });
 

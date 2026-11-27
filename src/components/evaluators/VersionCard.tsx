@@ -8,6 +8,7 @@ import { ratingRank, scaleBounds } from "@/lib/ratingRank";
 import { RANKS, RatingRankPill } from "./RatingScaleEditor";
 import { ModelProblemNote } from "@/components/ModelProblemNote";
 import type { ModelProblem } from "@/lib/modelAvailability";
+import { VARIABLE_COLORS } from "@/lib/variableChip";
 
 // Pixel height used as the collapsed cap for prompt bodies. Matches the
 // max-h-[7.5rem] applied to the <pre> below (7.5rem at 16px root).
@@ -54,9 +55,7 @@ type VersionCardProps = {
   variablesPanel?: React.ReactNode;
 };
 
-// The same blues as the variable chips in TraceVariablesDialog.
-const PROMPT_VARIABLE =
-  "bg-blue-500/10 text-blue-700 dark:text-blue-300 font-semibold rounded px-1";
+const PROMPT_VARIABLE = `${VARIABLE_COLORS} rounded px-1`;
 
 /** The prompt with each `{{variable}}` marked. */
 function highlightVariables(prompt: string) {

@@ -323,6 +323,20 @@ it("submits a response test with the selected evaluator", async () => {
     { created: 2, test_uuids: ["t1", "t2"] },
     [{ uuid: "ev-default", name: "Correctness" }],
   );
+  // The built-in evaluator has nothing to read from the traces.
+  expect(mockValues).not.toHaveBeenCalled();
+});
+
+it("leaves the built-in evaluator unticked while it needs setting up, and reads nothing", async () => {
+  mockFetchEvals.mockResolvedValue([
+    { ...EVALUATORS[0], live_version: { variables: [{ name: "criteria" }] } },
+  ]);
+  setup();
+  await screen.findByText("Correctness");
+
+  expect(evaluatorCheckbox("Correctness")).not.toBeChecked();
+  expect(screen.getByRole("button", { name: "Add to tests" })).toBeDisabled();
+  expect(mockValues).not.toHaveBeenCalled();
 });
 
 it("requires an evaluator for a response test", async () => {
@@ -776,6 +790,7 @@ describe("evaluators with variables", () => {
       {
         trace_id: "tr-9",
         evaluator_id: "ev-vars",
+        input_preview: "Refund my order",
         values: [{ variable: "topic", source: "input", value: null }],
       },
     ]);
@@ -788,6 +803,9 @@ describe("evaluators with variables", () => {
     await user.click(screen.getByRole("button", { name: "Add to tests" }));
 
     expect(await screen.findByText("1 of 40")).toBeInTheDocument();
+    // Not on the page, so it is named by what the user said in it.
+    expect(screen.getByText("Refund my order")).toBeInTheDocument();
+    expect(screen.queryByText("tr-9")).not.toBeInTheDocument();
     expect(mockValues).toHaveBeenCalledWith("tok", "ag-1", ["tr-9"], [
       "ev-vars",
     ]);
@@ -819,7 +837,7 @@ describe("evaluators with variables", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps the general failure when the values cannot be read", async () => {
+  it("says the values could not be read and stays put", async () => {
     const user = setupUser();
     mockFetchAgentEvals.mockResolvedValue([MAPPED]);
     mockValues.mockRejectedValue(new Error("boom"));
@@ -830,9 +848,61 @@ describe("evaluators with variables", () => {
 
     expect(
       await screen.findByText(
-        "Something went wrong while adding to tests. Please try again.",
+        "Could not read the values from these traces. Please try again.",
       ),
     ).toBeInTheDocument();
     expect(mockConvert).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText("Some traces are missing a value"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to tests" })).toBeEnabled();
+  });
+
+  it("shows its own line, not the backend's, when a refusal for missing values cannot be explained", async () => {
+    const user = setupUser();
+    mockFetchAgentEvals.mockResolvedValue([MAPPED]);
+    mockConvert.mockRejectedValue(
+      new Error(
+        `Request failed: 400 - ${JSON.stringify({
+          detail: {
+            message: "Pass skip_missing_values to continue.",
+            missing: [{ trace_id: "tr-9", evaluator_id: "ev-vars" }],
+          },
+        })}`,
+      ),
+    );
+    // The re-read finds the value after all.
+    mockValues.mockResolvedValue([
+      {
+        trace_id: "tr-9",
+        evaluator_id: "ev-vars",
+        values: [{ variable: "topic", source: "input", value: "order" }],
+      },
+    ]);
+    setup({ selectAll: { agentId: "ag-1" } as never, traceCount: 40 });
+    await screen.findByText("{{topic}}");
+
+    await user.click(screen.getByRole("button", { name: "Add to tests" }));
+
+    expect(
+      await screen.findByText(
+        "Something went wrong while adding to tests. Please try again.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/skip_missing_values/)).not.toBeInTheDocument();
+  });
+
+  it("tells the page once one is set up", async () => {
+    const user = setupUser();
+    const onEvaluatorSetUp = jest.fn();
+    setup({ fromTrace: { uuid: "tr-1" } as never, onEvaluatorSetUp });
+    await screen.findByText("Needs Variables");
+
+    await user.click(evaluatorCheckbox("Needs Variables"));
+    await user.click(
+      screen.getByRole("button", { name: "save mapping from tr-1" }),
+    );
+
+    await waitFor(() => expect(onEvaluatorSetUp).toHaveBeenCalledTimes(1));
   });
 });

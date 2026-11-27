@@ -55,7 +55,38 @@ describe("MissingValuesDialog", () => {
     ).toHaveTextContent(
       "1 of 1 trace is missing a value. This item is added with that value left blank.",
     );
+    // One trace is not "some traces".
+    expect(
+      screen.getByText("This trace is missing a value"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Some traces are missing a value"),
+    ).not.toBeInTheDocument();
   });
+
+  it.each([
+    [
+      "tests",
+      "Each of these tests is added without the evaluator it has no value for.",
+    ],
+    ["labelling", "These items are added with that value left blank."],
+  ] as const)(
+    "speaks of several traces missing a value for %s",
+    (outcome, sentence) => {
+      setup({
+        traces: [
+          traces[1],
+          { ...traces[1], traceId: "t4", label: "Lacks it too" },
+          traces[0],
+        ],
+        totalTraces: 3,
+        outcome,
+      });
+      expect(screen.getByText(sentence, { exact: false })).toHaveTextContent(
+        `2 of 3 traces are missing a value. ${sentence} The other trace has every value.`,
+      );
+    },
+  );
 
   it("lists only the traces missing a value, under each evaluator's variable", () => {
     setup();

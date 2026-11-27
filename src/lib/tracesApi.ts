@@ -466,6 +466,8 @@ export type TraceVariableValue = {
 export type TraceVariableValuesItem = {
   trace_id: string;
   evaluator_id: string;
+  /** What the user said in this trace, for naming it to the reader. */
+  input_preview?: string | null;
   values: TraceVariableValue[];
 };
 
@@ -738,10 +740,9 @@ export function convertTracesErrorMessage(error: unknown): string | null {
   const detail = convertErrorDetail(error);
   if (typeof detail === "string") return detail;
   if (!detail || typeof detail !== "object") return null;
-  if (convertMissingValues(error)) {
-    const { message } = detail as { message?: unknown };
-    if (typeof message === "string") return message;
-  }
+  // The window asks about missing values itself; the backend's own words
+  // for this name a request field the reader never sees.
+  if (convertMissingValues(error)) return null;
   const {
     error: summary,
     evaluators,

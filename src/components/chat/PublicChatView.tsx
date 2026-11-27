@@ -309,12 +309,11 @@ export function PublicChatView({ token }: { token: string }) {
     agentId && orgUuid
       ? async (turn: Extract<Turn, { role: "agent" }>, index: number) => {
           // An evaluator can read the user's comment from the trace, so a
-          // comment typed but not saved is saved first, or the test would be
-          // made without what is on screen.
+          // comment changed but not saved (cleared included) is saved first,
+          // or the test would be made without what is on screen.
           const f = feedback[turn.traceUuid!];
           if (
             f?.open &&
-            f.draft.trim() &&
             f.draft.trim() !== (f.comment ?? "") &&
             !(await saveComment(turn.traceUuid!))
           ) {

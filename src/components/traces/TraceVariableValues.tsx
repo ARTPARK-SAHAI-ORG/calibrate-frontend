@@ -1,7 +1,13 @@
 import { Tooltip } from "@/components/Tooltip";
 import { SpinnerIcon, WarningTriangleIcon } from "@/components/icons";
-import { traceSourceHint, traceSourceLabel } from "@/lib/traceScoring";
+import {
+  isMetadataSource,
+  metadataKey,
+  traceSourceHint,
+  traceSourceLabel,
+} from "@/lib/traceScoring";
 import { missingValueSentence, missingValueText } from "@/lib/traceVariableText";
+import { VARIABLE_CHIP } from "@/lib/variableChip";
 import type { AgentNature } from "./ingestSnippets";
 import { WarningBox } from "./WarningBox";
 
@@ -12,10 +18,6 @@ export type TraceVariableRow = {
   source: string;
   perTrace: { traceId: string; label: string; value: string | null }[];
 };
-
-/** The same blue chip TraceVariablesDialog gives a variable. */
-export const VARIABLE_CHIP =
-  "inline-block self-start max-w-full px-2 py-0.5 rounded-md text-sm font-mono font-semibold break-all bg-blue-500/10 text-blue-700 dark:text-blue-300";
 
 const SMALL_HEADING =
   "text-[11px] uppercase tracking-wide text-muted-foreground font-medium";
@@ -33,8 +35,8 @@ export function VariableFromSource({
   const hint = traceSourceHint(source);
   const chip = (
     <span className="bg-muted text-muted-foreground text-xs font-medium rounded px-2 py-0.5">
-      {source.startsWith("metadata.")
-        ? `Metadata: ${source.slice("metadata.".length)}`
+      {isMetadataSource(source)
+        ? `Metadata: ${metadataKey(source)}`
         : traceSourceLabel(source, agentNature)}
     </span>
   );
