@@ -70,9 +70,6 @@ export function useTraces({
   // result and asked for again only when the filters change.
   const [scoreAverages, setScoreAverages] = useState<TraceScoreAverage[]>([]);
   const averagesKeyRef = useRef<string | null>(null);
-  // Whether the page on screen came from a 3-second check that left the
-  // averages out, the one case where scoring can finish unseen by them.
-  const lastReadSkippedAveragesRef = useRef(false);
   const requestIdRef = useRef(0);
   // The normal load whose spinner is on screen. A silent re-read must not
   // stop it from clearing that spinner when it answers.
@@ -119,7 +116,21 @@ export function useTraces({
           averagesKeyRef.current = filterKey;
           setScoreAverages(page.score_averages ?? []);
         }
-        lastReadSkippedAveragesRef.current = silent && !wantAverages;
+        // A silent read is a check made while a row was being scored, and it
+        // skips the averages. When it finds every row done, the averages have
+        // just changed: a first scored trace would otherwise show no card.
+        // Forgetting which filters they belong to, rather than asking for them
+        // on one read, means a page turn that cuts that read off asks instead.
+        if (
+          silent &&
+          !wantAverages &&
+          !(page.items ?? []).some((t) =>
+            isTraceScoringInProgress(t.latest_run_status),
+          )
+        ) {
+          averagesKeyRef.current = null;
+          void load(targetOffset, { silent: true });
+        }
         setTotal(nextTotal);
         setLoadedFilters(filters);
         setLoadedOffset(targetOffset);
@@ -128,8 +139,6 @@ export function useTraces({
         if (requestId !== requestIdRef.current) return 0;
         reportError("Error fetching traces:", err);
         if (silent) return 0;
-        // The rows emptied below are not a scoring run finishing.
-        lastReadSkippedAveragesRef.current = false;
         // Drop the last page too: leaving it on screen next to the message
         // would let the reader tick and delete rows from a failed load.
         setItems([]);
@@ -169,28 +178,6 @@ export function useTraces({
     }, POLLING_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [poll, accessToken, isLoading, hasOpenScoring, offset, load]);
-
-  // The polls above skip the averages, so the scores a run just finished
-  // would never reach them: a first scored trace would show no card at all.
-  // Read them once when a poll finds the last row on the page scored. A page
-  // turn or a new filter that lands on finished rows already decided for
-  // itself whether to read them.
-  const wasScoringRef = useRef(false);
-  useEffect(() => {
-    if (
-      wasScoringRef.current &&
-      !hasOpenScoring &&
-      lastReadSkippedAveragesRef.current
-    ) {
-      // Forgetting which filters the averages belong to, rather than asking
-      // for them on this one read, means a page turn that cuts this read off
-      // asks for them instead.
-      averagesKeyRef.current = null;
-      void load(offset, { silent: true });
-    }
-    wasScoringRef.current = hasOpenScoring;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasOpenScoring]);
 
   /** Re-sync after `count` rows were deleted, clamping the page back into
    *  range when the current offset would land past the new end. */
