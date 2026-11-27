@@ -11,6 +11,7 @@ import {
   scoringFailedCopy,
   scoringRunErrorCopy,
   traceChoices,
+  traceSourceHint,
   traceSourceLabel,
   traceSources,
   traceRowOutputFacts,
@@ -174,6 +175,7 @@ describe("naming a part of a trace", () => {
       "Conversation",
       "Agent reply",
       "Tool calls",
+      "User feedback comment",
       "Metadata",
       "Labels",
       "Conversation ID",
@@ -183,6 +185,7 @@ describe("naming a part of a trace", () => {
       "Input",
       "Output",
       "Tool calls",
+      "User feedback comment",
       "Metadata",
       "Labels",
     ]);
@@ -197,6 +200,17 @@ describe("naming a part of a trace", () => {
     );
     expect(traceSourceLabel("output.response", "general")).toBe("Output");
     expect(traceSourceLabel("output.response")).toBe("Agent reply");
+  });
+
+  it("names the user's feedback comment and says what it holds", () => {
+    expect(traceSourceLabel("feedback.comment")).toBe("User feedback comment");
+    expect(traceSourceHint("feedback.comment")).toBe(
+      "The comment given by the user along with the feedback for the trace",
+    );
+    expect(traceSourceHint("metadata.language")).toBe(
+      "A field your code sent in the trace's metadata",
+    );
+    expect(traceSourceHint("input")).toBeNull();
   });
 
   it("names a value this agent's list does not offer, or leaves it as it is", () => {

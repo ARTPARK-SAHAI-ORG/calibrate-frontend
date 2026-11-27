@@ -1,0 +1,156 @@
+import { Tooltip } from "@/components/Tooltip";
+import { SpinnerIcon, WarningTriangleIcon } from "@/components/icons";
+import { traceSourceHint, traceSourceLabel } from "@/lib/traceScoring";
+import { missingValueSentence, missingValueText } from "@/lib/traceVariableText";
+import type { AgentNature } from "./ingestSnippets";
+import { WarningBox } from "./WarningBox";
+
+export type TraceVariableOutcome = "tests" | "labelling";
+
+export type TraceVariableRow = {
+  variable: string;
+  source: string;
+  perTrace: { traceId: string; label: string; value: string | null }[];
+};
+
+/** The same blue chip TraceVariablesDialog gives a variable. */
+export const VARIABLE_CHIP =
+  "inline-block self-start max-w-full px-2 py-0.5 rounded-md text-sm font-mono font-semibold break-all bg-blue-500/10 text-blue-700 dark:text-blue-300";
+
+const SMALL_HEADING =
+  "text-[11px] uppercase tracking-wide text-muted-foreground font-medium";
+
+/** `{{name}}` from <part of the trace>, with what that part is on hover. */
+export function VariableFromSource({
+  variable,
+  source,
+  agentNature,
+}: {
+  variable: string;
+  source: string;
+  agentNature?: AgentNature;
+}) {
+  const hint = traceSourceHint(source);
+  const chip = (
+    <span className="bg-muted text-muted-foreground text-xs font-medium rounded px-2 py-0.5">
+      {source.startsWith("metadata.")
+        ? `Metadata: ${source.slice("metadata.".length)}`
+        : traceSourceLabel(source, agentNature)}
+    </span>
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <code className={VARIABLE_CHIP}>{`{{${variable}}}`}</code>
+      <span className="text-sm text-muted-foreground">from</span>
+      {hint ? (
+        <Tooltip content={hint} position="top">
+          {chip}
+        </Tooltip>
+      ) : (
+        chip
+      )}
+    </div>
+  );
+}
+
+/** What each of an evaluator's variables reads from the traces picked. */
+export function TraceVariableValues({
+  rows,
+  outcome,
+  agentNature,
+  loading = false,
+}: {
+  rows: TraceVariableRow[];
+  outcome: TraceVariableOutcome;
+  agentNature?: AgentNature;
+  loading?: boolean;
+}) {
+  return (
+    <div className="border border-border rounded-md divide-y divide-border">
+      {rows.map((row) => (
+        <div key={row.variable} className="p-4 space-y-2">
+          <VariableFromSource
+            variable={row.variable}
+            source={row.source}
+            agentNature={agentNature}
+          />
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <SpinnerIcon className="w-4 h-4 animate-spin" />
+              Loading
+            </div>
+          ) : (
+            <Values row={row} outcome={outcome} agentNature={agentNature} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Values({
+  row,
+  outcome,
+  agentNature,
+}: {
+  row: TraceVariableRow;
+  outcome: TraceVariableOutcome;
+  agentNature?: AgentNature;
+}) {
+  // No traces named, such as every trace the list matches: only where each
+  // value comes from can be said.
+  if (row.perTrace.length === 0) return null;
+  if (row.perTrace.length === 1) {
+    const { value } = row.perTrace[0];
+    if (value !== null) {
+      return (
+        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+          {value}
+        </p>
+      );
+    }
+    return (
+      <WarningBox
+        icon={
+          <WarningTriangleIcon className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+        }
+      >
+        {missingValueSentence(row.source, agentNature)}
+        {outcome === "tests"
+          ? ", so the test will be added without this evaluator"
+          : ", so this item will have it left blank"}
+      </WarningBox>
+    );
+  }
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr>
+          <th className={`${SMALL_HEADING} text-left align-top pr-4 pb-1`}>
+            Trace
+          </th>
+          <th className={`${SMALL_HEADING} text-left align-top pb-1`}>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        {row.perTrace.map((t) => (
+          <tr key={t.traceId} className="border-t border-border">
+            <td className="py-2 pr-4 align-top text-muted-foreground break-words">
+              {t.label}
+            </td>
+            <td className="py-2 align-top break-words whitespace-pre-wrap">
+              {t.value !== null ? (
+                <span className="text-foreground">{t.value}</span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
+                  <WarningTriangleIcon className="w-4 h-4 flex-shrink-0" />
+                  {missingValueText(row.source, agentNature)}
+                </span>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}

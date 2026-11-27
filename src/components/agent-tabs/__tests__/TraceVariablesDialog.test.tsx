@@ -112,11 +112,13 @@ function setup({
   agentNature = "general",
   onSave = jest.fn().mockResolvedValue(undefined),
   fromTrace,
+  title,
 }: {
   evaluators?: EvaluatorData[];
   agentNature?: "conversation" | "general";
   onSave?: jest.Mock;
   fromTrace?: TraceSummary;
+  title?: string;
 } = {}) {
   const onClose = jest.fn();
   const user = setupUser();
@@ -126,6 +128,7 @@ function setup({
       agentNature={agentNature}
       evaluators={evaluators}
       fromTrace={fromTrace}
+      title={title}
       onClose={onClose}
       onSave={onSave}
     />,
@@ -171,6 +174,7 @@ it("lists every part of a trace with its value in the latest trace", async () =>
       input: "input",
       "output.response": "output.response",
       "output.tool_calls": "output.tool_calls",
+      "feedback.comment": "feedback.comment",
       labels: "labels",
       conversation_id: "conversation_id",
       message_id: "message_id",
@@ -186,10 +190,13 @@ it("lists every part of a trace with its value in the latest trace", async () =>
     "InputMy child has loose motions",
     "OutputGive fluids and ORS",
     "Tool callsNot in the latest trace",
+    "User feedback commentNot in the latest trace",
     "Labelspilot, hindi",
     "Metadataexpert_answer, language",
   ]);
-  expect(screen.getByText("Not in the latest trace")).toHaveClass("italic");
+  for (const note of screen.getAllByText("Not in the latest trace")) {
+    expect(note).toHaveClass("italic");
+  }
 });
 
 it("lists a conversation agent's parts by their names for it", async () => {
@@ -203,11 +210,43 @@ it("lists a conversation agent's parts by their names for it", async () => {
     "Conversation",
     "Agent reply",
     "Tool calls",
+    "User feedback comment",
     "Labels",
     "Conversation ID",
     "Message ID",
     "Metadata",
   ]);
+});
+
+it("says what the user feedback comment holds on hovering its icon", async () => {
+  const { user } = setup();
+  await loaded();
+  await user.click(source("nurse_reply"));
+
+  const icons = screen.getAllByRole("img", { name: /^About / });
+  expect(icons.map((i) => i.getAttribute("aria-label"))).toEqual([
+    "About User feedback comment",
+  ]);
+  await user.hover(icons[0]);
+  expect(
+    await screen.findByText(
+      "The comment given by the user along with the feedback for the trace",
+    ),
+  ).toBeInTheDocument();
+});
+
+it("is headed Configure for traces when given no title", async () => {
+  setup();
+  expect(
+    await screen.findByRole("heading", { name: "Configure for traces" }),
+  ).toBeInTheDocument();
+});
+
+it("uses the title it is given as its heading", async () => {
+  setup({ title: "Fill in the evaluator values" });
+  expect(
+    await screen.findByRole("heading", { name: "Fill in the evaluator values" }),
+  ).toBeInTheDocument();
 });
 
 it("offers the latest trace's metadata keys, and a typed key under Other key", async () => {
@@ -360,6 +399,7 @@ describe("with no traces", () => {
       "Input",
       "Output",
       "Tool calls",
+      "User feedback comment",
       "Labels",
       "Metadata",
     ]);

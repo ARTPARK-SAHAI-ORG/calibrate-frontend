@@ -729,7 +729,7 @@ describe("Add to tests", () => {
     expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
   });
 
-  it("names the test after a comment typed but not saved yet", async () => {
+  it("saves a comment typed but not saved before opening the dialog", async () => {
     const user = setupUser();
     mockSend.mockResolvedValue(reply());
     await open("conversation", member);
@@ -741,11 +741,41 @@ describe("Add to tests", () => {
       ),
       "Too short",
     );
+    mockFeedback.mockClear();
     await user.click(screen.getByText("Add to tests"));
+    // An evaluator can read the comment from the trace, so it is saved first.
+    expect(mockFeedback).toHaveBeenCalledWith(
+      "tok",
+      "t1",
+      { is_correct: false, comment: "Too short" },
+      null,
+    );
+    expect(await screen.findByTestId("convert-dialog")).toBeInTheDocument();
     expect(dialogProps().nameFrom).toEqual({
       comment: "Too short",
       userMessage: "Hi",
     });
+  });
+
+  it("does not open the dialog when the comment cannot be saved", async () => {
+    const user = setupUser();
+    mockSend.mockResolvedValue(reply());
+    await open("conversation", member);
+    await sendMessage(user);
+    await user.click(await screen.findByLabelText("Bad reply"));
+    await user.type(
+      await screen.findByLabelText(
+        "What was wrong with this reply? (optional)",
+      ),
+      "Too short",
+    );
+    mockFeedback.mockResolvedValueOnce({ ok: false, error: "network" });
+    await user.click(screen.getByText("Add to tests"));
+
+    expect(
+      await screen.findByText("Your feedback could not be saved. Try again"),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("convert-dialog")).not.toBeInTheDocument();
   });
 
   it("confirms once added, linking to the test it made", async () => {

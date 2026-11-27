@@ -14,6 +14,7 @@ const CONVERSATION_SOURCES = [
   { value: "input", label: "Conversation" },
   { value: "output.response", label: "Agent reply" },
   { value: "output.tool_calls", label: "Tool calls" },
+  { value: "feedback.comment", label: "User feedback comment" },
   { value: METADATA_SOURCE, label: "Metadata" },
   { value: "labels", label: "Labels" },
   { value: "conversation_id", label: "Conversation ID" },
@@ -25,9 +26,23 @@ const GENERAL_SOURCES = [
   { value: "input", label: "Input" },
   { value: "output.response", label: "Output" },
   { value: "output.tool_calls", label: "Tool calls" },
+  { value: "feedback.comment", label: "User feedback comment" },
   { value: METADATA_SOURCE, label: "Metadata" },
   { value: "labels", label: "Labels" },
 ];
+
+/** What a part of a trace holds, for the ones whose name does not say. */
+export const TRACE_SOURCE_HINTS: Record<string, string> = {
+  "feedback.comment":
+    "The comment given by the user along with the feedback for the trace",
+};
+
+export function traceSourceHint(source: string): string | null {
+  if (isMetadataSource(source)) {
+    return "A field your code sent in the trace's metadata";
+  }
+  return TRACE_SOURCE_HINTS[source] ?? null;
+}
 
 export const isMetadataSource = (source: string) =>
   source.startsWith(METADATA_SOURCE);

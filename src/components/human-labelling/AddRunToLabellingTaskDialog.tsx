@@ -87,6 +87,8 @@ export type TraceLabellingItem = {
   input: unknown[] | string;
   output: { response?: string | null; tool_calls?: unknown[] | null };
   metadata?: { key: string; value: string }[];
+  /** What each evaluator's variables read from this trace, by evaluator. */
+  evaluatorVariables?: Record<string, Record<string, string>>;
 };
 
 export type AddRunToLabellingTaskSource =
@@ -748,7 +750,7 @@ export function buildItemsFromSource(
               name: t.name,
               input,
               output: t.output?.response ?? "",
-              evaluator_variables: {},
+              evaluator_variables: t.evaluatorVariables ?? {},
             },
             metadata: t.metadata,
           });
@@ -803,11 +805,19 @@ export function buildItemsFromSource(
           skippedCount += 1;
           continue;
         }
-        items.push({ ...built.item, metadata: t.metadata });
+        items.push({
+          ...built.item,
+          payload: {
+            ...built.item.payload,
+            evaluator_variables: t.evaluatorVariables ?? {},
+          },
+          metadata: t.metadata,
+        });
       }
-      // A trace has no run and therefore no judge results, so its items carry
-      // no evaluator variables. The evaluators come wholesale from the source
-      // (the caller asks the user to pick them).
+      // A trace has no run and therefore no judge results. Its variable values
+      // come from the trace itself, read before this dialog opened, and the
+      // evaluators come wholesale from the source (the caller asks the user to
+      // pick them).
       for (const ev of source.evaluators ?? []) {
         if (ev?.uuid) evaluatorUuids.add(ev.uuid);
       }

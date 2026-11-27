@@ -3,20 +3,26 @@
 import React, { useEffect, useState } from "react";
 import { useHideFloatingButton } from "@/components/AppLayout";
 import { CloseIcon } from "@/components/icons";
-import { CreateEvaluatorFlow } from "@/components/evaluators/CreateEvaluatorFlow";
-import { EvaluatorPicker } from "@/components/evaluators/EvaluatorPicker";
 import { DialogStepper, LoadingState } from "@/components/ui";
 import { useAgentLlmEvaluators } from "@/hooks/useAgentLlmEvaluators";
 import { reportError } from "@/lib/reportError";
-import { agentTaskType } from "@/lib/traceScoring";
 import {
+  convertMissingValues,
   convertTracesToTests,
   convertTracesErrorMessage,
   ConvertTestType,
   ConvertTracesToTestsResult,
   defaultTestName,
   type TraceSelectAll,
+  type TraceSummary,
 } from "@/lib/tracesApi";
+import {
+  AgentEvaluatorStep,
+  hasVariables,
+  readTraceValues,
+  type MissingValues,
+} from "./AgentEvaluatorStep";
+import { MissingValuesDialog } from "./MissingValuesDialog";
 
 type ConvertTracesToTestsDialogProps = {
   isOpen: boolean;
@@ -39,6 +45,10 @@ type ConvertTracesToTestsDialogProps = {
   /** What one trace's test name starts from. Given when a single trace is
    *  converted, which adds a step to name the test. */
   nameFrom?: { comment?: string | null; userMessage?: string | null };
+  /** How each trace is named to the reader, by its id. */
+  traceLabels?: Record<string, string>;
+  /** The trace setting up an evaluator's variables is tried on first. */
+  fromTrace?: TraceSummary;
   /** Called with the backend result after a successful conversion. */
   /** The second argument is the evaluators the created tests were given, so
    *  the caller can offer to attach any the agent does not have yet. */
@@ -52,13 +62,6 @@ const SECONDARY_BUTTON =
   "h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium border border-border bg-background hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
 const PRIMARY_BUTTON =
   "h-9 md:h-10 px-4 rounded-md text-xs md:text-sm font-medium bg-foreground text-background hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
-
-function toggle(set: Set<string>, uuid: string): Set<string> {
-  const next = new Set(set);
-  if (next.has(uuid)) next.delete(uuid);
-  else next.add(uuid);
-  return next;
-}
 
 /**
  * Convert selected traces into regression tests. `response` and `general`
@@ -79,6 +82,8 @@ export function ConvertTracesToTestsDialog({
   agentUuid,
   agentNature = "conversation",
   nameFrom,
+  traceLabels,
+  fromTrace,
   onConverted,
 }: ConvertTracesToTestsDialogProps) {
   useHideFloatingButton(isOpen);
@@ -87,24 +92,18 @@ export function ConvertTracesToTestsDialog({
   // other kind judges what the agent produced and needs at least one.
   const needsEvaluator = testType !== "tool_call";
 
-  const {
-    evaluators,
-    preselectedUuids,
-    isLoading: loading,
-    error: loadError,
-    addEvaluator,
-  } = useAgentLlmEvaluators({
+  const list = useAgentLlmEvaluators({
     agentUuid,
     accessToken,
     enabled: isOpen && needsEvaluator,
     agentNature,
   });
-  // Null until the reader ticks something: until then the agent's own
-  // evaluators are what is selected, and reopening starts from them again.
-  const [pickedEvaluators, setPickedEvaluators] = useState<Set<string> | null>(
-    null,
-  );
-  const selectedEvaluators = pickedEvaluators ?? preselectedUuids;
+  const {
+    evaluators,
+    selectedUuids: selectedEvaluators,
+    isLoading: loading,
+    error: loadError,
+  } = list;
   // Only one trace's test can be named; a batch is named by the backend.
   const naming = !!nameFrom && !selectAll && traceUuids.length === 1;
   const suggested = defaultTestName(nameFrom?.comment, nameFrom?.userMessage);
@@ -117,15 +116,14 @@ export function ConvertTracesToTestsDialog({
   const [step, setStep] = useState<1 | 2>(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [createFlowOpen, setCreateFlowOpen] = useState(false);
-  // The evaluator made from inside this dialog, so its prompt opens on the
-  // right as well as its box being ticked.
-  const [createdUuid, setCreatedUuid] = useState<string | null>(null);
+  // Traces with nothing for a variable, asked about before adding without them.
+  const [missing, setMissing] = useState<MissingValues | null>(null);
+  const [skipping, setSkipping] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
-    setPickedEvaluators(null);
     setTypedName(null);
+    setMissing(null);
     setStep(1);
     setError(null);
   }, [isOpen]);
@@ -139,41 +137,90 @@ export function ConvertTracesToTestsDialog({
     (!naming || name.length > 0) &&
     (!needsEvaluator || selectedEvaluators.size > 0);
 
+  const chosen = needsEvaluator
+    ? evaluators.filter((e) => selectedEvaluators.has(e.uuid))
+    : [];
+  const withVariables = chosen.filter(hasVariables);
+  const labelOf = (uuid: string) => traceLabels?.[uuid] ?? uuid;
+
+  const convert = (skipMissingValues: boolean) =>
+    convertTracesToTests(accessToken as string, {
+      traceIds: traceUuids,
+      selectAll,
+      type: testType,
+      evaluatorUuids: needsEvaluator ? chosen.map((e) => e.uuid) : undefined,
+      // The recorded calls become the expected output, arguments and all,
+      // and the test can be edited afterwards.
+      acceptAnyArguments: false,
+      name: naming ? name : undefined,
+      skipMissingValues: skipMissingValues || undefined,
+    }).then((result) =>
+      onConverted(
+        result,
+        chosen.map((e) => ({ uuid: e.uuid, name: e.name })),
+      ),
+    );
+
+  const showFailure = (err: unknown) => {
+    reportError("Error converting traces to tests:", err);
+    // Nothing is created when a conversion fails, so the reader can fix what
+    // the backend names and press the button again.
+    setError(
+      convertTracesErrorMessage(err) ??
+        "Something went wrong while adding to tests. Please try again.",
+    );
+  };
+
   const submit = async () => {
     if (!accessToken || !canSubmit) return;
     setSubmitting(true);
     setError(null);
     try {
-      const result = await convertTracesToTests(accessToken, {
-        traceIds: traceUuids,
-        selectAll,
-        type: testType,
-        evaluatorUuids: needsEvaluator
-          ? Array.from(selectedEvaluators)
-          : undefined,
-        // The recorded calls become the expected output, arguments and all,
-        // and the test can be edited afterwards.
-        acceptAnyArguments: false,
-        name: naming ? name : undefined,
-      });
-      onConverted(
-        result,
-        needsEvaluator
-          ? evaluators
-              .filter((e) => selectedEvaluators.has(e.uuid))
-              .map((e) => ({ uuid: e.uuid, name: e.name }))
-          : [],
-      );
+      // Picked traces are checked first. Every trace the list matches has no
+      // ids to check, so the backend says which ones lack a value instead.
+      if (!selectAll && withVariables.length > 0) {
+        const { missing: gaps } = await readTraceValues(
+          accessToken,
+          agentUuid,
+          withVariables,
+          traceUuids.map((uuid) => ({ uuid, label: labelOf(uuid) })),
+        );
+        if (gaps) {
+          setMissing(gaps);
+          return;
+        }
+      }
+      try {
+        await convert(false);
+      } catch (err) {
+        const refused = convertMissingValues(err);
+        if (!refused) throw err;
+        const ids = Array.from(new Set(refused.map((m) => m.trace_id)));
+        const { missing: gaps } = await readTraceValues(
+          accessToken,
+          agentUuid,
+          withVariables,
+          ids.map((uuid) => ({ uuid, label: labelOf(uuid) })),
+        );
+        if (!gaps) throw err;
+        setMissing(gaps);
+      }
     } catch (err) {
-      reportError("Error converting traces to tests:", err);
-      // Nothing is created when a conversion fails, so the reader can fix what
-      // the backend names and press the button again.
-      setError(
-        convertTracesErrorMessage(err) ??
-          "Something went wrong while adding to tests. Please try again.",
-      );
+      showFailure(err);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const addWithoutThem = async () => {
+    setSkipping(true);
+    try {
+      await convert(true);
+    } catch (err) {
+      setMissing(null);
+      showFailure(err);
+    } finally {
+      setSkipping(false);
     }
   };
 
@@ -264,49 +311,30 @@ export function ConvertTracesToTestsDialog({
           ) : (
             <>
               {needsEvaluator ? (
-                <div className="flex-1 min-h-0 flex flex-col gap-2">
-                  {evaluators.length > 0 && (
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium text-foreground">
-                        Pick at least one evaluator for evaluating the
-                        agent&apos;s performance
-                      </p>
-                      {/* The same offer the empty picker makes, kept in reach
-                          once there is a list to read. */}
-                      <button
-                        type="button"
-                        onClick={() => setCreateFlowOpen(true)}
-                        className="h-8 px-3 rounded-md text-xs md:text-sm font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
-                      >
-                        Create evaluator
-                      </button>
-                    </div>
-                  )}
-                  <div className="flex-1 min-h-0">
-                    <EvaluatorPicker
-                      evaluators={evaluators}
-                      selectedIds={selectedEvaluators}
-                      onToggle={(uuid) =>
-                        setPickedEvaluators((prev) =>
-                          toggle(prev ?? preselectedUuids, uuid),
-                        )
-                      }
-                      emptyMessage={emptyEvaluatorMessage}
-                      emptyAction={
-                        <button
-                          type="button"
-                          onClick={() => setCreateFlowOpen(true)}
-                          className="h-9 md:h-10 px-3 md:px-4 rounded-md text-sm md:text-base font-medium border cursor-pointer transition-colors bg-emerald-500/12 border-emerald-500/45 text-emerald-950 dark:text-emerald-100 hover:bg-emerald-500/22 dark:hover:bg-emerald-500/18"
-                        >
-                          Create evaluator
-                        </button>
-                      }
-                      previewUuid={createdUuid}
-                      fillHeight
-                      selectedFirst
-                    />
-                  </div>
-                </div>
+                <AgentEvaluatorStep
+                  list={list}
+                  agentUuid={agentUuid}
+                  accessToken={accessToken}
+                  agentNature={agentNature}
+                  heading={
+                    <p className="text-sm font-medium text-foreground">
+                      Pick at least one evaluator for evaluating the
+                      agent&apos;s performance
+                    </p>
+                  }
+                  emptyMessage={emptyEvaluatorMessage}
+                  traces={
+                    selectAll
+                      ? []
+                      : traceUuids.map((uuid) => ({
+                          uuid,
+                          label: labelOf(uuid),
+                        }))
+                  }
+                  fromTrace={fromTrace}
+                  outcome="tests"
+                  selectedFirst
+                />
               ) : (
                 <p className="text-sm text-foreground">
                   The resulting tests will consider the tool calls recorded in{" "}
@@ -368,23 +396,18 @@ export function ConvertTracesToTestsDialog({
         </div>
       </div>
 
-      <CreateEvaluatorFlow
-        open={createFlowOpen}
-        onClose={() => setCreateFlowOpen(false)}
-        existingEvaluators={evaluators}
-        onCreated={(created) => {
-          addEvaluator(created);
-          setCreatedUuid(created.uuid);
-          // Ticking already started, so the new one has to join that set
-          // rather than the untouched default.
-          setPickedEvaluators((prev) =>
-            prev ? new Set(prev).add(created.uuid) : prev,
-          );
-          setCreateFlowOpen(false);
-        }}
-        // Single type only, so the flow skips the "what is this for?" step.
-        useCaseTypes={[agentTaskType(agentNature)]}
-      />
+      {missing && (
+        <MissingValuesDialog
+          evaluators={missing.evaluators}
+          traces={missing.traces}
+          totalTraces={count}
+          outcome="tests"
+          agentNature={agentNature}
+          busy={skipping}
+          onBack={() => setMissing(null)}
+          onConfirm={() => void addWithoutThem()}
+        />
+      )}
     </div>
   );
 }

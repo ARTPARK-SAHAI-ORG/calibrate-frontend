@@ -115,20 +115,41 @@ jest.mock("../../traces/TraceLabellingEvaluatorsDialog", () => ({
   TraceLabellingEvaluatorsDialog: ({
     isOpen,
     agentUuid,
+    traces,
+    fromTrace,
     onChosen,
   }: {
     isOpen: boolean;
     agentUuid: string;
-    onChosen: (evaluators: { uuid: string; name?: string }[]) => void;
+    traces: { uuid: string; label: string }[];
+    fromTrace?: { uuid: string };
+    onChosen: (
+      evaluators: { uuid: string; name?: string }[],
+      variables?: Record<string, Record<string, Record<string, string>>>,
+    ) => void;
   }) =>
     isOpen ? (
       <div data-testid="labelling-evaluators">
         <span data-testid="labelling-evaluators-agent">{agentUuid}</span>
+        <span data-testid="labelling-evaluators-traces">
+          {JSON.stringify(traces)}
+        </span>
+        <span data-testid="labelling-evaluators-from">{fromTrace?.uuid}</span>
         <button
           type="button"
           onClick={() => onChosen([{ uuid: "ev-1", name: "Correctness" }])}
         >
           choose evaluators
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onChosen([{ uuid: "ev-1", name: "Correctness" }], {
+              [traces[0].uuid]: { "ev-1": { topic: "vaccines" } },
+            })
+          }
+        >
+          choose evaluators with values
         </button>
       </div>
     ) : null,
@@ -331,10 +352,14 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
     selectAll,
     agentNature,
     nameFrom,
+    traceLabels,
+    fromTrace,
     onConverted,
   }: {
     isOpen: boolean;
     nameFrom?: { comment?: string | null; userMessage?: string | null };
+    traceLabels?: Record<string, string>;
+    fromTrace?: { uuid: string };
     agentUuid: string;
     traceUuids: string[];
     testType: "response" | "tool_call" | "general";
@@ -358,6 +383,10 @@ jest.mock("../../traces/ConvertTracesToTestsDialog", () => ({
         <span data-testid="convert-agent">{agentUuid}</span>
         <span data-testid="convert-traces">{traceUuids.join(",")}</span>
         <span data-testid="convert-type">{testType}</span>
+        <span data-testid="convert-labels">
+          {JSON.stringify(traceLabels ?? null)}
+        </span>
+        <span data-testid="convert-from">{fromTrace?.uuid ?? "none"}</span>
         <span data-testid="convert-name-from">
           {JSON.stringify(nameFrom ?? null)}
         </span>
@@ -2451,6 +2480,18 @@ describe("TracesTabContent", () => {
     expect(lastTracesArgs()).not.toHaveProperty("createdBefore");
   });
 
+  it("names the picked traces by what the user said, and sets up from the first", async () => {
+    const user = setupUser();
+    render(<TracesTabContent {...tabProps} />);
+
+    await user.click(screen.getAllByLabelText("Select trace")[0]);
+    await user.click(screen.getByText("Add to tests (1)"));
+    expect(
+      JSON.parse(screen.getByTestId("convert-labels").textContent!),
+    ).toEqual({ "trace-1": "When is the next vaccination?" });
+    expect(screen.getByTestId("convert-from")).toHaveTextContent("trace-1");
+  });
+
   it("names one trace's test from its message when it has no comment", async () => {
     const user = setupUser();
     render(<TracesTabContent {...tabProps} />);
@@ -3518,6 +3559,31 @@ describe("TracesTabContent", () => {
       await user.click(screen.getAllByLabelText("Select trace")[0]);
 
       expect(screen.getByText("Submit for labelling (1)")).toBeInTheDocument();
+    });
+
+    it("hands the picked traces to the evaluator step and their values to each item", async () => {
+      const user = setupUser();
+      fetchTrace.mockImplementation(async (_token: string, uuid: string) =>
+        detail({ uuid }),
+      );
+      render(<TracesTabContent {...tabProps} />);
+
+      await user.click(screen.getAllByLabelText("Select trace")[0]);
+      await user.click(screen.getByText("Submit for labelling (1)"));
+      expect(
+        JSON.parse(
+          screen.getByTestId("labelling-evaluators-traces").textContent!,
+        ),
+      ).toEqual([{ uuid: "trace-1", label: "When is the next vaccination?" }]);
+      expect(screen.getByTestId("labelling-evaluators-from")).toHaveTextContent(
+        "trace-1",
+      );
+      await user.click(screen.getByText("choose evaluators with values"));
+
+      const payload = await screen.findByTestId("labelling-payload");
+      expect(
+        JSON.parse(payload.textContent ?? "[]")[0].evaluatorVariables,
+      ).toEqual({ "ev-1": { topic: "vaccines" } });
     });
 
     it("sends a general agent's trace as plain text, not as turns", async () => {

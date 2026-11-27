@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ViewMoreToggle, InfoNote } from "@/components/ui";
 import { getBinaryLabel } from "@/lib/binaryLabels";
@@ -48,7 +49,28 @@ type VersionCardProps = {
   isSelectedDetail?: boolean;
   /** Why this version's model cannot be used, or soon will not be. */
   modelProblem?: ModelProblem | null;
+  /** Drawn under the prompt in place of the variable definitions, headed
+   *  "Variables". When given, each `{{variable}}` in the prompt is marked. */
+  variablesPanel?: React.ReactNode;
 };
+
+// The same blues as the variable chips in TraceVariablesDialog.
+const PROMPT_VARIABLE =
+  "bg-blue-500/10 text-blue-700 dark:text-blue-300 font-semibold rounded px-1";
+
+/** The prompt with each `{{variable}}` marked. */
+function highlightVariables(prompt: string) {
+  // The capture group keeps each `{{...}}` in the split, at the odd indexes.
+  return prompt.split(/(\{\{[^{}]+\}\})/).map((part, i) =>
+    i % 2 ? (
+      <mark key={i} className={PROMPT_VARIABLE}>
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  );
+}
 
 export function VersionCard({
   version,
@@ -60,6 +82,7 @@ export function VersionCard({
   formatDateTime,
   modelProblem = null,
   isSelectedDetail = false,
+  variablesPanel,
 }: VersionCardProps) {
   const [promptVisible, setPromptVisible] = useState(
     isLive || isDefault || isSelectedDetail,
@@ -276,7 +299,9 @@ export function VersionCard({
                   : ""
               }`}
             >
-              {version.system_prompt}
+              {variablesPanel
+                ? highlightVariables(version.system_prompt)
+                : version.system_prompt}
             </pre>
             {clampPrompt && !promptExpanded && (
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 flex items-end justify-center rounded-b-md bg-gradient-to-t from-background via-background/85 to-transparent">
@@ -300,7 +325,14 @@ export function VersionCard({
         </div>
       )}
 
-      {version.variables?.length ? (
+      {variablesPanel ? (
+        <div className="space-y-2">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Variables
+          </div>
+          {variablesPanel}
+        </div>
+      ) : version.variables?.length ? (
         <div className="space-y-2">
           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Variables

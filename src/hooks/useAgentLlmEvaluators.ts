@@ -12,7 +12,7 @@ import {
   EvaluatorData,
 } from "@/lib/evaluatorApi";
 import { reportError } from "@/lib/reportError";
-import { agentTaskType } from "@/lib/traceScoring";
+import { agentTaskType, isMissingTraceValue } from "@/lib/traceScoring";
 
 type UseAgentLlmEvaluatorsArgs = {
   /** The agent whose own evaluators seed the selection. */
@@ -26,10 +26,22 @@ type UseAgentLlmEvaluatorsArgs = {
 };
 
 export type UseAgentLlmEvaluatorsResult = {
-  /** Library evaluators that can judge a reply, minus any needing variables. */
+  /** Library evaluators that can judge a reply. Each carries the trace values
+   *  saved for it on this agent, as `trace_variables`. */
   evaluators: EvaluatorData[];
   /** What to start with ticked: the agent's own, else the reply default. */
   preselectedUuids: Set<string>;
+  /** What is ticked now: the preselection until the reader ticks something. */
+  selectedUuids: Set<string>;
+  toggle: (uuid: string) => void;
+  /** Ticks one, keeping whatever else is ticked. */
+  tick: (uuid: string) => void;
+  /** The evaluators already linked to the agent. */
+  linkedUuids: Set<string>;
+  /** Evaluators with a variable that has no part of the trace chosen yet. */
+  needsSetup: Set<string>;
+  /** Records trace values just saved for an evaluator, which links it too. */
+  updateTraceVariables: (uuid: string, traceVariables: Record<string, string>) => void;
   isLoading: boolean;
   error: string | null;
   /** Put a just-created evaluator on the list and tick it, so a reader who
@@ -43,8 +55,8 @@ export type UseAgentLlmEvaluatorsResult = {
  * the library evaluators of the kind this agent needs, with the agent's own
  * ones ticked and the matching built-in evaluator as the fallback.
  *
- * Evaluators with variables need a value per variable, and these dialogs have
- * nowhere to ask for those, so they are left out.
+ * Evaluators with variables read each value from a part of the trace, chosen
+ * per agent. One with a variable still unchosen is never ticked to start with.
  */
 export function useAgentLlmEvaluators({
   agentUuid,
@@ -56,6 +68,8 @@ export function useAgentLlmEvaluators({
   const [preselectedUuids, setPreselectedUuids] = useState<Set<string>>(
     () => new Set(),
   );
+  const [picked, setPicked] = useState<Set<string> | null>(null);
+  const [linkedUuids, setLinkedUuids] = useState<Set<string>>(() => new Set());
   const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +87,8 @@ export function useAgentLlmEvaluators({
         ? DEFAULT_LLM_GENERAL_SLUG
         : DEFAULT_LLM_NEXT_REPLY_SLUG;
     let cancelled = false;
+    // Each opening starts from the agent's own evaluators again.
+    setPicked(null);
     const load = async () => {
       setIsLoading(true);
       setError(null);
@@ -86,19 +102,19 @@ export function useAgentLlmEvaluators({
           ),
         ]);
         if (cancelled) return;
-        const llm = evs.filter(
-          // An evaluator whose prompt expects variables needs a value per
-          // variable when it is attached to a test. Neither trace request
-          // carries those values and neither dialog can ask for them, so such
-          // an evaluator is left out rather than attached half-filled.
-          (e) =>
-            e.evaluator_type === evaluatorType &&
-            (e.live_version?.variables?.length ?? 0) === 0,
-        );
+        // Which part of a trace fills each variable is saved per agent, so it
+        // is only on the agent's own list.
+        const saved = new Map(attached.map((e) => [e.uuid, e.trace_variables]));
+        const llm = evs
+          .filter((e) => e.evaluator_type === evaluatorType)
+          .map((e) => ({ ...e, trace_variables: saved.get(e.uuid) ?? null }));
         setEvaluators(llm);
-        // Start from the agent's own evaluators, limited to the ones on offer.
-        const attachedUuids = new Set(attached.map((e) => e.uuid));
-        const preselect = llm.filter((e) => attachedUuids.has(e.uuid));
+        setLinkedUuids(new Set(saved.keys()));
+        // Start from the agent's own evaluators, limited to the ones on offer
+        // and ready to use.
+        const preselect = llm.filter(
+          (e) => saved.has(e.uuid) && !isMissingTraceValue(e),
+        );
         // Nothing attached: seed the built-in evaluator for this kind of agent,
         // matching how the tests UI seeds.
         const fallback = llm.find((e) => defaultOriginSlug(e) === defaultSlug);
@@ -123,7 +139,48 @@ export function useAgentLlmEvaluators({
       prev.some((e) => e.uuid === evaluator.uuid) ? prev : [...prev, evaluator],
     );
     setPreselectedUuids((prev) => new Set(prev).add(evaluator.uuid));
+    // Ticking already started, so the new one has to join that set.
+    setPicked((prev) => (prev ? new Set(prev).add(evaluator.uuid) : prev));
   }, []);
 
-  return { evaluators, preselectedUuids, isLoading, error, addEvaluator };
+  const selectedUuids = picked ?? preselectedUuids;
+
+  const toggle = (uuid: string) => {
+    const next = new Set(selectedUuids);
+    if (next.has(uuid)) next.delete(uuid);
+    else next.add(uuid);
+    setPicked(next);
+  };
+
+  const tick = (uuid: string) => setPicked(new Set(selectedUuids).add(uuid));
+
+  const updateTraceVariables = useCallback(
+    (uuid: string, traceVariables: Record<string, string>) => {
+      setEvaluators((prev) =>
+        prev.map((e) =>
+          e.uuid === uuid ? { ...e, trace_variables: traceVariables } : e,
+        ),
+      );
+      setLinkedUuids((prev) => new Set(prev).add(uuid));
+    },
+    [],
+  );
+
+  const needsSetup = new Set(
+    evaluators.filter(isMissingTraceValue).map((e) => e.uuid),
+  );
+
+  return {
+    evaluators,
+    preselectedUuids,
+    selectedUuids,
+    toggle,
+    tick,
+    linkedUuids,
+    needsSetup,
+    updateTraceVariables,
+    isLoading,
+    error,
+    addEvaluator,
+  };
 }

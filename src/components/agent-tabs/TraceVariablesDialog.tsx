@@ -8,6 +8,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { MAX_KEY_LENGTH } from "@/components/human-labelling/MetadataFieldsEditor";
 import {
   CloseIcon,
+  InfoIcon,
   SpinnerIcon,
   WarningTriangleIcon,
 } from "@/components/icons";
@@ -34,6 +35,7 @@ import {
   METADATA_SOURCE,
   metadataKey,
   traceChoices,
+  TRACE_SOURCE_HINTS,
   traceSourceLabel,
   traceSources,
 } from "@/lib/traceScoring";
@@ -52,6 +54,9 @@ type TraceVariablesDialogProps = {
   /** The trace the dialog was opened from: its values are shown, and it is
    *  the one tested on by default. */
   fromTrace?: TraceSummary;
+  /** The window's heading. With several evaluators and none given, it names
+   *  the one being set up. */
+  title?: string;
   onClose: () => void;
   onSave: (
     evaluatorUuid: string,
@@ -96,7 +101,7 @@ function Waiting() {
 // Props shared by the pickers that sit beside a variable, so they look like `Select`.
 const PICKER = {
   compact: true,
-  className: "w-40",
+  className: "w-56",
   triggerClassName: "h-10 px-3 rounded-md",
   panelWidth: 300,
 };
@@ -107,8 +112,11 @@ function OptionRow({
   detail,
   muted,
   fromTrace,
+  hint,
 }: {
   name: string;
+  /** What the option holds, shown on hovering an (i) after its name. */
+  hint?: string | null;
   /** Undefined draws no second line; null says the trace lacks it. */
   detail?: string | null;
   muted?: boolean;
@@ -117,9 +125,20 @@ function OptionRow({
   return (
     <span className="block min-w-0 flex-1">
       <span
-        className={`block text-sm font-medium ${muted ? "text-muted-foreground" : ""}`}
+        className={`flex items-center gap-1 text-sm font-medium ${muted ? "text-muted-foreground" : ""}`}
       >
         {name}
+        {hint && (
+          <Tooltip content={hint} position="top">
+            <span
+              role="img"
+              aria-label={`About ${name}`}
+              className="inline-flex text-muted-foreground"
+            >
+              <InfoIcon className="w-3.5 h-3.5" />
+            </span>
+          </Tooltip>
+        )}
       </span>
       {detail === null ? (
         <span className="block truncate text-xs italic text-muted-foreground/60">
@@ -165,6 +184,7 @@ export function TraceVariablesDialog({
   evaluators,
   agentNature,
   fromTrace,
+  title,
   onClose,
   onSave,
 }: TraceVariablesDialogProps) {
@@ -406,6 +426,7 @@ export function TraceVariablesDialog({
               <OptionRow
                 fromTrace={!!fromTrace}
                 name={source.label}
+                hint={TRACE_SOURCE_HINTS[source.value]}
                 detail={
                   !latest
                     ? undefined
@@ -460,7 +481,7 @@ export function TraceVariablesDialog({
               disabled={saving}
               maxLength={MAX_KEY_LENGTH}
               placeholder="Type a metadata key"
-              className="w-40 h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-56 h-10 px-3 rounded-md text-sm border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
             />
           )}
         </div>
@@ -642,7 +663,7 @@ export function TraceVariablesDialog({
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base md:text-lg font-semibold text-foreground flex flex-wrap items-center gap-2">
-                {saved.length > 1 ? (
+                {title ?? (saved.length > 1 ? (
                   <>
                     Configure
                     <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted border border-border">
@@ -652,7 +673,7 @@ export function TraceVariablesDialog({
                   </>
                 ) : (
                   "Configure for traces"
-                )}
+                ))}
               </h2>
               <p className="text-xs md:text-sm text-muted-foreground mt-1.5">
                 This evaluator has variables. Map each one to a part of the

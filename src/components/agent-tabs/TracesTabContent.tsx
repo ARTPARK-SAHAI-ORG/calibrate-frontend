@@ -9,7 +9,10 @@ import { TraceDetailDialog } from "@/components/traces/TraceDetailDialog";
 import { TracesEmptyState } from "@/components/traces/TracesEmptyState";
 import { AddedToTestsDialog } from "@/components/traces/AddedToTestsDialog";
 import { ConvertTracesToTestsDialog } from "@/components/traces/ConvertTracesToTestsDialog";
-import { TraceLabellingEvaluatorsDialog } from "@/components/traces/TraceLabellingEvaluatorsDialog";
+import {
+  TraceLabellingEvaluatorsDialog,
+  type TraceEvaluatorVariables,
+} from "@/components/traces/TraceLabellingEvaluatorsDialog";
 import { TraceIngestCodeDialog } from "@/components/traces/TraceIngestCodeDialog";
 import {
   EvaluatorsTabLink,
@@ -278,6 +281,9 @@ export function TracesTabContent({
     isLabellableOutput(traceRowOutputFacts(trace)),
   );
   const labellableUuids = labellableTraces.map((trace) => trace.uuid);
+  // How a trace is named in the evaluator windows: what the user said.
+  const traceLabel = (trace: TraceSummary) =>
+    trace.input_preview || trace.uuid;
   // A selection that is nothing but tool calls skips the evaluator step: a
   // tool-call row is answered only against the tool-call evaluator, so there
   // is nothing to pick.
@@ -301,7 +307,10 @@ export function TracesTabContent({
   const labellableRef = useRef(labellableUuids);
   labellableRef.current = labellableUuids;
 
-  const prepareLabelling = async (chosen: SourceEvaluatorRef[]) => {
+  const prepareLabelling = async (
+    chosen: SourceEvaluatorRef[],
+    variables: TraceEvaluatorVariables = {},
+  ) => {
     setEvaluatorStepOpen(false);
     if (!accessToken) return;
     const uuids = labellableRef.current;
@@ -358,6 +367,7 @@ export function TracesTabContent({
               : (trace.input ?? []).filter((turn) => turn.role !== "system"),
           output: trace.output,
           metadata: traceLabellingMetadata(trace),
+          evaluatorVariables: variables[trace.uuid],
         })),
       );
     } finally {
@@ -1431,6 +1441,10 @@ export function TracesTabContent({
               }
             : undefined
         }
+        traceLabels={Object.fromEntries(
+          selectedTraces.map((trace) => [trace.uuid, traceLabel(trace)]),
+        )}
+        fromTrace={selectedTraces[0]}
         onConverted={(result, evaluatorsUsed = []) => {
           setConvertOpen(false);
           const created = result.created;
@@ -1475,6 +1489,11 @@ export function TracesTabContent({
           agentUuid={agentUuid}
           agentNature={agentNature}
           accessToken={accessToken}
+          traces={labellableTraces.map((trace) => ({
+            uuid: trace.uuid,
+            label: traceLabel(trace),
+          }))}
+          fromTrace={labellableTraces[0]}
           onChosen={prepareLabelling}
         />
       )}

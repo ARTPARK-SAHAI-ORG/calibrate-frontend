@@ -457,6 +457,34 @@ export async function previewTraceVariables(
   );
 }
 
+export type TraceVariableValue = {
+  variable: string;
+  source: string;
+  value: string | null;
+};
+
+export type TraceVariableValuesItem = {
+  trace_id: string;
+  evaluator_id: string;
+  values: TraceVariableValue[];
+};
+
+/** The values each evaluator's variables would read from each trace, using
+ *  the trace values saved on this agent. */
+export async function fetchTraceVariableValues(
+  accessToken: string,
+  agentUuid: string,
+  traceIds: string[],
+  evaluatorIds: string[],
+): Promise<TraceVariableValuesItem[]> {
+  const { items } = await apiPost<{ items: TraceVariableValuesItem[] }>(
+    `/agents/${encodeURIComponent(agentUuid)}/trace-variables/values`,
+    accessToken,
+    { trace_ids: traceIds, evaluator_ids: evaluatorIds },
+  );
+  return items;
+}
+
 /** JWT-only: which linked evaluators can score this agent's traces. */
 export async function fetchTraceScoringEligibility(
   accessToken: string,
@@ -629,6 +657,9 @@ export type ConvertTracesToTestsBody = {
   acceptAnyArguments?: boolean;
   /** The test's name. Only when converting exactly one trace by its id. */
   name?: string;
+  /** Make tests from the traces that have every value their evaluators need,
+   *  and leave out the rest, rather than refusing the whole conversion. */
+  skipMissingValues?: boolean;
 };
 
 /** The name a test made from one trace starts with: the comment left with the
@@ -678,6 +709,7 @@ export async function convertTracesToTests(
     evaluatorUuids,
     acceptAnyArguments,
     name,
+    skipMissingValues,
   }: ConvertTracesToTestsBody,
 ): Promise<ConvertTracesToTestsResult> {
   const body: Record<string, unknown> = selectAll
@@ -688,6 +720,7 @@ export async function convertTracesToTests(
   }
   if (type === "tool_call") body.accept_any_arguments = !!acceptAnyArguments;
   if (name) body.name = name;
+  if (skipMissingValues) body.skip_missing_values = true;
   return apiPost<ConvertTracesToTestsResult>(
     "/traces/convert-to-tests",
     accessToken,
@@ -702,17 +735,13 @@ export async function convertTracesToTests(
  * show it. Returns null when there is nothing better than a general message.
  */
 export function convertTracesErrorMessage(error: unknown): string | null {
-  const text = error instanceof Error ? error.message : "";
-  const start = text.indexOf("{");
-  if (start < 0) return null;
-  let detail: unknown;
-  try {
-    detail = (JSON.parse(text.slice(start)) as { detail?: unknown }).detail;
-  } catch {
-    return null;
-  }
+  const detail = convertErrorDetail(error);
   if (typeof detail === "string") return detail;
   if (!detail || typeof detail !== "object") return null;
+  if (convertMissingValues(error)) {
+    const { message } = detail as { message?: unknown };
+    if (typeof message === "string") return message;
+  }
   const {
     error: summary,
     evaluators,
@@ -733,4 +762,34 @@ export function convertTracesErrorMessage(error: unknown): string | null {
     );
   }
   return parts.length ? parts.join(" ") : null;
+}
+
+// The `detail` of the backend body the shared client throws inside its message.
+function convertErrorDetail(error: unknown): unknown {
+  const text = error instanceof Error ? error.message : "";
+  const start = text.indexOf("{");
+  if (start < 0) return undefined;
+  try {
+    return (JSON.parse(text.slice(start)) as { detail?: unknown }).detail;
+  } catch {
+    return undefined;
+  }
+}
+
+export type MissingTraceValue = {
+  trace_id: string;
+  evaluator_id: string;
+  evaluator_name: string;
+  variable: string;
+  source: string;
+};
+
+/** The values a conversion was refused for, when that is why it failed. */
+export function convertMissingValues(
+  error: unknown,
+): MissingTraceValue[] | null {
+  const detail = convertErrorDetail(error) as { missing?: unknown } | undefined;
+  return detail && typeof detail === "object" && Array.isArray(detail.missing)
+    ? (detail.missing as MissingTraceValue[])
+    : null;
 }
